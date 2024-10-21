@@ -4,11 +4,11 @@ pragma solidity ^0.8.9;
 interface IPaymentVault {
 
     struct Reservation {
-        uint64 dataRate;        // Bandwidth being reserved
-        uint64 startTimestamp;  // timestamp of epoch where reservation begins
-        uint64 endTimestamp;    // timestamp of epoch where reservation ends
-		bytes quorumNumbers;    // quorum numbers in an ordered bytes array
-		bytes quorumSplits;     // quorum splits in a bytes array that correspond to the quorum numbers
+        uint64 symbolsPerSecond; // Number of symbols reserved per second
+        uint64 startTimestamp;   // timestamp of epoch where reservation begins
+        uint64 endTimestamp;     // timestamp of epoch where reservation ends
+		bytes quorumNumbers;     // quorum numbers in an ordered bytes array
+		bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
     }
 
     /// @notice Emitted when a reservation is created or updated
@@ -17,8 +17,10 @@ interface IPaymentVault {
     event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
     /// @notice Emitted when minChargeableSize is updated
     event MinChargeableSizeUpdated(uint256 previousValue, uint256 newValue);
-    /// @notice Emitted when globalBytesPerSecond is updated
-    event GlobalBytesPerSecondUpdated(uint256 previousValue, uint256 newValue);
+    /// @notice Emitted when globalSymbolsPerSecond is updated
+    event GlobalSymbolsPerSecondUpdated(uint256 previousValue, uint256 newValue);
+    /// @notice Emitted when pricePerSymbol is updated
+    event PricePerSymbolUpdated(uint256 previousValue, uint256 newValue);
 
     /**
      * @notice This function is called by EigenDA governance to store reservations

@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title Entrypoint for making reservations and on demand payments for EigenDA.
@@ -25,11 +26,13 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     function initialize(
         address _initialOwner,
         uint256 _minChargeableSize,
-        uint256 _globalBytesPerSecond
+        uint256 _globalSymbolsPerSecond,
+        uint256 _pricePerSymbol
     ) public initializer {
         transferOwnership(_initialOwner);
         minChargeableSize = _minChargeableSize;
-        globalBytesPerSecond = _globalBytesPerSecond;
+        globalSymbolsPerSecond = _globalSymbolsPerSecond;
+        pricePerSymbol = _pricePerSymbol;
     }
 
     /**
@@ -62,14 +65,23 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         minChargeableSize = _minChargeableSize;
     }
 
-    function setGlobalBytesPerSec(uint256 _globalBytesPerSecond) external onlyOwner {
-        emit GlobalBytesPerSecondUpdated(globalBytesPerSecond, _globalBytesPerSecond);
-        globalBytesPerSecond = _globalBytesPerSecond;
+    function setGlobalSymbolsPerSecond(uint256 _globalSymbolsPerSecond) external onlyOwner {
+        emit GlobalSymbolsPerSecondUpdated(globalSymbolsPerSecond, _globalSymbolsPerSecond);
+        globalSymbolsPerSecond = _globalSymbolsPerSecond;
+    }
+
+    function setPricePerSymbol(uint256 _pricePerSymbol) external onlyOwner {
+        emit PricePerSymbolUpdated(pricePerSymbol, _pricePerSymbol);
+        pricePerSymbol = _pricePerSymbol;
     }
 
     function withdraw(uint256 _amount) external onlyOwner {
         (bool success,) = payable(owner()).call{value: _amount}("");
         require(success);
+    }
+
+    function withdrawERC20(address _token, uint256 _amount) external onlyOwner {
+        IERC20(_token).transfer(owner(), _amount);
     }
 
     function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {
