@@ -1,39 +1,49 @@
 package api
 
 import (
+	"time"
+
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // The canonical errors from the EigenDA gRPC API endpoints.
 //
 // Notes:
-// - Start the error space small (but sufficient), and expand when there is an important
-//   failure case to separate out.
-// - Avoid simply wrapping system-internal errors without checking if they are appropriate
-//   in user-facing errors defined here. Consider map and convert system-internal errors
-//   before return to users from APIs.
+// - We start with a small (but sufficient) subset of google's error code convention, 
+//   and expand when there is an important failure case to separate out. See:
+//   https://cloud.google.com/apis/design/errors#handling_errors
+// - Make sure that internally propagated errors are eventually wrapped in one of the 
+//   user-facing errors defined here, since grpc otherwise returns an UNKNOWN error code,
+//   which is harder to debug and understand for users.
 
-func NewGRPCError(code codes.Code, msg string) error {
+func newErrorGRPC(code codes.Code, msg string) error {
 	return status.Error(code, msg)
 }
 
 // HTTP Mapping: 400 Bad Request
-func NewInvalidArgError(msg string) error {
-	return NewGRPCError(codes.InvalidArgument, msg)
+func NewErrorInvalidArg(msg string) error {
+	return newErrorGRPC(codes.InvalidArgument, msg)
 }
 
 // HTTP Mapping: 404 Not Found
-func NewNotFoundError(msg string) error {
-	return NewGRPCError(codes.NotFound, msg)
+func NewErrorNotFound(msg string) error {
+	return newErrorGRPC(codes.NotFound, msg)
 }
 
 // HTTP Mapping: 429 Too Many Requests
-func NewResourceExhaustedError(msg string) error {
-	return NewGRPCError(codes.ResourceExhausted, msg)
+func NewErrorResourceExhausted(msg string) error {
+	return newErrorGRPC(codes.ResourceExhausted, msg)
 }
 
 // HTTP Mapping: 500 Internal Server Error
-func NewInternalError(msg string) error {
-	return NewGRPCError(codes.Internal, msg)
+func NewErrorInternal(msg string) error {
+	return newErrorGRPC(codes.Internal, msg)
+}
+
+// HTTP Mapping: 501 Not Implemented
+func NewErrorUnimplemented() error {
+	return newErrorGRPC(codes.Unimplemented, "not implemented")
 }
