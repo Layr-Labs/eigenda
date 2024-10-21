@@ -47,3 +47,29 @@ func NewErrorInternal(msg string) error {
 func NewErrorUnimplemented() error {
 	return newErrorGRPC(codes.Unimplemented, "not implemented")
 }
+
+// HTTP Mapping: 503 Service Unavailable
+// Unavailable is used instead of 500 to indicate to the client that it can retry the operation.
+// See the documentation for the FAILED_PRECONDITION error code in https://grpc.io/docs/guides/status-codes/
+// which compares FAILED_PRECONDITION, UNAVAILABLE, and ABORTED.
+func NewErrorUnavailable(msg string) error {
+	return newErrorGRPC(codes.Unavailable, msg)
+}
+
+// HTTP Mapping: 503 Service Unavailable
+// NewErrorUnavailableWithRetry is like NewUnavailableError, but allows the caller to specify a retry delay.
+func NewErrorUnavailableWithRetry(msg string, delay time.Duration) error {
+	st := status.New(codes.Unavailable, msg)
+
+	retry := &errdetails.RetryInfo{
+		RetryDelay: durationpb.New(delay),
+	}
+
+	statusWithDetails, err := st.WithDetails(retry)
+	if err != nil {
+		// If adding details failed, just return the status without details
+		return st.Err()
+	}
+
+	return statusWithDetails.Err()
+}

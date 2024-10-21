@@ -15,6 +15,7 @@ service Disperser {
 	// RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg.
 	//                           user should retry after the specified duration.
 	// INTERNAL (500): serious error, user should NOT retry.
+	// UNAVAILABLE (503): intermittent failure, user can retry after 1s & exponential backoff.
 	rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
 
 

@@ -245,6 +245,8 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
+//
+// disperseBlob returns grpc errors that can be returned without wrapping to the client.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
@@ -286,7 +288,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
-		return nil, api.NewErrorUnavailableWithRetry("failed to store blob", 30*time.Second)
+		return nil, err
 	}
 
 	for _, param := range securityParams {
@@ -428,6 +430,8 @@ type limiterInfo struct {
 //
 // This information is currently passed to the DA nodes for their use is ratelimiting retrieval requests. This retrieval ratelimiting
 // is a temporary measure until the DA nodes are able to determine rates by themselves and will be simplified or replaced in the future.
+//
+// All errors returned by checkRateLimitsAndAddRatesToHeader are grpc errors, so they can be returned directly to the client without needing more wrapping.
 func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context, blob *core.Blob, origin, authenticatedAddress string, apiMethodName string) error {
 
 	requestParams := make([]common.RequestParams, 0)

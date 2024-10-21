@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/aws/smithy-go"
 	"github.com/gammazero/workerpool"
 )
 
@@ -78,22 +80,31 @@ func NewSharedStorage(bucketName string, s3Client s3.Client, blobMetadataStore *
 func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, requestedAt uint64) (disperser.BlobKey, error) {
 	metadataKey := disperser.BlobKey{}
 	if blob == nil {
-		return metadataKey, errors.New("blob is nil")
+		return metadataKey, api.NewErrorInternal("StoreBlob received a nil blob")
 	}
 
 	blobHash := getBlobHash(blob)
-	metadataHash, err := getMetadataHash(requestedAt, blob.RequestHeader.SecurityParams)
-	if err != nil {
-		s.logger.Error("error creating metadata key", "err", err)
-		return metadataKey, err
-	}
+	metadataHash := getMetadataHash(requestedAt, blob.RequestHeader.SecurityParams)
 	metadataKey.BlobHash = blobHash
 	metadataKey.MetadataHash = metadataHash
 
-	err = s.s3Client.UploadObject(ctx, s.bucketName, blobObjectKey(blobHash), blob.Data)
+	err := s.s3Client.UploadObject(ctx, s.bucketName, blobObjectKey(blobHash), blob.Data)
 	if err != nil {
-		s.logger.Error("error uploading blob", "err", err)
-		return metadataKey, err
+		s.logger.Error("error uploading blob to s3", "err", err)
+		// see https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/ to understand aws sdk errors
+		var ae smithy.APIError
+		if errors.As(err, &ae) {
+			if ae.ErrorFault() == smithy.FaultClient {
+				// our code most likely generated the error, so it's an internal error wrt the client
+				return metadataKey, api.NewErrorInternal(ae.ErrorMessage())
+			} else {
+				// server or unknown error, we return unavailable to tell the client to retry
+				return metadataKey, api.NewErrorUnavailable(ae.ErrorMessage())
+			}
+		}
+		// this should never happen, because aws sdk always returns an APIError
+		// https://aws.github.io/aws-sdk-go-v2/docs/handling-errors/#api-error-responses
+		return metadataKey, api.NewErrorInternal("error uploading blob to s3: " + err.Error())
 	}
 
 	// don't expire if ttl is 0
@@ -280,7 +291,7 @@ func (s *SharedBlobStore) HandleBlobFailure(ctx context.Context, metadata *dispe
 	}
 }
 
-func getMetadataHash(requestedAt uint64, securityParams []*core.SecurityParam) (string, error) {
+func getMetadataHash(requestedAt uint64, securityParams []*core.SecurityParam) string {
 	var str string
 	str = fmt.Sprintf("%d/", requestedAt)
 	for _, param := range securityParams {
@@ -289,7 +300,7 @@ func getMetadataHash(requestedAt uint64, securityParams []*core.SecurityParam) (
 		str = str + appendStr
 	}
 	bytes := []byte(str)
-	return hex.EncodeToString(sha256.New().Sum(bytes)), nil
+	return hex.EncodeToString(sha256.New().Sum(bytes))
 }
 
 func blobObjectKey(blobHash disperser.BlobHash) string {
