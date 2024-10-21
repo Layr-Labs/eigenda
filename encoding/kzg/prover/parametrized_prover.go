@@ -23,31 +23,37 @@ type ParametrizedProver struct {
 	Computer ProofDevice
 }
 
-type RsEncodeResult struct {
+type rsEncodeResult struct {
 	Frames   []rs.Frame
 	Indices  []uint32
 	Duration time.Duration
 	Err      error
 }
-type LengthCommitmentResult struct {
+type lengthCommitmentResult struct {
 	LengthCommitment bn254.G2Affine
 	Duration         time.Duration
 	Err              error
 }
-type LengthProofResult struct {
+type lengthProofResult struct {
 	LengthProof bn254.G2Affine
 	Duration    time.Duration
 	Err         error
 }
-type CommitmentResult struct {
+type commitmentResult struct {
 	Commitment bn254.G1Affine
 	Duration   time.Duration
 	Err        error
 }
-type ProofsResult struct {
+type proofsResult struct {
 	Proofs   []bn254.G1Affine
 	Duration time.Duration
 	Err      error
+}
+type commitmentsResult struct {
+	commitment       *bn254.G1Affine
+	lengthCommitment *bn254.G2Affine
+	lengthProof      *bn254.G2Affine
+	Error            error
 }
 
 // just a wrapper to take bytes not Fr Element
@@ -67,21 +73,14 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 
 	encodeStart := time.Now()
 
-	type commitments struct {
-		commitment       *bn254.G1Affine
-		lengthCommitment *bn254.G2Affine
-		lengthProof      *bn254.G2Affine
-		Error            error
-	}
-
-	commitmentsChan := make(chan commitments, 1)
+	commitmentsChan := make(chan commitmentsResult, 1)
 
 	// inputFr is untouched
 	// compute chunks
 	go func() {
 		commitment, lengthCommitment, lengthProof, err := g.GetCommitments(inputFr)
 
-		commitmentsChan <- commitments{
+		commitmentsChan <- commitmentsResult{
 			commitment:       commitment,
 			lengthCommitment: lengthCommitment,
 			lengthProof:      lengthProof,
@@ -115,15 +114,15 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affi
 
 	encodeStart := time.Now()
 
-	lengthCommitmentChan := make(chan LengthCommitmentResult, 1)
-	lengthProofChan := make(chan LengthProofResult, 1)
-	commitmentChan := make(chan CommitmentResult, 1)
+	lengthCommitmentChan := make(chan lengthCommitmentResult, 1)
+	lengthProofChan := make(chan lengthProofResult, 1)
+	commitmentChan := make(chan commitmentResult, 1)
 
 	// compute commit for the full poly
 	go func() {
 		start := time.Now()
 		commit, err := g.Computer.ComputeCommitment(inputFr)
-		commitmentChan <- CommitmentResult{
+		commitmentChan <- commitmentResult{
 			Commitment: *commit,
 			Err:        err,
 			Duration:   time.Since(start),
@@ -133,7 +132,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affi
 	go func() {
 		start := time.Now()
 		lengthCommitment, err := g.Computer.ComputeLengthCommitment(inputFr)
-		lengthCommitmentChan <- LengthCommitmentResult{
+		lengthCommitmentChan <- lengthCommitmentResult{
 			LengthCommitment: *lengthCommitment,
 			Err:              err,
 			Duration:         time.Since(start),
@@ -143,7 +142,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affi
 	go func() {
 		start := time.Now()
 		lengthProof, err := g.Computer.ComputeLengthProof(inputFr)
-		lengthProofChan <- LengthProofResult{
+		lengthProofChan <- lengthProofResult{
 			LengthProof: *lengthProof,
 			Err:         err,
 			Duration:    time.Since(start),
@@ -180,15 +179,15 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		return nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
 	}
 
-	proofChan := make(chan ProofsResult, 1)
-	rsChan := make(chan RsEncodeResult, 1)
+	proofChan := make(chan proofsResult, 1)
+	rsChan := make(chan rsEncodeResult, 1)
 
 	// inputFr is untouched
 	// compute chunks
 	go func() {
 		start := time.Now()
 		frames, indices, err := g.Encoder.Encode(inputFr)
-		rsChan <- RsEncodeResult{
+		rsChan <- rsEncodeResult{
 			Frames:   frames,
 			Indices:  indices,
 			Err:      err,
@@ -210,7 +209,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		}
 
 		proofs, err := g.Computer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
-		proofChan <- ProofsResult{
+		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
 			Duration: time.Since(start),
