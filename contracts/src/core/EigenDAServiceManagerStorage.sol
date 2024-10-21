@@ -41,21 +41,21 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumAdversaryThresholdPercentages = hex"21";
+    bytes public constant quorumAdversaryThresholdPercentages = hex"212121";
 
     /**
      * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
      * this is the percentage of the total stake needed to confirm a blob.
      * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
      */
-    bytes public constant quorumConfirmationThresholdPercentages = hex"37";
+    bytes public constant quorumConfirmationThresholdPercentages = hex"373737";
 
     /**
      * @notice The quorum numbers required for confirmation stored as an ordered bytes array
      * these quorum numbers have respective canonical thresholds in the
      * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
      */
-    bytes public constant quorumNumbersRequired = hex"00";
+    bytes public constant quorumNumbersRequired = hex"0001";
 
     /// @notice The current batchId
     uint32 public batchId;
