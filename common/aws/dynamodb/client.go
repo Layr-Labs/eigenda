@@ -223,17 +223,6 @@ func (c *Client) QueryIndex(ctx context.Context, tableName string, indexName str
 	return response.Items, nil
 }
 
-// QueryWithOrderLimit returns all items in the index that match the given key
-// If forward is true, the items are returned in ascending order
-func (c *Client) QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error) {
-	response, err := c.dynamoClient.Query(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-
-	return response.Items, nil
-}
-
 // Query returns all items in the primary index that match the given expression
 func (c *Client) Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
