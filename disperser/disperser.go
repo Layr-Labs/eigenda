@@ -143,7 +143,8 @@ type BatchIndexExclusiveStartKey struct {
 }
 
 type BlobStore interface {
-	// StoreBlob adds a blob to the queue and returns a key that can be used to retrieve the blob later
+	// StoreBlob adds a blob to the queue and returns a key that can be used to retrieve the blob later.
+	// Errors returned are grpc errors which can be returned to the client without wrapping.
 	StoreBlob(ctx context.Context, blob *core.Blob, requestedAt uint64) (BlobKey, error)
 	// GetBlobContent retrieves a blob's content
 	GetBlobContent(ctx context.Context, blobHash BlobHash) ([]byte, error)

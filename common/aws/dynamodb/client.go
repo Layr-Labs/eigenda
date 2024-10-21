@@ -93,7 +93,7 @@ func (c *Client) DeleteTable(ctx context.Context, tableName string) error {
 	_, err := c.dynamoClient.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(tableName)})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete table %s: %w", tableName, err)
 	}
 	return nil
 }
@@ -103,9 +103,8 @@ func (c *Client) PutItem(ctx context.Context, tableName string, item Item) (err 
 		TableName: aws.String(tableName), Item: item,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to put item in table %s: %w", tableName, err)
 	}
-
 	return nil
 }
 
@@ -115,9 +114,8 @@ func (c *Client) PutItemWithCondition(ctx context.Context, tableName string, ite
 		ConditionExpression: aws.String(condition),
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to put item in table %s: %w", tableName, err)
 	}
-
 	return nil
 }
 

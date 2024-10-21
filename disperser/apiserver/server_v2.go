@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -37,15 +36,15 @@ func NewDispersalServerV2(
 }
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
-	return &pb.DisperseBlobReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return &pb.DisperseBlobReply{}, api.NewErrorUnimplemented()
 }
 
 func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatusRequest) (*pb.BlobStatusReply, error) {
-	return &pb.BlobStatusReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return &pb.BlobStatusReply{}, api.NewErrorUnimplemented()
 }
 
 func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
-	return &pb.BlobCommitmentReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return &pb.BlobCommitmentReply{}, api.NewErrorUnimplemented()
 }
 
 func (s *DispersalServerV2) Start(ctx context.Context) error {

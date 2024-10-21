@@ -98,8 +98,8 @@ func (s *client) DownloadObject(ctx context.Context, bucket string, key string) 
 func (s *client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	var partMiBs int64 = 10
 	uploader := manager.NewUploader(s.s3Client, func(u *manager.Uploader) {
-		u.PartSize = partMiBs * 1024 * 1024 // 10MB per part
-		u.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to Upload when sending parts
+		u.PartSize = partMiBs * 1024 * 1024 // 10MiB per part
+		u.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to upload when sending parts
 	})
 
 	_, err := uploader.Upload(ctx, &s3.PutObjectInput{

@@ -113,7 +113,7 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 	for _, quorumID := range churnRequest.QuorumIDs {
 		for _, quorumIDAlreadyRegisteredFor := range quorumIDsAlreadyRegisteredFor {
 			if quorumIDAlreadyRegisteredFor == quorumID {
-				return nil, api.NewInvalidArgError("operator is already registered in quorum")
+				return nil, api.NewErrorInvalidArg("operator is already registered in quorum")
 			}
 		}
 	}
@@ -238,7 +238,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 				"registering operator address: %s, registering operator stake: %d, " +
 				"stake of lowest-stake operator: %d, operatorId of lowest-stake operator: " +
 				"%x, quorum ID: %d"
-			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
 		}
 
 		// verify the lowest stake against the total stake
@@ -254,7 +254,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 				"Block number used for this decision: %d, operatorId of the operator " +
 				"to churn: %x, stake of the operator to churn: %d, total stake in " +
 				"quorum: %d, quorum ID: %d"
-			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
 		}
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)

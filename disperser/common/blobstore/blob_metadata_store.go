@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -50,6 +51,7 @@ func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.
 	}
 }
 
+// QueueNewBlobMetadata returns a grpc error which can be directly returned to the client
 func (s *BlobMetadataStore) QueueNewBlobMetadata(ctx context.Context, blobMetadata *disperser.BlobMetadata) error {
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {
@@ -59,11 +61,16 @@ func (s *BlobMetadataStore) QueueNewBlobMetadata(ctx context.Context, blobMetada
 	if s.shadowTableName != "" && s.shadowTableName != s.tableName {
 		err = s.dynamoDBClient.PutItem(ctx, s.shadowTableName, item)
 		if err != nil {
+			// TODO: should we return an error here? If not, then we should document why we are ignoring the error
 			s.logger.Error("failed to put item into shadow table %s : %v", s.shadowTableName, err)
 		}
 	}
 
-	return s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	err = s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	if err != nil {
+		return api.NewErrorUnavailable(fmt.Sprintf("failed to put item into table %s : %v", s.tableName, err))
+	}
+	return nil
 }
 
 func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobKey) (*disperser.BlobMetadata, error) {
@@ -526,10 +533,14 @@ func GenerateTableSchema(metadataTableName string, readCapacityUnits int64, writ
 	}
 }
 
+// MarshalBlobMetadata marshals the blob metadata into a DynamoDB item, or else returns a grpc internal error
 func MarshalBlobMetadata(metadata *disperser.BlobMetadata) (commondynamodb.Item, error) {
+	// We use MarshalMap a few times here. Errors from MarshalMap are most likely
+	// a bug in our code (badly set configurations), so not worth client retrying,
+	// hence we send a 500s instead of 503s
 	basicFields, err := attributevalue.MarshalMap(metadata)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	if metadata.RequestMetadata == nil {
@@ -538,7 +549,7 @@ func MarshalBlobMetadata(metadata *disperser.BlobMetadata) (commondynamodb.Item,
 
 	requestMetadata, err := attributevalue.MarshalMap(metadata.RequestMetadata)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	// Flatten the request metadata
@@ -552,7 +563,7 @@ func MarshalBlobMetadata(metadata *disperser.BlobMetadata) (commondynamodb.Item,
 
 	confirmationInfo, err := attributevalue.MarshalMap(metadata.ConfirmationInfo)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	// Flatten the confirmation info
