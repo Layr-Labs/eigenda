@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
