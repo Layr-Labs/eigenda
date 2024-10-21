@@ -22,20 +22,27 @@ const (
 )
 
 type Config struct {
-	DisperserVersion  DisperserVersion
-	AwsClientConfig   aws.ClientConfig
-	BlobstoreConfig   blobstore.Config
-	ServerConfig      disperser.ServerConfig
-	LoggerConfig      common.LoggerConfig
-	MetricsConfig     disperser.MetricsConfig
-	RatelimiterConfig ratelimit.Config
-	RateConfig        apiserver.RateConfig
-	EnableRatelimiter bool
-	BucketTableName   string
-	ShadowTableName   string
-	BucketStoreSize   int
-	EthClientConfig   geth.EthClientConfig
-	MaxBlobSize       int
+	DisperserVersion       DisperserVersion
+	AwsClientConfig        aws.ClientConfig
+	BlobstoreConfig        blobstore.Config
+	ServerConfig           disperser.ServerConfig
+	LoggerConfig           common.LoggerConfig
+	MetricsConfig          disperser.MetricsConfig
+	RatelimiterConfig      ratelimit.Config
+	RateConfig             apiserver.RateConfig
+	EnableRatelimiter      bool
+	EnablePaymentMeterer   bool
+	MinNumSymbols          uint32
+	PricePerSymbol         uint32
+	OnDemandGlobalLimit    uint64
+	ReservationWindow      uint32 // in seconds
+	PaymentChainID         uint64
+	PaymentContractAddress string
+	BucketTableName        string
+	ShadowTableName        string
+	BucketStoreSize        int
+	EthClientConfig        geth.EthClientConfig
+	MaxBlobSize            int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -79,13 +86,20 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		RatelimiterConfig: ratelimiterConfig,
-		RateConfig:        rateConfig,
-		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
-		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:       ctx.GlobalInt(flags.MaxBlobSize.Name),
+		RatelimiterConfig:      ratelimiterConfig,
+		RateConfig:             rateConfig,
+		EnableRatelimiter:      ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer:   ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservationWindow:      uint32(ctx.GlobalUint64(flags.ReservationWindow.Name)),
+		MinNumSymbols:          uint32(ctx.GlobalUint64(flags.MinNumSymbols.Name)),
+		PricePerSymbol:         uint32(ctx.GlobalUint64(flags.PricePerSymbol.Name)),
+		OnDemandGlobalLimit:    ctx.GlobalUint64(flags.OnDemandGlobalLimit.Name),
+		PaymentChainID:         ctx.GlobalUint64(flags.PaymentChainID.Name),
+		PaymentContractAddress: ctx.GlobalString(flags.PaymentContractAddress.Name),
+		BucketTableName:        ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:        ctx.GlobalInt(flags.BucketStoreSize.Name),
+		EthClientConfig:        geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:            ctx.GlobalInt(flags.MaxBlobSize.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
