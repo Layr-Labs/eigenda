@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -15,7 +14,7 @@ import (
 
 var (
 	dummyActiveReservation = core.ActiveReservation{
-		DataRate:       100,
+		SymbolsPerSec:  100,
 		StartTimestamp: 1000,
 		EndTimestamp:   2000,
 		QuorumSplit:    []byte{50, 50},
@@ -25,28 +24,13 @@ var (
 	}
 )
 
-func TestGetCurrentOnchainPaymentState(t *testing.T) {
+func TestRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("CurrentOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(meterer.OnchainPaymentState{
-		ActiveReservations: map[string]core.ActiveReservation{
-			"account1": dummyActiveReservation,
-		},
-		OnDemandPayments: map[string]core.OnDemandPayment{
-			"account1": dummyOnDemandPayment,
-		},
-	}, nil)
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
 
-	state, err := mockState.CurrentOnchainPaymentState(ctx, &eth.Transactor{})
+	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Transactor{})
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.OnchainPaymentState{
-		ActiveReservations: map[string]core.ActiveReservation{
-			"account1": dummyActiveReservation,
-		},
-		OnDemandPayments: map[string]core.OnDemandPayment{
-			"account1": dummyOnDemandPayment,
-		},
-	}, state)
 }
 
 func TestGetCurrentBlockNumber(t *testing.T) {
@@ -66,7 +50,7 @@ func TestGetActiveReservations(t *testing.T) {
 	}
 	mockState.On("GetActiveReservations", testifymock.Anything, testifymock.Anything).Return(expectedReservations, nil)
 
-	reservations, err := mockState.GetActiveReservations(ctx, 1000)
+	reservations, err := mockState.GetActiveReservations(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedReservations, reservations)
 }
@@ -74,9 +58,9 @@ func TestGetActiveReservations(t *testing.T) {
 func TestGetActiveReservationByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetActiveReservationsByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
+	mockState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
 
-	reservation, err := mockState.GetActiveReservationsByAccount(ctx, 1000, "account1")
+	reservation, err := mockState.GetActiveReservationByAccount(ctx, "account1")
 	assert.NoError(t, err)
 	assert.Equal(t, dummyActiveReservation, reservation)
 }
@@ -89,7 +73,7 @@ func TestGetOnDemandPayments(t *testing.T) {
 	}
 	mockState.On("GetOnDemandPayments", testifymock.Anything, testifymock.Anything).Return(expectedPayments, nil)
 
-	payments, err := mockState.GetOnDemandPayments(ctx, 1000)
+	payments, err := mockState.GetOnDemandPayments(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedPayments, payments)
 }
@@ -100,7 +84,17 @@ func TestGetOnDemandPaymentByAccount(t *testing.T) {
 	accountID := "account1"
 	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
 
-	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, 1000, accountID)
+	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, accountID)
 	assert.NoError(t, err)
 	assert.Equal(t, dummyOnDemandPayment, payment)
+}
+
+func TestGetOnDemandQuorumNumbers(t *testing.T) {
+	mockState := &mock.MockOnchainPaymentState{}
+	ctx := context.Background()
+	mockState.On("GetOnDemandQuorumNumbers", testifymock.Anything, testifymock.Anything).Return([]uint8{0, 1}, nil)
+
+	quorumNumbers, err := mockState.GetOnDemandQuorumNumbers(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, []uint8{0, 1}, quorumNumbers)
 }
