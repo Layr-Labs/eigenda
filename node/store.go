@@ -29,7 +29,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     kvstore.Store
+	db     kvstore.Store[[]byte]
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
