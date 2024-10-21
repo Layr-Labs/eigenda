@@ -1,4 +1,4 @@
-package chainio_test
+package corev2_test
 
 import (
 	"encoding/hex"

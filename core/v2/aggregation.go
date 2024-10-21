@@ -10,7 +10,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/Layr-Labs/eigenda/chainio"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -83,20 +82,20 @@ type SignatureAggregation struct {
 // SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
 type SignatureAggregator interface {
 	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the attestation result by quorum.
-	ReceiveSignatures(ctx context.Context, state *chainio.IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error)
+	ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error)
 	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
-	AggregateSignatures(ctx context.Context, ics chainio.IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error)
+	AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error)
 }
 
 type StdSignatureAggregator struct {
 	Logger      logging.Logger
-	ChainReader chainio.Reader
+	ChainReader Reader
 	// OperatorAddresses contains the ethereum addresses of the operators corresponding to their operator IDs
 	OperatorAddresses *lru.Cache[OperatorID, gethcommon.Address]
 }
 
-func NewStdSignatureAggregator(logger logging.Logger, reader chainio.Reader) (*StdSignatureAggregator, error) {
+func NewStdSignatureAggregator(logger logging.Logger, reader Reader) (*StdSignatureAggregator, error) {
 	operatorAddrs, err := lru.New[OperatorID, gethcommon.Address](maxNumOperatorAddresses)
 	if err != nil {
 		return nil, err
@@ -111,7 +110,7 @@ func NewStdSignatureAggregator(logger logging.Logger, reader chainio.Reader) (*S
 
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
-func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *chainio.IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error) {
+func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error) {
 	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
 	for quorumID := range state.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
@@ -144,7 +143,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *c
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 		r := <-messageChan
-		operatorIDHex := chainio.GetOperatorHex(r.Operator)
+		operatorIDHex := GetOperatorHex(r.Operator)
 		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
 		if !ok && a.ChainReader != nil {
 			operatorAddr, err = a.ChainReader.OperatorIDToAddress(ctx, r.Operator)
@@ -280,7 +279,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *c
 	}, nil
 }
 
-func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics chainio.IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error) {
+func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error) {
 	// Aggregate the aggregated signatures. We reuse the first aggregated signature as the accumulator
 	var aggSig *bn254.Signature
 	for _, quorumID := range quorumIDs {
@@ -344,7 +343,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics ch
 
 }
 
-func GetStakeThreshold(state *chainio.OperatorState, quorum QuorumID, quorumThreshold uint8) *big.Int {
+func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold uint8) *big.Int {
 
 	// Get stake threshold
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
@@ -355,7 +354,7 @@ func GetStakeThreshold(state *chainio.OperatorState, quorum QuorumID, quorumThre
 	return stakeThreshold
 }
 
-func GetSignedPercentage(state *chainio.OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
+func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
 
 	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)

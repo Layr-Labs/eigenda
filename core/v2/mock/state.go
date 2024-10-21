@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/Layr-Labs/eigenda/chainio"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/stretchr/testify/mock"
 )
@@ -15,16 +15,16 @@ import (
 type ChainDataMock struct {
 	mock.Mock
 
-	KeyPairs  map[chainio.OperatorID]*bn254.KeyPair
-	Operators []chainio.OperatorID
-	Stakes    map[chainio.QuorumID]map[chainio.OperatorID]int
+	KeyPairs  map[corev2.OperatorID]*bn254.KeyPair
+	Operators []corev2.OperatorID
+	Stakes    map[corev2.QuorumID]map[corev2.OperatorID]int
 }
 
-var _ chainio.ChainState = (*ChainDataMock)(nil)
-var _ chainio.IndexedChainState = (*ChainDataMock)(nil)
+var _ corev2.ChainState = (*ChainDataMock)(nil)
+var _ corev2.IndexedChainState = (*ChainDataMock)(nil)
 
 type PrivateOperatorInfo struct {
-	*chainio.IndexedOperatorInfo
+	*corev2.IndexedOperatorInfo
 	KeyPair       *bn254.KeyPair
 	Host          string
 	DispersalPort string
@@ -32,12 +32,12 @@ type PrivateOperatorInfo struct {
 }
 
 type PrivateOperatorState struct {
-	*chainio.OperatorState
-	*chainio.IndexedOperatorState
-	PrivateOperators map[chainio.OperatorID]*PrivateOperatorInfo
+	*corev2.OperatorState
+	*corev2.IndexedOperatorState
+	PrivateOperators map[corev2.OperatorID]*PrivateOperatorInfo
 }
 
-func MakeOperatorId(id int) chainio.OperatorID {
+func MakeOperatorId(id int) corev2.OperatorID {
 
 	// Initialize a [32]byte array
 	var data [32]byte
@@ -46,9 +46,9 @@ func MakeOperatorId(id int) chainio.OperatorID {
 	return data
 }
 
-func NewChainDataMock(stakes map[chainio.QuorumID]map[chainio.OperatorID]int) (*ChainDataMock, error) {
+func NewChainDataMock(stakes map[corev2.QuorumID]map[corev2.OperatorID]int) (*ChainDataMock, error) {
 
-	seenOperators := make(map[chainio.OperatorID]struct{})
+	seenOperators := make(map[corev2.OperatorID]struct{})
 	for _, oprStakes := range stakes {
 		for opID := range oprStakes {
 			if _, ok := seenOperators[opID]; ok {
@@ -58,16 +58,16 @@ func NewChainDataMock(stakes map[chainio.QuorumID]map[chainio.OperatorID]int) (*
 		}
 	}
 
-	operators := make([]chainio.OperatorID, 0, len(seenOperators))
+	operators := make([]corev2.OperatorID, 0, len(seenOperators))
 	for opID := range seenOperators {
 		operators = append(operators, opID)
 	}
 
 	sort.Slice(operators, func(i, j int) bool {
-		return chainio.GetOperatorHex(operators[i]) < chainio.GetOperatorHex(operators[j])
+		return corev2.GetOperatorHex(operators[i]) < corev2.GetOperatorHex(operators[j])
 	})
 
-	keyPairs := make(map[chainio.OperatorID]*bn254.KeyPair)
+	keyPairs := make(map[corev2.OperatorID]*bn254.KeyPair)
 	for _, opID := range operators {
 		keyPair, err := bn254.GenRandomBlsKeys()
 		if err != nil {
@@ -105,10 +105,10 @@ func NewChainDataMock(stakes map[chainio.QuorumID]map[chainio.OperatorID]int) (*
 //		   core.OperatorID{2}: 3,
 //	  },
 //	}
-func MakeChainDataMock(numOperatorsPerQuorum map[chainio.QuorumID]int) (*ChainDataMock, error) {
-	stakes := make(map[chainio.QuorumID]map[chainio.OperatorID]int)
+func MakeChainDataMock(numOperatorsPerQuorum map[corev2.QuorumID]int) (*ChainDataMock, error) {
+	stakes := make(map[corev2.QuorumID]map[corev2.OperatorID]int)
 	for quorumID, numOpr := range numOperatorsPerQuorum {
-		stakes[quorumID] = make(map[chainio.OperatorID]int)
+		stakes[quorumID] = make(map[corev2.OperatorID]int)
 		for i := 0; i < numOpr; i++ {
 			id := MakeOperatorId(i)
 			stakes[quorumID][id] = int(i + 1)
@@ -119,10 +119,10 @@ func MakeChainDataMock(numOperatorsPerQuorum map[chainio.QuorumID]int) (*ChainDa
 }
 
 func (d *ChainDataMock) GetTotalOperatorState(ctx context.Context, blockNumber uint) *PrivateOperatorState {
-	return d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, []chainio.QuorumID{})
+	return d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, []corev2.QuorumID{})
 }
 
-func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, blockNumber uint, filterQuorums []chainio.QuorumID) *PrivateOperatorState {
+func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, blockNumber uint, filterQuorums []corev2.QuorumID) *PrivateOperatorState {
 	quorums := filterQuorums
 	if len(quorums) == 0 {
 		for quorumID := range d.Stakes {
@@ -130,18 +130,18 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		}
 	}
 
-	indexedOperators := make(map[chainio.OperatorID]*chainio.IndexedOperatorInfo, len(d.Operators))
-	privateOperators := make(map[chainio.OperatorID]*PrivateOperatorInfo, len(d.Operators))
+	indexedOperators := make(map[corev2.OperatorID]*corev2.IndexedOperatorInfo, len(d.Operators))
+	privateOperators := make(map[corev2.OperatorID]*PrivateOperatorInfo, len(d.Operators))
 
-	aggPubKeys := make(map[chainio.QuorumID]*bn254.G1Point)
+	aggPubKeys := make(map[corev2.QuorumID]*bn254.G1Point)
 	for i, id := range d.Operators {
 
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", 2*i)
 		retrievalPort := fmt.Sprintf("3%03v", 2*i+1)
-		socket := chainio.MakeOperatorSocket(host, dispersalPort, retrievalPort)
+		socket := corev2.MakeOperatorSocket(host, dispersalPort, retrievalPort)
 
-		indexed := &chainio.IndexedOperatorInfo{
+		indexed := &corev2.IndexedOperatorInfo{
 			Socket:   string(socket),
 			PubkeyG1: d.KeyPairs[id].GetPubKeyG1(),
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
@@ -159,12 +159,12 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		privateOperators[id] = private
 	}
 
-	storedOperators := make(map[chainio.QuorumID]map[chainio.OperatorID]*chainio.OperatorInfo, len(d.Stakes))
-	totals := make(map[chainio.QuorumID]*chainio.OperatorInfo)
+	storedOperators := make(map[corev2.QuorumID]map[corev2.OperatorID]*corev2.OperatorInfo, len(d.Stakes))
+	totals := make(map[corev2.QuorumID]*corev2.OperatorInfo)
 
 	for _, quorumID := range quorums {
 
-		storedOperators[quorumID] = make(map[chainio.OperatorID]*chainio.OperatorInfo, len(d.Stakes[quorumID]))
+		storedOperators[quorumID] = make(map[corev2.OperatorID]*corev2.OperatorInfo, len(d.Stakes[quorumID]))
 
 		index := uint32(0)
 		for _, opID := range d.Operators {
@@ -173,7 +173,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 				continue
 			}
 
-			storedOperators[quorumID][opID] = &chainio.OperatorInfo{
+			storedOperators[quorumID][opID] = &corev2.OperatorInfo{
 				Stake: big.NewInt(int64(stake)),
 				Index: index,
 			}
@@ -184,19 +184,19 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		for _, stake := range d.Stakes[quorumID] {
 			quorumStake += stake
 		}
-		totals[quorumID] = &chainio.OperatorInfo{
+		totals[quorumID] = &corev2.OperatorInfo{
 			Stake: big.NewInt(int64(quorumStake)),
 			Index: uint32(len(d.Stakes[quorumID])),
 		}
 	}
 
-	operatorState := &chainio.OperatorState{
+	operatorState := &corev2.OperatorState{
 		Operators:   storedOperators,
 		Totals:      totals,
 		BlockNumber: blockNumber,
 	}
 
-	filteredIndexedOperators := make(map[chainio.OperatorID]*chainio.IndexedOperatorInfo, 0)
+	filteredIndexedOperators := make(map[corev2.OperatorID]*corev2.IndexedOperatorInfo, 0)
 	for quorumID, operatorsByID := range storedOperators {
 		for opID := range operatorsByID {
 			if aggPubKeys[quorumID] == nil {
@@ -209,10 +209,10 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		}
 	}
 
-	indexedState := &chainio.IndexedOperatorState{
+	indexedState := &corev2.IndexedOperatorState{
 		OperatorState:    operatorState,
 		IndexedOperators: filteredIndexedOperators,
-		AggKeys:          make(map[chainio.QuorumID]*bn254.G1Point),
+		AggKeys:          make(map[corev2.QuorumID]*bn254.G1Point),
 	}
 	for quorumID, apk := range aggPubKeys {
 		indexedState.AggKeys[quorumID] = apk
@@ -228,13 +228,13 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 
 }
 
-func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, quorums []chainio.QuorumID) (*chainio.OperatorState, error) {
+func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, quorums []corev2.QuorumID) (*corev2.OperatorState, error) {
 	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil
 }
 
-func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator chainio.OperatorID) (*chainio.OperatorState, error) {
+func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator corev2.OperatorID) (*corev2.OperatorState, error) {
 
 	state := d.GetTotalOperatorState(ctx, blockNumber)
 
@@ -242,7 +242,7 @@ func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNum
 
 }
 
-func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []chainio.QuorumID) (*chainio.IndexedOperatorState, error) {
+func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []corev2.QuorumID) (*corev2.IndexedOperatorState, error) {
 
 	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
@@ -250,7 +250,7 @@ func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber
 
 }
 
-func (d *ChainDataMock) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[chainio.OperatorID]*chainio.IndexedOperatorInfo, error) {
+func (d *ChainDataMock) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[corev2.OperatorID]*corev2.IndexedOperatorInfo, error) {
 	state := d.GetTotalOperatorState(ctx, blockNumber)
 
 	return state.IndexedOperatorState.IndexedOperators, nil

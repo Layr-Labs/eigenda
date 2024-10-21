@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
-	"github.com/Layr-Labs/eigenda/chainio"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/mock"
@@ -17,13 +17,13 @@ type MockWriter struct {
 	mock.Mock
 }
 
-var _ chainio.Writer = (*MockWriter)(nil)
+var _ corev2.Writer = (*MockWriter)(nil)
 
 func (t *MockWriter) RegisterOperator(
 	ctx context.Context,
 	keypair *bn254.KeyPair,
 	socket string,
-	quorumIds []chainio.QuorumID,
+	quorumIds []corev2.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
@@ -36,7 +36,7 @@ func (t *MockWriter) RegisterOperatorWithChurn(
 	ctx context.Context,
 	keypair *bn254.KeyPair,
 	socket string,
-	quorumIds []chainio.QuorumID,
+	quorumIds []corev2.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
@@ -45,7 +45,7 @@ func (t *MockWriter) RegisterOperatorWithChurn(
 	return args.Error(0)
 }
 
-func (t *MockWriter) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point, blockNumber uint32, quorumIds []chainio.QuorumID) error {
+func (t *MockWriter) DeregisterOperator(ctx context.Context, pubkeyG1 *bn254.G1Point, blockNumber uint32, quorumIds []corev2.QuorumID) error {
 	args := t.Called()
 	return args.Error(0)
 }
@@ -55,7 +55,7 @@ func (t *MockWriter) UpdateOperatorSocket(ctx context.Context, socket string) er
 	return args.Error(0)
 }
 
-func (t *MockWriter) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]chainio.OperatorID) (*types.Transaction, error) {
+func (t *MockWriter) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]corev2.OperatorID) (*types.Transaction, error) {
 	args := t.Called(ctx, operatorsByQuorum)
 	result := args.Get(0)
 	return result.(*types.Transaction), args.Error(1)

@@ -1,4 +1,4 @@
-package chainio
+package corev2
 
 import (
 	"context"

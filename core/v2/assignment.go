@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-
-	"github.com/Layr-Labs/eigenda/chainio"
-	"github.com/Layr-Labs/eigenda/core"
 )
 
-func GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8) (map[core.OperatorID]Assignment, error) {
+func GetAssignments(state *OperatorState, blobVersion byte, quorum uint8) (map[OperatorID]Assignment, error) {
 
 	params, ok := ParametersMap[blobVersion]
 	if !ok {
@@ -29,7 +26,7 @@ func GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8
 	m := big.NewInt(int64(params.NumChunks))
 
 	type assignment struct {
-		id     core.OperatorID
+		id     OperatorID
 		index  uint32
 		chunks uint32
 		stake  *big.Int
@@ -64,7 +61,7 @@ func GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8
 		return nil, fmt.Errorf("total chunks %d exceeds maximum %d", mp, params.NumChunks)
 	}
 
-	assignments := make(map[core.OperatorID]Assignment, len(chunkAssignments))
+	assignments := make(map[OperatorID]Assignment, len(chunkAssignments))
 	index := uint32(0)
 	for i, a := range chunkAssignments {
 		if i < delta {
@@ -84,7 +81,7 @@ func GetAssignments(state *chainio.OperatorState, blobVersion byte, quorum uint8
 
 }
 
-func GetAssignment(state *chainio.OperatorState, blobVersion byte, quorum QuorumID, id core.OperatorID) (Assignment, error) {
+func GetAssignment(state *OperatorState, blobVersion byte, quorum QuorumID, id OperatorID) (Assignment, error) {
 
 	assignments, err := GetAssignments(state, blobVersion, quorum)
 	if err != nil {

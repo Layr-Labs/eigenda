@@ -8,11 +8,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/chainio"
-	"github.com/Layr-Labs/eigenda/chainio/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core/v2/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -113,9 +112,9 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber
 
 }
 
-// prepareBatch takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
+// prepareBlobs takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertificate, blobs [][]byte) (map[corev2.OperatorID][]*corev2.BlobShard, chainio.IndexedChainState) {
+func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertificate, blobs [][]byte) (map[corev2.OperatorID][]*corev2.BlobShard, corev2.IndexedChainState) {
 
 	cst, err := mock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
@@ -197,7 +196,7 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertifi
 
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
-func checkBatchByUniversalVerifier(cst chainio.IndexedChainState, packagedBlobs map[corev2.OperatorID][]*corev2.BlobShard, pool common.WorkerPool) error {
+func checkBatchByUniversalVerifier(cst corev2.IndexedChainState, packagedBlobs map[corev2.OperatorID][]*corev2.BlobShard, pool common.WorkerPool) error {
 
 	ctx := context.Background()
 

@@ -5,9 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/chainio"
-	"github.com/Layr-Labs/eigenda/chainio/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core/v2/mock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +23,7 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 	assignments, err := corev2.GetAssignments(operatorState, blobVersion, 0)
 	assert.NoError(t, err)
-	expectedAssignments := map[chainio.OperatorID]corev2.Assignment{
+	expectedAssignments := map[corev2.OperatorID]corev2.Assignment{
 		mock.MakeOperatorId(0): {
 			StartIndex: 7802,
 			NumChunks:  390,
@@ -74,7 +73,7 @@ func TestAssignmentWithTooManyOperators(t *testing.T) {
 
 	numOperators := maxNumOperators + 1
 
-	stakes := map[chainio.QuorumID]map[chainio.OperatorID]int{
+	stakes := map[corev2.QuorumID]map[corev2.OperatorID]int{
 		0: {},
 	}
 	for i := 0; i < numOperators; i++ {
@@ -117,7 +116,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		// Generate a random slice of integers of length n
 
-		stakes := map[chainio.QuorumID]map[chainio.OperatorID]int{
+		stakes := map[corev2.QuorumID]map[corev2.OperatorID]int{
 			0: {},
 		}
 		for i := 0; i < numOperators; i++ {

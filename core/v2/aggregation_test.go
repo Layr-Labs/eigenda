@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/chainio/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core/v2/mock"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 )

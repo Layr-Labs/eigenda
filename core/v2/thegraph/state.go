@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/chainio"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gnarkbn254 "github.com/consensys/gnark-crypto/ecc/bn254"
@@ -24,8 +24,8 @@ const (
 
 type (
 	IndexedChainState interface {
-		GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []chainio.QuorumID) (*chainio.IndexedOperatorState, error)
-		GetIndexedOperatorInfoByOperatorId(ctx context.Context, operatorId chainio.OperatorID, blockNumber uint32) (*chainio.IndexedOperatorInfo, error)
+		GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []corev2.QuorumID) (*corev2.IndexedOperatorState, error)
+		GetIndexedOperatorInfoByOperatorId(ctx context.Context, operatorId corev2.OperatorID, blockNumber uint32) (*corev2.IndexedOperatorInfo, error)
 	}
 
 	AggregatePubkeyKeyGql struct {
@@ -77,7 +77,7 @@ type (
 	}
 
 	indexedChainState struct {
-		chainio.ChainState
+		corev2.ChainState
 		querier GraphQLQuerier
 
 		logger logging.Logger
@@ -86,7 +86,7 @@ type (
 
 var _ IndexedChainState = (*indexedChainState)(nil)
 
-func MakeIndexedChainState(config Config, cs chainio.ChainState, logger logging.Logger) *indexedChainState {
+func MakeIndexedChainState(config Config, cs corev2.ChainState, logger logging.Logger) *indexedChainState {
 
 	logger.Info("Using graph node")
 	querier := graphql.NewClient(config.Endpoint, nil)
@@ -97,7 +97,7 @@ func MakeIndexedChainState(config Config, cs chainio.ChainState, logger logging.
 	return NewIndexedChainState(cs, retryQuerier, logger)
 }
 
-func NewIndexedChainState(cs chainio.ChainState, querier GraphQLQuerier, logger logging.Logger) *indexedChainState {
+func NewIndexedChainState(cs corev2.ChainState, querier GraphQLQuerier, logger logging.Logger) *indexedChainState {
 	return &indexedChainState{
 		ChainState: cs,
 		querier:    querier,
@@ -124,7 +124,7 @@ func (ics *indexedChainState) Start(ctx context.Context) error {
 	}
 }
 
-func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []chainio.QuorumID) (*chainio.IndexedOperatorState, error) {
+func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []corev2.QuorumID) (*corev2.IndexedOperatorState, error) {
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
 	if err != nil {
 		return nil, err
@@ -151,11 +151,11 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	}
 
 	// Detect missing operators
-	operatorSeen := make(map[chainio.OperatorID]struct{})
+	operatorSeen := make(map[corev2.OperatorID]struct{})
 	for _, quorumOperators := range operatorState.Operators {
 		for operatorID := range quorumOperators {
 			if indexedOperators[operatorID] == nil {
-				return nil, fmt.Errorf("operator %s not found in indexed state", chainio.GetOperatorHex(operatorID))
+				return nil, fmt.Errorf("operator %s not found in indexed state", corev2.GetOperatorHex(operatorID))
 			}
 			operatorSeen[operatorID] = struct{}{}
 		}
@@ -169,7 +169,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		}
 	}
 
-	state := &chainio.IndexedOperatorState{
+	state := &corev2.IndexedOperatorState{
 		OperatorState:    operatorState,
 		IndexedOperators: indexedOperators,
 		AggKeys:          aggKeys,
@@ -177,7 +177,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	return state, nil
 }
 
-func (ics *indexedChainState) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[chainio.OperatorID]*chainio.IndexedOperatorInfo, error) {
+func (ics *indexedChainState) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[corev2.OperatorID]*corev2.IndexedOperatorInfo, error) {
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
 	if err != nil {
 		return nil, err
@@ -187,16 +187,16 @@ func (ics *indexedChainState) GetIndexedOperators(ctx context.Context, blockNumb
 }
 
 // GetIndexedOperatorInfoByOperatorId returns the IndexedOperatorInfo for the operator with the given operatorId at the given block number
-func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Context, operatorId chainio.OperatorID, blockNumber uint32) (*chainio.IndexedOperatorInfo, error) {
+func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Context, operatorId corev2.OperatorID, blockNumber uint32) (*corev2.IndexedOperatorInfo, error) {
 	var (
 		query     QueryOperatorByIdGql
 		variables = map[string]any{
-			"id": graphql.String(fmt.Sprintf("0x%s", chainio.GetOperatorHex(operatorId))),
+			"id": graphql.String(fmt.Sprintf("0x%s", corev2.GetOperatorHex(operatorId))),
 		}
 	)
 	err := ics.querier.Query(context.Background(), &query, variables)
 	if err != nil {
-		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", chainio.GetOperatorHex(operatorId), "blockNumber", blockNumber)
+		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", corev2.GetOperatorHex(operatorId), "blockNumber", blockNumber)
 		return nil, err
 	}
 
@@ -210,7 +210,7 @@ type quorumAPK struct {
 }
 
 // GetQuorumAPKs returns the Aggregate Public Keys for the given quorums at the given block number
-func (ics *indexedChainState) getQuorumAPKs(ctx context.Context, quorumIDs []chainio.QuorumID, blockNumber uint32) map[uint8]*quorumAPK {
+func (ics *indexedChainState) getQuorumAPKs(ctx context.Context, quorumIDs []corev2.QuorumID, blockNumber uint32) map[uint8]*quorumAPK {
 	quorumAPKs := make(map[uint8]*quorumAPK)
 	for i := range quorumIDs {
 		id := quorumIDs[i]
@@ -241,7 +241,7 @@ func (ics *indexedChainState) getQuorumAPKs(ctx context.Context, quorumIDs []cha
 }
 
 // GetQuorumAPK returns the Aggregate Public Key for the given quorum at the given block number
-func (ics *indexedChainState) getQuorumAPK(ctx context.Context, quorumID chainio.QuorumID, blockNumber uint32) (*bn254.G1Point, error) {
+func (ics *indexedChainState) getQuorumAPK(ctx context.Context, quorumID corev2.QuorumID, blockNumber uint32) (*bn254.G1Point, error) {
 	var (
 		query     QueryQuorumAPKGql
 		variables = map[string]any{
@@ -276,13 +276,13 @@ func (ics *indexedChainState) getQuorumAPK(ctx context.Context, quorumID chainio
 }
 
 // GetRegisteredIndexedOperatorInfo returns the IndexedOperatorInfo for all registered operators at the given block number keyed by operatorId
-func (ics *indexedChainState) getRegisteredIndexedOperatorInfo(ctx context.Context, blockNumber uint32) (map[chainio.OperatorID]*chainio.IndexedOperatorInfo, error) {
+func (ics *indexedChainState) getRegisteredIndexedOperatorInfo(ctx context.Context, blockNumber uint32) (map[corev2.OperatorID]*corev2.IndexedOperatorInfo, error) {
 	operatorsGql, err := ics.getAllOperatorsRegisteredAtBlockNumberWithPagination(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	operators := make(map[chainio.OperatorID]*chainio.IndexedOperatorInfo, len(operatorsGql))
+	operators := make(map[corev2.OperatorID]*corev2.IndexedOperatorInfo, len(operatorsGql))
 	for i := range operatorsGql {
 		operator := operatorsGql[i]
 		operatorIndexedInfo, err := convertIndexedOperatorInfoGqlToIndexedOperatorInfo(&operator)
@@ -292,7 +292,7 @@ func (ics *indexedChainState) getRegisteredIndexedOperatorInfo(ctx context.Conte
 
 		// convert graphql.String to [32]byte
 		// example: "0x0000000000000000000000000000000000000000000000000000000000000001" -> [32]byte{0x01}
-		operatorId, err := chainio.OperatorIDFromHex(string(operator.Id))
+		operatorId, err := corev2.OperatorIDFromHex(string(operator.Id))
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (ics *indexedChainState) getAllOperatorsRegisteredAtBlockNumberWithPaginati
 	return operators, nil
 }
 
-func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperatorInfoGql) (*chainio.IndexedOperatorInfo, error) {
+func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperatorInfoGql) (*corev2.IndexedOperatorInfo, error) {
 
 	if len(operator.SocketUpdates) == 0 {
 		return nil, errors.New("no socket found for operator")
@@ -360,7 +360,7 @@ func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperato
 		return nil, err
 	}
 
-	return &chainio.IndexedOperatorInfo{
+	return &corev2.IndexedOperatorInfo{
 		PubkeyG1: &bn254.G1Point{G1Affine: pubkeyG1},
 		PubkeyG2: &bn254.G2Point{G2Affine: pubkeyG2},
 		Socket:   string(operator.SocketUpdates[0].Socket),

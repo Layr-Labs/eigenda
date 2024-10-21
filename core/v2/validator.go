@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/chainio"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
@@ -23,11 +22,11 @@ type BlobShard struct {
 // shardValidator implements the validation logic that a DA node should apply to its received data
 type ShardValidator struct {
 	verifier   encoding.Verifier
-	chainState chainio.ChainState
+	chainState ChainState
 	operatorID OperatorID
 }
 
-func NewShardValidator(v encoding.Verifier, cst chainio.ChainState, operatorID OperatorID) *ShardValidator {
+func NewShardValidator(v encoding.Verifier, cst ChainState, operatorID OperatorID) *ShardValidator {
 	return &ShardValidator{
 		verifier:   v,
 		chainState: cst,
@@ -35,11 +34,11 @@ func NewShardValidator(v encoding.Verifier, cst chainio.ChainState, operatorID O
 	}
 }
 
-func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, operatorState *chainio.OperatorState) ([]*encoding.Frame, *Assignment, error) {
+func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, operatorState *OperatorState) ([]*encoding.Frame, *Assignment, error) {
 
 	// Check if the operator is a member of the quorum
 	if _, ok := operatorState.Operators[quorum]; !ok {
-		return nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, chainio.GetOperatorHex(v.operatorID), quorum)
+		return nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, GetOperatorHex(v.operatorID), quorum)
 	}
 
 	// Get the assignments for the quorum
@@ -50,7 +49,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 
 	// Validate the number of chunks
 	if assignment.NumChunks == 0 {
-		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, chainio.GetOperatorHex(v.operatorID), quorum)
+		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, GetOperatorHex(v.operatorID), quorum)
 	}
 	if assignment.NumChunks != uint32(len(blob.Chunks[quorum])) {
 		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Chunks[quorum]), assignment.NumChunks, quorum)

@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/chainio"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
 )
@@ -13,7 +13,7 @@ type MockReader struct {
 	mock.Mock
 }
 
-var _ chainio.Reader = (*MockReader)(nil)
+var _ corev2.Reader = (*MockReader)(nil)
 
 func (t *MockReader) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
 	args := t.Called()
@@ -25,23 +25,23 @@ func (t *MockReader) GetStoreDurationBlocks(ctx context.Context) (uint32, error)
 	return *new(uint32), args.Error(0)
 }
 
-func (t *MockReader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator [32]byte) ([]chainio.QuorumID, error) {
+func (t *MockReader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator [32]byte) ([]corev2.QuorumID, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.([]chainio.QuorumID), args.Error(1)
+	return result.([]corev2.QuorumID), args.Error(1)
 }
 
-func (t *MockReader) GetOperatorStakes(ctx context.Context, operatorId [32]byte, blockNumber uint32) (chainio.OperatorStakes, []chainio.QuorumID, error) {
+func (t *MockReader) GetOperatorStakes(ctx context.Context, operatorId [32]byte, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
 	args := t.Called()
 	result0 := args.Get(0)
 	result1 := args.Get(1)
-	return result0.(chainio.OperatorStakes), result1.([]chainio.QuorumID), args.Error(1)
+	return result0.(corev2.OperatorStakes), result1.([]corev2.QuorumID), args.Error(1)
 }
 
-func (t *MockReader) GetOperatorStakesForQuorums(ctx context.Context, quorums []chainio.QuorumID, blockNumber uint32) (chainio.OperatorStakes, error) {
+func (t *MockReader) GetOperatorStakesForQuorums(ctx context.Context, quorums []corev2.QuorumID, blockNumber uint32) (corev2.OperatorStakes, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(chainio.OperatorStakes), args.Error(1)
+	return result.(corev2.OperatorStakes), args.Error(1)
 }
 
 func (t *MockReader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
@@ -80,19 +80,19 @@ func (t *MockReader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, ope
 	return result.(*big.Int), args.Error(1)
 }
 
-func (t *MockReader) GetOperatorSetParams(ctx context.Context, quorumID chainio.QuorumID) (*chainio.OperatorSetParam, error) {
+func (t *MockReader) GetOperatorSetParams(ctx context.Context, quorumID corev2.QuorumID) (*corev2.OperatorSetParam, error) {
 	args := t.Called(ctx, quorumID)
 	result := args.Get(0)
-	return result.(*chainio.OperatorSetParam), args.Error(1)
+	return result.(*corev2.OperatorSetParam), args.Error(1)
 }
 
-func (t *MockReader) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID) (uint32, error) {
+func (t *MockReader) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID corev2.QuorumID) (uint32, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockReader) WeightOfOperatorForQuorum(ctx context.Context, quorumID chainio.QuorumID, operator gethcommon.Address) (*big.Int, error) {
+func (t *MockReader) WeightOfOperatorForQuorum(ctx context.Context, quorumID corev2.QuorumID, operator gethcommon.Address) (*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(*big.Int), args.Error(1)
@@ -102,7 +102,7 @@ func (t *MockReader) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
 	operatorAddress gethcommon.Address,
 	operatorId [32]byte,
-	operatorsToChurn []chainio.OperatorToChurn,
+	operatorsToChurn []corev2.OperatorToChurn,
 	salt [32]byte,
 	expiry *big.Int,
 ) ([32]byte, error) {
