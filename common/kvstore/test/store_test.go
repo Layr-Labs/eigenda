@@ -15,38 +15,30 @@ import (
 )
 
 // A list of builders for various stores to be tested.
-var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store, error){
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
+var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store[[]byte], error){
+	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		return mapstore.NewStore(), nil
 	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
+	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		return leveldb.NewStore(logger, path)
 	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
+	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		config := tablestore.DefaultMapStoreConfig()
 		config.Schema = []string{"test"}
 		tableStore, err := tablestore.Start(logger, config)
 		if err != nil {
 			return nil, err
 		}
-		store, err := tableStore.GetTable("test")
-		if err != nil {
-			return nil, err
-		}
-		return store, nil
+		return NewTableAsAStore(tableStore)
 	},
-	func(logger logging.Logger, path string) (kvstore.Store, error) {
+	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		config := tablestore.DefaultLevelDBConfig(path)
 		config.Schema = []string{"test"}
 		tableStore, err := tablestore.Start(logger, config)
 		if err != nil {
 			return nil, err
 		}
-		store, err := tableStore.GetTable("test")
-		if err != nil {
-			return nil, err
-		}
-		return store, nil
+		return NewTableAsAStore(tableStore)
 	},
 }
 
@@ -62,7 +54,7 @@ func verifyDBIsDeleted(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func randomOperationsTest(t *testing.T, store kvstore.Store) {
+func randomOperationsTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
@@ -146,7 +138,7 @@ func TestRandomOperations(t *testing.T) {
 	}
 }
 
-func writeBatchTest(t *testing.T, store kvstore.Store) {
+func writeBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
@@ -213,7 +205,7 @@ func TestWriteBatch(t *testing.T) {
 	}
 }
 
-func deleteBatchTest(t *testing.T, store kvstore.Store) {
+func deleteBatchTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
@@ -279,7 +271,7 @@ func TestDeleteBatch(t *testing.T) {
 	}
 }
 
-func iterationTest(t *testing.T, store kvstore.Store) {
+func iterationTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
@@ -331,7 +323,7 @@ func TestIteration(t *testing.T) {
 	}
 }
 
-func iterationWithPrefixTest(t *testing.T, store kvstore.Store) {
+func iterationWithPrefixTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
@@ -417,7 +409,7 @@ func TestIterationWithPrefix(t *testing.T) {
 	}
 }
 
-func putNilTest(t *testing.T, store kvstore.Store) {
+func putNilTest(t *testing.T, store kvstore.Store[[]byte]) {
 	tu.InitializeRandom()
 	deleteDBDirectory(t)
 
