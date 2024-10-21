@@ -56,4 +56,4 @@ func (t *tableStoreBatch) Apply() error {
 // Size returns the number of operations in the batch.
 func (t *tableStoreBatch) Size() uint32 {
 	return t.baseBatch.Size()
-} // TODO do we ever call this?
+}
