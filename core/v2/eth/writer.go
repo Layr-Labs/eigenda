@@ -241,7 +241,7 @@ func (t *Writer) UpdateOperatorSocket(ctx context.Context, socket string) error 
 	return nil
 }
 
-func (t *Writer) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][][32]byte) (*types.Transaction, error) {
+func (t *Writer) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]corev2.OperatorID) (*types.Transaction, error) {
 	byteIdsByQuorum := make([][][32]byte, len(operatorsByQuorum))
 	for i, ids := range operatorsByQuorum {
 		for _, id := range ids {

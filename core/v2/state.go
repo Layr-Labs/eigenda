@@ -83,7 +83,7 @@ func (s *OperatorState) Hash() (map[QuorumID][16]byte, error) {
 
 		for opID, opInfo := range opInfos {
 			marshalable.Operators = append(marshalable.Operators, operatorInfoWithID{
-				OperatorID: GetOperatorHex(opID),
+				OperatorID: opID.GetHex(),
 				Stake:      opInfo.Stake.String(),
 				Index:      uint(opInfo.Index),
 			})

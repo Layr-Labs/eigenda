@@ -25,13 +25,13 @@ func (t *MockReader) GetStoreDurationBlocks(ctx context.Context) (uint32, error)
 	return *new(uint32), args.Error(0)
 }
 
-func (t *MockReader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator [32]byte) ([]corev2.QuorumID, error) {
+func (t *MockReader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator corev2.OperatorID) ([]corev2.QuorumID, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]corev2.QuorumID), args.Error(1)
 }
 
-func (t *MockReader) GetOperatorStakes(ctx context.Context, operatorId [32]byte, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
+func (t *MockReader) GetOperatorStakes(ctx context.Context, operatorId corev2.OperatorID, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
 	args := t.Called()
 	result0 := args.Get(0)
 	result1 := args.Get(1)
@@ -50,31 +50,31 @@ func (t *MockReader) StakeRegistry(ctx context.Context) (gethcommon.Address, err
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockReader) OperatorIDToAddress(ctx context.Context, operatorId [32]byte) (gethcommon.Address, error) {
+func (t *MockReader) OperatorIDToAddress(ctx context.Context, operatorId corev2.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockReader) OperatorAddressToID(ctx context.Context, address gethcommon.Address) ([32]byte, error) {
+func (t *MockReader) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (corev2.OperatorID, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.([32]byte), args.Error(1)
+	return result.(corev2.OperatorID), args.Error(1)
 }
 
-func (t *MockReader) BatchOperatorIDToAddress(ctx context.Context, operatorIds [][32]byte) ([]gethcommon.Address, error) {
+func (t *MockReader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []corev2.OperatorID) ([]gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]gethcommon.Address), args.Error(1)
 }
 
-func (t *MockReader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds [][32]byte, blockNumber uint32) ([]*big.Int, error) {
+func (t *MockReader) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []corev2.OperatorID, blockNumber uint32) ([]*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]*big.Int), args.Error(1)
 }
 
-func (t *MockReader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId [32]byte) (*big.Int, error) {
+func (t *MockReader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId corev2.OperatorID) (*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(*big.Int), args.Error(1)
@@ -101,7 +101,7 @@ func (t *MockReader) WeightOfOperatorForQuorum(ctx context.Context, quorumID cor
 func (t *MockReader) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
 	operatorAddress gethcommon.Address,
-	operatorId [32]byte,
+	operatorId corev2.OperatorID,
 	operatorsToChurn []corev2.OperatorToChurn,
 	salt [32]byte,
 	expiry *big.Int,
@@ -129,7 +129,7 @@ func (t *MockReader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber u
 	return result.([]uint8), args.Error(1)
 }
 
-func (t *MockReader) PubkeyHashToOperator(ctx context.Context, operatorId [32]byte) (gethcommon.Address, error) {
+func (t *MockReader) PubkeyHashToOperator(ctx context.Context, operatorId corev2.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)

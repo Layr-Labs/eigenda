@@ -103,9 +103,9 @@ const (
 
 type QuorumID = uint8
 
-type OperatorID = [32]byte
+type OperatorID [32]byte
 
-func GetOperatorHex(id OperatorID) string {
+func (id OperatorID) GetHex() string {
 	return hex.EncodeToString(id[:])
 }
 

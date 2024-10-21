@@ -64,7 +64,7 @@ func NewChainDataMock(stakes map[corev2.QuorumID]map[corev2.OperatorID]int) (*Ch
 	}
 
 	sort.Slice(operators, func(i, j int) bool {
-		return corev2.GetOperatorHex(operators[i]) < corev2.GetOperatorHex(operators[j])
+		return operators[i].GetHex() < operators[j].GetHex()
 	})
 
 	keyPairs := make(map[corev2.OperatorID]*bn254.KeyPair)

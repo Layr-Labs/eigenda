@@ -38,7 +38,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 
 	// Check if the operator is a member of the quorum
 	if _, ok := operatorState.Operators[quorum]; !ok {
-		return nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, GetOperatorHex(v.operatorID), quorum)
+		return nil, nil, fmt.Errorf("%w: operator %s is not a member of quorum %d", ErrBlobQuorumSkip, v.operatorID.GetHex(), quorum)
 	}
 
 	// Get the assignments for the quorum
@@ -49,7 +49,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum QuorumID, blob *BlobShard, op
 
 	// Validate the number of chunks
 	if assignment.NumChunks == 0 {
-		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, GetOperatorHex(v.operatorID), quorum)
+		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, v.operatorID.GetHex(), quorum)
 	}
 	if assignment.NumChunks != uint32(len(blob.Chunks[quorum])) {
 		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Chunks[quorum]), assignment.NumChunks, quorum)

@@ -172,12 +172,12 @@ func (t *Reader) getRegistrationParams(
 // GetOperatorStakes returns the stakes of all operators within the quorums that the operator represented by operatorId
 // is registered with. The returned stakes are for the block number supplied. The indices of the operators within each quorum
 // are also returned.
-func (t *Reader) GetOperatorStakes(ctx context.Context, operator [32]byte, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
+func (t *Reader) GetOperatorStakes(ctx context.Context, operator corev2.OperatorID, blockNumber uint32) (corev2.OperatorStakes, []corev2.QuorumID, error) {
 	quorumBitmap, state_, err := t.bindings.OpStateRetriever.GetOperatorState0(&bind.CallOpts{
 		Context: ctx,
 	}, t.bindings.RegCoordinatorAddr, operator, blockNumber)
 	if err != nil {
-		t.logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", corev2.GetOperatorHex(operator))
+		t.logger.Error("Failed to fetch operator state", "err", err, "blockNumber", blockNumber, "operatorID", operator.GetHex())
 		return nil, nil, err
 	}
 

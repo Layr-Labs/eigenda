@@ -155,7 +155,7 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	for _, quorumOperators := range operatorState.Operators {
 		for operatorID := range quorumOperators {
 			if indexedOperators[operatorID] == nil {
-				return nil, fmt.Errorf("operator %s not found in indexed state", corev2.GetOperatorHex(operatorID))
+				return nil, fmt.Errorf("operator %s not found in indexed state", operatorID.GetHex())
 			}
 			operatorSeen[operatorID] = struct{}{}
 		}
@@ -191,12 +191,12 @@ func (ics *indexedChainState) GetIndexedOperatorInfoByOperatorId(ctx context.Con
 	var (
 		query     QueryOperatorByIdGql
 		variables = map[string]any{
-			"id": graphql.String(fmt.Sprintf("0x%s", corev2.GetOperatorHex(operatorId))),
+			"id": graphql.String(fmt.Sprintf("0x%s", operatorId.GetHex())),
 		}
 	)
 	err := ics.querier.Query(context.Background(), &query, variables)
 	if err != nil {
-		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", corev2.GetOperatorHex(operatorId), "blockNumber", blockNumber)
+		ics.logger.Error("Error requesting info for operator", "err", err, "operatorId", operatorId.GetHex(), "blockNumber", blockNumber)
 		return nil, err
 	}
 

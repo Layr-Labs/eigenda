@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core/v2/mock"
+	"github.com/Layr-Labs/eigenda/core/v2/thegraph"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
@@ -39,7 +39,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
-		id = key.Hex()
+		id = key.GetHex()
 	}
 
 	operatorsQueryCalled := false
@@ -106,7 +106,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
-		id = key.Hex()
+		id = key.GetHex()
 		break
 	}
 
@@ -173,7 +173,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
-		id = key.Hex()
+		id = key.GetHex()
 		break
 	}
 
@@ -256,7 +256,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
-		id = key.Hex()
+		id = key.GetHex()
 	}
 
 	querier := &mockGraphQLQuerier{}

@@ -143,7 +143,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 		r := <-messageChan
-		operatorIDHex := GetOperatorHex(r.Operator)
+		operatorIDHex := r.Operator.GetHex()
 		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
 		if !ok && a.ChainReader != nil {
 			operatorAddr, err = a.ChainReader.OperatorIDToAddress(ctx, r.Operator)
