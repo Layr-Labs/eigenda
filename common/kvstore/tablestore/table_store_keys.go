@@ -10,10 +10,16 @@ const prefixLength = 4
 var _ kvstore.Key = (*key)(nil)
 
 type key struct {
-	data []byte
+	keyBuilder kvstore.KeyBuilder
+	data       []byte
 }
 
-// RawKey returns the raw byte slice that represents the key.
+// Builder returns the KeyBuilder that was used to create the key.
+func (k *key) Builder() kvstore.KeyBuilder {
+	return k.keyBuilder
+}
+
+// Raw returns the raw byte slice that represents the key.
 func (k *key) Raw() []byte {
 	return k.data
 }
@@ -87,7 +93,10 @@ func (k *keyBuilder) Key(data []byte) kvstore.Key {
 	result := make([]byte, prefixLength+len(data))
 	copy(result, k.prefix)
 	copy(result[prefixLength:], data)
-	return &key{data: result}
+	return &key{
+		keyBuilder: k,
+		data:       result,
+	}
 }
 
 // StringKey creates a key from a string. Equivalent to Key([]byte(key)).
@@ -100,7 +109,10 @@ func (k *keyBuilder) Uint64Key(data uint64) kvstore.Key {
 	result := make([]byte, 12)
 	copy(result, k.prefix)
 	binary.BigEndian.PutUint64(result[prefixLength:], data)
-	return &key{data: result}
+	return &key{
+		keyBuilder: k,
+		data:       result,
+	}
 }
 
 // Int64Key creates a key from an int64. Resulting key is an 8-byte big-endian representation of the int64.
@@ -108,7 +120,10 @@ func (k *keyBuilder) Int64Key(data int64) kvstore.Key {
 	result := make([]byte, 12)
 	copy(result, k.prefix)
 	binary.BigEndian.PutUint64(result[prefixLength:], uint64(data))
-	return &key{data: result}
+	return &key{
+		keyBuilder: k,
+		data:       result,
+	}
 }
 
 // Uint32Key creates a key from a uint32. Resulting key is a 4-byte big-endian representation of the uint32.
@@ -116,7 +131,10 @@ func (k *keyBuilder) Uint32Key(data uint32) kvstore.Key {
 	result := make([]byte, 8)
 	copy(result, k.prefix)
 	binary.BigEndian.PutUint32(result[prefixLength:], data)
-	return &key{data: result}
+	return &key{
+		keyBuilder: k,
+		data:       result,
+	}
 }
 
 // Int32Key creates a key from an int32. Resulting key is a 4-byte big-endian representation of the int32.
@@ -124,5 +142,8 @@ func (k *keyBuilder) Int32Key(data int32) kvstore.Key {
 	result := make([]byte, 8)
 	copy(result, k.prefix)
 	binary.BigEndian.PutUint32(result[prefixLength:], uint32(data))
-	return &key{data: result}
+	return &key{
+		keyBuilder: k,
+		data:       result,
+	}
 }

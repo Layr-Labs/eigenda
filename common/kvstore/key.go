@@ -27,6 +27,8 @@ type Key interface {
 	// may not be equal to the byte slice that was used to create the key, and
 	// should be treated as an opaque value.
 	Raw() []byte
+	// Builder returns the KeyBuilder that created this key.
+	Builder() KeyBuilder
 }
 
 // KeyBuilder is used to create keys for a TableStore. Each KeyBuilder is scoped to a particular table,

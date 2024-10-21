@@ -84,7 +84,7 @@ func (t *tableStore) GetKeyBuilder(name string) (kvstore.KeyBuilder, error) {
 	return table, nil
 }
 
-// GetTables returns a list of all tables in the store in no particular order.
+// GetKeyBuilders returns a list of all tables in the store in no particular order.
 func (t *tableStore) GetKeyBuilders() []kvstore.KeyBuilder {
 	tables := make([]kvstore.KeyBuilder, 0, len(t.keyBuilderMap))
 	for _, kb := range t.keyBuilderMap {
@@ -145,12 +145,12 @@ func (t *tableStore) PutWithExpiration(key kvstore.Key, value []byte, expiryTime
 
 // NewIterator returns an iterator that can be used to iterate over a subset of the keys in the store.
 func (t *tableStore) NewIterator(prefix kvstore.Key) (iterator.Iterator, error) {
-	return t.base.NewIterator(prefix.Raw())
+	return newTableStoreIterator(t.base, prefix)
 }
 
 // NewTableIterator returns an iterator that can be used to iterate over all keys in a table.
 func (t *tableStore) NewTableIterator(builder kvstore.KeyBuilder) (iterator.Iterator, error) {
-	return t.NewIterator(builder.Key([]byte{}))
+	return newTableStoreIterator(t.base, builder.Key([]byte{}))
 }
 
 // ExpireKeysInBackground spawns a background goroutine that periodically checks for expired keys and deletes them.
