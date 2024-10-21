@@ -62,7 +62,26 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         );
     }
 
-    function verifyBlobV2() external view {}
+    function verifyBlobV2(
+        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate
+    ) external view {
+        EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
+            eigenDASignatureVerifier,
+            signedCertificate,
+            quorumNumbersRequired()
+        );
+    }
+
+    function verifyBlobV2(
+        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate,
+        bytes calldata additionalQuorumNumbersRequired
+    ) external view {
+        EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
+            eigenDASignatureVerifier,
+            signedCertificate,
+            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
+        );
+    }
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {

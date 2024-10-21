@@ -29,5 +29,12 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
         bytes calldata additionalQuorumNumbersRequired
     ) external view;
 
-    function verifyBlobV2() external view;
+    function verifyBlobV2(
+        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate
+    ) external view;
+
+    function verifyBlobV2(
+        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate,
+        bytes calldata additionalQuorumNumbersRequired
+    ) external view;
 }
