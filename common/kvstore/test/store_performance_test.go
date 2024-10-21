@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func writeThenReadBenchmark(b *testing.B, store kvstore.Store) {
+func writeThenReadBenchmark(b *testing.B, store kvstore.Store[[]byte]) {
 	keySize := 8
 	valueSize := 1024
 

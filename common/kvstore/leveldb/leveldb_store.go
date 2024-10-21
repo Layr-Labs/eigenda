@@ -12,7 +12,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-var _ kvstore.Store = &levelDBStore{}
+var _ kvstore.Store[[]byte] = &levelDBStore{}
 
 // levelDBStore implements kvstore.Store interfaces with levelDB as the backend engine.
 type levelDBStore struct {
@@ -25,7 +25,7 @@ type levelDBStore struct {
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
-func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
+func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
@@ -88,7 +88,7 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 }
 
 // NewBatch creates a new batch for the store.
-func (store *levelDBStore) NewBatch() kvstore.StoreBatch {
+func (store *levelDBStore) NewBatch() kvstore.Batch[[]byte] {
 	return &levelDBBatch{
 		store: store,
 		batch: new(leveldb.Batch),
