@@ -73,7 +73,7 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 			semver = "error"
 		}
 
-		logger.Warn("NodeInfo", "operatorId", operatorId, "semver", semver, "error", err)
+		logger.Warn("NodeInfo", "operatorId", operatorId.Hex(), "semver", semver, "error", err)
 		return semver
 	}
 
@@ -82,6 +82,6 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 		reply.Semver = "src-compile"
 	}
 
-	logger.Info("NodeInfo", "operatorId", operatorId, "socker", socket, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 	return reply.Semver
 }
