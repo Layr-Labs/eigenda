@@ -3,6 +3,7 @@ package corev2
 import (
 	"math"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -37,7 +38,7 @@ type BlobHeader struct {
 	QuorumNumbers []uint8
 
 	// PaymentHeader contains the payment information for the blob
-	PaymentHeader
+	core.PaymentMetadata
 
 	// AuthenticationData is the signature of the blob header by the account ID
 	AuthenticationData []byte `json:"authentication_data"`
@@ -57,16 +58,6 @@ func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
 		ChunkLength: uint64(length),
 	}, nil
 
-}
-
-type PaymentHeader struct {
-	// AccountID is the account that is paying for the blob to be stored. AccountID is hexadecimal representation of the ECDSA public key
-	AccountID string
-
-	// Cumulative Payment
-	CumulativePayment uint64
-
-	BinIndex uint64
 }
 
 type BlobCertificate struct {
