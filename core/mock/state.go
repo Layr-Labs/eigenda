@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
@@ -36,7 +37,8 @@ type PrivateOperatorState struct {
 }
 
 func MakeOperatorId(id int) core.OperatorID {
-	data := [32]byte{uint8(id)}
+	var data [32]byte
+	binary.LittleEndian.PutUint64(data[:8], uint64(id))
 	return data
 }
 
