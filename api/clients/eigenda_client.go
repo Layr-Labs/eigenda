@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
@@ -143,6 +144,19 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
 // to be reached (guarded by WaitForFinalization config param) before returning.
 // This function is resilient to transient failures and timeouts.
+//
+// PutBlob returned errors all implement the ErrorAPI interface, which allows the caller
+// to determine whether the error is a client or server fault, as well as get its status code.
+// A 503 error returned is used to signify that eigenda is temporarily unavailable,
+// and suggest to the caller (most likely some rollup batcher via the eigenda-proxy)
+// to fallback to ethda for some amount of time.
+// See https://github.com/ethereum-optimism/specs/issues/434 for more details.
+//
+// Seriously considered literally returning the ErrorAPI interface instead of error,
+// but this seems like a very uncommon pattern in Go, so I'm not sure if it's a good idea.
+// https://www.reddit.com/r/golang/comments/18wnmhx/returning_a_type_representing_an_error_rather/
+// has some pros and cons, although their main con is when the return type is a struct pointer,
+// which wouldn't apply in our case.
 func (m *EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
@@ -153,25 +167,25 @@ func (m *EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperse
 	}
 }
 
-func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan api.ErrorAPI) {
 	resultChan = make(chan *grpcdisperser.BlobInfo, 1)
-	errChan = make(chan error, 1)
+	errChan = make(chan api.ErrorAPI, 1)
 	go m.putBlob(ctx, data, resultChan, errChan)
 	return
 }
 
-func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan api.ErrorAPI) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
 	if m.Codec == nil {
-		errChan <- fmt.Errorf("Codec cannot be nil")
+		errChan <- api.NewErrorAPIGeneric(api.ErrorCodeBadRequest, fmt.Errorf("codec not initialized"))
 		return
 	}
 
 	data, err := m.Codec.EncodeBlob(rawData)
 	if err != nil {
-		errChan <- fmt.Errorf("error encoding blob: %w", err)
+		errChan <- api.NewErrorAPIGeneric(api.ErrorCodeBadRequest, fmt.Errorf("error encoding blob: %w", err))
 		return
 	}
 
@@ -183,13 +197,21 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
-		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
+		errChan <- &api.ErrorAPIGeneric{
+			Err: fmt.Errorf("error submitted authenticated blob to disperser: %w", err),
+			// We set to unknown fault b/c disperser client returns a mix of 400s and 500s currently.
+			// TODO: update disperser client to also return ErrorAPIGeneric errors
+			Code:  0,
+			Fault: api.ErrorFaultUnknown,
+		}
 		return
 	}
 
 	// process response
 	if *blobStatus == disperser.Failed {
-		errChan <- fmt.Errorf("unable to disperse blob to eigenda (reply status %d): %w", blobStatus, err)
+		// Don't think this state should be reachable. DisperseBlobAuthenticated should return an error instead of a failed status.
+		// TODO: we should document that endpoint in the proto file to mention this. If it is the case, then we can remove this code.
+		errChan <- api.NewErrorAPIGeneric(api.ErrorCodeInternal, fmt.Errorf("dispersed blob immediately in failed status, something bad happened: %w", err))
 		return
 	}
 
@@ -205,10 +227,26 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 
 	alreadyWaitingForDispersal := false
 	alreadyWaitingForFinalization := false
+	var latestBlobStatus grpcdisperser.BlobStatus
 	for {
 		select {
 		case <-ctx.Done():
-			errChan <- fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id=%s: %w", base64RequestID, ctx.Err())
+			// We can only land here if blob is still in
+			// 1. processing or dispersing status: waiting to land onchain
+			// 2. or confirmed status: landed onchain, waiting for finalization
+			// because all other statuses return immediately below.
+			//
+			// Assuming that the timeout is correctly set (long enough to both land onchain + finalize),
+			// 1. means that there is a problem with EigenDA, so we return 503 to let the batcher failover to ethda
+			// 2. means that there is a problem with Ethereum, so we return 500.
+			//    batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
+			//    eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
+			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
+				errChan <- api.NewErrorAPIGeneric(api.ErrorCodeUnavailable,
+					fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctx.Err()))
+			}
+			// but not else (otherwise it might be a problem with ethereum, so fallbacking to ethda wouldnt help)
+			errChan <- api.NewErrorAPIGeneric(api.ErrorCodeInternal, fmt.Errorf("timed out waiting for blob that landed onchain to finalize (request id=%s): %w. Either timeout not long enough, or ethereum might be experiencing difficulties.", base64RequestID, ctx.Err()))
 			return
 		case <-ticker.C:
 			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
@@ -216,7 +254,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				m.Log.Warn("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
 			}
-
+			latestBlobStatus = statusRes.Status
 			switch statusRes.Status {
 			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
 				// to prevent log clutter, we only log at info level once
@@ -227,10 +265,12 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 					alreadyWaitingForDispersal = true
 				}
 			case grpcdisperser.BlobStatus_FAILED:
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
+				// TODO: when exactly does this happen? I think only happens if ethereum reorged and the blob was lost
+				errChan <- api.NewErrorAPIGeneric(api.ErrorCodeInternal, fmt.Errorf("blob dispersal (requestID=%s) reached failed status. please resubmit the blob.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES:
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with insufficient signatures, requestID=%s: %w", base64RequestID, err)
+				// this might be a temporary condition where some eigenda nodes were temporarily offline, so we should retry
+				errChan <- api.NewErrorAPIGeneric(api.ErrorCodeInternal, fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. please resubmit the blob.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {
@@ -253,7 +293,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				return
 			default:
 				// this should never happen. If it does, the blob is in a heisenberg state... it could either eventually get confirmed or fail
-				errChan <- fmt.Errorf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID)
+				errChan <- api.NewErrorAPIGeneric(api.ErrorCodeInternal, fmt.Errorf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID))
 				return
 			}
 		}
