@@ -34,11 +34,6 @@ service Disperser {
 	// 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
 
-	// DispersePaidBlobAuthenticated is similar to DispersePaidBlob, except that it requires the
-	// client to authenticate itself via the AuthenticationData message. The protoco is similar to 
-	// DisperseBlobAuthenticated.
-	rpc DispersePaidBlobAuthenticated(stream AuthenticatedPaidRequest) returns (stream AuthenticatedReply);
-
 	// This API is meant to be polled for the blob status.
 	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
@@ -58,13 +53,6 @@ service Disperser {
 message AuthenticatedRequest {
 	oneof payload {
 		DisperseBlobRequest disperse_request = 1;
-		AuthenticationData authentication_data = 2;
-	}
-}
-
-message AuthenticatedPaidRequest {
-	oneof payload {
-		DispersePaidBlobRequest disperse_paid_request = 1;
 		AuthenticationData authentication_data = 2;
 	}
 }
@@ -130,7 +118,10 @@ message DispersePaidBlobRequest {
 	// for individual requests.
 	repeated uint32 custom_quorum_numbers = 2;
 	
+	// Payment header contains AccountID, BinIndex, and CumulativePayment
 	common.PaymentHeader payment_header = 3;
+	// signature of payment_header
+	bytes payment_signature = 4;
 }
 
 message DisperseBlobReply {

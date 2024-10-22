@@ -231,10 +231,6 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 }
 
-func (s *DispersalServer) DispersePaidBlobAuthenticated(stream pb.Disperser_DispersePaidBlobAuthenticatedServer) error {
-	return api.NewGRPCError(codes.Unimplemented, "not implemented")
-}
-
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {

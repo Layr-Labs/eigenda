@@ -45,7 +45,6 @@ type DisperserClient interface {
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
-	DispersePaidBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 }
@@ -250,11 +249,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	return blobStatus, disperseReply.DisperseReply.GetRequestId(), nil
-}
-
-// TODO: implemented in subsequent PR
-func (c *disperserClient) DispersePaidBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, api.NewGRPCError(codes.Unimplemented, "not implemented")
 }
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
