@@ -1,7 +1,7 @@
 syntax = "proto3";
 package node.v2;
 import "google/protobuf/wrappers.proto";
-import "common/common.proto";
+import "common/v2/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node/v2";
 
 // The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
@@ -26,7 +26,7 @@ service Retrieval {
 
 message StoreChunksRequest {
 	// list of blob certificates to process
-	repeated common.BlobCertificate blob_certificates = 1;
+	repeated common.v2.BlobCertificate blob_certificates = 1;
 }
 
 message StoreChunksReply {
@@ -51,7 +51,7 @@ message GetBlobCertificateRequest {
 }
 
 message GetBlobCertificateReply {
-	common.BlobCertificate blob_certificate = 1;
+	common.v2.BlobCertificate blob_certificate = 1;
 }
 
 // Node info request
