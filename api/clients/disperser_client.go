@@ -18,8 +18,8 @@ import (
 )
 
 type Config struct {
-	Hostname          string
-	Port              string
+	Hostname string
+	Port     string
 	// BlobDispersal Timeouts for both authenticated and unauthenticated dispersals
 	// GetBlobStatus and RetrieveBlob timeouts are hardcoded to 60seconds
 	// TODO: do we want to add config timeouts for those separate requests?
@@ -161,7 +161,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_DisperseRequest{
 		DisperseRequest: request,
 	}})
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to send request: %w", err)
 	}

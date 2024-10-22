@@ -16,6 +16,8 @@ func NewDefaultBlobCodec() DefaultBlobCodec {
 	return DefaultBlobCodec{}
 }
 
+// EncodeBlob can never return an error, but to maintain the interface it is included
+// so that it can be swapped for the IFFTCodec without changing the interface
 func (v DefaultBlobCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	codecBlobHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the codecBlobHeader is a valid bn254 element
