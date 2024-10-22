@@ -36,6 +36,7 @@ type (
 		QueryOperatorQuorumEvent(ctx context.Context, startBlock, endBlock uint32) (*OperatorQuorumEvents, error)
 		QueryIndexedOperatorsWithStateForTimeWindow(ctx context.Context, days int32, state OperatorState) (*IndexedQueriedOperatorInfo, error)
 		QueryOperatorInfoByOperatorId(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error)
+		QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error)
 	}
 	Batch struct {
 		Id              []byte
@@ -84,6 +85,7 @@ type (
 	IndexedQueriedOperatorInfo struct {
 		Operators map[core.OperatorID]*QueriedOperatorInfo
 	}
+
 	NonSigner struct {
 		OperatorId string
 		Count      int
@@ -272,6 +274,51 @@ func (sc *subgraphClient) QueryIndexedOperatorsWithStateForTimeWindow(ctx contex
 	return &IndexedQueriedOperatorInfo{
 		Operators: operators,
 	}, nil
+}
+
+func (sc *subgraphClient) QueryOperatorEjectionsForTimeWindow(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
+	// Query all operators in the last N days.
+	lastNDayInSeconds := uint64(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
+
+	var err error
+	var ejections []*subgraph.OperatorEjection
+
+	if operatorId == "" {
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestamp(ctx, lastNDayInSeconds, first, skip)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ejections, err = sc.api.QueryOperatorEjectionsGteBlockTimestampByOperatorId(ctx, lastNDayInSeconds, operatorId, first, skip)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	queriedEjections := make([]*QueriedOperatorEjections, len(ejections))
+	for i, ejection := range ejections {
+		blockNumber, err := strconv.ParseUint(string(ejection.BlockNumber), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		timestamp, err := strconv.ParseInt(string(ejection.BlockTimestamp), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		t := time.Unix(timestamp, 0)
+		blockTimestamp := t.Format(time.RFC3339)
+		queriedEjections[i] = &QueriedOperatorEjections{
+			OperatorId:      string(ejection.OperatorId),
+			Quorum:          uint8(ejection.QuorumNumber),
+			BlockNumber:     blockNumber,
+			BlockTimestamp:  blockTimestamp,
+			TransactionHash: string(ejection.TransactionHash),
+		}
+	}
+
+	return queriedEjections, nil
 }
 
 func (sc *subgraphClient) QueryIndexedDeregisteredOperatorsForTimeWindow(ctx context.Context, days int32) (*IndexedQueriedOperatorInfo, error) {

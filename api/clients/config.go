@@ -8,22 +8,33 @@ import (
 )
 
 type EigenDAClientConfig struct {
-	// RPC is the HTTP provider URL for the Data Availability node.
+	// RPC is the HTTP provider URL for the EigenDA Disperser
 	RPC string
 
-	// The total amount of time that the client will spend waiting for EigenDA to confirm a blob
+	// Timeout used when making dispersals to the EigenDA Disperser
+	// TODO: we should change this param as its name is quite confusing
+	ResponseTimeout time.Duration
+
+	// The total amount of time that the client will spend waiting for EigenDA
+	// to confirm a blob after it has been dispersed
+	// Note that reasonable values for this field will depend on the value of WaitForFinalization.
 	StatusQueryTimeout time.Duration
 
 	// The amount of time to wait between status queries of a newly dispersed blob
 	StatusQueryRetryInterval time.Duration
 
-	// The total amount of time that the client will waiting for a response from the EigenDA disperser
-	ResponseTimeout time.Duration
+	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
+	WaitForFinalization bool
 
 	// The quorum IDs to write blobs to using this client. Should not include default quorums 0 or 1.
+	// TODO: should we change this to core.QuorumID instead? https://github.com/Layr-Labs/eigenda/blob/style--improve-api-clients-comments/core/data.go#L18
 	CustomQuorumIDs []uint
 
-	// Signer private key in hex encoded format. This key should not be associated with an Ethereum address holding any funds.
+	// Signer private key in hex encoded format. This key is currently purely used for authn/authz on the disperser.
+	// For security, it should not be associated with an Ethereum address holding any funds.
+	// This might change once we introduce payments.
+	// OPTIONAL: this value is optional, and if set to "", will result in a read-only eigenDA client,
+	// that can retrieve blobs but cannot disperse blobs.
 	SignerPrivateKeyHex string
 
 	// Whether to disable TLS for an insecure connection when connecting to a local EigenDA disperser instance.
@@ -37,9 +48,6 @@ type EigenDAClientConfig struct {
 	// the commitment. With this mode disabled, you will need to supply the entire blob to perform a verification
 	// that any part of the data matches the KZG commitment.
 	DisablePointVerificationMode bool
-
-	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
-	WaitForFinalization bool
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {

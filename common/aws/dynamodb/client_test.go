@@ -661,3 +661,91 @@ func TestQueryIndexOrderWithLimit(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 30) // Should return all items
 }
+
+func TestQueryWithInput(t *testing.T) {
+	tableName := "ProcessingQueryWithInput"
+	createTable(t, tableName)
+
+	ctx := context.Background()
+	numItems := 30
+	items := make([]commondynamodb.Item, numItems)
+	for i := 0; i < numItems; i++ {
+		requestedAt := time.Now().Add(-time.Duration(i) * time.Minute).Unix()
+		items[i] = commondynamodb.Item{
+			"MetadataKey": &types.AttributeValueMemberS{Value: fmt.Sprintf("key%d", i)},
+			"BlobKey":     &types.AttributeValueMemberS{Value: fmt.Sprintf("blob%d", i)},
+			"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+			"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+			"RequestedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(requestedAt, 10)},
+		}
+	}
+	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
+	assert.NoError(t, err)
+	assert.Len(t, unprocessed, 0)
+
+	// Test forward order with limit
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
+		KeyConditionExpression: aws.String("BlobStatus = :status"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":status": &types.AttributeValueMemberN{Value: "0"},
+		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(10),
+	}
+	queryResult, err := dynamoClient.QueryWithInput(ctx, queryInput)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in ascending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value <= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test reverse order with limit
+	queryInput = &dynamodb.QueryInput{
+		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
+		KeyConditionExpression: aws.String("BlobStatus = :status"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":status": &types.AttributeValueMemberN{Value: "0"},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(10),
+	}
+	queryResult, err = dynamoClient.QueryWithInput(ctx, queryInput)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 10)
+	// Check if the items are in descending order
+	for i := 0; i < len(queryResult)-1; i++ {
+		assert.True(t, queryResult[i]["RequestedAt"].(*types.AttributeValueMemberN).Value >= queryResult[i+1]["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	}
+
+	// Test with a smaller limit
+	queryInput = &dynamodb.QueryInput{
+		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
+		KeyConditionExpression: aws.String("BlobStatus = :status"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":status": &types.AttributeValueMemberN{Value: "0"},
+		},
+		Limit: aws.Int32(5),
+	}
+	queryResult, err = dynamoClient.QueryWithInput(ctx, queryInput)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 5)
+
+	// Test with a limit larger than the number of items
+	queryInput = &dynamodb.QueryInput{
+		TableName:              aws.String(tableName),
+		IndexName:              aws.String("StatusIndex"),
+		KeyConditionExpression: aws.String("BlobStatus = :status"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":status": &types.AttributeValueMemberN{Value: "0"},
+		},
+		Limit: aws.Int32(50),
+	}
+	queryResult, err = dynamoClient.QueryWithInput(ctx, queryInput)
+	assert.NoError(t, err)
+	assert.Len(t, queryResult, 30) // Should return all items
+}

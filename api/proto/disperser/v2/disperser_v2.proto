@@ -1,6 +1,7 @@
 syntax = "proto3";
 package disperser.v2;
 import "common/common.proto";
+import "common/v2/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
 // WARNING: the following RPCs are experimental and subject to change.
@@ -24,16 +25,13 @@ service Disperser {
 
 message DisperseBlobRequest {
 	// The data to be dispersed.
-	// The size of data must be <= 2MiB. Every 32 bytes of data chunk is interpreted as an integer in big endian format
+	// The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
 	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-	// as a field element on the bn254 curve. The valid range is 
+	// as a field element on the bn254 curve. The valid range is
 	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-	// containing slightly less than 254 bits and more than 253 bits. If any one of the 32 bytes chunk is outside the range, 
-	// the whole request is deemed as invalid, and rejected. 
+	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
 	bytes data = 1;
-	BlobHeader blob_header = 2;
-	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-	bytes authentication_data = 3;
+	common.v2.BlobHeader blob_header = 2;
 }
 
 message DisperseBlobReply {
@@ -97,19 +95,8 @@ enum BlobStatus {
 	INSUFFICIENT_SIGNATURES = 5;
 }
 
-message BlobHeader {
-	repeated uint32 quorum_numbers = 1;
-	// API version used to disperse the blob
-	uint32 version = 2;
-	uint32 bin_index = 3;
-	uint64 cumulative_payment = 4;
-	// Ethereum Account Address in Hex string "0x..."
-	string account_id = 5;
-	common.G1Commitment commitment = 6;
-}
-
 message SignedCertificate {
-	common.BlobCertificate blob_certificate = 1;
+	common.v2.BlobCertificate blob_certificate = 1;
   Attestation non_signer_stakes_and_signature = 2;
 }
 

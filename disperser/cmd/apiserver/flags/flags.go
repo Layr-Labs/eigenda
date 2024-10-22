@@ -63,6 +63,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	/* Optional Flags*/
+	DisperserVersionFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-version"),
+		Usage:    "Disperser version. Options are 1 and 2.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_VERSION"),
+	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -113,6 +120,7 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	DisperserVersionFlag,
 	MetricsHTTPPort,
 	EnableMetrics,
 	EnableRatelimiter,

@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -254,6 +255,15 @@ func (c *Client) Query(ctx context.Context, tableName string, keyCondition strin
 	return response.Items, nil
 }
 
+// QueryWithInput is a wrapper for the Query function that allows for a custom query input
+func (c *Client) QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error) {
+	response, err := c.dynamoClient.Query(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return response.Items, nil
+}
+
 // QueryIndexCount returns the count of the items in the index that match the given key
 func (c *Client) QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) (int32, error) {
 	response, err := c.dynamoClient.Query(ctx, &dynamodb.QueryInput{
@@ -407,4 +417,18 @@ func (c *Client) readItems(ctx context.Context, tableName string, keys []Key) ([
 	}
 
 	return items, nil
+}
+
+// TableExists checks if a table exists and can be described
+func (c *Client) TableExists(ctx context.Context, name string) error {
+	if name == "" {
+		return errors.New("table name is empty")
+	}
+	_, err := c.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		TableName: aws.String(name),
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

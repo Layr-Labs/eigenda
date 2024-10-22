@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type AccountID = string
@@ -220,6 +222,14 @@ type Blob struct {
 	Data          []byte
 }
 
+func (b *Blob) GetQuorumNumbers() []uint8 {
+	quorumNumbers := make([]uint8, 0, len(b.RequestHeader.SecurityParams))
+	for _, sp := range b.RequestHeader.SecurityParams {
+		quorumNumbers = append(quorumNumbers, sp.QuorumID)
+	}
+	return quorumNumbers
+}
+
 // BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
 // Signing the combination of the Nonce and the BlobCommitments prohibits the disperser from
 // using the signature to charge the user for a different blob or for dispersing the same blob
@@ -291,7 +301,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -469,4 +479,51 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 		c[quorum] = fr
 	}
 	return c, nil
+}
+
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// Existing fields
+	AccountID string
+
+	// New fields
+	BinIndex uint32
+	// TODO: we are thinking the contract can use uint128 for cumulative payment,
+	// but the definition on v2 uses uint64. Double check with team.
+	CumulativePayment *big.Int
+}
+
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) Hash() []byte {
+	// Create a byte slice to hold the serialized data
+	data := make([]byte, 0, len(pm.AccountID)+4+pm.CumulativePayment.BitLen()/8+1)
+
+	// Append AccountID
+	data = append(data, []byte(pm.AccountID)...)
+
+	// Append BinIndex
+	binIndexBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
+	data = append(data, binIndexBytes...)
+
+	// Append CumulativePayment
+	paymentBytes := pm.CumulativePayment.Bytes()
+	data = append(data, paymentBytes...)
+
+	return crypto.Keccak256(data)
+}
+
+// OperatorInfo contains information about an operator which is stored on the blockchain state,
+// corresponding to a particular quorum
+type ActiveReservation struct {
+	SymbolsPerSec  uint64 // reserve number of symbols per second
+	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
+	EndTimestamp   uint64
+
+	QuorumNumbers []uint8 // allowed quorums
+	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+}
+
+type OnDemandPayment struct {
+	CumulativePayment *big.Int // Total amount deposited by the user
 }

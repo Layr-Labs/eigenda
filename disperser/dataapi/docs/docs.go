@@ -528,6 +528,115 @@ const docTemplate = `{
                 }
             }
         },
+        "/operators-info/operator-ejections": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsInfo"
+                ],
+                "summary": "Fetch list of operator ejections over last N days.",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Lookback in days [default: 1]",
+                        "name": "days",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Operator ID filter [default: all operators]",
+                        "name": "operator_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Return first N ejections [default: 1000]",
+                        "name": "first",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Skip first N ejections [default: 0]",
+                        "name": "skip",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.QueriedOperatorEjectionsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators-info/operators-stake": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsStake"
+                ],
+                "summary": "Operator stake distribution query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "operator_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.OperatorsStakeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/operators-info/port-check": {
             "get": {
                 "produces": [
@@ -829,6 +938,23 @@ const docTemplate = `{
                 }
             }
         },
+        "dataapi.OperatorStake": {
+            "type": "object",
+            "properties": {
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum_id": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                }
+            }
+        },
         "dataapi.OperatorsNonsigningPercentage": {
             "type": "object",
             "properties": {
@@ -840,6 +966,51 @@ const docTemplate = `{
                 },
                 "meta": {
                     "$ref": "#/definitions/dataapi.Meta"
+                }
+            }
+        },
+        "dataapi.OperatorsStakeResponse": {
+            "type": "object",
+            "properties": {
+                "stake_ranked_operators": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/dataapi.OperatorStake"
+                        }
+                    }
+                }
+            }
+        },
+        "dataapi.QueriedOperatorEjections": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "block_timestamp": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum": {
+                    "type": "integer"
+                },
+                "transaction_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.QueriedOperatorEjectionsResponse": {
+            "type": "object",
+            "properties": {
+                "ejections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dataapi.QueriedOperatorEjections"
+                    }
                 }
             }
         },

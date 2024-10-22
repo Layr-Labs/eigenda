@@ -29,13 +29,10 @@ message BlobCommitment {
 	uint32 data_length = 4;
 }
 
-// BlobCertificate is what gets attested by the network
-message BlobCertificate {
-	uint32 version = 1;
-	bytes blob_key = 2;
-	BlobCommitment blob_commitment = 3;
-	repeated uint32 quorum_numbers = 4;
-	uint32 reference_block_number = 5;
+message PaymentHeader {
+  string account_id = 1;
+  uint32 bin_index = 2;
+  bytes cumulative_payment = 3;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
