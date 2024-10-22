@@ -11,28 +11,35 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 **/
 contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
  
-    constructor(
-        uint256 _reservationBinInterval,
-        uint256 _reservationBinStartTimestamp,
-        uint256 _priceUpdateCooldown
-    ) PaymentVaultStorage(
-        _reservationBinInterval,
-        _reservationBinStartTimestamp,
-        _priceUpdateCooldown
-    ){
+    constructor() {
         _disableInitializers();
+    }
+
+    receive() external payable {
+        _deposit(msg.sender, msg.value);
+    }
+
+    fallback() external payable {
+        _deposit(msg.sender, msg.value);
     }
 
     function initialize(
         address _initialOwner,
         uint256 _minChargeableSize,
         uint256 _globalSymbolsPerSecond,
-        uint256 _pricePerSymbol
+        uint256 _pricePerSymbol,
+        uint256 _reservationBinInterval,
+        uint256 _priceUpdateCooldown
     ) public initializer {
         transferOwnership(_initialOwner);
+        
         minChargeableSize = _minChargeableSize;
         globalSymbolsPerSecond = _globalSymbolsPerSecond;
         pricePerSymbol = _pricePerSymbol;
+        reservationBinInterval = _reservationBinInterval;
+        priceUpdateCooldown = _priceUpdateCooldown;
+
+        lastPriceUpdateTime = block.timestamp;
     }
 
     /**
@@ -54,15 +61,24 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
      * @param _account is the address to deposit the funds for
      */
     function depositOnDemand(address _account) external payable {
-		onDemandPayments[_account] += msg.value;
-        emit OnDemandPaymentUpdated(_account, msg.value, onDemandPayments[_account]);
+		_deposit(_account, msg.value);
     }
 
-    function setMinChargeableSize(uint256 _minChargeableSize) external onlyOwner {
+    function setPriceParams(
+        uint256 _minChargeableSize,
+        uint256 _pricePerSymbol,
+        uint256 _priceUpdateCooldown
+    ) external onlyOwner {
         require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
-        emit MinChargeableSizeUpdated(minChargeableSize, _minChargeableSize);
-        lastPriceUpdateTime = block.timestamp;
+        emit PriceParamsUpdated(
+            minChargeableSize, _minChargeableSize, 
+            pricePerSymbol, _pricePerSymbol, 
+            priceUpdateCooldown, _priceUpdateCooldown
+        );
+        pricePerSymbol = _pricePerSymbol;
         minChargeableSize = _minChargeableSize;
+        priceUpdateCooldown = _priceUpdateCooldown;
+        lastPriceUpdateTime = block.timestamp;
     }
 
     function setGlobalSymbolsPerSecond(uint256 _globalSymbolsPerSecond) external onlyOwner {
@@ -70,9 +86,9 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         globalSymbolsPerSecond = _globalSymbolsPerSecond;
     }
 
-    function setPricePerSymbol(uint256 _pricePerSymbol) external onlyOwner {
-        emit PricePerSymbolUpdated(pricePerSymbol, _pricePerSymbol);
-        pricePerSymbol = _pricePerSymbol;
+    function setReservationBinInterval(uint256 _reservationBinInterval) external onlyOwner {
+        emit ReservationBinIntervalUpdated(reservationBinInterval, _reservationBinInterval);
+        reservationBinInterval = _reservationBinInterval;
     }
 
     function withdraw(uint256 _amount) external onlyOwner {
@@ -89,6 +105,11 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         uint8 total;
         for(uint256 i; i < _quorumSplits.length; ++i) total += uint8(_quorumSplits[i]);
         require(total == 100, "sum of quorumSplits must be 100");
+    }
+
+    function _deposit(address _account, uint256 _amount) internal {
+        onDemandPayments[_account] += _amount;
+        emit OnDemandPaymentUpdated(_account, _amount, onDemandPayments[_account]);
     }
 
     /// @notice Fetches the current reservation for an account
