@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -149,7 +148,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 
 // TODO: implemented in subsequent PR
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return nil, nil, api.NewErrorInternal("not implemented")
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
