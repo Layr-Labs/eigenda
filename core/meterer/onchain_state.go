@@ -52,18 +52,13 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPay
 
 // RefreshOnchainPaymentState returns the current onchain payment state (TODO: can optimize based on contract interface)
 func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
-	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return err
-	}
-
 	pcs.ReservationsLock.Lock()
 	accountIDs := make([]string, 0, len(pcs.ActiveReservations))
 	for accountID := range pcs.ActiveReservations {
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	activeReservations, err := tx.GetActiveReservations(ctx, blockNumber, accountIDs)
+	activeReservations, err := tx.GetActiveReservations(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -76,7 +71,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := tx.GetOnDemandPayments(ctx, blockNumber, accountIDs)
+	onDemandPayments, err := tx.GetOnDemandPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -91,12 +86,12 @@ func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, block
 }
 
 // GetActiveReservationByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
-func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
 	if reservation, ok := pcs.ActiveReservations[accountID]; ok {
 		return reservation, nil
 	}
 	// pulls the chain state
-	res, err := pcs.tx.GetActiveReservationByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.tx.GetActiveReservationByAccount(ctx, accountID)
 	if err != nil {
 		return core.ActiveReservation{}, errors.New("payment not found")
 	}
@@ -112,12 +107,12 @@ func (pcs *OnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNu
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
-func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
 	if payment, ok := pcs.OnDemandPayments[accountID]; ok {
 		return payment, nil
 	}
 	// pulls the chain state
-	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return core.OnDemandPayment{}, errors.New("payment not found")
 	}

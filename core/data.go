@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/common"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -515,14 +516,7 @@ func (pm *PaymentMetadata) Hash() []byte {
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
-type ActiveReservation struct {
-	SymbolsPerSec  uint64 // reserve number of symbols per second
-	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
-	EndTimestamp   uint64
-
-	QuorumNumbers []uint8 // allowed quorums
-	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-}
+type ActiveReservation = paymentvault.IPaymentVaultReservation
 
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user

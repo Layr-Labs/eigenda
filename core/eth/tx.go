@@ -22,6 +22,7 @@ import (
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 
@@ -55,6 +56,7 @@ type ContractBindings struct {
 	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
 	EjectionManager       *ejectionmg.ContractEjectionManager
 	AVSDirectory          *avsdir.ContractAVSDirectory
+	PaymentVault          *paymentvault.ContractPaymentVault
 }
 
 type BN254G1Point struct {
@@ -763,24 +765,71 @@ func (t *Transactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber u
 	return requiredQuorums, nil
 }
 
-func (t *Transactor) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
-	// contract is not implemented yet
-	return map[string]core.ActiveReservation{}, nil
+func (t *Transactor) GetActiveReservations(ctx context.Context, accountIDs []string) (map[string]core.ActiveReservation, error) {
+	// map accountIDs to addresses
+	accountAddresses := make([]gethcommon.Address, len(accountIDs))
+	for i, accountID := range accountIDs {
+		accountAddresses[i] = gethcommon.HexToAddress(accountID)
+	}
+
+	reservations_map := make(map[string]core.ActiveReservation)
+	reservations, err := t.Bindings.PaymentVault.GetReservations(&bind.CallOpts{
+		Context: ctx,
+	}, accountAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	// since reservations are returned in the same order as the accountIDs, we can directly map them
+	for i, reservation := range reservations {
+		reservations_map[accountIDs[i]] = reservation
+	}
+	return reservations_map, nil
 }
 
-func (t *Transactor) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
-	// contract is not implemented yet
-	return core.ActiveReservation{}, nil
+func (t *Transactor) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
+	reservation, err := t.Bindings.PaymentVault.GetReservation(&bind.CallOpts{
+		Context: ctx,
+	}, gethcommon.HexToAddress(accountID))
+	if err != nil {
+		return core.ActiveReservation{}, err
+	}
+	return reservation, nil
 }
 
-func (t *Transactor) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
-	// contract is not implemented yet
-	return map[string]core.OnDemandPayment{}, nil
+func (t *Transactor) GetOnDemandPayments(ctx context.Context, accountIDs []string) (map[string]core.OnDemandPayment, error) {
+	// map accountIDs to addresses
+	accountAddresses := make([]gethcommon.Address, len(accountIDs))
+	for i, accountID := range accountIDs {
+		accountAddresses[i] = gethcommon.HexToAddress(accountID)
+	}
+	payments_map := make(map[string]core.OnDemandPayment)
+	payments, err := t.Bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
+		Context: ctx,
+	}, accountAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	// since payments are returned in the same order as the accountIDs, we can directly map them
+	for i, payment := range payments {
+		payments_map[accountIDs[i]] = core.OnDemandPayment{
+			CumulativePayment: payment,
+		}
+	}
+	return payments_map, nil
 }
 
-func (t *Transactor) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
-	// contract is not implemented yet
-	return core.OnDemandPayment{}, nil
+func (t *Transactor) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
+	onDemandPayment, err := t.Bindings.PaymentVault.GetOnDemandAmount(&bind.CallOpts{
+		Context: ctx,
+	}, gethcommon.HexToAddress(accountID))
+	if err != nil {
+		return core.OnDemandPayment{}, err
+	}
+	return core.OnDemandPayment{
+		CumulativePayment: onDemandPayment,
+	}, nil
 }
 
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {

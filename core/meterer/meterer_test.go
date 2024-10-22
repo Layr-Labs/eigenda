@@ -130,8 +130,8 @@ func setup(_ *testing.M) {
 	now := uint64(time.Now().Unix())
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
-	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1Reservations = core.ActiveReservation{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = core.ActiveReservation{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 

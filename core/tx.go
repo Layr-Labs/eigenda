@@ -148,14 +148,14 @@ type Transactor interface {
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
 
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
-	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
+	GetActiveReservations(ctx context.Context, accountIDs []string) (map[string]ActiveReservation, error)
 
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
-	GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (ActiveReservation, error)
+	GetActiveReservationByAccount(ctx context.Context, accountID string) (ActiveReservation, error)
 
 	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]OnDemandPayment, error)
+	GetOnDemandPayments(ctx context.Context, accountIDs []string) (map[string]OnDemandPayment, error)
 
 	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
+	GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (OnDemandPayment, error)
 }
