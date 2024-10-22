@@ -1,4 +1,4 @@
-package corev2
+package core
 
 import (
 	"math"

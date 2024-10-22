@@ -1,4 +1,4 @@
-package corev2
+package v2
 
 import (
 	"fmt"
@@ -24,8 +24,8 @@ func GetAssignments(state *core.OperatorState, blobVersion byte, quorum uint8) (
 		return nil, fmt.Errorf("too many operators for blob version %d", blobVersion)
 	}
 
-	n := big.NewInt(int64(len(ops)))
-	m := big.NewInt(int64(params.NumChunks))
+	numOperators := big.NewInt(int64(len(ops)))
+	numChunks := big.NewInt(int64(params.NumChunks))
 
 	type assignment struct {
 		id     core.OperatorID
@@ -37,10 +37,10 @@ func GetAssignments(state *core.OperatorState, blobVersion byte, quorum uint8) (
 	chunkAssignments := make([]assignment, 0, len(ops))
 	for ID, r := range state.Operators[quorum] {
 
-		num := new(big.Int).Mul(r.Stake, new(big.Int).Sub(m, n))
+		num := new(big.Int).Mul(r.Stake, new(big.Int).Sub(numChunks, numOperators))
 		denom := state.Totals[quorum].Stake
 
-		chunks := RoundUpDivideBig(num, denom)
+		chunks := core.RoundUpDivideBig(num, denom)
 
 		chunkAssignments = append(chunkAssignments, assignment{id: ID, index: uint32(r.Index), chunks: uint32(chunks.Uint64()), stake: r.Stake})
 	}
@@ -70,12 +70,10 @@ func GetAssignments(state *core.OperatorState, blobVersion byte, quorum uint8) (
 			a.chunks++
 		}
 
-		assignment := Assignment{
+		assignments[a.id] = Assignment{
 			StartIndex: index,
 			NumChunks:  a.chunks,
 		}
-
-		assignments[a.id] = assignment
 		index += a.chunks
 	}
 
