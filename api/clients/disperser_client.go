@@ -197,7 +197,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_DisperseRequest{
 		DisperseRequest: request,
 	}})
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to send request: %w", err)
 	}
