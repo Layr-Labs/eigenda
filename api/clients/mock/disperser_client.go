@@ -82,12 +82,6 @@ func (c *MockDisperserClient) DisperseBlob(ctx context.Context, data []byte, quo
 }
 
 // TODO: implement in the subsequent PR
-func (c *MockDisperserClient) DispersePaidBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, nil
-
-}
-
-// TODO: implement in the subsequent PR
 func (c *MockDisperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	return nil, nil, nil
 }
