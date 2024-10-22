@@ -34,6 +34,11 @@ service Disperser {
 	// 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
 
+	// DispersePaidBlobAuthenticated is similar to DispersePaidBlob, except that it requires the
+	// client to authenticate itself via the AuthenticationData message. The protoco is similar to 
+	// DisperseBlobAuthenticated.
+	rpc DispersePaidBlobAuthenticated(stream AuthenticatedPaidRequest) returns (stream AuthenticatedReply);
+
 	// This API is meant to be polled for the blob status.
 	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
@@ -54,7 +59,13 @@ message AuthenticatedRequest {
 	oneof payload {
 		DisperseBlobRequest disperse_request = 1;
 		AuthenticationData authentication_data = 2;
-		DispersePaidBlobRequest paid_disperse_request = 3;
+	}
+}
+
+message AuthenticatedPaidRequest {
+	oneof payload {
+		DispersePaidBlobRequest disperse_paid_request = 1;
+		AuthenticationData authentication_data = 2;
 	}
 }
 
@@ -119,17 +130,7 @@ message DispersePaidBlobRequest {
 	// for individual requests.
 	repeated uint32 custom_quorum_numbers = 2;
 	
-	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
-	// corresponding to the key used by the client to sign the BlobAuthHeader.
-	string account_id = 3;
-
-	// The bin index of the blob.
-	uint32 bin_index = 6;
-	// The cumulative payment of the blob.
-	uint64 cumulative_payment = 7;
-
-	// signature over payment related fields
-	bytes signature = 8;
+	common.PaymentHeader payment_header = 3;
 }
 
 message DisperseBlobReply {
