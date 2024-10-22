@@ -8,12 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -148,7 +150,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 
 // TODO: implemented in subsequent PR
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, nil
+	return nil, nil, api.NewGRPCError(codes.Unimplemented, "not implemented")
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
@@ -252,7 +254,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 
 // TODO: implemented in subsequent PR
 func (c *disperserClient) DispersePaidBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, nil
+	return nil, nil, api.NewGRPCError(codes.Unimplemented, "not implemented")
 }
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {

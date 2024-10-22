@@ -231,6 +231,10 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 
 }
 
+func (s *DispersalServer) DispersePaidBlobAuthenticated(stream pb.Disperser_DispersePaidBlobAuthenticatedServer) error {
+	return api.NewGRPCError(codes.Unimplemented, "not implemented")
+}
+
 func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	blob, err := s.validateRequestAndGetBlob(ctx, req)
 	if err != nil {
@@ -249,6 +253,10 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		s.metrics.HandleSuccessfulRpcRequest("DisperseBlob")
 	}
 	return reply, err
+}
+
+func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	return &pb.DisperseBlobReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
 }
 
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
