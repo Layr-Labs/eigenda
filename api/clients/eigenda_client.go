@@ -15,12 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/disperser"
 )
 
 // IEigenDAClient is a wrapper around the DisperserClient interface which
@@ -162,11 +162,37 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
 // to be reached (guarded by WaitForFinalization config param) before returning.
-// This function is resilient to transient failures and timeouts.
+//
+// TODO: describe retry/timeout behavior
 //
 // Upon return the blob is guaranteed to be:
 //   - finalized onchain (if Config.WaitForFinalization is true), or
-//   - confirmed at a certain depth (if Config.WaitForFinalization is false, in which case Config.WaitForConfirmationDepth specifies the depth).
+//   - confirmed at a certain depth (if Config.WaitForFinalization is false,
+//     in which case Config.WaitForConfirmationDepth specifies the depth).
+//
+// Errors returned all either grpc errors, or api.ErrorFailover, for eg:
+//
+//	 blobInfo, err := client.PutBlob(ctx, blobData)
+//	 if err != nil {
+//	   if errors.Is(err, api.ErrorFailover) {
+//	     // failover to ethda
+//		  }
+//	   st, isGRPCError := status.FromError(err)
+//	   if isGRPCError {
+//	     // use st.Code() and st.Message()
+//	   } else {
+//	     // assert this shouldn't happen
+//	   }
+//	 }
+//
+// An api.ErrorFailover error returned is used to signify that eigenda is temporarily unavailable,
+// and suggest to the caller (most likely some rollup batcher via the eigenda-proxy)
+// to fallback to ethda for some amount of time. Three reasons for returning api.ErrorFailover:
+//  1. Failed to put the blob in the disperser's queue (disperser is down)
+//  2. Timed out before getting confirmed onchain (batcher is down)
+//  3. Insufficient signatures (eigenda network is down)
+//
+// See https://github.com/ethereum-optimism/specs/issues/434 for more details.
 func (m *EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
@@ -189,13 +215,14 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 
 	// encode blob
 	if m.Codec == nil {
-		errChan <- fmt.Errorf("Codec cannot be nil")
+		errChan <- api.NewErrorInternal("codec not initialized")
 		return
 	}
 
 	data, err := m.Codec.EncodeBlob(rawData)
 	if err != nil {
-		errChan <- fmt.Errorf("error encoding blob: %w", err)
+		// Encode can only fail if there is something wrong with the data, so we return a 400 error
+		errChan <- api.NewErrorInvalidArg(fmt.Sprintf("error encoding blob: %v", err))
 		return
 	}
 
@@ -205,15 +232,11 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
-	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
-		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
-		return
-	}
-
-	// process response
-	if *blobStatus == disperser.Failed {
-		errChan <- fmt.Errorf("unable to disperse blob to eigenda (reply status %d): %w", blobStatus, err)
+		// Disperser-client returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
+		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
+		errChan <- fmt.Errorf("error submitting authenticated blob to disperser: %w", err)
 		return
 	}
 
@@ -229,10 +252,33 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 
 	alreadyWaitingForDispersal := false
 	alreadyWaitingForConfirmationOrFinality := false
+	var latestBlobStatus grpcdisperser.BlobStatus
 	for {
 		select {
 		case <-ctx.Done():
-			errChan <- fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id=%s: %w", base64RequestID, ctx.Err())
+			// We can only land here if blob is still in
+			// 1. processing or dispersing status: waiting to land onchain
+			// 2. or confirmed status: landed onchain, waiting for finalization
+			// because all other statuses return immediately below.
+			//
+			// Assuming that the timeout is correctly set (long enough to both land onchain + finalize),
+			// 1. means that there is a problem with EigenDA, so we return an ErrorFailover to let the batcher failover to ethda
+			// 2. means that there is a problem with Ethereum, so we return 500.
+			//    batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
+			//    eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
+			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
+				errChan <- api.NewErrorFailover(fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctx.Err()))
+			} else if latestBlobStatus == grpcdisperser.BlobStatus_CONFIRMED {
+				// Timeout'ing in confirmed state means one of two things:
+				// 1. (if timeout was long enough to finalize in normal conditions): problem with ethereum, so we return 504 (DeadlineExceeded)
+				// 2. TODO: (if timeout was not long enough to finalize in normal conditions): eigenda-client is badly configured, should be a 400 (INVALID_ARGUMENT)
+				errChan <- api.NewErrorDeadlineExceeded(
+					fmt.Sprintf("timed out waiting for blob that landed onchain to finalize (request id=%s). "+
+						"Either timeout not long enough, or ethereum might be experiencing difficulties: %v. ", base64RequestID, ctx.Err()))
+			} else {
+				// this should not be reachable...
+				errChan <- api.NewErrorInternal(fmt.Sprintf("timed out in a state that shouldn't be possible (request id=%s): %s", base64RequestID, ctx.Err()))
+			}
 			return
 		case <-ticker.C:
 			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
@@ -240,7 +286,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				m.Log.Warn("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
 			}
-
+			latestBlobStatus = statusRes.Status
 			switch statusRes.Status {
 			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
 				// to prevent log clutter, we only log at info level once
@@ -251,10 +297,21 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 					alreadyWaitingForDispersal = true
 				}
 			case grpcdisperser.BlobStatus_FAILED:
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
+				// This can happen for a few reasons:
+				// 1. blob has expired, a client retrieve after 14 days. Sounds like 400 errors, but not sure this can happen during dispersal...
+				// 2. internal logic error while requesting encoding (shouldn't happen), but should probably return api.ErrorFailover
+				// 3. wait for blob finalization from confirmation and blob retry has exceeded its limit.
+				//    Probably from a chain re-org. See https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
+				//    So we should be returning 500 to force a blob resubmission (not eigenda's fault but until
+				//    we have idempotency this is unfortunately the only solution)
+				// TODO: we should create new BlobStatus categories to separate these cases out. For now returning 500 is fine.
+				errChan <- api.NewErrorInternal(fmt.Sprintf("blob dispersal (requestID=%s) reached failed status. please resubmit the blob.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES:
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with insufficient signatures, requestID=%s: %w", base64RequestID, err)
+				// Some quorum failed to sign the blob, indicating that the whole network is having issues.
+				// We hence return api.ErrorFailover to let the batcher failover to ethda. This could however be a very unlucky
+				// temporary issue, so the caller should retry at least one more time before failing over.
+				errChan <- api.NewErrorFailover(fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. eigenda nodes are probably down.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {
@@ -291,7 +348,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				return
 			default:
 				// this should never happen. If it does, the blob is in a heisenberg state... it could either eventually get confirmed or fail
-				errChan <- fmt.Errorf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID)
+				errChan <- api.NewErrorInternal(fmt.Sprintf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID))
 				return
 			}
 		}

@@ -42,6 +42,8 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 type DisperserClient interface {
 	Close() error
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
+	// DisperseBlobAuthenticated disperses a blob with an authenticated request.
+	// The BlobStatus returned will always be PROCESSSING if error is nil.
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
@@ -197,7 +199,6 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	err = stream.Send(&disperser_rpc.AuthenticatedRequest{Payload: &disperser_rpc.AuthenticatedRequest_DisperseRequest{
 		DisperseRequest: request,
 	}})
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to send request: %w", err)
 	}
@@ -245,6 +246,11 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	blobStatus, err := disperser.FromBlobStatusProto(disperseReply.DisperseReply.GetResult())
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Assert: only status that makes sense is processing. Anything else is a bug on disperser side.
+	if *blobStatus != disperser.Processing {
+		return nil, nil, fmt.Errorf("expected status to be Processing, got %v", *blobStatus)
 	}
 
 	return blobStatus, disperseReply.DisperseReply.GetRequestId(), nil
