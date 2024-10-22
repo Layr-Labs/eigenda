@@ -22,10 +22,10 @@ type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
 	GetCodec() codecs.BlobCodec
+	Close() error
 }
 
-// EigenDAClient is a wrapper around the DisperserClient which
-// encodes blobs before dispersing them, and decodes them after retrieving them.
+// See the NewEigenDAClient constructor's documentation for details and usage examples.
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
@@ -37,6 +37,33 @@ type EigenDAClient struct {
 
 var _ IEigenDAClient = &EigenDAClient{}
 
+// EigenDAClient is a wrapper around the DisperserClient which
+// encodes blobs before dispersing them, and decodes them after retrieving them.
+// It also turns the disperser's async polling-based API (disperseBlob + poll GetBlobStatus)
+// into a sync API where PutBlob will poll for the blob to be confirmed or finalized.
+//
+// DisperserClient is safe to be used concurrently by multiple goroutines.
+// Don't forget to call Close() on the client when you're done with it, to close the
+// underlying grpc connection maintained by the DiserserClient.
+//
+// Example usage:
+//
+//	client, err := NewEigenDAClient(log, EigenDAClientConfig{...})
+//	if err != nil {
+//	  return err
+//	}
+//	defer client.Close()
+//
+//	blobData := []byte("hello world")
+//	blobInfo, err := client.PutBlob(ctx, blobData)
+//	if err != nil {
+//	  return err
+//	}
+//
+//	retrievedData, err := client.GetBlob(ctx, blobInfo.BatchMetadata.BatchHeaderHash, blobInfo.BlobIndex)
+//	if err != nil {
+//	  return err
+//	}
 func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
 	err := config.CheckAndSetDefaults()
 	if err != nil {
@@ -58,8 +85,8 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("invalid length for signer private key")
 	}
 
-	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
-	llClient := NewDisperserClient(llConfig, signer)
+	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
+	disperserClient := NewDisperserClient(disperserConfig, signer)
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
@@ -76,7 +103,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	return &EigenDAClient{
 		Log:    log,
 		Config: config,
-		Client: llClient,
+		Client: disperserClient,
 		Codec:  codec,
 	}, nil
 }
@@ -231,4 +258,10 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 			}
 		}
 	}
+}
+
+// Close simply calls Close() on the wrapped disperserClient, to close the grpc connection to the disperser server.
+// It is thread safe and can be called multiple times.
+func (c *EigenDAClient) Close() error {
+	return c.Client.Close()
 }
