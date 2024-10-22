@@ -18,8 +18,8 @@ import (
 )
 
 type Config struct {
-	Hostname          string
-	Port              string
+	Hostname string
+	Port     string
 	// BlobDispersal Timeouts for both authenticated and unauthenticated dispersals
 	// GetBlobStatus and RetrieveBlob timeouts are hardcoded to 60seconds
 	// TODO: do we want to add config timeouts for those separate requests?
@@ -39,8 +39,9 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 type DisperserClient interface {
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
-	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
+	DispersePaidBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
+	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 }
 
@@ -110,6 +111,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	return blobStatus, reply.GetRequestId(), nil
 }
 
+// TODO: implemented in subsequent PR
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	return nil, nil, nil
 }
@@ -217,6 +219,11 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	return blobStatus, disperseReply.DisperseReply.GetRequestId(), nil
+}
+
+// TODO: implemented in subsequent PR
+func (c *disperserClient) DispersePaidBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	return nil, nil, nil
 }
 
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
