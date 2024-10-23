@@ -1156,9 +1156,14 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 	}
 
 	seenQuorums := make(map[uint8]struct{})
-	// The quorum ID must be in range [0, 254]. It'll actually be converted
-	// to uint8, so it cannot be greater than 254.
-	// No check with required quorums
+
+	// TODO: validate payment signature against payment metadata
+	if !auth.VerifyPaymentSignature(req.GetPaymentHeader(), req.GetPaymentSignature()) {
+		return nil, fmt.Errorf("payment signature is invalid")
+	}
+	// Unlike regular blob dispersal request validation, there's no check with required quorums
+	// Because Reservation has their specific quorum requirements, and on-demand is only allowed and paid to the required quorums.
+	// Payment specific validations are done within the meterer library.
 	for i := range req.GetCustomQuorumNumbers() {
 
 		if req.GetCustomQuorumNumbers()[i] > core.MaxQuorumID {
