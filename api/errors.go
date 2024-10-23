@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"strconv"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -60,11 +59,22 @@ func NewErrorUnimplemented() error {
 //
 // This way, consumers of the api clients can tell what kind of error they are dealing with,
 // most broadly whether it is a client or server fault (see the ErrorFault type).
+//
+// This interface is still a work in progress and might change. For eg,
+// we might eventually switch from http error codes to the more precise grpc error codes
+// https://cloud.google.com/apis/design/errors#handling_errors
 type ErrorAPI interface {
 	error
 
-	// ErrorCode returns the error code for the API exception.
-	ErrorCode() ErrorCode
+	// ErrorCode returns the HTTP status code for the API exception.
+	// See https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
+	//
+	// One special and very important code is 503,
+	// which is used to signify that eigenda is temporarily unavailable,
+	// and suggest to the caller (most likely some rollup batcher via the eigenda-proxy)
+	// to fallback to ethda for some amount of time.
+	// See https://github.com/ethereum-optimism/specs/issues/434 for more details.
+	ErrorCode() int
 	// ErrorFault returns the fault for the API exception.
 	ErrorFault() ErrorFault
 }
@@ -74,11 +84,16 @@ type ErrorAPI interface {
 // It would typically be
 type ErrorAPIGeneric struct {
 	Err   error
-	Code  ErrorCode
+	Code  int
 	Fault ErrorFault
 }
 
-func NewErrorAPIGeneric(code ErrorCode, err error) *ErrorAPIGeneric {
+// NewErrorApiGeneric creates a new Error that implements the ErrorAPI interface.
+//
+// eg usage:
+//
+//	NewErrorApiGeneric(http.StatusNotFound, errors.New("not found"))
+func NewErrorAPIGeneric(code int, err error) *ErrorAPIGeneric {
 	errGeneric := &ErrorAPIGeneric{
 		Err:   err,
 		Code:  code,
@@ -93,7 +108,7 @@ func NewErrorAPIGeneric(code ErrorCode, err error) *ErrorAPIGeneric {
 }
 
 // ErrorCode returns the error code for the API exception.
-func (e *ErrorAPIGeneric) ErrorCode() ErrorCode { return e.Code }
+func (e *ErrorAPIGeneric) ErrorCode() int { return e.Code }
 
 // ErrorFault returns the fault for the API exception.
 func (e *ErrorAPIGeneric) ErrorFault() ErrorFault { return e.Fault }
@@ -106,27 +121,6 @@ func (e *ErrorAPIGeneric) Error() string {
 func (e *ErrorAPIGeneric) Unwrap() error { return e.Err }
 
 var _ ErrorAPI = (*ErrorAPIGeneric)(nil)
-
-// ErrorCode is a subset of HTTP error codes that are relevant to the API.
-//
-// We might eventually switch to the more precise grpc error codes
-// https://cloud.google.com/apis/design/errors#handling_errors
-type ErrorCode uint16
-
-const (
-	ErrorCodeUnknown    ErrorCode = 0
-	ErrorCodeBadRequest ErrorCode = 400
-	ErrorCodeInternal   ErrorCode = 500
-	// 503 is used to signify that eigenda is temporarily unavailable,
-	// and suggest to the caller (most likely some rollup batcher via the eigenda-proxy)
-	// to fallback to ethda for some amount of time.
-	// See https://github.com/ethereum-optimism/specs/issues/434 for more details.
-	ErrorCodeUnavailable ErrorCode = 503
-)
-
-func (f ErrorCode) String() string {
-	return strconv.Itoa(int(f))
-}
 
 // ErrorFault provides the broadest categorization of an error (client, server, or unknown).
 type ErrorFault int
