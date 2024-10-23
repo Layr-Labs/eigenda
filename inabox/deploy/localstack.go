@@ -86,7 +86,7 @@ func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.
 	return pool, resource, nil
 }
 
-func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, shadowTableName, bucketTableName string) error {
+func DeployResources(pool *dockertest.Pool, localStackPort, metadataTableName, bucketTableName string) error {
 
 	if pool == nil {
 		var err error
