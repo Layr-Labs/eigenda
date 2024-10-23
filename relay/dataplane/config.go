@@ -1,6 +1,6 @@
 package dataplane
 
-import "github.com/aws/aws-sdk-go-v2/aws"
+import "github.com/aws/aws-sdk-go/aws"
 
 // S3Config is the configuration for an S3Client.
 type S3Config struct {
@@ -9,7 +9,7 @@ type S3Config struct {
 	AWSConfig *aws.Config
 	// The name of the S3 bucket to use. All data written to the S3Client will be written to this bucket.
 	// This is a required field.
-	Bucket *string
+	Bucket string
 	// If true then the bucket will be created if it does not already exist. If false and the bucket does not exist
 	// then the S3Client will return an error when it is created. Default is false.
 	AutoCreateBucket bool
@@ -27,7 +27,7 @@ type S3Config struct {
 func DefaultS3Config() *S3Config {
 	return &S3Config{
 		AWSConfig: &aws.Config{
-			Region: "us-east-2",
+			Region: aws.String("us-east-2"),
 		},
 		AutoCreateBucket:    false,
 		PrefixChars:         3,

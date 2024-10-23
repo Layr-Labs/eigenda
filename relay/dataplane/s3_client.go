@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"sync"
+	"time"
 )
 
 var _ S3Client = &s3Client{}
@@ -18,8 +20,8 @@ type s3Client struct {
 	ctx context.Context
 	// cancel is called to cancel the context.
 	cancel context.CancelFunc
-	// the AWS S3 session to use to talk to S3.
-	session *s3.S3
+	// the AWS S3 handle to use to talk to S3.
+	svc *s3.S3
 	// tasks are placed into this channel to be processed by workers.
 	tasks chan func()
 	// this wait group is completed when all workers have finished.
@@ -33,7 +35,7 @@ func NewS3Client(
 	ctx context.Context,
 	config *S3Config) (S3Client, error) {
 
-	if config.Bucket == nil {
+	if config.Bucket == "" {
 		return nil, errors.New("config.Bucket is required")
 	}
 	if config.Parallelism < 1 {
@@ -42,13 +44,27 @@ func NewS3Client(
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	sess, err := session.NewSession(config.AWSConfig)
+	if err != nil {
+		return nil, err
+	}
+	svc := s3.New(sess)
+
 	client := &s3Client{
 		config: config,
 		ctx:    ctx,
 		cancel: cancel,
 		tasks:  make(chan func()),
+		svc:    svc,
+		wg:     &sync.WaitGroup{},
 	}
 
+	err = client.createBucketIfNeeded()
+	if err != nil {
+		return nil, err
+	}
+
+	client.wg.Add(config.Parallelism)
 	for i := 0; i < config.Parallelism; i++ {
 		go client.worker()
 	}
@@ -56,13 +72,15 @@ func NewS3Client(
 	return client, nil
 }
 
-func (s *s3Client) Upload(key string, data []byte, fragmentSize int) error {
+func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Duration) error {
 	fragments := BreakIntoFragments(key, data, s.config.PrefixChars, fragmentSize)
 	resultChannel := make(chan error, len(fragments))
 
+	expiryTime := time.Now().Add(ttl)
+
 	for _, fragment := range fragments {
 		s.tasks <- func() {
-			s.writeTask(resultChannel, fragment.FragmentKey, fragment.Data)
+			s.writeTask(resultChannel, fragment.FragmentKey, fragment.Data, expiryTime)
 		}
 	}
 
@@ -104,9 +122,26 @@ func (s *s3Client) Close() error {
 	return nil
 }
 
+// createBucketIfNeeded creates the bucket if it does not exist.
+func (s *s3Client) createBucketIfNeeded() error {
+	_, err := s.svc.HeadBucket(&s3.HeadBucketInput{
+		Bucket: aws.String(s.config.Bucket),
+	})
+	if err == nil {
+		// Bucket exists
+		return nil
+	} else if s.config.AutoCreateBucket == false {
+		return err
+	}
+
+	_, err = s.svc.CreateBucket(&s3.CreateBucketInput{
+		Bucket: aws.String(s.config.Bucket),
+	})
+	return err
+}
+
 // worker is a function that processes tasks until the context is cancelled.
 func (s *s3Client) worker() {
-	s.wg.Add(1)
 	defer s.wg.Done()
 	for {
 		select {
@@ -135,8 +170,8 @@ func (s *s3Client) readTask(
 		resultChannel <- result
 	}()
 
-	ret, err := s.session.GetObject(&s3.GetObjectInput{
-		Bucket: s.config.Bucket,
+	ret, err := s.svc.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),
 	})
 
@@ -169,12 +204,14 @@ func (s *s3Client) readTask(
 func (s *s3Client) writeTask(
 	resultChannel chan error,
 	key string,
-	value []byte) {
+	value []byte,
+	expiryTime time.Time) {
 
-	_, err := s.session.PutObject(&s3.PutObjectInput{
-		Bucket: s.config.Bucket,
-		Key:    aws.String(key),
-		Body:   bytes.NewReader(value),
+	_, err := s.svc.PutObject(&s3.PutObjectInput{
+		Bucket:  aws.String(s.config.Bucket),
+		Key:     aws.String(key),
+		Body:    bytes.NewReader(value),
+		Expires: &expiryTime,
 	})
 
 	resultChannel <- err

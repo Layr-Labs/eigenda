@@ -1,11 +1,15 @@
 package dataplane
 
-import "github.com/Layr-Labs/eigenda/common/kvstore"
+import (
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"time"
+)
 
 var _ S3Client = &localClient{}
 
 // localClient implements the S3Client interface, but the data is stored locally using a kvstore.Store.
-// This may be useful for testing, but is not intended for production use.
+// This may be useful for testing, but is not intended for production use, as it does not implement things
+// like TTL.
 type localClient struct {
 	store kvstore.Store
 }
@@ -17,7 +21,7 @@ func NewLocalClient(store kvstore.Store) S3Client {
 	}
 }
 
-func (l *localClient) Upload(key string, data []byte, fragmentSize int) error {
+func (l *localClient) Upload(key string, data []byte, fragmentSize int, ttl time.Duration) error {
 	return l.store.Put([]byte(key), data)
 }
 
