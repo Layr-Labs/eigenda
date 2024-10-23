@@ -1,21 +1,17 @@
 package api
 
 import (
-	"time"
-
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 // The canonical errors from the EigenDA gRPC API endpoints.
 //
 // Notes:
-// - We start with a small (but sufficient) subset of google's error code convention, 
+// - We start with a small (but sufficient) subset of google's error code convention,
 //   and expand when there is an important failure case to separate out. See:
 //   https://cloud.google.com/apis/design/errors#handling_errors
-// - Make sure that internally propagated errors are eventually wrapped in one of the 
+// - Make sure that internally propagated errors are eventually wrapped in one of the
 //   user-facing errors defined here, since grpc otherwise returns an UNKNOWN error code,
 //   which is harder to debug and understand for users.
 

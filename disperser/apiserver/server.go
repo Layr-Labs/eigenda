@@ -286,7 +286,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
-		return nil, api.NewErrorUnavailableWithRetry("failed to store blob", 30*time.Second)
+		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
 	}
 
 	for _, param := range securityParams {
