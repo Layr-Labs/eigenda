@@ -8,6 +8,7 @@ import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager}
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
@@ -36,10 +37,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IAVSDirectory __avsDirectory,
         IRewardsCoordinator __rewardsCoordinator,
         IRegistryCoordinator __registryCoordinator,
-        IStakeRegistry __stakeRegistry
+        IStakeRegistry __stakeRegistry,
+        IEigenDAThresholdRegistry __eigenDAThresholdRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
+        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry)
     {
         _disableInitializers();
     }
@@ -145,6 +148,41 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     /// @notice Given a reference block number, returns the block until which operators must serve.
     function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
+    }
+
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
+        return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
+    }
+
+    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
+        return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
+    }
+
+    /// @notice Returns the bytes array of quorumsNumbersRequired
+    function quorumNumbersRequired() external view returns (bytes memory) {
+        return eigenDAThresholdRegistry.quorumNumbersRequired();
+    }
+
+    function getQuorumAdversaryThresholdPercentage(
+        uint8 quorumNumber
+    ) external view returns (uint8){
+        return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
+    }
+
+    /// @notice Gets the confirmation threshold percentage for a quorum
+    function getQuorumConfirmationThresholdPercentage(
+        uint8 quorumNumber
+    ) external view returns (uint8){
+        return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
+    }
+
+    /// @notice Checks if a quorum is required
+    function getIsQuorumRequired(
+        uint8 quorumNumber
+    ) external view returns (bool){
+        return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }
 
 }
