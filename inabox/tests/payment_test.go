@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -36,15 +36,16 @@ var _ = Describe("Inabox Integration", func() {
 		// wait for a second, retry, and that should allow ondemand to work
 		privateKey, err := crypto.HexToECDSA(privateKeyHex[2:]) // Remove "0x" prefix
 		Expect(err).To(BeNil())
+		paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey.D.Bytes()))
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(meterer.DummyReservation, meterer.DummyOnDemandPayment, 60, meterer.DummyMinimumChargeableSize, meterer.DummyMinimumChargeablePayment, privateKey))
+		}, signer, clients.NewAccountant(dummyActiveReservation, dummyOnDemandPayment, 60, 128, 128, paymentSigner))
 
 		Expect(disp).To(Not(BeNil()))
 
-		singleBlobSize := meterer.DummyMinimumChargeableSize
+		singleBlobSize := uint32(128)
 		data := make([]byte, singleBlobSize)
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
@@ -54,9 +55,11 @@ var _ = Describe("Inabox Integration", func() {
 		// requests that count towards either reservation or payments
 		paidBlobStatus := []disperser.BlobStatus{}
 		paidKeys := [][]byte{}
+		reservationBytesLimit := 1024
+		paymentLimit := 512
 		// TODO: payment calculation unit consistency
-		for i := 0; i < (int(meterer.DummyReservationBytesLimit)+int(meterer.DummyPaymentLimit))/int(singleBlobSize); i++ {
-			blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{0})
+		for i := 0; i < (int(reservationBytesLimit+paymentLimit))/int(singleBlobSize); i++ {
+			blobStatus, key, err := disp.DisperseBlob(ctx, paddedData, []uint8{0})
 			Expect(err).To(BeNil())
 			Expect(key).To(Not(BeNil()))
 			Expect(blobStatus).To(Not(BeNil()))
@@ -66,7 +69,7 @@ var _ = Describe("Inabox Integration", func() {
 		}
 
 		// requests that aren't covered by reservation or on-demand payment
-		blobStatus, key, err := disp.PaidDisperseBlob(ctx, paddedData, []uint8{0})
+		blobStatus, key, err := disp.DispersePaidBlob(ctx, paddedData, []uint8{0})
 		Expect(err).To(Not(BeNil()))
 		Expect(key).To(BeNil())
 		Expect(blobStatus).To(BeNil())

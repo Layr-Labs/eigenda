@@ -510,7 +510,7 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 
 func TestPutBlobNoopSigner(t *testing.T) {
 	config := clients.NewConfig("nohost", "noport", time.Second, false)
-	disperserClient := clients.NewDisperserClient(config, auth.NewLocalNoopSigner())
+	disperserClient := clients.NewDisperserClient(config, auth.NewLocalNoopSigner(), clients.Accountant{})
 
 	test := []byte("test")
 	test[0] = 0x00 // make sure the first byte of the requst is always 0

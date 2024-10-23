@@ -649,14 +649,12 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create bucket store")
 	}
-	meterConfig := meterer.Config{
-		PricePerSymbol:         1,
-		MinNumSymbols:          1,
-		GlobalSymbolsPerSecond: 1000,
-		ReservationWindow:      60,
-	}
 
 	mockState := &mock.MockOnchainPaymentState{}
+	mockState.On("GetPricePerSymbol").Return(uint32(1), nil)
+	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
+	mockState.On("GetGlobalSymbolsPerSecond").Return(uint32(1000), nil)
+	mockState.On("GetReservationWindow").Return(uint32(60), nil)
 
 	clientConfig := commonaws.ClientConfig{
 		Region:          "us-east-1",
@@ -676,7 +674,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		teardown()
 		panic("failed to create offchain store")
 	}
-	meterer := meterer.NewMeterer(meterConfig, mockState, store, logger)
+	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{

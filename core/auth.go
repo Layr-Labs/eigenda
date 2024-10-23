@@ -13,4 +13,5 @@ type BlobRequestSigner interface {
 
 type PaymentSigner interface {
 	SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error)
+	GetAccountID() (string, error)
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -122,11 +123,6 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 	// after getting response from the disperser, the client validate the received blob status;
 	// if there's failure, based on the type of failure, the client rollback local accounting or retry or send off warning to the user
 
-	header, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 
 	dialOptions := c.getDialOptions()
@@ -151,13 +147,16 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
 
+	header, signature, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	request := &disperser_rpc.DispersePaidBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: quorumNumbers,
-		AccountId:           header.AccountID,
-		BinIndex:            header.BinIndex,
-		//TODO: use big.Int in protobuf
-		CumulativePayment: header.CumulativePayment.Uint64(),
+		PaymentHeader:       header,
+		PaymentSignature:    signature,
 	}
 
 	reply, err := disperserClient.DispersePaidBlob(ctxTimeout, request)

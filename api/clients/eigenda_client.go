@@ -38,26 +38,6 @@ type EigenDAClient struct {
 	accountant Accountant
 }
 
-// type Accountant struct {
-// 	reservation meterer.ActiveReservation
-// 	onDemand    meterer.OnDemandPayment
-// 	// contains 3 bins; 0 for current bin, 1 for next bin, 2 for overflowed bin
-// 	binUsages         []uint64
-// 	cumulativePayment uint64
-// }
-
-// func NewAccountant(reservation meterer.ActiveReservation, onDemand meterer.OnDemandPayment) *Accountant {
-// 	return &Accountant{
-// 		reservation: reservation,
-// 		onDemand:    onDemand,
-// 		// add cache for local states
-// 		// concurrent thread to update bin usage every binInterval
-// 		// delete bin0, shift bin_i to bin_{i-1}, add 0 to bin2
-// 		binUsages:         []uint64{0, 0, 0},
-// 		cumulativePayment: 0,
-// 	}
-// }
-
 var _ IEigenDAClient = &EigenDAClient{}
 
 func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
@@ -101,7 +81,8 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 
-	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize, privateKey)
+	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey.D.Bytes()))
+	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize, paymentSigner)
 
 	llClient := NewDisperserClient(llConfig, signer, accountant)
 

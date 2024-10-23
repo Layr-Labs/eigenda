@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigenda/disperser/meterer"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -27,6 +28,18 @@ func mineAnvilBlocks(numBlocks int) {
 	}
 }
 
+var (
+	dummyActiveReservation = core.ActiveReservation{
+		SymbolsPerSec:  100,
+		StartTimestamp: 1000,
+		EndTimestamp:   2000,
+		QuorumSplit:    []byte{50, 50},
+	}
+	dummyOnDemandPayment = core.OnDemandPayment{
+		CumulativePayment: big.NewInt(1000),
+	}
+)
+
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
@@ -39,11 +52,12 @@ var _ = Describe("Inabox Integration", func() {
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
 		privateKey, err := crypto.HexToECDSA(privateKeyHex[2:]) // Remove "0x" prefix
+		paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey.D.Bytes()))
 		disp := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(meterer.DummyReservation, meterer.DummyOnDemandPayment, 60, meterer.DummyMinimumChargeableSize, meterer.DummyMinimumChargeablePayment, privateKey))
+		}, signer, clients.NewAccountant(dummyActiveReservation, dummyOnDemandPayment, 60, 128, 128, paymentSigner))
 
 		Expect(disp).To(Not(BeNil()))
 
