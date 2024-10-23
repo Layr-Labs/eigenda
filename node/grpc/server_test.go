@@ -110,7 +110,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	}
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
-	tx := &coremock.MockTransactor{}
+	tx := &coremock.MockWriter{}
 
 	ratelimiter := &commonmock.NoopRatelimiter{}
 

@@ -100,7 +100,7 @@ func TestChurner(t *testing.T) {
 	}
 	var lowestStakeOperatorAddr gethcommon.Address
 	var lowestStakeOperatorPubKey *core.G1Point
-	var tx *eth.Transactor
+	var tx *eth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
 	var keyPair *dacore.KeyPair
 	for i, op := range testConfig.Operators {
@@ -187,7 +187,7 @@ func TestChurner(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Transactor, error) {
+func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceManager string, logger logging.Logger) (*eth.Writer, error) {
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          []string{rpcURL},
 		PrivateKeyString: privateKey,
@@ -200,7 +200,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewTransactor(logger, gethClient, operatorStateRetriever, serviceManager)
+	return eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
 }
 
 func newTestServer(t *testing.T) *churner.Server {

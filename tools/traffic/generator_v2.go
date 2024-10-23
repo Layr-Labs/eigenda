@@ -3,6 +3,12 @@ package traffic
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -16,11 +22,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/common"
@@ -156,7 +157,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 		panic(fmt.Sprintf("Unable to instantiate geth client: %s", err))
 	}
 
-	tx, err := eth.NewTransactor(
+	tx, err := eth.NewReader(
 		logger,
 		gethClient,
 		config.RetrievalClientConfig.BLSOperatorStateRetrieverAddr,

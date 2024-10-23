@@ -22,7 +22,7 @@ var opID = [32]byte{}
 
 type components struct {
 	node *node.Node
-	tx   *coremock.MockTransactor
+	tx   *coremock.MockWriter
 }
 
 func newComponents(t *testing.T) *components {
@@ -53,7 +53,7 @@ func newComponents(t *testing.T) *components {
 	if err != nil {
 		panic("failed to create a directory for db")
 	}
-	tx := &coremock.MockTransactor{}
+	tx := &coremock.MockWriter{}
 
 	mockVal := coremock.NewMockShardValidator()
 	mockVal.On("ValidateBatch", mock.Anything, mock.Anything, mock.Anything).Return(nil)

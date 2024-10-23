@@ -40,7 +40,7 @@ type DispersalServer struct {
 	rateConfig   RateConfig
 
 	blobStore    disperser.BlobStore
-	tx           core.Transactor
+	tx           core.Reader
 	quorumConfig QuorumConfig
 
 	ratelimiter   common.RateLimiter
@@ -65,7 +65,7 @@ type QuorumConfig struct {
 func NewDispersalServer(
 	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
-	tx core.Transactor,
+	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
