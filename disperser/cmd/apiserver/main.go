@@ -106,11 +106,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
 		mtConfig := mt.Config{
-			PricePerSymbol:         config.PricePerSymbol,
-			GlobalSymbolsPerSecond: config.OnDemandGlobalLimit,
-			MinNumSymbols:          config.MinNumSymbols,
-			ReservationWindow:      config.ReservationWindow,
-			ChainReadTimeout:       3 * time.Second,
+			ChainReadTimeout: 3 * time.Second,
 		}
 
 		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)

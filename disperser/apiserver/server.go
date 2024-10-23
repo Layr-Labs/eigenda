@@ -248,10 +248,6 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	return reply, err
 }
 
-func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
-	return &pb.DisperseBlobReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
-}
-
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
@@ -311,9 +307,10 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
 	blob, err := s.validatePaidRequestAndGetBlob(ctx, req)
 	quorumNumbers := req.CustomQuorumNumbers
-	binIndex := req.BinIndex
-	cumulativePayment := req.CumulativePayment
-	signature := req.Signature
+	binIndex := req.PaymentHeader.BinIndex
+	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
+	//todo: before disperse blob, validate the signature
+	signature := req.PaymentSignature
 
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
@@ -323,7 +320,7 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 		return nil, api.NewInvalidArgError(err.Error())
 	}
 
-	reply, err := s.dispersePaidBlob(ctx, blob, quorumNumbers, binIndex, big.NewInt(int64(cumulativePayment)), signature, "", "DispersePaidBlob")
+	reply, err := s.dispersePaidBlob(ctx, blob, quorumNumbers, binIndex, cumulativePayment, signature, "", "DispersePaidBlob")
 	if err != nil {
 		// Note the DispersePaidBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -1201,7 +1198,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 
 	header := core.BlobRequestHeader{
 		BlobAuthHeader: core.BlobAuthHeader{
-			AccountID: req.AccountId,
+			AccountID: req.PaymentHeader.AccountId,
 		},
 		SecurityParams: params,
 	}

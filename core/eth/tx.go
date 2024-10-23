@@ -783,6 +783,26 @@ func (t *Transactor) GetOnDemandPaymentByAccount(ctx context.Context, blockNumbe
 	return core.OnDemandPayment{}, nil
 }
 
+func (t *Transactor) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Transactor) GetMinNumSymbols(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Transactor) GetPricePerSymbol(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Transactor) GetReservationWindow(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
 func (t *Transactor) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.EthClient)

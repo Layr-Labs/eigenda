@@ -17,6 +17,10 @@ type OnchainPayment interface {
 	GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
+	GetGlobalSymbolsPerSecond() uint64
+	GetMinNumSymbols() uint32
+	GetPricePerSymbol() uint32
+	GetReservationWindow() uint32
 }
 
 var _ OnchainPayment = (*OnchainPaymentState)(nil)
@@ -24,29 +28,74 @@ var _ OnchainPayment = (*OnchainPaymentState)(nil)
 type OnchainPaymentState struct {
 	tx *eth.Transactor
 
-	ActiveReservations    map[string]core.ActiveReservation
-	OnDemandPayments      map[string]core.OnDemandPayment
-	OnDemandQuorumNumbers []uint8
-	ReservationsLock      sync.RWMutex
-	OnDemandLocks         sync.RWMutex
+	ActiveReservations map[string]core.ActiveReservation
+	OnDemandPayments   map[string]core.OnDemandPayment
+
+	ReservationsLock sync.RWMutex
+	OnDemandLocks    sync.RWMutex
+
+	PaymentVaultParams PaymentVaultParams
+}
+
+type PaymentVaultParams struct {
+	GlobalSymbolsPerSecond uint64
+	MinNumSymbols          uint32
+	PricePerSymbol         uint32
+	ReservationWindow      uint32
+	OnDemandQuorumNumbers  []uint8
 }
 
 func NewOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPaymentState, error) {
-	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return OnchainPaymentState{}, err
-	}
-
-	quorumNumbers, err := tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
 	if err != nil {
 		return OnchainPaymentState{}, err
 	}
 
 	return OnchainPaymentState{
-		tx:                    tx,
-		ActiveReservations:    make(map[string]core.ActiveReservation),
-		OnDemandPayments:      make(map[string]core.OnDemandPayment),
-		OnDemandQuorumNumbers: quorumNumbers,
+		tx:                 tx,
+		ActiveReservations: make(map[string]core.ActiveReservation),
+		OnDemandPayments:   make(map[string]core.OnDemandPayment),
+		PaymentVaultParams: paymentVaultParams,
+	}, nil
+}
+
+func GetPaymentVaultParams(ctx context.Context, tx *eth.Transactor) (PaymentVaultParams, error) {
+	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	quorumNumbers, err := tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	globalSymbolsPerSecond, err := tx.GetGlobalSymbolsPerSecond(ctx)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	minNumSymbols, err := tx.GetMinNumSymbols(ctx)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	pricePerSymbol, err := tx.GetPricePerSymbol(ctx)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	reservationWindow, err := tx.GetReservationWindow(ctx)
+	if err != nil {
+		return PaymentVaultParams{}, err
+	}
+
+	return PaymentVaultParams{
+		OnDemandQuorumNumbers:  quorumNumbers,
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
 	}, nil
 }
 
@@ -82,6 +131,12 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	}
 	pcs.OnDemandPayments = onDemandPayments
 	pcs.OnDemandLocks.Unlock()
+
+	// These parameters should be rarely updated, but we refresh them anyway
+	pcs.PaymentVaultParams, err = GetPaymentVaultParams(ctx, tx)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -150,4 +205,20 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 		return nil, err
 	}
 	return pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+}
+
+func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
+	return pcs.PaymentVaultParams.GlobalSymbolsPerSecond
+}
+
+func (pcs *OnchainPaymentState) GetMinNumSymbols() uint32 {
+	return pcs.PaymentVaultParams.MinNumSymbols
+}
+
+func (pcs *OnchainPaymentState) GetPricePerSymbol() uint32 {
+	return pcs.PaymentVaultParams.PricePerSymbol
+}
+
+func (pcs *OnchainPaymentState) GetReservationWindow() uint32 {
+	return pcs.PaymentVaultParams.ReservationWindow
 }
