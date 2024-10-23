@@ -10,10 +10,10 @@ import (
 
 type ChainState struct {
 	Client common.EthClient
-	Tx     core.Transactor
+	Tx     core.Reader
 }
 
-func NewChainState(tx core.Transactor, client common.EthClient) *ChainState {
+func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 	return &ChainState{
 		Client: client,
 		Tx:     tx,

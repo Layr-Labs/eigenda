@@ -12,29 +12,29 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockTransactor struct {
+type MockWriter struct {
 	mock.Mock
 }
 
-var _ core.Transactor = (*MockTransactor)(nil)
+var _ core.Writer = (*MockWriter)(nil)
 
-func (t *MockTransactor) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
+func (t *MockWriter) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
 	args := t.Called()
 	return *new(uint32), args.Error(0)
 }
 
-func (t *MockTransactor) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
+func (t *MockWriter) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
 	args := t.Called()
 	return *new(uint32), args.Error(0)
 }
 
-func (t *MockTransactor) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator core.OperatorID) ([]core.QuorumID, error) {
+func (t *MockWriter) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator core.OperatorID) ([]core.QuorumID, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]core.QuorumID), args.Error(1)
 }
 
-func (t *MockTransactor) RegisterOperator(
+func (t *MockWriter) RegisterOperator(
 	ctx context.Context,
 	keypair *core.KeyPair,
 	socket string,
@@ -47,7 +47,7 @@ func (t *MockTransactor) RegisterOperator(
 	return args.Error(0)
 }
 
-func (t *MockTransactor) RegisterOperatorWithChurn(
+func (t *MockWriter) RegisterOperatorWithChurn(
 	ctx context.Context,
 	keypair *core.KeyPair,
 	socket string,
@@ -60,42 +60,42 @@ func (t *MockTransactor) RegisterOperatorWithChurn(
 	return args.Error(0)
 }
 
-func (t *MockTransactor) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
+func (t *MockWriter) DeregisterOperator(ctx context.Context, pubkeyG1 *core.G1Point, blockNumber uint32, quorumIds []core.QuorumID) error {
 	args := t.Called()
 	return args.Error(0)
 }
 
-func (t *MockTransactor) UpdateOperatorSocket(ctx context.Context, socket string) error {
+func (t *MockWriter) UpdateOperatorSocket(ctx context.Context, socket string) error {
 	args := t.Called()
 	return args.Error(0)
 }
 
-func (t *MockTransactor) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Transaction, error) {
+func (t *MockWriter) BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]core.OperatorID) (*types.Transaction, error) {
 	args := t.Called(ctx, operatorsByQuorum)
 	result := args.Get(0)
 	return result.(*types.Transaction), args.Error(1)
 }
 
-func (t *MockTransactor) GetOperatorStakes(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
+func (t *MockWriter) GetOperatorStakes(ctx context.Context, operatorId core.OperatorID, blockNumber uint32) (core.OperatorStakes, []core.QuorumID, error) {
 	args := t.Called()
 	result0 := args.Get(0)
 	result1 := args.Get(1)
 	return result0.(core.OperatorStakes), result1.([]core.QuorumID), args.Error(1)
 }
 
-func (t *MockTransactor) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
+func (t *MockWriter) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.OperatorStakes), args.Error(1)
 }
 
-func (t *MockTransactor) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
+func (t *MockWriter) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
 	args := t.Called(ctx, batchHeader, quorums, signatureAggregation)
 	result := args.Get(0)
 	return result.(*types.Transaction), args.Error(1)
 }
 
-func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Receipt, error) {
+func (t *MockWriter) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Receipt, error) {
 	args := t.Called()
 	var receipt *types.Receipt
 	if args.Get(0) != nil {
@@ -104,61 +104,61 @@ func (t *MockTransactor) ConfirmBatch(ctx context.Context, batchHeader *core.Bat
 	return receipt, args.Error(1)
 }
 
-func (t *MockTransactor) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
+func (t *MockWriter) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockTransactor) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
+func (t *MockWriter) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockTransactor) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (core.OperatorID, error) {
+func (t *MockWriter) OperatorAddressToID(ctx context.Context, address gethcommon.Address) (core.OperatorID, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.OperatorID), args.Error(1)
 }
 
-func (t *MockTransactor) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
+func (t *MockWriter) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]gethcommon.Address), args.Error(1)
 }
 
-func (t *MockTransactor) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
+func (t *MockWriter) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]*big.Int), args.Error(1)
 }
 
-func (t *MockTransactor) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
+func (t *MockWriter) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(*big.Int), args.Error(1)
 }
 
-func (t *MockTransactor) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
+func (t *MockWriter) GetOperatorSetParams(ctx context.Context, quorumID core.QuorumID) (*core.OperatorSetParam, error) {
 	args := t.Called(ctx, quorumID)
 	result := args.Get(0)
 	return result.(*core.OperatorSetParam), args.Error(1)
 }
 
-func (t *MockTransactor) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID core.QuorumID) (uint32, error) {
+func (t *MockWriter) GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID core.QuorumID) (uint32, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockTransactor) WeightOfOperatorForQuorum(ctx context.Context, quorumID core.QuorumID, operator gethcommon.Address) (*big.Int, error) {
+func (t *MockWriter) WeightOfOperatorForQuorum(ctx context.Context, quorumID core.QuorumID, operator gethcommon.Address) (*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(*big.Int), args.Error(1)
 }
 
-func (t *MockTransactor) CalculateOperatorChurnApprovalDigestHash(
+func (t *MockWriter) CalculateOperatorChurnApprovalDigestHash(
 	ctx context.Context,
 	operatorAddress gethcommon.Address,
 	operatorId core.OperatorID,
@@ -171,55 +171,55 @@ func (t *MockTransactor) CalculateOperatorChurnApprovalDigestHash(
 	return result.([32]byte), args.Error(1)
 }
 
-func (t *MockTransactor) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
+func (t *MockWriter) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockTransactor) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
+func (t *MockWriter) GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(uint8), args.Error(1)
 }
 
-func (t *MockTransactor) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]core.SecurityParam, error) {
+func (t *MockWriter) GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]core.SecurityParam, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]core.SecurityParam), args.Error(1)
 }
 
-func (t *MockTransactor) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
+func (t *MockWriter) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]uint8, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.([]uint8), args.Error(1)
 }
 
-func (t *MockTransactor) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
+func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockTransactor) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
+func (t *MockWriter) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(map[string]core.ActiveReservation), args.Error(1)
 }
 
-func (t *MockTransactor) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+func (t *MockWriter) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.ActiveReservation), args.Error(1)
 }
 
-func (t *MockTransactor) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(map[string]core.OnDemandPayment), args.Error(1)
 }
 
-func (t *MockTransactor) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.OnDemandPayment), args.Error(1)

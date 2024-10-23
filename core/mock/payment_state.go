@@ -24,7 +24,7 @@ func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (ui
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
+func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
 	args := m.Called()
 	return args.Error(0)
 }
