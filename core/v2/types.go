@@ -8,6 +8,8 @@ import (
 )
 
 var (
+	// TODO(mooselumph): Put these parameters on chain and add on-chain checks to ensure that the number of operators does not
+	// conflict with the existing on-chain limits
 	ParametersMap = map[uint8]BlobVersionParameters{
 		0: {CodingRate: 8, ReconstructionThreshold: 0.22, NumChunks: 8192},
 	}

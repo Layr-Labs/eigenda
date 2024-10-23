@@ -13,7 +13,6 @@ func RoundUpDivideBig(a, b *big.Int) *big.Int {
 	num := new(big.Int).Sub(new(big.Int).Add(a, b), one) // a + b - 1
 	res := new(big.Int).Div(num, b)                      // (a + b - 1) / b
 	return res
-
 }
 
 func RoundUpDivide[T constraints.Integer](a, b T) T {
