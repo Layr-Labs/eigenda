@@ -99,7 +99,7 @@ func (e *ErrorAPIGeneric) ErrorCode() ErrorCode { return e.Code }
 func (e *ErrorAPIGeneric) ErrorFault() ErrorFault { return e.Fault }
 
 func (e *ErrorAPIGeneric) Error() string {
-	return fmt.Sprintf("api error %d: %s", e.Code, e.Error())
+	return fmt.Sprintf("api error %d: %s", e.Code, e.Err.Error())
 }
 
 // We implement Unwrap so that errors.Is and errors.As work as expected.
