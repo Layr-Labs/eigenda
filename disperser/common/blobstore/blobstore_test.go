@@ -45,10 +45,9 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4569"
 
-	dynamoClient            *dynamodb.Client
-	blobMetadataStore       *blobstore.BlobMetadataStore
-	shadowBlobMetadataStore *blobstore.BlobMetadataStore
-	sharedStorage           *blobstore.SharedBlobStore
+	dynamoClient      *dynamodb.Client
+	blobMetadataStore *blobstore.BlobMetadataStore
+	sharedStorage     *blobstore.SharedBlobStore
 
 	UUID                    = uuid.New()
 	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -106,8 +105,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, metadataTableName, time.Hour)
-	shadowBlobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
+	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
 	sharedStorage = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 }
 
