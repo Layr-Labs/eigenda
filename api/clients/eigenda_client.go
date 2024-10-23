@@ -198,7 +198,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
 		errChan <- &api.ErrorAPIGeneric{
-			Err: fmt.Errorf("error submitted authenticated blob to disperser: %w", err),
+			Err: fmt.Errorf("error submitting authenticated blob to disperser: %w", err),
 			// We set to unknown fault b/c disperser client returns a mix of 400s and 500s currently.
 			// TODO: update disperser client to also return ErrorAPIGeneric errors
 			Code:  0,
