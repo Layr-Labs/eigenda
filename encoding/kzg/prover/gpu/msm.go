@@ -14,7 +14,7 @@ import (
 
 // MsmBatchOnDevice function supports batch across blobs.
 // totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks
-func (c *KzgGpuProofDevice) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []icicle_bn254.Affine, totalSize int, device runtime.Device) (core.DeviceSlice, error) {
+func (c *KzgGpuProofDevice) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []icicle_bn254.Affine, totalSize int) (core.DeviceSlice, error) {
 	rowsG1IcicleCopy := core.HostSliceFromElements[icicle_bn254.Affine](rowsG1Icicle)
 
 	var p icicle_bn254.Projective

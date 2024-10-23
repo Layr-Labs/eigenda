@@ -18,7 +18,7 @@ func SetupNTT() (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleErro
 	cfg := core.GetDefaultNTTInitDomainConfig()
 
 	// maximally possible
-	exp := 25
+	exp := 20
 	e := initDomain(exp, cfg)
 	if e != runtime.Success {
 		log.Println("Error")

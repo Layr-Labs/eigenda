@@ -1,15 +1,12 @@
 package cpu
 
 import (
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 type RsCpuComputeDevice struct {
 	Fs *fft.FFTSettings
-
-	encoding.EncodingParams
 }
 
 // Encoding Reed Solomon using FFT

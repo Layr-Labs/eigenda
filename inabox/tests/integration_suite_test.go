@@ -169,7 +169,6 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		NumWorker:       1,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
-		Verbose:         true,
 		PreloadEncoder:  false,
 	}, false)
 	if err != nil {

@@ -46,9 +46,7 @@ func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
 		return nil, nil, err
 	}
 
-	if g.verbose {
-		slog.Info("Extending evaluation duration", "duration", time.Since(intermediate))
-	}
+	slog.Debug("Extending evaluation duration", "duration", time.Since(intermediate))
 
 	// create frames to group relevant info
 	frames, indices, err := g.MakeFrames(polyEvals)

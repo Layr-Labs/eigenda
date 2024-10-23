@@ -30,7 +30,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
 	}
 
-	encoder, err := rs.NewEncoder(params, g.Verbose)
+	encoder, err := rs.NewEncoder(params)
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
@@ -79,13 +79,17 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	runtime.LoadBackendFromEnvOrDefault()
 
 	// trying to choose CUDA if available, or fallback to CPU otherwise (default device)
+	var device runtime.Device
 	deviceCuda := runtime.CreateDevice("CUDA", 0) // GPU-0
 	if runtime.IsDeviceAvailable(&deviceCuda) {
+		device = runtime.CreateDevice("CUDA", 0) // GPU-0
 		slog.Debug("CUDA device available, setting device")
-		runtime.SetDevice(&deviceCuda)
+		runtime.SetDevice(&device)
 	} else {
 		slog.Debug("CUDA device not available, falling back to CPU")
-	} // else we stay on CPU backend
+		device = runtime.CreateDevice("CPU", 0)
+		runtime.SetDevice(&device)
+	}
 
 	gpuLock := sync.Mutex{}
 
@@ -120,18 +124,11 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		KzgConfig:      g.KzgConfig,
 		GpuLock:        &gpuLock,
 		Stream:         &stream,
-		Device:         deviceCuda,
+		Device:         device,
 	}
 
-	// Set RS GPU computer
-	// RsComputeDevice := &rs_gpu.GpuComputeDevice{
-	// 	EncodingParams: params,
-	// 	NttCfg:         nttCfg,
-	// 	GpuLock:        &GpuLock,
-	// }
 	RsComputeDevice := &rs_encoder.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
+		Fs: fs,
 	}
 
 	encoder.Computer = RsComputeDevice

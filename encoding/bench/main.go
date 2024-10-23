@@ -28,21 +28,23 @@ type BenchmarkResult struct {
 }
 
 type Config struct {
-	OutputFile   string
-	BlobLength   uint64
-	NumChunks    uint64
-	NumRuns      uint64
-	CPUProfile   string
-	MemProfile   string
-	EnableVerify bool
+	MinBlobLength uint64 `json:"min_blob_length"`
+	MaxBlobLength uint64 `json:"max_blob_length"`
+	OutputFile    string
+	BlobLength    uint64
+	NumChunks     uint64
+	NumRuns       uint64
+	CPUProfile    string
+	MemProfile    string
+	EnableVerify  bool
 }
 
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.BlobLength, "blob-length", 131072, "Blob length (power of 2)")
+	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 1024, "Minimum blob length (power of 2)")
+	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 1048576, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
-	flag.Uint64Var(&config.NumRuns, "num-runs", 2, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
 	flag.BoolVar(&config.EnableVerify, "enable-verify", true, "Verify blobs after encoding")
@@ -63,7 +65,6 @@ func main() {
 		SRSOrder:        268435456,
 		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		Verbose:         true,
 	}
 
 	fmt.Printf("* Task Starts\n")
@@ -115,12 +116,13 @@ func runBenchmark(p *prover.Prover, config *Config) []BenchmarkResult {
 
 	// Fixed coding ratio of 8
 	codingRatio := uint64(8)
-	for i := uint64(0); i < config.NumRuns; i++ {
-		chunkLen := (config.BlobLength * codingRatio) / config.NumChunks
+
+	for blobLength := config.MinBlobLength; blobLength <= config.MaxBlobLength; blobLength *= 2 {
+		chunkLen := (blobLength * codingRatio) / config.NumChunks
 		if chunkLen < 1 {
 			continue // Skip invalid configurations
 		}
-		result := benchmarkEncodeAndVerify(p, config.BlobLength, config.NumChunks, chunkLen, config.EnableVerify)
+		result := benchmarkEncodeAndVerify(p, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
 		results = append(results, result)
 	}
 	return results

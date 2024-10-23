@@ -6,7 +6,6 @@ package gpu
 import (
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
@@ -17,8 +16,6 @@ import (
 type GpuComputeDevice struct {
 	NttCfg  core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
 	GpuLock *sync.Mutex
-
-	encoding.EncodingParams
 }
 
 // Encoding Reed Solomon using FFT

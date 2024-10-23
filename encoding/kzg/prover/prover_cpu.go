@@ -23,7 +23,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, err
 	}
 
-	encoder, err := rs.NewEncoder(params, g.Verbose)
+	encoder, err := rs.NewEncoder(params)
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
@@ -75,8 +75,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	// Set RS CPU computer
 	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
+		Fs: fs,
 	}
 	encoder.Computer = RsComputeDevice
 

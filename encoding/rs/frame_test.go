@@ -18,7 +18,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder(params, true)
+	enc, _ := rs.NewEncoder(params)
 
 	n := uint8(math.Log2(float64(enc.NumEvaluations())))
 	if enc.ChunkLength == 1 {
@@ -27,8 +27,7 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	fs := fft.NewFFTSettings(n)
 
 	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
+		Fs: fs,
 	}
 
 	enc.Computer = RsComputeDevice

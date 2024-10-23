@@ -148,7 +148,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		var flattenStoreCopyToDevice core.DeviceSlice
 		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
 
-		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2, p.Device)
+		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 		if err != nil {
 			gpuErr = fmt.Errorf("msm error: %w", err)
 		}

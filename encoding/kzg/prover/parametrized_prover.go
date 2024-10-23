@@ -226,8 +226,13 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	if rsResult.Err != nil || proofsResult.Err != nil {
 		return nil, nil, multierror.Append(rsResult.Err, proofsResult.Err)
 	}
+	totalProcessingTime := time.Since(encodeStart)
 
 	slog.Info("Encoding process details",
+		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
+		"Num_chunks", g.NumChunks,
+		"Chunk_length", g.ChunkLength,
+		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"Commiting_duration", commitmentResult.Duration,
 		"LengthCommit_duration", lengthCommitmentResult.Duration,

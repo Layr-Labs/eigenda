@@ -12,13 +12,9 @@ import (
 type Encoder struct {
 	encoding.EncodingParams
 
-	Fs *fft.FFTSettings
-
-	verbose bool
-
+	Fs          *fft.FFTSettings
 	NumRSWorker int
-
-	Computer RsComputeDevice
+	Computer    RsComputeDevice
 }
 
 // RsComputeDevice represents a device capable of performing Reed-Solomon encoding computations.
@@ -44,7 +40,7 @@ type RsComputeDevice interface {
 // original data. When some systematic chunks are missing but identical parity chunk are
 // available, the receive can go through a Reed Solomon decoding to reconstruct the
 // original data.
-func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) {
+func NewEncoder(params encoding.EncodingParams) (*Encoder, error) {
 
 	err := params.Validate()
 	if err != nil {
@@ -57,7 +53,6 @@ func NewEncoder(params encoding.EncodingParams, verbose bool) (*Encoder, error) 
 	return &Encoder{
 		EncodingParams: params,
 		Fs:             fs,
-		verbose:        verbose,
 		NumRSWorker:    runtime.GOMAXPROCS(0),
 	}, nil
 

@@ -69,7 +69,6 @@ func TestKzgRs() {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		Verbose:         true,
 	}
 
 	// create encoding object

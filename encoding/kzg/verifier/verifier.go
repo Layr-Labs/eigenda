@@ -156,7 +156,7 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 		return nil, err
 	}
 
-	encoder, err := rs.NewEncoder(params, g.Verbose)
+	encoder, err := rs.NewEncoder(params)
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
