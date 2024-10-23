@@ -519,6 +519,15 @@ func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
 	}
 }
 
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader {
+	return &commonpb.PaymentHeader{
+		AccountId:         pm.AccountID,
+		BinIndex:          pm.BinIndex,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {

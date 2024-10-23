@@ -76,6 +76,8 @@ type DisperserVars struct {
 	DISPERSER_SERVER_RETRIEVAL_BLOB_RATE string
 
 	DISPERSER_SERVER_RETRIEVAL_BYTE_RATE string
+
+	DISPERSER_SERVER_ENABLE_PAYMENT_METERER string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {

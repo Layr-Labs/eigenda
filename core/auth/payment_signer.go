@@ -55,6 +55,10 @@ func (s *NoopPaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]b
 	return nil, fmt.Errorf("noop signer cannot sign blob payment header")
 }
 
+func (s *NoopPaymentSigner) GetAccountID() (string, error) {
+	return "", fmt.Errorf("noop signer cannot get accountID")
+}
+
 // VerifyPaymentSignature verifies the signature against the payment metadata
 func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignature []byte) bool {
 	pubKeyBytes, err := hex.DecodeString(paymentHeader.AccountId)
@@ -76,4 +80,8 @@ func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignat
 		hash.Bytes(),
 		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
 	)
+}
+
+func (s *PaymentSigner) GetAccountID() (string, error) {
+	return hex.EncodeToString(crypto.FromECDSAPub(&s.PrivateKey.PublicKey)), nil
 }
