@@ -28,6 +28,7 @@ type Config struct {
 	UseSecureGrpcFlag bool
 }
 
+// Deprecated: Use &Config{...} directly instead
 func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag bool) *Config {
 	return &Config{
 		Hostname:          hostname,
@@ -53,8 +54,15 @@ type disperserClient struct {
 	// whenever a method is called, using initOnce to make sure initialization happens only once
 	// and is thread-safe
 	initOnce sync.Once
-	conn     *grpc.ClientConn
-	client   disperser_rpc.DisperserClient
+	// We use a single grpc connection, which allows a max number of concurrent open streams (from DisperseBlobAuthenticated).
+	// This should be fine in most cases, as each such request should take <1sec per 1MB blob.
+	// The MaxConcurrentStreams parameter is set by the server. If not set, then it defaults to the stdlib's
+	// http2 default of 100-1000: https://github.com/golang/net/blob/4783315416d92ff3d4664762748bd21776b42b98/http2/transport.go#L55
+	// This means a conservative estimate of 100-1000MB/sec, which should be amply sufficient.
+	// If we ever need to increase this, we could either consider asking the disperser to increase its limit,
+	// or to use a pool of connections here.
+	conn   *grpc.ClientConn
+	client disperser_rpc.DisperserClient
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -299,4 +307,3 @@ func getGrpcDialOptions(useSecureGrpcFlag bool) []grpc.DialOption {
 	}
 	return options
 }
-
