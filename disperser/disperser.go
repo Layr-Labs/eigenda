@@ -45,7 +45,7 @@ const (
 	// signatures, which is a separate state). This status is somewhat of a catch-all category,
 	// containg (but not necessarily exclusively as errors can be added in the future):
 	// - blob has expired
-	// - internal logic error while requesting encoding
+	// - internal logic error while requesting encoder API 
 	// - blob retry has exceeded its limit while waiting for blob finalization after confirmation
 	Failed
 	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
