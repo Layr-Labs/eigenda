@@ -20,6 +20,13 @@ func GetFragmentCount(fileSize int, fragmentSize int) int {
 }
 
 // GetFragmentKey returns the key for the fragment at the given index.
+//
+// Fragment keys take the form of "prefix/body-index[f]". The prefix is the first prefixLength characters
+// of the file key. The body is the file key. The index is the index of the fragment. The character "f" is appended
+// to the key of the last fragment in the series.
+//
+// Example: fileKey="abc123", prefixLength=2, fragmentCount=3
+// The keys will be "ab/abc123-0", "ab/abc123-1", "ab/abc123-2f"
 func GetFragmentKey(fileKey string, prefixLength int, fragmentCount int, index int) string {
 	var prefix string
 	if prefixLength > len(fileKey) {
@@ -29,7 +36,7 @@ func GetFragmentKey(fileKey string, prefixLength int, fragmentCount int, index i
 	}
 
 	postfix := ""
-	if fragmentCount == index {
+	if fragmentCount-1 == index {
 		postfix = "f"
 	}
 
@@ -44,16 +51,16 @@ type Fragment struct {
 }
 
 // BreakIntoFragments breaks a file into fragments of the given size.
-func BreakIntoFragments(fileKey string, data []byte, prefixLength int, fragmentSize int) []Fragment {
+func BreakIntoFragments(fileKey string, data []byte, prefixLength int, fragmentSize int) []*Fragment {
 	fragmentCount := GetFragmentCount(len(data), fragmentSize)
-	fragments := make([]Fragment, fragmentCount)
+	fragments := make([]*Fragment, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
 		start := i * fragmentSize
 		end := start + fragmentSize
 		if end > len(data) {
 			end = len(data)
 		}
-		fragments[i] = Fragment{
+		fragments[i] = &Fragment{
 			FragmentKey: GetFragmentKey(fileKey, prefixLength, fragmentCount, i),
 			Data:        data[start:end],
 			Index:       i,
@@ -75,6 +82,10 @@ func GetFragmentKeys(fileKey string, prefixLength int, fragmentCount int) []stri
 // Returns an error if any fragments are missing.
 func RecombineFragments(fragments []*Fragment) ([]byte, error) {
 
+	if len(fragments) == 0 {
+		return nil, fmt.Errorf("no fragments")
+	}
+
 	// Sort the fragments by index
 	sort.Slice(fragments, func(i, j int) bool {
 		return fragments[i].Index < fragments[j].Index
@@ -90,17 +101,16 @@ func RecombineFragments(fragments []*Fragment) ([]byte, error) {
 	}
 
 	// Make sure we have the last fragment
-	if len(fragments) == 0 {
-		return nil, fmt.Errorf("no fragments")
-	}
 	if !strings.HasSuffix(fragments[len(fragments)-1].FragmentKey, "f") {
 		return nil, fmt.Errorf("missing final fragment")
 	}
 
+	fragmentSize := len(fragments[0].Data)
+
 	// Concatenate the data
 	result := make([]byte, dataSize)
 	for _, fragment := range fragments {
-		copy(result[fragment.Index*len(fragment.Data):], fragment.Data)
+		copy(result[fragment.Index*fragmentSize:], fragment.Data)
 	}
 
 	return result, nil
