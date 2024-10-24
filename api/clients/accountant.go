@@ -8,6 +8,7 @@ import (
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
@@ -18,11 +19,11 @@ type IAccountant interface {
 
 type Accountant struct {
 	// on-chain states
-	reservation        core.ActiveReservation
-	onDemand           core.OnDemandPayment
-	reservationWindow  uint32
-	pricePerChargeable uint32
-	minChargeableSize  uint32
+	reservation       core.ActiveReservation
+	onDemand          core.OnDemandPayment
+	reservationWindow uint32
+	pricePerSymbol    uint32
+	minNumSymbols     uint32
 
 	// local accounting
 	// contains 3 bins; 0 for current bin, 1 for next bin, 2 for overflowed bin
@@ -33,19 +34,19 @@ type Accountant struct {
 	paymentSigner core.PaymentSigner
 }
 
-func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerChargeable uint32, minChargeableSize uint32, paymentSigner core.PaymentSigner) Accountant {
+func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	a := Accountant{
-		reservation:        reservation,
-		onDemand:           onDemand,
-		reservationWindow:  reservationWindow,
-		pricePerChargeable: pricePerChargeable,
-		minChargeableSize:  minChargeableSize,
-		binUsages:          []uint64{0, 0, 0},
-		cumulativePayment:  big.NewInt(0),
-		stopRotation:       make(chan struct{}),
-		paymentSigner:      paymentSigner,
+		reservation:       reservation,
+		onDemand:          onDemand,
+		reservationWindow: reservationWindow,
+		pricePerSymbol:    pricePerSymbol,
+		minNumSymbols:     minNumSymbols,
+		binUsages:         []uint64{0, 0, 0},
+		cumulativePayment: big.NewInt(0),
+		stopRotation:      make(chan struct{}),
+		paymentSigner:     paymentSigner,
 	}
 	go a.startBinRotation()
 	return a
@@ -136,10 +137,30 @@ func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums
 
 // PaymentCharged returns the chargeable price for a given data length
 func (a *Accountant) PaymentCharged(dataLength uint32) uint64 {
-	return uint64(core.RoundUpDivide(uint(a.BlobSizeCharged(dataLength)*a.pricePerChargeable), uint(a.minChargeableSize)))
+	return uint64(core.RoundUpDivide(uint(a.BlobSizeCharged(dataLength)*a.pricePerSymbol), uint(a.minNumSymbols)))
 }
 
 // BlobSizeCharged returns the chargeable data length for a given data length
 func (a *Accountant) BlobSizeCharged(dataLength uint32) uint32 {
-	return max(dataLength, uint32(a.minChargeableSize))
+	return max(dataLength, uint32(a.minNumSymbols))
+}
+
+func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) {
+	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
+	for i, quorum := range paymentState.Reservation.QuorumNumbers {
+		quorumNumbers[i] = uint8(quorum)
+	}
+	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
+	for i, quorum := range paymentState.Reservation.QuorumSplit {
+		quorumSplit[i] = uint8(quorum)
+	}
+	a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.OnChainCumulativePayment)
+	a.reservation.SymbolsPerSec = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
+	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
+	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
+	a.reservation.QuorumNumbers = quorumNumbers
+	a.reservation.QuorumSplit = quorumSplit
+	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
+	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
+	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
 }
