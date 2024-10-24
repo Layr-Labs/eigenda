@@ -84,7 +84,7 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	return p, v, nil
 }
 
-func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber uint64, length int, quorums []core.QuorumID) (corev2.BlobCertificate, []byte) {
+func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, refBlockNumber uint64, length int, quorums []core.QuorumID) (corev2.BlobCertificate, []byte) {
 
 	data := make([]byte, length*31)
 	_, err := rand.Read(data)
@@ -101,7 +101,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version uint8, refBlockNumber
 
 	header := corev2.BlobCertificate{
 		BlobHeader: corev2.BlobHeader{
-			Version:         version,
+			BlobVersion:     version,
 			QuorumNumbers:   quorums,
 			BlobCommitments: commitments,
 		},
@@ -148,7 +148,7 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertifi
 
 		for _, quorum := range header.QuorumNumbers {
 
-			assignments, err := corev2.GetAssignments(state, header.Version, quorum)
+			assignments, err := corev2.GetAssignments(state, header.BlobVersion, quorum)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -238,7 +238,7 @@ func TestValidationSucceeds(t *testing.T) {
 
 	bn := uint64(0)
 
-	version := uint8(0)
+	version := corev2.BlobVersion(0)
 
 	pool := workerpool.New(1)
 

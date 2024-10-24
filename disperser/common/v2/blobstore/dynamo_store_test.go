@@ -2,11 +2,13 @@ package blobstore_test
 
 import (
 	"context"
+	"math/big"
 	"testing"
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/core"
+	core "github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
@@ -14,45 +16,47 @@ import (
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &core.BlobHeaderV2{
-		BlobVersion:    0,
-		QuorumIDs:      []core.QuorumID{0},
-		BlobCommitment: mockCommitment,
+	blobHeader1 := &corev2.BlobHeader{
+		BlobVersion:     0,
+		QuorumNumbers:   []core.QuorumID{0},
+		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
 			BinIndex:          0,
-			CumulativePayment: 531,
+			CumulativePayment: big.NewInt(532),
 		},
 	}
-	blobKey1 := core.BlobKey([32]byte{1, 2, 3})
-	blobHeader2 := &core.BlobHeaderV2{
-		BlobVersion:    0,
-		QuorumIDs:      []core.QuorumID{1},
-		BlobCommitment: mockCommitment,
+	blobKey1, err := blobHeader1.BlobKey()
+	assert.NoError(t, err)
+	blobHeader2 := &corev2.BlobHeader{
+		BlobVersion:     0,
+		QuorumNumbers:   []core.QuorumID{1},
+		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x456",
 			BinIndex:          2,
-			CumulativePayment: 999,
+			CumulativePayment: big.NewInt(999),
 		},
 	}
-	blobKey2 := core.BlobKey([32]byte{4, 5, 6})
+	blobKey2, err := blobHeader2.BlobKey()
+	assert.NoError(t, err)
 
 	now := time.Now()
 	metadata1 := &v2.BlobMetadata{
-		BlobHeaderV2: *blobHeader1,
-		BlobKey:      blobKey1,
-		BlobStatus:   v2.Queued,
-		Expiry:       uint64(now.Add(time.Hour).Unix()),
-		NumRetries:   0,
+		BlobHeader: blobHeader1,
+		BlobStatus: v2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
 	}
 	metadata2 := &v2.BlobMetadata{
-		BlobHeaderV2: *blobHeader2,
-		BlobKey:      blobKey2,
-		BlobStatus:   v2.Certified,
-		Expiry:       uint64(now.Add(time.Hour).Unix()),
-		NumRetries:   0,
+		BlobHeader: blobHeader2,
+		BlobStatus: v2.Certified,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	assert.NoError(t, err)
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata2)
 	assert.NoError(t, err)
@@ -64,11 +68,11 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, metadata2, fetchedMetadata)
 
-	queued, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Queued)
+	queued, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Queued, 0)
 	assert.NoError(t, err)
 	assert.Len(t, queued, 1)
 	assert.Equal(t, metadata1, queued[0])
-	certified, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Certified)
+	certified, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Certified, 0)
 	assert.NoError(t, err)
 	assert.Len(t, certified, 1)
 	assert.Equal(t, metadata2, certified[0])

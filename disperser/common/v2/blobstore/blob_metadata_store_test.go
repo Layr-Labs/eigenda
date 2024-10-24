@@ -12,13 +12,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/ory/dockertest/v3"
 )
 
@@ -32,7 +32,7 @@ var (
 	localStackPort   = "4571"
 
 	dynamoClient      *dynamodb.Client
-	blobMetadataStore blobstore.BlobMetadataStore
+	blobMetadataStore *blobstore.BlobMetadataStore
 
 	UUID              = uuid.New()
 	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
@@ -61,7 +61,6 @@ func setup(m *testing.M) {
 			teardown()
 			panic("failed to start localstack container")
 		}
-
 	}
 
 	cfg := aws.ClientConfig{

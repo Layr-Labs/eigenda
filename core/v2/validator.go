@@ -43,7 +43,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Get the assignments for the quorum
-	assignment, err := GetAssignment(operatorState, blob.Version, quorum, v.operatorID)
+	assignment, err := GetAssignment(operatorState, blob.BlobVersion, quorum, v.operatorID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -57,7 +57,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	chunkLength, err := GetChunkLength(blob.Version, uint32(blob.BlobHeader.Length))
+	chunkLength, err := GetChunkLength(blob.BlobVersion, uint32(blob.BlobHeader.BlobCommitments.Length))
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}

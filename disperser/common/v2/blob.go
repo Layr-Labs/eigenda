@@ -1,6 +1,8 @@
 package v2
 
-import "github.com/Layr-Labs/eigenda/core"
+import (
+	core "github.com/Layr-Labs/eigenda/core/v2"
+)
 
 type BlobStatus uint
 
@@ -11,14 +13,20 @@ const (
 	Failed
 )
 
+// BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {
-	core.BlobHeaderV2 `json:"blob_header"`
+	BlobHeader *core.BlobHeader
 
-	BlobKey    core.BlobKey `json:"blob_key"`
-	BlobStatus BlobStatus   `json:"blob_status"`
+	// BlobStatus indicates the current status of the blob
+	BlobStatus BlobStatus
 	// Expiry is Unix timestamp of the blob expiry in seconds from epoch
-	Expiry      uint64 `json:"expiry"`
-	NumRetries  uint   `json:"num_retries"`
-	BlobSize    uint64 `json:"blob_size"`
-	RequestedAt uint64 `json:"requested_at"`
+	Expiry uint64
+	// NumRetries is the number of times the blob has been retried
+	NumRetries uint
+	// BlobSize is the size of the blob in bytes
+	BlobSize uint64
+	// RequestedAt is the Unix timestamp of when the blob was requested in seconds
+	RequestedAt uint64
+	// UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_
+	UpdatedAt uint64
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/core"
+	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -23,33 +23,29 @@ const (
 	OperatorDispersalIndexName = "OperatorDispersalIndex"
 	OperatorResponseIndexName  = "OperatorResponseIndex"
 
-	blobKeyPrefix     = "BlobKey#"
-	dispersalIDPrefix = "DispersalID#"
-	blobMetadataSK    = "BlobMetadata"
-	certificateSK     = "Certificate"
+	blobKeyPrefix  = "BlobKey#"
+	blobMetadataSK = "BlobMetadata"
 )
 
-// blobMetadataStore is a blob metadata storage backed by DynamoDB
-type blobMetadataStore struct {
+// BlobMetadataStore is a blob metadata storage backed by DynamoDB
+type BlobMetadataStore struct {
 	dynamoDBClient *commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
 	ttl            time.Duration
 }
 
-var _ BlobMetadataStore = (*blobMetadataStore)(nil)
-
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store v2 with table %s with TTL: %s", tableName, ttl)
-	return &blobMetadataStore{
+	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
-		logger:         logger.With("component", "BlobMetadataStoreV2"),
+		logger:         logger.With("component", "blobMetadataStoreV2"),
 		tableName:      tableName,
 		ttl:            ttl,
 	}
 }
 
-func (s *blobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
+func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {
 		return err
@@ -58,7 +54,7 @@ func (s *blobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 	return s.dynamoDBClient.PutItem(ctx, s.tableName, item)
 }
 
-func (s *blobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.BlobKey) (*v2.BlobMetadata, error) {
+func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.BlobKey) (*v2.BlobMetadata, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -86,12 +82,12 @@ func (s *blobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.Bl
 
 // GetBlobMetadataByStatus returns all the metadata with the given status
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
-func (s *blobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus) ([]*v2.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpressionValues{
+func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
+	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-		":expiry": &types.AttributeValueMemberN{
+		":updatedAt": &types.AttributeValueMemberN{
 			Value: strconv.FormatInt(time.Now().Unix(), 10),
 		}})
 	if err != nil {
@@ -111,13 +107,10 @@ func (s *blobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 
 // GetBlobMetadataCountByStatus returns the count of all the metadata with the given status
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
-func (s *blobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status v2.BlobStatus) (int32, error) {
-	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND Expiry > :expiry", commondynamodb.ExpressionValues{
+func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status v2.BlobStatus) (int32, error) {
+	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
-		},
-		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
 		},
 	})
 	if err != nil {
@@ -130,10 +123,12 @@ func (s *blobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
 	return &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
+			// PK is the composite partition key
 			{
 				AttributeName: aws.String("PK"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
+			// SK is the composite sort key
 			{
 				AttributeName: aws.String("SK"),
 				AttributeType: types.ScalarAttributeTypeS,
@@ -143,7 +138,7 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
-				AttributeName: aws.String("Expiry"),
+				AttributeName: aws.String("UpdatedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
@@ -179,7 +174,7 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 						KeyType:       types.KeyTypeHash,
 					},
 					{
-						AttributeName: aws.String("Expiry"),
+						AttributeName: aws.String("UpdatedAt"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
@@ -246,7 +241,11 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	}
 
 	// Add PK and SK fields
-	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + metadata.BlobKey.Hex()}
+	blobKey, err := metadata.BlobHeader.BlobKey()
+	if err != nil {
+		return nil, err
+	}
+	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + blobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
 
 	return fields, nil
@@ -273,11 +272,5 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*v2.BlobMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
-	blobKey, err := UnmarshalBlobKey(item)
-	if err != nil {
-		return nil, err
-	}
-	metadata.BlobKey = blobKey
-
 	return &metadata, nil
 }
