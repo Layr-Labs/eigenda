@@ -99,34 +99,34 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 
 func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 	if in.GetBatchHeader() == nil {
-		return api.NewInvalidArgError("missing batch_header in request")
+		return api.NewErrorInvalidArg("missing batch_header in request")
 	}
 	if in.GetBatchHeader().GetBatchRoot() == nil {
-		return api.NewInvalidArgError("missing batch_root in request")
+		return api.NewErrorInvalidArg("missing batch_root in request")
 	}
 	if in.GetBatchHeader().GetReferenceBlockNumber() == 0 {
-		return api.NewInvalidArgError("missing reference_block_number in request")
+		return api.NewErrorInvalidArg("missing reference_block_number in request")
 	}
 
 	if len(in.GetBlobs()) == 0 {
-		return api.NewInvalidArgError("missing blobs in request")
+		return api.NewErrorInvalidArg("missing blobs in request")
 	}
 	for _, blob := range in.Blobs {
 		if blob.GetHeader() == nil {
-			return api.NewInvalidArgError("missing blob header in request")
+			return api.NewErrorInvalidArg("missing blob header in request")
 		}
 		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
-			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+			return api.NewErrorInvalidArg("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
-			return api.NewInvalidArgError("missing quorum headers in request")
+			return api.NewErrorInvalidArg("missing quorum headers in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
-			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+			return api.NewErrorInvalidArg("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
 			if q.GetQuorumId() > core.MaxQuorumID {
-				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+				return api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
 			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
 				return err
@@ -172,35 +172,35 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 
 func (s *Server) validateStoreBlobsRequest(in *pb.StoreBlobsRequest) error {
 	if in.GetReferenceBlockNumber() == 0 {
-		return api.NewInvalidArgError("missing reference_block_number in request")
+		return api.NewErrorInvalidArg("missing reference_block_number in request")
 	}
 
 	if len(in.GetBlobs()) == 0 {
-		return api.NewInvalidArgError("missing blobs in request")
+		return api.NewErrorInvalidArg("missing blobs in request")
 	}
 	for _, blob := range in.Blobs {
 		if blob.GetHeader() == nil {
-			return api.NewInvalidArgError("missing blob header in request")
+			return api.NewErrorInvalidArg("missing blob header in request")
 		}
 		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
-			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+			return api.NewErrorInvalidArg("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
-			return api.NewInvalidArgError("missing quorum headers in request")
+			return api.NewErrorInvalidArg("missing quorum headers in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
-			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+			return api.NewErrorInvalidArg("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
 			if q.GetQuorumId() > core.MaxQuorumID {
-				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+				return api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
 			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
 				return err
 			}
 		}
 		if in.GetReferenceBlockNumber() != blob.GetHeader().GetReferenceBlockNumber() {
-			return api.NewInvalidArgError("reference_block_number must be the same for all blobs")
+			return api.NewErrorInvalidArg("reference_block_number must be the same for all blobs")
 		}
 	}
 	return nil
@@ -257,7 +257,7 @@ func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*p
 	blobHeaderHashes := make([][32]byte, len(in.GetBlobHeaderHashes()))
 	for i, hash := range in.GetBlobHeaderHashes() {
 		if len(hash) != 32 {
-			return nil, api.NewInvalidArgError("invalid blob header hash")
+			return nil, api.NewErrorInvalidArg("invalid blob header hash")
 		}
 		var h [32]byte
 		copy(h[:], hash)
