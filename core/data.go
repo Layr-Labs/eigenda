@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strconv"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -560,6 +561,15 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	pm.BinIndex = uint32(binIndex)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
 	return nil
+}
+
+// ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
+func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
+	return &PaymentMetadata{
+		AccountID:         header.AccountId,
+		BinIndex:          header.BinIndex,
+		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
+	}
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,

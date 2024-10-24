@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	mt "github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -101,6 +103,37 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 	reg := prometheus.NewRegistry()
 
+	var meterer *mt.Meterer
+	if config.EnablePaymentMeterer {
+		mtConfig := mt.Config{
+			ChainReadTimeout: 3 * time.Second,
+		}
+
+		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+
+		offchainStore, err := mt.NewOffchainStore(
+			config.AwsClientConfig,
+			"reservations",
+			"ondemand",
+			"global",
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		// add some default sensible configs
+		meterer = mt.NewMeterer(
+			mtConfig,
+			&paymentChainState,
+			offchainStore,
+			logging.NewNoopLogger(),
+			// metrics.NewNoopMetrics(),
+		)
+	}
+
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
 		globalParams := config.RatelimiterConfig.GlobalRateParams
@@ -136,6 +169,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		meterer,
 		ratelimiter,
 		config.RateConfig,
 		config.MaxBlobSize,

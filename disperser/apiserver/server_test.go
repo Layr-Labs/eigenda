@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -674,6 +676,34 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create bucket store")
 	}
+	meterConfig := meterer.Config{
+		PricePerSymbol:         1,
+		MinNumSymbols:          1,
+		GlobalSymbolsPerSecond: 1000,
+		ReservationWindow:      60,
+	}
+
+	mockState := &mock.MockOnchainPaymentState{}
+
+	clientConfig := commonaws.ClientConfig{
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	}
+
+	store, err := meterer.NewOffchainStore(
+		clientConfig,
+		"reservations",
+		"ondemand",
+		"global",
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	meterer := meterer.NewMeterer(meterConfig, mockState, store, logger)
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
@@ -730,7 +760,7 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), meterer, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

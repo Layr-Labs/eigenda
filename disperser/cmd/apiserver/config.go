@@ -22,19 +22,20 @@ const (
 )
 
 type Config struct {
-	DisperserVersion  DisperserVersion
-	AwsClientConfig   aws.ClientConfig
-	BlobstoreConfig   blobstore.Config
-	ServerConfig      disperser.ServerConfig
-	LoggerConfig      common.LoggerConfig
-	MetricsConfig     disperser.MetricsConfig
-	RatelimiterConfig ratelimit.Config
-	RateConfig        apiserver.RateConfig
-	EnableRatelimiter bool
-	BucketTableName   string
-	BucketStoreSize   int
-	EthClientConfig   geth.EthClientConfig
-	MaxBlobSize       int
+	DisperserVersion     DisperserVersion
+	AwsClientConfig      aws.ClientConfig
+	BlobstoreConfig      blobstore.Config
+	ServerConfig         disperser.ServerConfig
+	LoggerConfig         common.LoggerConfig
+	MetricsConfig        disperser.MetricsConfig
+	RatelimiterConfig    ratelimit.Config
+	RateConfig           apiserver.RateConfig
+	EnableRatelimiter    bool
+	EnablePaymentMeterer bool
+	BucketTableName      string
+	BucketStoreSize      int
+	EthClientConfig      geth.EthClientConfig
+	MaxBlobSize          int
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -77,13 +78,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		RatelimiterConfig: ratelimiterConfig,
-		RateConfig:        rateConfig,
-		EnableRatelimiter: ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		BucketTableName:   ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:   ctx.GlobalInt(flags.BucketStoreSize.Name),
-		EthClientConfig:   geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:       ctx.GlobalInt(flags.MaxBlobSize.Name),
+		RatelimiterConfig:    ratelimiterConfig,
+		RateConfig:           rateConfig,
+		EnableRatelimiter:    ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer: ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		BucketTableName:      ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:      ctx.GlobalInt(flags.BucketStoreSize.Name),
+		EthClientConfig:      geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:          ctx.GlobalInt(flags.MaxBlobSize.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
