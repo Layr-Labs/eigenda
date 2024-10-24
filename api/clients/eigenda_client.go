@@ -81,16 +81,13 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 
 	var ethClient *ethclient.Client
 	var edasmCaller *edasm.ContractEigenDAServiceManagerCaller
-	if config.WaitForConfirmationDepth > 0 {
-		ethClient, err = ethclient.Dial(config.EthRpcUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to dial ETH RPC node: %w", err)
-		}
-		edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(common.HexToAddress(config.SvcManagerAddr), ethClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create EigenDAServiceManagerCaller: %w", err)
-		}
-
+	ethClient, err = ethclient.Dial(config.EthRpcUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial ETH RPC node: %w", err)
+	}
+	edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(common.HexToAddress(config.SvcManagerAddr), ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EigenDAServiceManagerCaller: %w", err)
 	}
 
 	host, port, err := net.SplitHostPort(config.RPC)
@@ -321,7 +318,7 @@ func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64)
 // It returns true if the batch ID has been confirmed at the given depth, and false otherwise,
 // or returns an error if any of the network calls fail.
 func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
-	confDeepBlockNumber, err := m.getConfDeepBlockNumber(ctx, m.Config.WaitForConfirmationDepth)
+	confDeepBlockNumber, err := m.getConfDeepBlockNumber(ctx, depth)
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation deep block number: %w", err)
 	}
