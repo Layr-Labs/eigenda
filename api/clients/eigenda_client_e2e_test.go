@@ -27,7 +27,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Skip("Skipping testnet integration test")
 	}
 
-	t.Run("PutBlobWaitForConfirmationAndGetBlob", func(t *testing.T) {
+	t.Run("PutBlobWaitForConfirmationDepth0AndGetBlob", func(t *testing.T) {
 		t.Parallel()
 		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
 		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
@@ -37,6 +37,9 @@ func TestClientUsingTestnet(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1",
 			WaitForFinalization:      false,
+			WaitForConfirmationDepth: 0,
+			SvcManagerAddr:           "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
+			EthRpcUrl:                "https://1rpc.io/holesky",
 		})
 		data := "hello world!"
 		assert.NoError(t, err)
@@ -49,7 +52,7 @@ func TestClientUsingTestnet(t *testing.T) {
 		assert.Equal(t, data, string(blob))
 	})
 
-	t.Run("PutBlobWaitForConfirmationDepthAndGetBlob", func(t *testing.T) {
+	t.Run("PutBlobWaitForConfirmationDepth3AndGetBlob", func(t *testing.T) {
 		t.Parallel()
 		confDepth := uint64(3)
 		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
