@@ -2,9 +2,10 @@ package apiserver
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"slices"
 	"strings"
@@ -146,7 +147,14 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
 
 	// Send back challenge to client
-	challenge := rand.Uint32()
+	challengeBytes := make([]byte, 32)
+	_, err = rand.Read(challengeBytes)
+	if err != nil {
+		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
+		return api.NewInvalidArgError(fmt.Sprintf("failed to generate challenge: %v", err))
+	}
+	challenge := binary.LittleEndian.Uint32(challengeBytes)
 	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
 		BlobAuthHeader: &pb.BlobAuthHeader{
 			ChallengeParameter: challenge,
