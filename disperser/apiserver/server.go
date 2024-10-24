@@ -260,7 +260,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 // to track the error again.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string, paymentHeader *core.PaymentMetadata) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
+		s.metrics.ObserveLatency(apiMethodName, f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 

@@ -252,7 +252,6 @@ func (m *Meterer) SymbolsCharged(dataLength uint) uint32 {
 		return m.ChainPaymentState.GetMinNumSymbols()
 	}
 	// Round up to the nearest multiple of MinNumSymbols
-	fmt.Println("return ", uint32(core.RoundUpDivide(uint(dataLength), uint(m.ChainPaymentState.GetMinNumSymbols())))*m.ChainPaymentState.GetMinNumSymbols())
 	return uint32(core.RoundUpDivide(uint(dataLength), uint(m.ChainPaymentState.GetMinNumSymbols()))) * m.ChainPaymentState.GetMinNumSymbols()
 }
 

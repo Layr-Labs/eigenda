@@ -105,6 +105,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	if err != nil {
 		return err
 	}
+	// These parameters should be rarely updated, but we refresh them anyway
 	pcs.PaymentVaultParams = paymentVaultParams
 	return nil
 }
