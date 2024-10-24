@@ -2,7 +2,6 @@ package dataplane
 
 import (
 	"context"
-	"fmt"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -49,18 +48,10 @@ func RandomOperationsTest(t *testing.T, client S3Client) {
 
 	// Read back the data
 	for key, expected := range expectedData {
-		fmt.Printf("Downloading key %s\n", key) // TODO
 		data, err := client.Download(key, len(expected), fragmentSize)
-		if err != nil {
-			fmt.Sprintf("Error downloading key %s: %v", key, err)
-		}
 		assert.NoError(t, err)
-		passed := assert.Equal(t, expected, data)
-		if !passed {
-			fmt.Sprintf("Data mismatch for key %s", key)
-		}
+		assert.Equal(t, expected, data)
 	}
-
 }
 
 func TestRandomOperations(t *testing.T) {

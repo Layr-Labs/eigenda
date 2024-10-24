@@ -1,6 +1,9 @@
 package dataplane
 
-import "github.com/aws/aws-sdk-go/aws"
+import (
+	"github.com/aws/aws-sdk-go/aws"
+	"time"
+)
 
 // S3Config is the configuration for an S3Client.
 type S3Config struct {
@@ -21,6 +24,10 @@ type S3Config struct {
 	Parallelism int
 	// The capacity of the task channel. Default is 256. It is suggested that this value exceed the number of workers.
 	TaskChannelCapacity int
+	// If a single read takes longer than this value then the read will be aborted. Default is 30 seconds.
+	ReadTimeout time.Duration
+	// If a single write takes longer than this value then the write will be aborted. Default is 30 seconds.
+	WriteTimeout time.Duration
 }
 
 // DefaultS3Config returns a new S3Config with default values.
@@ -33,5 +40,7 @@ func DefaultS3Config() *S3Config {
 		PrefixChars:         3,
 		Parallelism:         32,
 		TaskChannelCapacity: 256,
+		ReadTimeout:         30 * time.Second,
+		WriteTimeout:        30 * time.Second,
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -28,8 +27,6 @@ type s3Client struct {
 	// this wait group is completed when all workers have finished.
 	wg *sync.WaitGroup
 }
-
-// TODO add a timeout maybe?
 
 // NewS3Client creates a new S3Client instance.
 func NewS3Client(
@@ -79,10 +76,13 @@ func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Du
 
 	expiryTime := time.Now().Add(ttl)
 
+	ctx, cancel := context.WithTimeout(s.ctx, s.config.WriteTimeout)
+	defer cancel()
+
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
 		s.tasks <- func() {
-			s.writeTask(resultChannel, fragmentCapture, expiryTime)
+			s.writeTask(ctx, resultChannel, fragmentCapture, expiryTime)
 		}
 	}
 
@@ -92,19 +92,22 @@ func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Du
 			return err
 		}
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (s *s3Client) Download(key string, fileSize int, fragmentSize int) ([]byte, error) {
 	fragmentKeys := GetFragmentKeys(key, s.config.PrefixChars, GetFragmentCount(fileSize, fragmentSize))
 	resultChannel := make(chan *readResult, len(fragmentKeys))
 
+	ctx, cancel := context.WithTimeout(s.ctx, s.config.WriteTimeout)
+	defer cancel()
+
 	for i, fragmentKey := range fragmentKeys {
 		// TODO explain these
 		boundFragmentKey := fragmentKey
 		boundI := i
 		s.tasks <- func() {
-			s.readTask(resultChannel, boundFragmentKey, boundI)
+			s.readTask(ctx, resultChannel, boundFragmentKey, boundI)
 		}
 	}
 
@@ -117,12 +120,16 @@ func (s *s3Client) Download(key string, fileSize int, fragmentSize int) ([]byte,
 		fragments[result.fragment.Index] = result.fragment
 	}
 
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	return RecombineFragments(fragments)
 }
 
 // Close closes the S3 client.
 func (s *s3Client) Close() error {
-	s.ctx.Done()
+	s.cancel()
 	s.wg.Wait()
 	return nil
 }
@@ -166,6 +173,7 @@ type readResult struct {
 
 // readTask reads a single file from S3.
 func (s *s3Client) readTask(
+	ctx context.Context,
 	resultChannel chan *readResult,
 	key string,
 	index int) {
@@ -175,10 +183,11 @@ func (s *s3Client) readTask(
 		resultChannel <- result
 	}()
 
-	ret, err := s.svc.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(s.config.Bucket),
-		Key:    aws.String(key),
-	})
+	ret, err := s.svc.GetObjectWithContext(ctx,
+		&s3.GetObjectInput{
+			Bucket: aws.String(s.config.Bucket),
+			Key:    aws.String(key),
+		})
 
 	if err != nil {
 		result.err = err
@@ -188,21 +197,13 @@ func (s *s3Client) readTask(
 	data := make([]byte, *ret.ContentLength)
 	bytesRead := 0
 
-	for bytesRead < len(data) {
+	for bytesRead < len(data) && ctx.Err() == nil {
 		count, err := ret.Body.Read(data[bytesRead:])
 		if err != nil && err.Error() != "EOF" {
 			result.err = err
 			return
 		}
-		if count == 0 {
-			fmt.Printf("key %s: read 0 bytes\n", key)
-		}
 		bytesRead += count
-	}
-
-	if bytesRead != len(data) {
-		result.err = fmt.Errorf("expected %v bytes, read %v", len(data), bytesRead) // TODO
-		return
 	}
 
 	result.fragment = &Fragment{
@@ -219,18 +220,18 @@ func (s *s3Client) readTask(
 
 // writeTask writes a single file to S3.
 func (s *s3Client) writeTask(
+	ctx context.Context,
 	resultChannel chan error,
 	fragment *Fragment,
 	expiryTime time.Time) {
 
-	_, err := s.svc.PutObject(&s3.PutObjectInput{
-		Bucket:  aws.String(s.config.Bucket),
-		Key:     aws.String(fragment.FragmentKey),
-		Body:    bytes.NewReader(fragment.Data),
-		Expires: &expiryTime,
-	})
-
-	fmt.Printf("wrote key %v, err %v\n", fragment.FragmentKey, err)
+	_, err := s.svc.PutObjectWithContext(ctx,
+		&s3.PutObjectInput{
+			Bucket:  aws.String(s.config.Bucket),
+			Key:     aws.String(fragment.FragmentKey),
+			Body:    bytes.NewReader(fragment.Data),
+			Expires: &expiryTime,
+		})
 
 	resultChannel <- err
 }
