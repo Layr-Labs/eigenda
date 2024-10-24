@@ -152,7 +152,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to generate challenge: %v", err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to generate challenge: %v", err))
 	}
 	challenge := binary.LittleEndian.Uint32(challengeBytes)
 	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
