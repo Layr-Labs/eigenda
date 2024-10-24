@@ -216,12 +216,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	pricePerSymbol := uint32(1)
 	reservationLimit := uint64(1024)
 	paymentLimit := big.NewInt(512)
-	meterConfig := meterer.Config{
-		GlobalSymbolsPerSecond: 1024,
-		PricePerSymbol:         pricePerSymbol,
-		MinNumSymbols:          minimumNumSymbols,
-		ReservationWindow:      uint32(60),
-	}
 
 	// this is disperser client's private key used in tests
 	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
@@ -239,6 +233,11 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		return account == publicKey
 	})).Return(core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(core.OnDemandPayment{}, errors.New("payment not found"))
+	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(minimumNumSymbols, nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(pricePerSymbol, nil)
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
+	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1024), nil)
 	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
@@ -272,7 +271,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	if err != nil {
 		panic("failed to create offchain store")
 	}
-	meterer := meterer.NewMeterer(meterConfig, mockState, offchainStore, logger)
+	meterer := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
