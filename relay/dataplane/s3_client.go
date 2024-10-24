@@ -44,6 +44,7 @@ func NewS3Client(
 
 	sess, err := session.NewSession(config.AWSConfig)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 	svc := s3.New(sess)
@@ -145,7 +146,7 @@ func (s *s3Client) createBucketIfNeeded() error {
 	if err == nil {
 		// Bucket exists
 		return nil
-	} else if s.config.AutoCreateBucket == false {
+	} else if !s.config.AutoCreateBucket {
 		return err
 	}
 
