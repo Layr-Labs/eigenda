@@ -104,10 +104,6 @@ func setup(_ *testing.M) {
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
-		// PricePerSymbol:         2,
-		// MinNumSymbols:          3,
-		// GlobalSymbolsPerSecond: 1009,
-		// ReservationWindow:      1,
 		ChainReadTimeout: 3 * time.Second,
 	}
 

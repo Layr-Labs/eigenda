@@ -28,7 +28,6 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
@@ -76,7 +75,6 @@ var (
 
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	dynamoClient       *commondynamodb.Client
 	clientConfig       commonaws.ClientConfig
 
 	deployLocalStack bool
@@ -261,11 +259,29 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 
+	table_names := []string{"reservations-integration-test", "ondemand-integration-test", "global-integration-test"}
+
+	err = meterer.CreateReservationTable(clientConfig, table_names[0])
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(clientConfig, table_names[1])
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(clientConfig, table_names[2])
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
 	offchainStore, err := meterer.NewOffchainStore(
 		clientConfig,
-		"reservations",
-		"ondemand",
-		"global",
+		table_names[0],
+		table_names[1],
+		table_names[2],
 		logging.NewNoopLogger(),
 	)
 	if err != nil {

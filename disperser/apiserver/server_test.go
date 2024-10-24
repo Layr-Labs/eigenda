@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -651,18 +650,29 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 
 	mockState := &mock.MockOnchainPaymentState{}
 
-	clientConfig := commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:4566"),
+	table_names := []string{"reservations-apiserver-test", "ondemand-apiserver-test", "global-apiserver-test"}
+
+	err = meterer.CreateReservationTable(awsConfig, table_names[0])
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
 	}
 
 	store, err := meterer.NewOffchainStore(
-		clientConfig,
-		"reservations",
-		"ondemand",
-		"global",
+		awsConfig,
+		table_names[0],
+		table_names[1],
+		table_names[2],
 		logger,
 	)
 	if err != nil {
