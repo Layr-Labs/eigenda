@@ -214,7 +214,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated")
+	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated", &core.PaymentMetadata{})
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -246,7 +246,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob")
+	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob", &core.PaymentMetadata{})
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -258,7 +258,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string, paymentHeader *core.PaymentMetadata) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
 	}))
@@ -283,7 +283,13 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if s.ratelimiter != nil {
+	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
+	if *paymentHeader != (core.PaymentMetadata{}) {
+		err := s.meterer.MeterRequest(ctx, *blob, *paymentHeader)
+		if err != nil {
+			return nil, err
+		}
+	} else if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {
 			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
@@ -314,12 +320,13 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
 	blob, err := s.validatePaidRequestAndGetBlob(ctx, req)
-	quorumNumbers := req.CustomQuorumNumbers
 	binIndex := req.PaymentHeader.BinIndex
 	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
 	//todo: before disperse blob, validate the signature
 	signature := req.PaymentSignature
-
+	if !auth.VerifyPaymentSignature(req.GetPaymentHeader(), signature) {
+		return nil, api.NewErrorInvalidArg("payment signature is invalid")
+	}
 	if err != nil {
 		for _, quorumID := range req.CustomQuorumNumbers {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DispersePaidBlob")
@@ -328,7 +335,12 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	reply, err := s.dispersePaidBlob(ctx, blob, quorumNumbers, binIndex, cumulativePayment, signature, "", "DispersePaidBlob")
+	paymentHeader := core.PaymentMetadata{
+		AccountID:         blob.RequestHeader.AccountID,
+		BinIndex:          binIndex,
+		CumulativePayment: cumulativePayment,
+	}
+	reply, err := s.disperseBlob(ctx, blob, "", "DispersePaidBlob", &paymentHeader)
 	if err != nil {
 		// Note the DispersePaidBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -336,81 +348,6 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 		s.metrics.HandleSuccessfulRpcRequest("DispersePaidBlob")
 	}
 	return reply, err
-}
-
-// dispersePaidBlob checks for payment metering, otherwise does the same thing as disperseBlob
-func (s *DispersalServer) dispersePaidBlob(ctx context.Context, blob *core.Blob, quorumNumbers []uint32, binIndex uint32, cumulativePayment *big.Int, signature []byte, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("DispersePaidBlob", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
-	securityParams := blob.RequestHeader.SecurityParams
-	securityParamsStrings := make([]string, len(securityParams))
-	for i, sp := range securityParams {
-		securityParamsStrings[i] = sp.String()
-	}
-
-	blobSize := len(blob.Data)
-
-	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
-	if err != nil {
-		for _, param := range securityParams {
-			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
-		}
-		s.metrics.HandleInvalidArgRpcRequest(apiMethodName)
-		return nil, api.NewErrorInvalidArg(err.Error())
-	}
-
-	s.logger.Debug("received a new paid blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
-
-	// payments before ratelimits
-	if s.meterer != nil {
-		fmt.Println("Metering the request; lots of temporarily code")
-		//TODO: blob request header needs to be updated for payments; here we create a placeholder
-		qn := make([]uint8, len(quorumNumbers))
-		// don't care about higher bites. need to unify quorum number types
-		for i, v := range quorumNumbers {
-			qn[i] = uint8(v)
-		}
-		paymentHeader := core.PaymentMetadata{
-			AccountID: blob.RequestHeader.AccountID,
-			BinIndex:  binIndex,
-			// TODO: we are thinking the contract can use uint128 for cumulative payment,
-			// but the definition on v2 uses uint64. Double check with team.
-			CumulativePayment: cumulativePayment,
-		}
-		err := s.meterer.MeterRequest(ctx, *blob, paymentHeader)
-		if err != nil {
-			return nil, err
-		}
-	} else if s.ratelimiter != nil {
-		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
-		if err != nil {
-			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
-			return nil, err
-		}
-	}
-
-	requestedAt := uint64(time.Now().UnixNano())
-	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
-	if err != nil {
-		for _, param := range securityParams {
-			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
-		}
-		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
-		s.logger.Error("failed to store blob", "err", err)
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store blob, please try again later: %v", err))
-	}
-
-	for _, param := range securityParams {
-		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
-	}
-
-	return &pb.DisperseBlobReply{
-		Result:    pb.BlobStatus_PROCESSING,
-		RequestId: []byte(metadataKey.String()),
-	}, nil
 }
 
 func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
