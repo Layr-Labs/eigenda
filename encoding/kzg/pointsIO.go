@@ -8,7 +8,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"time"
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -109,7 +108,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 		}
 	}()
 
-	startTimer := time.Now()
 	g1r := bufio.NewReaderSize(g1f, int(n*G1PointBytes))
 
 	if n < numWorker {
@@ -120,12 +118,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 	if err != nil {
 		return nil, err
 	}
-
-	// measure reading time
-	t := time.Now()
-	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G1 points (%v bytes) takes %v\n", (n * G1PointBytes), elapsed)
-	startTimer = time.Now()
 
 	s1Outs := make([]bn254.G1Affine, n)
 
@@ -155,10 +147,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 		}
 	}
 
-	// measure parsing time
-	t = time.Now()
-	elapsed = t.Sub(startTimer)
-	log.Println("    Parsing takes", elapsed)
 	return s1Outs, nil
 }
 
@@ -279,7 +267,6 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 		}
 	}()
 
-	startTimer := time.Now()
 	g1r := bufio.NewReaderSize(g1f, int(n*G2PointBytes))
 
 	if n < numWorker {
@@ -290,13 +277,6 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 	if err != nil {
 		return nil, err
 	}
-
-	// measure reading time
-	t := time.Now()
-	elapsed := t.Sub(startTimer)
-	log.Printf("    Reading G2 points (%v bytes) takes %v\n", (n * G2PointBytes), elapsed)
-
-	startTimer = time.Now()
 
 	s2Outs := make([]bn254.G2Affine, n)
 
@@ -324,10 +304,6 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 		}
 	}
 
-	// measure parsing time
-	t = time.Now()
-	elapsed = t.Sub(startTimer)
-	log.Println("    Parsing takes", elapsed)
 	return s2Outs, nil
 }
 

@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -35,12 +37,14 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
 
-	// read the whole order, and treat it as entire SRS for low degree proof
+	// Read the whole order, and treat it as entire SRS for low degree proof
+	startTime := time.Now()
 	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
 		log.Println("failed to read G1 points", err)
 		return nil, err
 	}
+	slog.Info("ReadG1Points", "time", time.Since(startTime), "numPoints", len(s1))
 
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
@@ -51,12 +55,16 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
 
+		startTime := time.Now()
 		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
 			log.Println("failed to read G2 points", err)
 			return nil, err
 		}
+		slog.Info("ReadG2Points", "time", time.Since(startTime), "numPoints", len(s2))
 
+		// Measure time to read G2 points section
+		startTime = time.Now()
 		g2Trailing, err = kzg.ReadG2PointSection(
 			config.G2Path,
 			config.SRSOrder-config.SRSNumberToLoad,
@@ -66,6 +74,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 		if err != nil {
 			return nil, err
 		}
+		slog.Info("ReadG2PointSection", "time", time.Since(startTime), "numPoints", len(g2Trailing))
 	} else {
 		// todo, there are better ways to handle it
 		if len(config.G2PowerOf2Path) == 0 {
