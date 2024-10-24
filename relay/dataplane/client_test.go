@@ -2,34 +2,101 @@ package dataplane
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 )
 
-var clientBuilders = []func() (S3Client, error){
-	//func() (S3Client, error) {
-	//	return NewLocalClient(mapstore.NewStore()), nil
-	//},
-	func() (S3Client, error) {
+var (
+	dockertestPool     *dockertest.Pool
+	dockertestResource *dockertest.Resource
+)
 
-		config := DefaultS3Config()
-		config.Bucket = "eigen-cody-test"
-		config.AutoCreateBucket = true
+const (
+	localstackPort = "4566"
+	localstackHost = "http://0.0.0.0:4566"
+)
 
-		client, err := NewS3Client(context.Background(), config)
-		if err != nil {
-			return nil, err
-		}
+type clientBuilder struct {
+	// This method is called at the beginning of the test.
+	start func() error
+	// This method is called to build a new client.
+	build func() (S3Client, error)
+	// This method is called at the end of the test when all operations are done.
+	finish func() error
+}
 
-		return client, nil
+var clientBuilders = []*clientBuilder{
+	{
+		start: func() error {
+			return nil
+		},
+		build: func() (S3Client, error) {
+			return NewLocalClient(mapstore.NewStore()), nil
+		},
+		finish: func() error {
+			return nil
+		},
+	},
+	{
+		start: func() error {
+			return setupLocalstack()
+		},
+		build: func() (S3Client, error) {
+
+			config := DefaultS3Config()
+			config.AWSConfig.Endpoint = aws.String(localstackHost)
+			config.AWSConfig.S3ForcePathStyle = aws.Bool(true)
+			config.AWSConfig.WithRegion("us-east-1")
+
+			err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
+			if err != nil {
+				return nil, err
+			}
+			err = os.Setenv("AWS_SECRET_ACCESS_KEY", "localstack")
+			if err != nil {
+				return nil, err
+			}
+
+			config.Bucket = "this-is-a-test-bucket"
+			config.AutoCreateBucket = true
+
+			client, err := NewS3Client(context.Background(), config)
+			if err != nil {
+				return nil, err
+			}
+
+			return client, nil
+		},
+		finish: func() error {
+			teardownLocalstack()
+			return nil
+		},
 	},
 }
 
-func RandomOperationsTest(t *testing.T, client S3Client) {
+func setupLocalstack() error {
+	var err error
+	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+	if err != nil {
+		teardownLocalstack()
+		return err
+	}
+	return nil
+}
 
+func teardownLocalstack() {
+	deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+}
+
+func RandomOperationsTest(t *testing.T, client S3Client) {
 	numberToWrite := 100
 	expectedData := make(map[string][]byte)
 
@@ -56,17 +123,23 @@ func RandomOperationsTest(t *testing.T, client S3Client) {
 
 func TestRandomOperations(t *testing.T) {
 	tu.InitializeRandom()
-	for _, clientBuilder := range clientBuilders {
-		client, err := clientBuilder()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
+
+		client, err := builder.build()
 		assert.NoError(t, err)
 		RandomOperationsTest(t, client)
 		err = client.Close()
+		assert.NoError(t, err)
+
+		err = builder.finish()
 		assert.NoError(t, err)
 	}
 }
 
 func ReadNonExistentValueTest(t *testing.T, client S3Client) {
-	_, err := client.Download("nonexistent", 0, 0)
+	_, err := client.Download("nonexistent", 1000, 1000)
 	assert.Error(t, err)
 	randomKey := tu.RandomString(10)
 	_, err = client.Download(randomKey, 0, 0)
@@ -75,15 +148,17 @@ func ReadNonExistentValueTest(t *testing.T, client S3Client) {
 
 func TestReadNonExistentValue(t *testing.T) {
 	tu.InitializeRandom()
-	for _, clientBuilder := range clientBuilders {
-		client, err := clientBuilder()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
+
+		client, err := builder.build()
 		assert.NoError(t, err)
 		ReadNonExistentValueTest(t, client)
 		err = client.Close()
 		assert.NoError(t, err)
+
+		err = builder.finish()
+		assert.NoError(t, err)
 	}
 }
-
-// TODO:
-//  - test bucket creation
-//  - test a store that already has a bucket created

@@ -96,6 +96,10 @@ func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Du
 }
 
 func (s *s3Client) Download(key string, fileSize int, fragmentSize int) ([]byte, error) {
+	if fragmentSize <= 0 {
+		return nil, errors.New("fragmentSize must be greater than 0")
+	}
+
 	fragmentKeys := GetFragmentKeys(key, s.config.PrefixChars, GetFragmentCount(fileSize, fragmentSize))
 	resultChannel := make(chan *readResult, len(fragmentKeys))
 
@@ -103,7 +107,6 @@ func (s *s3Client) Download(key string, fileSize int, fragmentSize int) ([]byte,
 	defer cancel()
 
 	for i, fragmentKey := range fragmentKeys {
-		// TODO explain these
 		boundFragmentKey := fragmentKey
 		boundI := i
 		s.tasks <- func() {
