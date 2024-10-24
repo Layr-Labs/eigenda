@@ -353,7 +353,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-		err = encoding.ValidateEncodingParams(params, int(blobLength), e.SRSOrder)
+		err = encoding.ValidateEncodingParamsAndBlobLength(params, uint64(blobLength), uint64(e.SRSOrder))
 		if err != nil {
 			e.logger.Error("invalid encoding params", "err", err)
 			// Cancel the blob

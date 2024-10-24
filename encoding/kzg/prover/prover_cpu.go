@@ -4,7 +4,6 @@
 package prover
 
 import (
-	"fmt"
 	"log"
 	"math"
 
@@ -21,9 +20,8 @@ import (
 
 func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
 
-	// Check that the parameters are valid with respect to the SRS.
-	if params.ChunkLength*params.NumChunks >= g.SRSOrder {
-		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
+	if err := encoding.ValidateEncodingParams(params, g.SRSOrder); err != nil {
+		return nil, err
 	}
 
 	encoder, err := rs.NewEncoder(params, g.Verbose)

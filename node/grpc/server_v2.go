@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shirou/gopsutil/mem"
-	"google.golang.org/grpc/codes"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -54,9 +53,9 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-	return &pb.StoreChunksReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return &pb.StoreChunksReply{}, api.NewErrorUnimplemented()
 }
 
 func (s *ServerV2) GetChunks(context.Context, *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-	return &pb.GetChunksReply{}, api.NewGRPCError(codes.Unimplemented, "not implemented")
+	return &pb.GetChunksReply{}, api.NewErrorUnimplemented()
 }

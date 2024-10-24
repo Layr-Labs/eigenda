@@ -20,7 +20,7 @@ import (
 // interface, see grpc.Server.validateStoreChunkRequest.
 func GetBatchHeader(in *pb.BatchHeader) (*core.BatchHeader, error) {
 	if in == nil || len(in.GetBatchRoot()) == 0 {
-		return nil, api.NewInvalidArgError("batch header is nil or empty")
+		return nil, api.NewErrorInvalidArg("batch header is nil or empty")
 	}
 	var batchRoot [32]byte
 	copy(batchRoot[:], in.GetBatchRoot())
@@ -143,7 +143,7 @@ func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
 func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 
 	if h == nil {
-		return nil, api.NewInvalidArgError("GetBlobHeaderFromProto: blob header is nil")
+		return nil, api.NewErrorInvalidArg("GetBlobHeaderFromProto: blob header is nil")
 
 	}
 
@@ -184,7 +184,7 @@ func GetBlobHeaderFromProto(h *pb.BlobHeader) (*core.BlobHeader, error) {
 	quorumHeaders := make([]*core.BlobQuorumInfo, len(h.GetQuorumHeaders()))
 	for i, header := range h.GetQuorumHeaders() {
 		if header.GetQuorumId() > core.MaxQuorumID {
-			return nil, api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, header.GetQuorumId()))
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, header.GetQuorumId()))
 		}
 		if err := core.ValidateSecurityParam(header.GetConfirmationThreshold(), header.GetAdversaryThreshold()); err != nil {
 			return nil, err

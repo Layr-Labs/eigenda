@@ -29,10 +29,18 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DisperserClient interface {
-	// This API accepts blob to disperse from clients.
+	// DisperseBlob accepts a single blob to be dispersed.
 	// This executes the dispersal async, i.e. it returns once the request
-	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// is accepted. The client should use GetBlobStatus() API to poll the
 	// processing status of the blob.
+	//
+	// If DisperseBlob returns the following error codes:
+	// INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg.
+	// RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg.
+	//
+	//	user should retry after the specified duration.
+	//
+	// INTERNAL (500): serious error, user should NOT retry.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
@@ -124,10 +132,18 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, in *RetrieveBlobRequ
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
 type DisperserServer interface {
-	// This API accepts blob to disperse from clients.
+	// DisperseBlob accepts a single blob to be dispersed.
 	// This executes the dispersal async, i.e. it returns once the request
-	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// is accepted. The client should use GetBlobStatus() API to poll the
 	// processing status of the blob.
+	//
+	// If DisperseBlob returns the following error codes:
+	// INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg.
+	// RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg.
+	//
+	//	user should retry after the specified duration.
+	//
+	// INTERNAL (500): serious error, user should NOT retry.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:

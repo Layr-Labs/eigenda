@@ -42,3 +42,8 @@ func (m *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash 
 	args := m.mock.Called(batchHeaderHash, blobIndex)
 	return args.Get(0).([]byte), args.Error(1)
 }
+
+func (m *MockDisperserClient) Close() error {
+	args := m.mock.Called()
+	return args.Error(0)
+}

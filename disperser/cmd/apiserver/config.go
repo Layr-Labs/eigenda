@@ -32,7 +32,6 @@ type Config struct {
 	RateConfig        apiserver.RateConfig
 	EnableRatelimiter bool
 	BucketTableName   string
-	ShadowTableName   string
 	BucketStoreSize   int
 	EthClientConfig   geth.EthClientConfig
 	MaxBlobSize       int
@@ -70,9 +69,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
-			BucketName:      ctx.GlobalString(flags.S3BucketNameFlag.Name),
-			TableName:       ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
-			ShadowTableName: ctx.GlobalString(flags.ShadowTableNameFlag.Name),
+			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
+			TableName:  ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
 		},
 		LoggerConfig: *loggerConfig,
 		MetricsConfig: disperser.MetricsConfig{

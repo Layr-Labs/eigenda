@@ -2,9 +2,10 @@ package apiserver
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
 	"slices"
 	"strings"
@@ -108,14 +109,14 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("error receiving next message: %v", err))
 	}
 
 	request, ok := in.GetPayload().(*pb.AuthenticatedRequest_DisperseRequest)
 	if !ok {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError("missing DisperseBlobRequest")
+		return api.NewErrorInvalidArg("missing DisperseBlobRequest")
 	}
 
 	blob, err := s.validateRequestAndGetBlob(ctx, request.DisperseRequest)
@@ -124,7 +125,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(request.DisperseRequest.GetData()), "DisperseBlobAuthenticated")
 		}
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(err.Error())
+		return api.NewErrorInvalidArg(err.Error())
 	}
 
 	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
@@ -133,20 +134,27 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode account ID (%v): %v", blob.RequestHeader.AccountID, err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to decode account ID (%v): %v", blob.RequestHeader.AccountID, err))
 	}
 
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to decode public key (%v): %v", hexutil.Encode(publicKeyBytes), err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to decode public key (%v): %v", hexutil.Encode(publicKeyBytes), err))
 	}
 
 	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
 
 	// Send back challenge to client
-	challenge := rand.Uint32()
+	challengeBytes := make([]byte, 32)
+	_, err = rand.Read(challengeBytes)
+	if err != nil {
+		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
+		return api.NewInvalidArgError(fmt.Sprintf("failed to generate challenge: %v", err))
+	}
+	challenge := binary.LittleEndian.Uint32(challengeBytes)
 	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
 		BlobAuthHeader: &pb.BlobAuthHeader{
 			ChallengeParameter: challenge,
@@ -176,18 +184,18 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	case err := <-errCh:
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("error receiving next message: %v", err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("error receiving next message: %v", err))
 	case <-ctx.Done():
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError("context deadline exceeded")
+		return api.NewErrorInvalidArg("context deadline exceeded")
 	}
 
 	challengeReply, ok := in.GetPayload().(*pb.AuthenticatedRequest_AuthenticationData)
 	if !ok {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError("expected AuthenticationData")
+		return api.NewErrorInvalidArg("expected AuthenticationData")
 	}
 
 	blob.RequestHeader.Nonce = challenge
@@ -197,7 +205,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to authenticate blob request: %v", err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate blob request: %v", err))
 	}
 
 	// Disperse the blob
@@ -230,7 +238,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DisperseBlob")
 		}
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlob")
-		return nil, api.NewInvalidArgError(err.Error())
+		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob")
@@ -265,7 +273,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 		}
 		s.metrics.HandleInvalidArgRpcRequest(apiMethodName)
-		return nil, api.NewInvalidArgError(err.Error())
+		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
@@ -286,7 +294,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
-		return nil, api.NewInternalError("failed to store blob, please try again later")
+		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
 	}
 
 	for _, param := range securityParams {
@@ -440,13 +448,13 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 		globalRates, ok := s.rateConfig.QuorumRateInfos[param.QuorumID]
 		if !ok {
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
-			return api.NewInternalError(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
+			return api.NewErrorInternal(fmt.Sprintf("no configured rate exists for quorum %d", param.QuorumID))
 		}
 
 		accountRates, accountKey, err := s.getAccountRate(origin, authenticatedAddress, param.QuorumID)
 		if err != nil {
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
-			return api.NewInternalError(err.Error())
+			return api.NewErrorInternal(err.Error())
 		}
 
 		// Note: There's an implicit assumption that an empty name means the account
@@ -524,14 +532,14 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 	if err != nil {
 		s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
 		s.metrics.HandleFailedRequest(codes.Internal.String(), "", blobSize, apiMethodName)
-		return api.NewInternalError(err.Error())
+		return api.NewErrorInternal(err.Error())
 	}
 
 	if !allowed {
 		info, ok := params.Info.(limiterInfo)
 		if !ok {
 			s.metrics.HandleInternalFailureRpcRequest(apiMethodName)
-			return api.NewInternalError("failed to cast limiterInfo")
+			return api.NewErrorInternal("failed to cast limiterInfo")
 		}
 		if info.RateType == SystemThroughputType || info.RateType == SystemBlobRateType {
 			s.metrics.HandleSystemRateLimitedRpcRequest(apiMethodName)
@@ -542,7 +550,7 @@ func (s *DispersalServer) checkRateLimitsAndAddRatesToHeader(ctx context.Context
 			s.logger.Info("request ratelimited", "requesterName", requesterName, "requesterID", params.RequesterID, "rateType", info.RateType.String(), "quorum", info.QuorumID)
 		}
 		errorString := fmt.Sprintf("request ratelimited: %s for quorum %d", info.RateType.String(), info.QuorumID)
-		return api.NewResourceExhaustedError(errorString)
+		return api.NewErrorResourceExhausted(errorString)
 	}
 
 	return nil
@@ -559,7 +567,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	if len(requestID) == 0 {
 		s.metrics.HandleInvalidArgRpcRequest("GetBlobStatus")
 		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
-		return nil, api.NewInvalidArgError("request_id must not be empty")
+		return nil, api.NewErrorInvalidArg("request_id must not be empty")
 	}
 
 	s.logger.Info("received a new blob status request", "requestID", string(requestID))
@@ -567,7 +575,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("GetBlobStatus")
 		s.metrics.HandleInvalidArgRequest("GetBlobStatus")
-		return nil, api.NewInvalidArgError(fmt.Sprintf("failed to parse the requestID: %s", err.Error()))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the requestID: %s", err.Error()))
 	}
 
 	s.logger.Debug("metadataKey", "metadataKey", metadataKey.String())
@@ -576,16 +584,16 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 		if errors.Is(err, disperser.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("GetBlobStatus")
 			s.metrics.HandleNotFoundRequest("GetBlobStatus")
-			return nil, api.NewNotFoundError("no metadata found for the requestID")
+			return nil, api.NewErrorNotFound("no metadata found for the requestID")
 		}
 		s.metrics.HandleInternalFailureRpcRequest("GetBlobStatus")
-		return nil, api.NewInternalError(fmt.Sprintf("failed to get blob metadata, blobkey: %s", metadataKey.String()))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob metadata, blobkey: %s", metadataKey.String()))
 	}
 
 	isConfirmed, err := metadata.IsConfirmed()
 	if err != nil {
 		s.metrics.HandleInternalFailureRpcRequest("GetBlobStatus")
-		return nil, api.NewInternalError(fmt.Sprintf("missing confirmation information: %s", err.Error()))
+		return nil, api.NewErrorInternal(fmt.Sprintf("missing confirmation information: %s", err.Error()))
 	}
 
 	s.metrics.HandleSuccessfulRpcRequest("GetBlobStatus")
@@ -673,7 +681,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("RetrieveBlob")
 		s.metrics.HandleInvalidArgRequest("RetrieveBlob")
-		return nil, api.NewInvalidArgError(err.Error())
+		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	stageTimer := time.Now()
@@ -689,7 +697,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		})
 		if err != nil {
 			s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
-			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
+			return nil, api.NewErrorInternal(fmt.Sprintf("ratelimiter error: %v", err))
 		}
 		if !allowed {
 			s.metrics.HandleRateLimitedRpcRequest("RetrieveBlob")
@@ -699,7 +707,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			if ok {
 				errorString += ": " + info
 			}
-			return nil, api.NewResourceExhaustedError(errorString)
+			return nil, api.NewErrorResourceExhausted(errorString)
 		}
 	}
 	s.logger.Debug("checked retrieval blob rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalBlobRateType.Plug()), "duration", time.Since(stageTimer).String())
@@ -719,17 +727,17 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		if errors.Is(err, disperser.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 			s.metrics.HandleNotFoundRequest("RetrieveBlob")
-			return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
+			return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
 		}
 		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
-		return nil, api.NewInternalError("failed to get blob metadata, please retry")
+		return nil, api.NewErrorInternal("failed to get blob metadata, please retry")
 	}
 
 	if blobMetadata.Expiry < uint64(time.Now().Unix()) {
 		s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 		s.metrics.HandleNotFoundRequest("RetrieveBlob")
-		return nil, api.NewNotFoundError("no metadata found for the given batch header hash and blob index")
+		return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
 	}
 
 	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration", time.Since(stageTimer).String())
@@ -749,7 +757,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		})
 		if err != nil {
 			s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
-			return nil, api.NewInternalError(fmt.Sprintf("ratelimiter error: %v", err))
+			return nil, api.NewErrorInternal(fmt.Sprintf("ratelimiter error: %v", err))
 		}
 		if !allowed {
 			s.metrics.HandleRateLimitedRpcRequest("RetrieveBlob")
@@ -759,7 +767,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 			if ok {
 				errorString += ": " + info
 			}
-			return nil, api.NewResourceExhaustedError(errorString)
+			return nil, api.NewErrorResourceExhausted(errorString)
 		}
 	}
 	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).String())
@@ -770,7 +778,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		s.logger.Error("Failed to retrieve blob", "err", err)
 		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.HandleFailedRequest(codes.Internal.String(), "", len(data), "RetrieveBlob")
-		return nil, api.NewInternalError("failed to get blob data, please retry")
+		return nil, api.NewErrorInternal("failed to get blob data, please retry")
 	}
 	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
@@ -939,7 +947,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	_, err := rs.ToFrArray(data)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
-		return nil, api.NewInvalidArgError("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+		return nil, api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
 	}
 
 	quorumConfig, err := s.updateQuorumConfig(ctx)
