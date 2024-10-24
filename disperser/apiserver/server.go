@@ -251,6 +251,10 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	return reply, err
 }
 
+func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	return nil, api.NewErrorInternal("not implemented")
+}
+
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {

@@ -169,6 +169,7 @@ func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ReservationWindow)
 	quoromNumbers := []uint8{0, 1}
+
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
 		return account == accountID1
 	})).Return(account1Reservations, nil)

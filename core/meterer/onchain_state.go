@@ -14,9 +14,7 @@ import (
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error
-	GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error)
 	GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error)
-	GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 }
@@ -86,10 +84,6 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	return nil
 }
 
-func (pcs *OnchainPaymentState) GetActiveReservations(ctx context.Context, blockNumber uint) (map[string]core.ActiveReservation, error) {
-	return pcs.ActiveReservations, nil
-}
-
 // GetActiveReservationByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
 	if reservation, ok := pcs.ActiveReservations[accountID]; ok {
@@ -105,10 +99,6 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Contex
 	pcs.ActiveReservations[accountID] = res
 	pcs.ReservationsLock.Unlock()
 	return res, nil
-}
-
-func (pcs *OnchainPaymentState) GetOnDemandPayments(ctx context.Context, blockNumber uint) (map[string]core.OnDemandPayment, error) {
-	return pcs.OnDemandPayments, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment

@@ -103,13 +103,13 @@ type Reader interface {
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
 	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
 
-	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
+	// GetActiveReservationByAccount returns active reservation by account ID
 	GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (ActiveReservation, error)
 
 	// GetOnDemandPayments returns all on-demand payments
 	GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]OnDemandPayment, error)
 
-	// GetOnDemandPayments returns all on-demand payments
+	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
 }
 
