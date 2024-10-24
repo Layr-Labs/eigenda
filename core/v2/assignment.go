@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-func GetAssignments(state *core.OperatorState, blobVersion byte, quorum uint8) (map[core.OperatorID]Assignment, error) {
+func GetAssignments(state *core.OperatorState, blobVersion BlobVersion, quorum uint8) (map[core.OperatorID]Assignment, error) {
 
 	params, ok := ParametersMap[blobVersion]
 	if !ok {
@@ -81,7 +81,7 @@ func GetAssignments(state *core.OperatorState, blobVersion byte, quorum uint8) (
 
 }
 
-func GetAssignment(state *core.OperatorState, blobVersion byte, quorum core.QuorumID, id core.OperatorID) (Assignment, error) {
+func GetAssignment(state *core.OperatorState, blobVersion BlobVersion, quorum core.QuorumID, id core.OperatorID) (Assignment, error) {
 
 	assignments, err := GetAssignments(state, blobVersion, quorum)
 	if err != nil {
@@ -96,7 +96,7 @@ func GetAssignment(state *core.OperatorState, blobVersion byte, quorum core.Quor
 	return assignment, nil
 }
 
-func GetChunkLength(blobVersion byte, blobLength uint32) (uint32, error) {
+func GetChunkLength(blobVersion BlobVersion, blobLength uint32) (uint32, error) {
 
 	if blobLength == 0 {
 		return 0, fmt.Errorf("blob length must be greater than 0")

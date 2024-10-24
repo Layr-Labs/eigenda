@@ -20,7 +20,7 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 	operatorState := state.OperatorState
 
-	blobVersion := byte(0)
+	blobVersion := corev2.BlobVersion(0)
 
 	assignments, err := corev2.GetAssignments(operatorState, blobVersion, 0)
 	assert.NoError(t, err)
@@ -90,7 +90,7 @@ func TestAssignmentWithTooManyOperators(t *testing.T) {
 
 	assert.Equal(t, len(state.Operators[0]), numOperators)
 
-	blobVersion := byte(0)
+	blobVersion := corev2.BlobVersion(0)
 
 	_, err = corev2.GetAssignments(state.OperatorState, blobVersion, 0)
 	assert.Error(t, err)
@@ -131,7 +131,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		state := dat.GetTotalOperatorState(context.Background(), 0)
 
-		blobVersion := byte(0)
+		blobVersion := corev2.BlobVersion(0)
 
 		assignments, err := corev2.GetAssignments(state.OperatorState, blobVersion, 0)
 		assert.NoError(t, err)
@@ -162,7 +162,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 func TestChunkLength(t *testing.T) {
 
-	blobVersion := byte(0)
+	blobVersion := corev2.BlobVersion(0)
 
 	pairs := []struct {
 		blobLength  uint32
@@ -188,7 +188,7 @@ func TestChunkLength(t *testing.T) {
 
 func TestInvalidChunkLength(t *testing.T) {
 
-	blobVersion := byte(0)
+	blobVersion := corev2.BlobVersion(0)
 
 	invalidLengths := []uint32{
 		0,
