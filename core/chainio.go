@@ -1,11 +1,13 @@
-package chainio
+package core
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"math/big"
 
-	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
+	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type OperatorStake struct {
@@ -16,7 +18,7 @@ type OperatorStake struct {
 type OperatorToChurn struct {
 	QuorumId QuorumID
 	Operator gethcommon.Address
-	Pubkey   *bn254.G1Point
+	Pubkey   *G1Point
 }
 
 type OperatorSetParam struct {
@@ -25,9 +27,10 @@ type OperatorSetParam struct {
 	ChurnBIPsOfTotalStake    uint16
 }
 
-type OperatorStakes map[QuorumID]map[uint32]OperatorStake
+type OperatorStakes map[QuorumID]map[OperatorIndex]OperatorStake
 
 type Reader interface {
+
 	// GetRegisteredQuorumIdsForOperator returns the quorum ids that the operator is registered in with the given public key.
 	GetRegisteredQuorumIdsForOperator(ctx context.Context, operatorID OperatorID) ([]QuorumID, error)
 
@@ -91,6 +94,73 @@ type Reader interface {
 	// GetQuorumCount returns the number of quorums registered at given block number.
 	GetQuorumCount(ctx context.Context, blockNumber uint32) (uint8, error)
 
+	// GetQuorumSecurityParams returns the security params for the registered quorums.
+	GetQuorumSecurityParams(ctx context.Context, blockNumber uint32) ([]SecurityParam, error)
+
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
+
+	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
+	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
+
+	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
+	GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (ActiveReservation, error)
+
+	// GetOnDemandPayments returns all on-demand payments
+	GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]OnDemandPayment, error)
+
+	// GetOnDemandPayments returns all on-demand payments
+	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
+}
+
+type Writer interface {
+	Reader
+
+	// RegisterOperator registers a new operator with the given public key and socket with the provided quorum ids.
+	// If the operator is already registered with a given quorum id, the transaction will fail (noop) and an error
+	// will be returned.
+	RegisterOperator(
+		ctx context.Context,
+		keypair *KeyPair,
+		socket string,
+		quorumIds []QuorumID,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorToAvsRegistrationSigSalt [32]byte,
+		operatorToAvsRegistrationSigExpiry *big.Int,
+	) error
+
+	// RegisterOperatorWithChurn registers a new operator with the given public key and socket with the provided quorum ids
+	// with the provided signature from the churner
+	RegisterOperatorWithChurn(
+		ctx context.Context,
+		keypair *KeyPair,
+		socket string,
+		quorumIds []QuorumID,
+		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
+		operatorToAvsRegistrationSigSalt [32]byte,
+		operatorToAvsRegistrationSigExpiry *big.Int,
+		churnReply *churner.ChurnReply,
+	) error
+
+	// DeregisterOperator deregisters an operator with the given public key from the all the quorums that it is
+	// registered with at the supplied block number. To fully deregister an operator, this function should be called
+	// with the current block number.
+	// If the operator isn't registered with any of the specified quorums, this function will return error, and
+	// no quorum will be deregistered.
+	DeregisterOperator(ctx context.Context, pubkeyG1 *G1Point, blockNumber uint32, quorumIds []QuorumID) error
+
+	// UpdateOperatorSocket updates the socket of the operator in all the quorums that it is registered with.
+	UpdateOperatorSocket(ctx context.Context, socket string) error
+
+	// BuildEjectOperatorsTxn returns a transaction that ejects operators from AVS registryCoordinator.
+	// The operatorsByQuorum provides a list of operators for each quorum. Within a quorum,
+	// the operators are ordered; in case of rate limiting, the first operators will be ejected.
+	BuildEjectOperatorsTxn(ctx context.Context, operatorsByQuorum [][]OperatorID) (*types.Transaction, error)
+
+	// BuildConfirmBatchTxn builds a transaction to confirm a batch header and signature aggregation.
+	BuildConfirmBatchTxn(ctx context.Context, batchHeader *BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation *SignatureAggregation) (*types.Transaction, error)
+
+	// ConfirmBatch confirms a batch header and signature aggregation. The signature aggregation must satisfy the quorum thresholds
+	// specified in the batch header. If the signature aggregation does not satisfy the quorum thresholds, the transaction will fail.
+	ConfirmBatch(ctx context.Context, batchHeader *BatchHeader, quorums map[QuorumID]*QuorumResult, signatureAggregation *SignatureAggregation) (*types.Receipt, error)
 }

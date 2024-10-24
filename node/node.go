@@ -61,7 +61,7 @@ type Node struct {
 	Store                   *Store
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
-	Transactor              core.Transactor
+	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
@@ -106,7 +106,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	}
 
 	// Create Transactor
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, err
 	}

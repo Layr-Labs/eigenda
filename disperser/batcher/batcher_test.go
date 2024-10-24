@@ -38,7 +38,7 @@ var (
 )
 
 type batcherComponents struct {
-	transactor       *coremock.MockTransactor
+	transactor       *coremock.MockWriter
 	txnManager       *batchermock.MockTxnManager
 	blobStore        *inmem.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
@@ -90,7 +90,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	transactor := &coremock.MockTransactor{}
+	transactor := &coremock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, transactor)
 	assert.NoError(t, err)

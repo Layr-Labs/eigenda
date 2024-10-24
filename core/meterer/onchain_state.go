@@ -13,7 +13,7 @@ import (
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
-	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error
+	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error
 	GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error)
 	GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error)
 	GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error)
@@ -22,7 +22,7 @@ type OnchainPayment interface {
 }
 
 type OnchainPaymentState struct {
-	tx *eth.Transactor
+	tx *eth.Reader
 
 	ActiveReservations    map[string]core.ActiveReservation
 	OnDemandPayments      map[string]core.OnDemandPayment
@@ -31,7 +31,7 @@ type OnchainPaymentState struct {
 	OnDemandLocks         sync.RWMutex
 }
 
-func NewOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPaymentState, error) {
+func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (OnchainPaymentState, error) {
 	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return OnchainPaymentState{}, err
@@ -51,7 +51,7 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Transactor) (OnchainPay
 }
 
 // RefreshOnchainPaymentState returns the current onchain payment state (TODO: can optimize based on contract interface)
-func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
+func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
 	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return err

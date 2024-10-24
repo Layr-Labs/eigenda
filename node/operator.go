@@ -26,7 +26,7 @@ type Operator struct {
 }
 
 // RegisterOperator operator registers the operator with the given public key for the given quorum IDs.
-func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Transactor, churnerClient ChurnerClient, logger logging.Logger) error {
+func RegisterOperator(ctx context.Context, operator *Operator, transactor core.Writer, churnerClient ChurnerClient, logger logging.Logger) error {
 	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
 		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
@@ -94,7 +94,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.T
 
 // DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.
 // If the operator isn't registered with any of the specified quorums, this function will return error, and no quorum will be deregistered.
-func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Transactor) error {
+func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Writer) error {
 	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
 		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
@@ -106,12 +106,12 @@ func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.K
 }
 
 // UpdateOperatorSocket updates the socket for the given operator
-func UpdateOperatorSocket(ctx context.Context, transactor core.Transactor, socket string) error {
+func UpdateOperatorSocket(ctx context.Context, transactor core.Writer, socket string) error {
 	return transactor.UpdateOperatorSocket(ctx, socket)
 }
 
 // getQuorumIdsToRegister returns the quorum ids that the operator is not registered in.
-func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.Transactor) ([]core.QuorumID, error) {
+func (c *Operator) getQuorumIdsToRegister(ctx context.Context, transactor core.Writer) ([]core.QuorumID, error) {
 	if len(c.QuorumIDs) == 0 {
 		return nil, fmt.Errorf("an operator should be in at least one quorum to be useful")
 	}

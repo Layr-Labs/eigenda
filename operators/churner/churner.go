@@ -46,7 +46,7 @@ type ChurnResponse struct {
 type churner struct {
 	mu          sync.Mutex
 	Indexer     thegraph.IndexedChainState
-	Transactor  core.Transactor
+	Transactor  core.Writer
 	QuorumCount uint8
 
 	privateKey            *ecdsa.PrivateKey
@@ -58,7 +58,7 @@ type churner struct {
 func NewChurner(
 	config *Config,
 	indexer thegraph.IndexedChainState,
-	transactor core.Transactor,
+	transactor core.Writer,
 	logger logging.Logger,
 	metrics *Metrics,
 ) (*churner, error) {

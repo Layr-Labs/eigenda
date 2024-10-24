@@ -127,7 +127,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 
-	transactor := &mock.MockTransactor{}
+	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 	quorumParams := []core.SecurityParam{
@@ -594,7 +594,7 @@ func setup() {
 		panic("failed to deploy AWS resources")
 	}
 
-	transactor := &mock.MockTransactor{}
+	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 	quorumParams := []core.SecurityParam{
@@ -617,7 +617,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
+func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
 
 	bucketName := "test-eigenda-blobstore"
