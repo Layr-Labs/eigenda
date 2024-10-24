@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// TODO unit test these methods
-
 // GetFragmentCount returns the number of fragments that a file of the given size will be broken into.
 func GetFragmentCount(fileSize int, fragmentSize int) int {
 	if fileSize < fragmentSize {
@@ -88,9 +86,6 @@ func RecombineFragments(fragments []*Fragment) ([]byte, error) {
 
 	// Sort the fragments by index
 	sort.Slice(fragments, func(i, j int) bool {
-		if fragments == nil || fragments[i] == nil || fragments[j] == nil {
-			return false // TODO
-		}
 		return fragments[i].Index < fragments[j].Index
 	})
 
