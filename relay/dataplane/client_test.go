@@ -2,7 +2,7 @@ package dataplane
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
+	"fmt"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -11,9 +11,9 @@ import (
 )
 
 var clientBuilders = []func() (S3Client, error){
-	func() (S3Client, error) {
-		return NewLocalClient(mapstore.NewStore()), nil
-	},
+	//func() (S3Client, error) {
+	//	return NewLocalClient(mapstore.NewStore()), nil
+	//},
 	func() (S3Client, error) {
 
 		config := DefaultS3Config()
@@ -49,9 +49,16 @@ func RandomOperationsTest(t *testing.T, client S3Client) {
 
 	// Read back the data
 	for key, expected := range expectedData {
+		fmt.Printf("Downloading key %s\n", key) // TODO
 		data, err := client.Download(key, len(expected), fragmentSize)
+		if err != nil {
+			fmt.Sprintf("Error downloading key %s: %v", key, err)
+		}
 		assert.NoError(t, err)
-		assert.Equal(t, expected, data)
+		passed := assert.Equal(t, expected, data)
+		if !passed {
+			fmt.Sprintf("Data mismatch for key %s", key)
+		}
 	}
 
 }

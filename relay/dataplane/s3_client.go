@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -79,8 +80,9 @@ func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Du
 	expiryTime := time.Now().Add(ttl)
 
 	for _, fragment := range fragments {
+		fragmentCapture := fragment
 		s.tasks <- func() {
-			s.writeTask(resultChannel, fragment.FragmentKey, fragment.Data, expiryTime)
+			s.writeTask(resultChannel, fragmentCapture, expiryTime)
 		}
 	}
 
@@ -98,8 +100,11 @@ func (s *s3Client) Download(key string, fileSize int, fragmentSize int) ([]byte,
 	resultChannel := make(chan *readResult, len(fragmentKeys))
 
 	for i, fragmentKey := range fragmentKeys {
+		// TODO explain these
+		boundFragmentKey := fragmentKey
+		boundI := i
 		s.tasks <- func() {
-			s.readTask(resultChannel, fragmentKey, i)
+			s.readTask(resultChannel, boundFragmentKey, boundI)
 		}
 	}
 
@@ -181,10 +186,22 @@ func (s *s3Client) readTask(
 	}
 
 	data := make([]byte, *ret.ContentLength)
-	_, err = ret.Body.Read(data)
+	bytesRead := 0
 
-	if err != nil {
-		result.err = err
+	for bytesRead < len(data) {
+		count, err := ret.Body.Read(data[bytesRead:])
+		if err != nil && err.Error() != "EOF" {
+			result.err = err
+			return
+		}
+		if count == 0 {
+			fmt.Printf("key %s: read 0 bytes\n", key)
+		}
+		bytesRead += count
+	}
+
+	if bytesRead != len(data) {
+		result.err = fmt.Errorf("expected %v bytes, read %v", len(data), bytesRead) // TODO
 		return
 	}
 
@@ -203,16 +220,17 @@ func (s *s3Client) readTask(
 // writeTask writes a single file to S3.
 func (s *s3Client) writeTask(
 	resultChannel chan error,
-	key string,
-	value []byte,
+	fragment *Fragment,
 	expiryTime time.Time) {
 
 	_, err := s.svc.PutObject(&s3.PutObjectInput{
 		Bucket:  aws.String(s.config.Bucket),
-		Key:     aws.String(key),
-		Body:    bytes.NewReader(value),
+		Key:     aws.String(fragment.FragmentKey),
+		Body:    bytes.NewReader(fragment.Data),
 		Expires: &expiryTime,
 	})
+
+	fmt.Printf("wrote key %v, err %v\n", fragment.FragmentKey, err)
 
 	resultChannel <- err
 }

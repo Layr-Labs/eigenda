@@ -88,6 +88,9 @@ func RecombineFragments(fragments []*Fragment) ([]byte, error) {
 
 	// Sort the fragments by index
 	sort.Slice(fragments, func(i, j int) bool {
+		if fragments == nil || fragments[i] == nil || fragments[j] == nil {
+			return false // TODO
+		}
 		return fragments[i].Index < fragments[j].Index
 	})
 
