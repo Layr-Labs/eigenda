@@ -5,11 +5,18 @@ package encoder;
 
 service Encoder {
   rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
-  rpc RSEncodeBlob(EncodeBlobRequest) returns (RSEncodeBlobReply) {}
 }
 
 service RSEncoder {
   rpc RSEncodeBlob(EncodeBlobRequest) returns (RSEncodeBlobReply) {}
+}
+
+service KZGProver {
+  rpc ComputeMultiFrameProof(EncodeBlobRequest) returns (MultiProofReply) {}
+}
+
+message MultiProofReply {
+  repeated bytes proofs = 1;  // serialized G1Affine proofs in bit-reversed order
 }
 
 message RSEncodedFrame {

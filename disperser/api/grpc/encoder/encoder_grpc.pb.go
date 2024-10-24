@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Encoder_EncodeBlob_FullMethodName   = "/encoder.Encoder/EncodeBlob"
-	Encoder_RSEncodeBlob_FullMethodName = "/encoder.Encoder/RSEncodeBlob"
+	Encoder_EncodeBlob_FullMethodName = "/encoder.Encoder/EncodeBlob"
 )
 
 // EncoderClient is the client API for Encoder service.
@@ -28,7 +27,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EncoderClient interface {
 	EncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobReply, error)
-	RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error)
 }
 
 type encoderClient struct {
@@ -48,21 +46,11 @@ func (c *encoderClient) EncodeBlob(ctx context.Context, in *EncodeBlobRequest, o
 	return out, nil
 }
 
-func (c *encoderClient) RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error) {
-	out := new(RSEncodeBlobReply)
-	err := c.cc.Invoke(ctx, Encoder_RSEncodeBlob_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // EncoderServer is the server API for Encoder service.
 // All implementations must embed UnimplementedEncoderServer
 // for forward compatibility
 type EncoderServer interface {
 	EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error)
-	RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error)
 	mustEmbedUnimplementedEncoderServer()
 }
 
@@ -72,9 +60,6 @@ type UnimplementedEncoderServer struct {
 
 func (UnimplementedEncoderServer) EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EncodeBlob not implemented")
-}
-func (UnimplementedEncoderServer) RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RSEncodeBlob not implemented")
 }
 func (UnimplementedEncoderServer) mustEmbedUnimplementedEncoderServer() {}
 
@@ -107,24 +92,6 @@ func _Encoder_EncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Encoder_RSEncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EncodeBlobRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EncoderServer).RSEncodeBlob(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Encoder_RSEncodeBlob_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EncoderServer).RSEncodeBlob(ctx, req.(*EncodeBlobRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Encoder_ServiceDesc is the grpc.ServiceDesc for Encoder service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -135,10 +102,6 @@ var Encoder_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EncodeBlob",
 			Handler:    _Encoder_EncodeBlob_Handler,
-		},
-		{
-			MethodName: "RSEncodeBlob",
-			Handler:    _Encoder_RSEncodeBlob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -229,6 +192,96 @@ var RSEncoder_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RSEncodeBlob",
 			Handler:    _RSEncoder_RSEncodeBlob_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "encoder/encoder.proto",
+}
+
+const (
+	KZGProver_ComputeMultiFrameProof_FullMethodName = "/encoder.KZGProver/ComputeMultiFrameProof"
+)
+
+// KZGProverClient is the client API for KZGProver service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type KZGProverClient interface {
+	ComputeMultiFrameProof(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*MultiProofReply, error)
+}
+
+type kZGProverClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewKZGProverClient(cc grpc.ClientConnInterface) KZGProverClient {
+	return &kZGProverClient{cc}
+}
+
+func (c *kZGProverClient) ComputeMultiFrameProof(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*MultiProofReply, error) {
+	out := new(MultiProofReply)
+	err := c.cc.Invoke(ctx, KZGProver_ComputeMultiFrameProof_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// KZGProverServer is the server API for KZGProver service.
+// All implementations must embed UnimplementedKZGProverServer
+// for forward compatibility
+type KZGProverServer interface {
+	ComputeMultiFrameProof(context.Context, *EncodeBlobRequest) (*MultiProofReply, error)
+	mustEmbedUnimplementedKZGProverServer()
+}
+
+// UnimplementedKZGProverServer must be embedded to have forward compatible implementations.
+type UnimplementedKZGProverServer struct {
+}
+
+func (UnimplementedKZGProverServer) ComputeMultiFrameProof(context.Context, *EncodeBlobRequest) (*MultiProofReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ComputeMultiFrameProof not implemented")
+}
+func (UnimplementedKZGProverServer) mustEmbedUnimplementedKZGProverServer() {}
+
+// UnsafeKZGProverServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to KZGProverServer will
+// result in compilation errors.
+type UnsafeKZGProverServer interface {
+	mustEmbedUnimplementedKZGProverServer()
+}
+
+func RegisterKZGProverServer(s grpc.ServiceRegistrar, srv KZGProverServer) {
+	s.RegisterService(&KZGProver_ServiceDesc, srv)
+}
+
+func _KZGProver_ComputeMultiFrameProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EncodeBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(KZGProverServer).ComputeMultiFrameProof(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: KZGProver_ComputeMultiFrameProof_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(KZGProverServer).ComputeMultiFrameProof(ctx, req.(*EncodeBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// KZGProver_ServiceDesc is the grpc.ServiceDesc for KZGProver service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var KZGProver_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "encoder.KZGProver",
+	HandlerType: (*KZGProverServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ComputeMultiFrameProof",
+			Handler:    _KZGProver_ComputeMultiFrameProof_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
