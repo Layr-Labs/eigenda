@@ -5,6 +5,20 @@ package encoder;
 
 service Encoder {
   rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
+  rpc RSEncodeBlob(EncodeBlobRequest) returns (RSEncodeBlobReply) {}
+}
+
+service RSEncoder {
+  rpc RSEncodeBlob(EncodeBlobRequest) returns (RSEncodeBlobReply) {}
+}
+
+message RSEncodedFrame {
+  bytes coeffs = 1;                // serialized coefficients using your rs.Frame.Serialize()
+  uint32 bit_reversed_index = 3;   // ReverseBits(i)
+}
+
+message RSEncodeBlobReply {
+  repeated RSEncodedFrame frames = 1;
 }
 
 // BlobCommitments contains the blob's commitment, degree proof, and the actual degree

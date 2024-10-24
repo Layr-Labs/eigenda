@@ -85,9 +85,7 @@ func (g *Encoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 
 // MakeFrames function takes extended evaluation data and bundles relevant information into Frame.
 // Every frame is verifiable to the commitment.
-func (g *Encoder) MakeFrames(
-	polyEvals []fr.Element,
-) ([]Frame, []uint32, error) {
+func (g *Encoder) MakeFrames(polyEvals []fr.Element) ([]Frame, []uint32, error) {
 	// reverse dataFr making easier to sample points
 	err := rb.ReverseBitOrderFr(polyEvals)
 	if err != nil {

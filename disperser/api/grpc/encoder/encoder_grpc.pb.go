@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Encoder_EncodeBlob_FullMethodName = "/encoder.Encoder/EncodeBlob"
+	Encoder_EncodeBlob_FullMethodName   = "/encoder.Encoder/EncodeBlob"
+	Encoder_RSEncodeBlob_FullMethodName = "/encoder.Encoder/RSEncodeBlob"
 )
 
 // EncoderClient is the client API for Encoder service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EncoderClient interface {
 	EncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobReply, error)
+	RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error)
 }
 
 type encoderClient struct {
@@ -46,11 +48,21 @@ func (c *encoderClient) EncodeBlob(ctx context.Context, in *EncodeBlobRequest, o
 	return out, nil
 }
 
+func (c *encoderClient) RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error) {
+	out := new(RSEncodeBlobReply)
+	err := c.cc.Invoke(ctx, Encoder_RSEncodeBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EncoderServer is the server API for Encoder service.
 // All implementations must embed UnimplementedEncoderServer
 // for forward compatibility
 type EncoderServer interface {
 	EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error)
+	RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error)
 	mustEmbedUnimplementedEncoderServer()
 }
 
@@ -60,6 +72,9 @@ type UnimplementedEncoderServer struct {
 
 func (UnimplementedEncoderServer) EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EncodeBlob not implemented")
+}
+func (UnimplementedEncoderServer) RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RSEncodeBlob not implemented")
 }
 func (UnimplementedEncoderServer) mustEmbedUnimplementedEncoderServer() {}
 
@@ -92,6 +107,24 @@ func _Encoder_EncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Encoder_RSEncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EncodeBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EncoderServer).RSEncodeBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Encoder_RSEncodeBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EncoderServer).RSEncodeBlob(ctx, req.(*EncodeBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Encoder_ServiceDesc is the grpc.ServiceDesc for Encoder service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -102,6 +135,100 @@ var Encoder_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EncodeBlob",
 			Handler:    _Encoder_EncodeBlob_Handler,
+		},
+		{
+			MethodName: "RSEncodeBlob",
+			Handler:    _Encoder_RSEncodeBlob_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "encoder/encoder.proto",
+}
+
+const (
+	RSEncoder_RSEncodeBlob_FullMethodName = "/encoder.RSEncoder/RSEncodeBlob"
+)
+
+// RSEncoderClient is the client API for RSEncoder service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type RSEncoderClient interface {
+	RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error)
+}
+
+type rSEncoderClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewRSEncoderClient(cc grpc.ClientConnInterface) RSEncoderClient {
+	return &rSEncoderClient{cc}
+}
+
+func (c *rSEncoderClient) RSEncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*RSEncodeBlobReply, error) {
+	out := new(RSEncodeBlobReply)
+	err := c.cc.Invoke(ctx, RSEncoder_RSEncodeBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RSEncoderServer is the server API for RSEncoder service.
+// All implementations must embed UnimplementedRSEncoderServer
+// for forward compatibility
+type RSEncoderServer interface {
+	RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error)
+	mustEmbedUnimplementedRSEncoderServer()
+}
+
+// UnimplementedRSEncoderServer must be embedded to have forward compatible implementations.
+type UnimplementedRSEncoderServer struct {
+}
+
+func (UnimplementedRSEncoderServer) RSEncodeBlob(context.Context, *EncodeBlobRequest) (*RSEncodeBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RSEncodeBlob not implemented")
+}
+func (UnimplementedRSEncoderServer) mustEmbedUnimplementedRSEncoderServer() {}
+
+// UnsafeRSEncoderServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to RSEncoderServer will
+// result in compilation errors.
+type UnsafeRSEncoderServer interface {
+	mustEmbedUnimplementedRSEncoderServer()
+}
+
+func RegisterRSEncoderServer(s grpc.ServiceRegistrar, srv RSEncoderServer) {
+	s.RegisterService(&RSEncoder_ServiceDesc, srv)
+}
+
+func _RSEncoder_RSEncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EncodeBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RSEncoderServer).RSEncodeBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RSEncoder_RSEncodeBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RSEncoderServer).RSEncodeBlob(ctx, req.(*EncodeBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// RSEncoder_ServiceDesc is the grpc.ServiceDesc for RSEncoder service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var RSEncoder_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "encoder.RSEncoder",
+	HandlerType: (*RSEncoderServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RSEncodeBlob",
+			Handler:    _RSEncoder_RSEncodeBlob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
