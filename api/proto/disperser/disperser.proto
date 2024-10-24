@@ -318,4 +318,5 @@ message Reservation {
 	uint32 start_timestamp = 2;
 	uint32 end_timestamp = 3;
 	repeated uint32 quorum_numbers = 4;
+	repeated uint32 quorum_split = 5;
 }

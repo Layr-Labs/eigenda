@@ -45,6 +45,16 @@ func (s *PaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte,
 	return sig, nil
 }
 
+func (s *PaymentSigner) SignAccountID(accountID string) ([]byte, error) {
+	hash := crypto.Keccak256Hash([]byte(accountID))
+	sig, err := crypto.Sign(hash.Bytes(), s.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign account ID: %v", err)
+	}
+
+	return sig, nil
+}
+
 type NoopPaymentSigner struct{}
 
 func NewNoopPaymentSigner() *NoopPaymentSigner {

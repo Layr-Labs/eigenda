@@ -63,8 +63,8 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	llConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 	binInterval := uint32(time.Minute.Seconds())
 	now := uint64(time.Now().Unix())
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(1)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(1)
 	reservation := core.ActiveReservation{
 		SymbolsPerSec:  100,
 		StartTimestamp: now,
@@ -82,9 +82,15 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, binInterval, pricePerSymbol, minNumSymbols, paymentSigner)
 
 	llClient := NewDisperserClient(llConfig, signer, accountant)
+
+	paymentState, err := llClient.GetPaymentState(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error getting payment state: %w", err)
+	}
+	accountant.SetPaymentState(paymentState)
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

@@ -411,8 +411,16 @@ func (s *DispersalServer) GetPaymentState(ctx context.Context, req *pb.GetPaymen
 		return nil, api.NewInvalidArgError("invalid signature")
 	}
 
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainState.GetReservationWindow()
+
 	// off-chain account specific payment state
-	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, s.meterer.GetCurrentBinIndex())
+	now := uint64(time.Now().Unix())
+	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
+	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, currentBinIndex)
 	if err != nil {
 		return nil, api.NewNotFoundError("failed to get active reservation")
 	}
@@ -429,11 +437,6 @@ func (s *DispersalServer) GetPaymentState(ctx context.Context, req *pb.GetPaymen
 	if err != nil {
 		return nil, api.NewNotFoundError("failed to get on-demand payment")
 	}
-	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainState.GetGlobalSymbolsPerSecond()
-	minNumSymbols := s.meterer.ChainState.GetMinNumSymbols()
-	pricePerSymbol := s.meterer.ChainState.GetPricePerSymbol()
-	reservationWindow := s.meterer.ChainState.GetReservationWindow()
 
 	paymentGlobalParams := pb.PaymentGlobalParams{
 		GlobalSymbolsPerSecond: globalSymbolsPerSecond,

@@ -43,6 +43,7 @@ type DisperserClient interface {
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
+	GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error)
 }
 
 type disperserClient struct {
@@ -322,4 +323,36 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 		return nil, err
 	}
 	return reply.Data, nil
+}
+
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+	addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
+	dialOptions := c.getDialOptions()
+	conn, err := grpc.Dial(addr, dialOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	disperserClient := disperser_rpc.NewDisperserClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	accountID, err := c.accountant.paymentSigner.GetAccountID()
+
+	signature, err := c.accountant.paymentSigner.SignAccountID(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &disperser_rpc.GetPaymentStateRequest{
+		AccountId: accountID,
+		Signature: signature,
+	}
+
+	reply, err := disperserClient.GetPaymentState(ctxTimeout, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return reply, nil
 }
