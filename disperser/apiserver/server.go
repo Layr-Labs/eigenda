@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"slices"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -44,6 +46,7 @@ type DispersalServer struct {
 	tx           core.Reader
 	quorumConfig QuorumConfig
 
+	meterer       *meterer.Meterer
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
@@ -69,6 +72,7 @@ func NewDispersalServer(
 	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
+	meterer *meterer.Meterer,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 	maxBlobSize int,
@@ -90,6 +94,7 @@ func NewDispersalServer(
 		tx:            tx,
 		metrics:       metrics,
 		logger:        logger,
+		meterer:       meterer,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
@@ -251,10 +256,6 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	return reply, err
 }
 
-func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
-	return nil, api.NewErrorInternal("not implemented")
-}
-
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
 func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
@@ -299,6 +300,107 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
 		s.logger.Error("failed to store blob", "err", err)
 		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
+	}
+
+	for _, param := range securityParams {
+		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+	}
+
+	return &pb.DisperseBlobReply{
+		Result:    pb.BlobStatus_PROCESSING,
+		RequestId: []byte(metadataKey.String()),
+	}, nil
+}
+
+func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	blob, err := s.validatePaidRequestAndGetBlob(ctx, req)
+	quorumNumbers := req.CustomQuorumNumbers
+	binIndex := req.PaymentHeader.BinIndex
+	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
+	//todo: before disperse blob, validate the signature
+	signature := req.PaymentSignature
+
+	if err != nil {
+		for _, quorumID := range req.CustomQuorumNumbers {
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DispersePaidBlob")
+		}
+		s.metrics.HandleInvalidArgRpcRequest("DispersePaidBlob")
+		return nil, api.NewErrorInvalidArg(err.Error())
+	}
+
+	reply, err := s.dispersePaidBlob(ctx, blob, quorumNumbers, binIndex, cumulativePayment, signature, "", "DispersePaidBlob")
+	if err != nil {
+		// Note the DispersePaidBlob already updated metrics for this error.
+		s.logger.Info("failed to disperse blob", "err", err)
+	} else {
+		s.metrics.HandleSuccessfulRpcRequest("DispersePaidBlob")
+	}
+	return reply, err
+}
+
+// dispersePaidBlob checks for payment metering, otherwise does the same thing as disperseBlob
+func (s *DispersalServer) dispersePaidBlob(ctx context.Context, blob *core.Blob, quorumNumbers []uint32, binIndex uint32, cumulativePayment *big.Int, signature []byte, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("DispersePaidBlob", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	securityParams := blob.RequestHeader.SecurityParams
+	securityParamsStrings := make([]string, len(securityParams))
+	for i, sp := range securityParams {
+		securityParamsStrings[i] = sp.String()
+	}
+
+	blobSize := len(blob.Data)
+
+	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
+	if err != nil {
+		for _, param := range securityParams {
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+		}
+		s.metrics.HandleInvalidArgRpcRequest(apiMethodName)
+		return nil, api.NewErrorInvalidArg(err.Error())
+	}
+
+	s.logger.Debug("received a new paid blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
+
+	// payments before ratelimits
+	if s.meterer != nil {
+		fmt.Println("Metering the request; lots of temporarily code")
+		//TODO: blob request header needs to be updated for payments; here we create a placeholder
+		qn := make([]uint8, len(quorumNumbers))
+		// don't care about higher bites. need to unify quorum number types
+		for i, v := range quorumNumbers {
+			qn[i] = uint8(v)
+		}
+		paymentHeader := core.PaymentMetadata{
+			AccountID: blob.RequestHeader.AccountID,
+			BinIndex:  binIndex,
+			// TODO: we are thinking the contract can use uint128 for cumulative payment,
+			// but the definition on v2 uses uint64. Double check with team.
+			CumulativePayment: cumulativePayment,
+		}
+		err := s.meterer.MeterRequest(ctx, *blob, paymentHeader)
+		if err != nil {
+			return nil, err
+		}
+	} else if s.ratelimiter != nil {
+		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
+		if err != nil {
+			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
+			return nil, err
+		}
+	}
+
+	requestedAt := uint64(time.Now().UnixNano())
+	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
+	if err != nil {
+		for _, param := range securityParams {
+			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
+		}
+		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
+		s.logger.Error("failed to store blob", "err", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store blob, please try again later: %v", err))
 	}
 
 	for _, param := range securityParams {
@@ -1017,6 +1119,99 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	header := core.BlobRequestHeader{
 		BlobAuthHeader: core.BlobAuthHeader{
 			AccountID: req.AccountId,
+		},
+		SecurityParams: params,
+	}
+
+	blob := &core.Blob{
+		RequestHeader: header,
+		Data:          data,
+	}
+
+	return blob, nil
+}
+
+func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*core.Blob, error) {
+
+	data := req.GetData()
+	blobSize := len(data)
+	// The blob size in bytes must be in range [1, maxBlobSize].
+	if blobSize > s.maxBlobSize {
+		return nil, fmt.Errorf("blob size cannot exceed %v Bytes", s.maxBlobSize)
+	}
+	if blobSize == 0 {
+		return nil, fmt.Errorf("blob size must be greater than 0")
+	}
+
+	if len(req.GetCustomQuorumNumbers()) > 256 {
+		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
+	}
+
+	// validate every 32 bytes is a valid field element
+	_, err := rs.ToFrArray(data)
+	if err != nil {
+		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617: %v", err))
+	}
+
+	quorumConfig, err := s.updateQuorumConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum config: %w", err)
+	}
+
+	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
+		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
+	}
+
+	seenQuorums := make(map[uint8]struct{})
+
+	// TODO: validate payment signature against payment metadata
+	if !auth.VerifyPaymentSignature(req.GetPaymentHeader(), req.GetPaymentSignature()) {
+		return nil, fmt.Errorf("payment signature is invalid")
+	}
+	// Unlike regular blob dispersal request validation, there's no check with required quorums
+	// Because Reservation has their specific quorum requirements, and on-demand is only allowed and paid to the required quorums.
+	// Payment specific validations are done within the meterer library.
+	for i := range req.GetCustomQuorumNumbers() {
+
+		if req.GetCustomQuorumNumbers()[i] > core.MaxQuorumID {
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
+		}
+
+		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
+		if quorumID >= quorumConfig.QuorumCount {
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
+		}
+
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("custom_quorum_numbers must not contain duplicates")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
+	}
+
+	if len(seenQuorums) == 0 {
+		return nil, fmt.Errorf("the blob must be sent to at least one quorum")
+	}
+
+	params := make([]*core.SecurityParam, len(seenQuorums))
+	i := 0
+	for quorumID := range seenQuorums {
+		params[i] = &core.SecurityParam{
+			QuorumID:              core.QuorumID(quorumID),
+			AdversaryThreshold:    quorumConfig.SecurityParams[quorumID].AdversaryThreshold,
+			ConfirmationThreshold: quorumConfig.SecurityParams[quorumID].ConfirmationThreshold,
+		}
+		err = params[i].Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid request: %w", err)
+		}
+		i++
+	}
+
+	header := core.BlobRequestHeader{
+		BlobAuthHeader: core.BlobAuthHeader{
+			AccountID: req.PaymentHeader.AccountId,
 		},
 		SecurityParams: params,
 	}
