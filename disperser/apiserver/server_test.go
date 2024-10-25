@@ -214,6 +214,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
+	// (*dispersalServer).tx.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{2},
