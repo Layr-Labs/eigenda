@@ -106,52 +106,6 @@ func TestEigenDAClientConfig_CheckAndSetDefaults(t *testing.T) {
 		}
 	})
 
-	t.Run("WaitForFinalization and WaitForConfirmationDepth interaction", func(t *testing.T) {
-		testCases := []struct {
-			name                   string
-			waitForFinalization    bool
-			confirmationDepth      uint64
-			shouldWarnFinalization bool
-			shouldWarnDepthTooHigh bool
-		}{
-			{
-				name:                   "WaitForFinalization true ignores depth",
-				waitForFinalization:    true,
-				confirmationDepth:      10,
-				shouldWarnFinalization: true,
-				shouldWarnDepthTooHigh: false,
-			},
-			{
-				name:                   "High confirmation depth without finalization",
-				waitForFinalization:    false,
-				confirmationDepth:      25,
-				shouldWarnFinalization: false,
-				shouldWarnDepthTooHigh: true,
-			},
-			{
-				name:                   "Normal confirmation depth",
-				waitForFinalization:    false,
-				confirmationDepth:      12,
-				shouldWarnFinalization: false,
-				shouldWarnDepthTooHigh: false,
-			},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				config := newValidConfig()
-				config.WaitForFinalization = tc.waitForFinalization
-				config.WaitForConfirmationDepth = tc.confirmationDepth
-				err := config.CheckAndSetDefaults()
-				require.NoError(t, err)
-
-				// Note: In a real implementation, you might want to use a custom logger
-				// to capture and verify the warning messages. This test structure
-				// demonstrates what we would verify if we had that capability.
-			})
-		}
-	})
-
 	t.Run("Custom timeouts", func(t *testing.T) {
 		config := newValidConfig()
 		customRetryInterval := 10 * time.Second
