@@ -284,7 +284,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
-	if *paymentHeader != (core.PaymentMetadata{}) {
+	if paymentHeader != nil && *paymentHeader != (core.PaymentMetadata{}) {
 		err := s.meterer.MeterRequest(ctx, *blob, *paymentHeader)
 		if err != nil {
 			return nil, err
@@ -988,7 +988,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
-		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
+		return nil, fmt.Errorf("number of custom_quorum_numbers must not exceed 256")
 	}
 
 	// validate every 32 bytes is a valid field element
@@ -1004,7 +1004,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
-		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
+		return nil, fmt.Errorf("number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
 	seenQuorums := make(map[uint8]struct{})

@@ -2,7 +2,7 @@ package meterer
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -165,7 +165,7 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccountOnChain(ctx context
 	}
 	res, err := pcs.tx.GetActiveReservationByAccount(ctx, blockNumber, accountID)
 	if err != nil {
-		return core.ActiveReservation{}, errors.New("reservation account not found on-chain")
+		return core.ActiveReservation{}, fmt.Errorf("reservation account not found on-chain: %w", err)
 	}
 	return res, nil
 }
@@ -194,7 +194,7 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccountOnChain(ctx context.C
 	}
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, blockNumber, accountID)
 	if err != nil {
-		return core.OnDemandPayment{}, errors.New("on-demand not found on-chain")
+		return core.OnDemandPayment{}, fmt.Errorf("on-demand not found on-chain: %w", err)
 	}
 	return res, nil
 }

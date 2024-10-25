@@ -680,6 +680,10 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
 	// append test name to each table name for an unique store
 	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
