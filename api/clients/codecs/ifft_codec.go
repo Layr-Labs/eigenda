@@ -18,6 +18,7 @@ func (v IFFTCodec) EncodeBlob(data []byte) ([]byte, error) {
 	var err error
 	data, err = v.writeCodec.EncodeBlob(data)
 	if err != nil {
+		// this cannot happen, because EncodeBlob never returns an error
 		return nil, fmt.Errorf("error encoding data: %w", err)
 	}
 
