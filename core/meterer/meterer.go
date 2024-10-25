@@ -239,16 +239,13 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 
 // PaymentCharged returns the chargeable price for a given data length
 func (m *Meterer) PaymentCharged(dataLength uint) uint64 {
-	fmt.Println("PaymentCharged", dataLength, m.SymbolsCharged(dataLength), m.ChainPaymentState.GetPricePerSymbol())
 	return uint64(m.SymbolsCharged(dataLength)) * uint64(m.ChainPaymentState.GetPricePerSymbol())
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
 func (m *Meterer) SymbolsCharged(dataLength uint) uint32 {
-	fmt.Println("SymbolsCharged", dataLength, m.ChainPaymentState.GetMinNumSymbols())
 	if dataLength <= uint(m.ChainPaymentState.GetMinNumSymbols()) {
-		fmt.Println("return ", m.ChainPaymentState.GetMinNumSymbols())
 		return m.ChainPaymentState.GetMinNumSymbols()
 	}
 	// Round up to the nearest multiple of MinNumSymbols

@@ -30,8 +30,8 @@ func NewPaymentSigner(privateKeyHex string) *PaymentSigner {
 	}
 }
 
+// SignBlobPayment signs the payment header and returns the signature
 func (s *PaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
-	// Set the account id to the hex encoded public key of the signer
 	header.AccountId = s.GetAccountID()
 	pm := core.ConvertPaymentHeader(header)
 	hash := pm.Hash()
