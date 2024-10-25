@@ -31,6 +31,14 @@ var (
 	gitDate   = ""
 )
 
+type EjectionTransaction struct {
+	BlockNumber           uint64            `json:"block_number"`
+	BlockTimestamp        string            `json:"block_timestamp"`
+	TransactionHash       string            `json:"transaction_hash"`
+	QuorumStakePercentage map[uint8]float64 `json:"stake_percentage"`
+	QuorumEjections       map[uint8]uint8   `json:"ejections"`
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Version = fmt.Sprintf("%s,%s,%s", version, gitCommit, gitDate)
@@ -78,13 +86,6 @@ func RunScan(ctx *cli.Context) error {
 		return errors.New("operator ejections not found")
 	}
 
-	rowConfigAutoMerge := table.RowConfig{AutoMerge: true}
-
-	operators := table.NewWriter()
-	operators.AppendHeader(table.Row{"Operator Address", "Quorum", "Stake %", "Timestamp", "Txn"}, rowConfigAutoMerge)
-	txns := table.NewWriter()
-	txns.AppendHeader(table.Row{"Txn", "Timestamp", "Operator Address", "Quorum", "Stake %"}, rowConfigAutoMerge)
-
 	sort.Slice(ejections, func(i, j int) bool {
 		return ejections[i].BlockTimestamp > ejections[j].BlockTimestamp
 	})
@@ -123,6 +124,16 @@ func RunScan(ctx *cli.Context) error {
 		operatorIdToAddress["0x"+operatorIDs[i].Hex()] = strings.ToLower(operatorAddresses[i].Hex())
 	}
 
+	rowConfigAutoMerge := table.RowConfig{AutoMerge: true}
+	rowConfigNoAutoMerge := table.RowConfig{AutoMerge: false}
+	operators := table.NewWriter()
+	operators.AppendHeader(table.Row{"Operator Address", "Quorum", "Stake %", "Timestamp", "Txn"}, rowConfigAutoMerge)
+	txns := table.NewWriter()
+	txns.AppendHeader(table.Row{"Txn", "Timestamp", "Operator Address", "Quorum", "Stake %"}, rowConfigAutoMerge)
+	txnQuorums := table.NewWriter()
+	txnQuorums.AppendHeader(table.Row{"Txn", "Timestamp", "Quorum", "Stake %", "Operators"}, rowConfigNoAutoMerge)
+
+	ejectionTransactions := make(map[string]*EjectionTransaction)
 	for _, ejection := range ejections {
 		state := stateCache[ejection.BlockNumber-1]
 		opID, err := core.OperatorIDFromHex(ejection.OperatorId)
@@ -137,9 +148,37 @@ func RunScan(ctx *cli.Context) error {
 			stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
 		}
 
+		if _, exists := ejectionTransactions[ejection.TransactionHash]; !exists {
+			ejectionTransactions[ejection.TransactionHash] = &EjectionTransaction{
+				BlockNumber:           ejection.BlockNumber,
+				BlockTimestamp:        ejection.BlockTimestamp,
+				TransactionHash:       ejection.TransactionHash,
+				QuorumStakePercentage: make(map[uint8]float64),
+				QuorumEjections:       make(map[uint8]uint8),
+			}
+			ejectionTransactions[ejection.TransactionHash].QuorumStakePercentage[ejection.Quorum] = stakePercentage
+			ejectionTransactions[ejection.TransactionHash].QuorumEjections[ejection.Quorum] = 1
+		} else {
+			ejectionTransactions[ejection.TransactionHash].QuorumStakePercentage[ejection.Quorum] += stakePercentage
+			ejectionTransactions[ejection.TransactionHash].QuorumEjections[ejection.Quorum] += 1
+		}
+
 		operatorAddress := operatorIdToAddress[ejection.OperatorId]
 		operators.AppendRow(table.Row{operatorAddress, ejection.Quorum, stakePercentage, ejection.BlockTimestamp, ejection.TransactionHash}, rowConfigAutoMerge)
 		txns.AppendRow(table.Row{ejection.TransactionHash, ejection.BlockTimestamp, operatorAddress, ejection.Quorum, stakePercentage}, rowConfigAutoMerge)
+	}
+
+	orderedEjectionTransactions := make([]*EjectionTransaction, 0, len(ejectionTransactions))
+	for _, txn := range ejectionTransactions {
+		orderedEjectionTransactions = append(orderedEjectionTransactions, txn)
+	}
+	sort.Slice(orderedEjectionTransactions, func(i, j int) bool {
+		return orderedEjectionTransactions[i].BlockNumber > orderedEjectionTransactions[j].BlockNumber
+	})
+	for _, txn := range orderedEjectionTransactions {
+		for quorum, ejections := range txn.QuorumEjections {
+			txnQuorums.AppendRow(table.Row{txn.TransactionHash, txn.BlockTimestamp, quorum, txn.QuorumStakePercentage[quorum], ejections}, rowConfigAutoMerge)
+		}
 	}
 
 	operators.SetAutoIndex(true)
@@ -160,7 +199,18 @@ func RunScan(ctx *cli.Context) error {
 	txns.SetStyle(table.StyleLight)
 	txns.Style().Options.SeparateRows = true
 
+	txnQuorums.SetAutoIndex(true)
+	txnQuorums.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 1, AutoMerge: true},
+		{Number: 2, AutoMerge: true, Align: text.AlignCenter},
+		{Number: 3, Align: text.AlignCenter},
+		{Number: 5, Align: text.AlignCenter},
+	})
+	txnQuorums.SetStyle(table.StyleLight)
+	txnQuorums.Style().Options.SeparateRows = true
+
 	fmt.Println(operators.Render())
 	fmt.Println(txns.Render())
+	fmt.Println(txnQuorums.Render())
 	return nil
 }
