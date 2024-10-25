@@ -299,12 +299,12 @@ func (m EigenDAClient) paidPutBlob(ctx context.Context, rawData []byte, resultCh
 		return
 	}
 
-	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
+	quorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {
-		customQuorumNumbers[i] = uint8(e)
+		quorumNumbers[i] = uint8(e)
 	}
 	// disperse blob
-	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, customQuorumNumbers)
+	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, quorumNumbers)
 	if err != nil {
 		errChan <- fmt.Errorf("error initializing DispersePaidBlob() client: %w", err)
 		return
