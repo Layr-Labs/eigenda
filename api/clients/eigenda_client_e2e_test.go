@@ -31,8 +31,11 @@ func TestClientUsingTestnet(t *testing.T) {
 		t.Parallel()
 		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
 		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
-			RPC:                      "disperser-holesky.eigenda.xyz:443",
-			StatusQueryTimeout:       25 * time.Minute,
+			RPC: "disperser-holesky.eigenda.xyz:443",
+			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
+			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
+			// plus wait for 3 blocks of confirmation.
+			StatusQueryTimeout:       20 * time.Minute,
 			StatusQueryRetryInterval: 5 * time.Second,
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1",
@@ -57,8 +60,11 @@ func TestClientUsingTestnet(t *testing.T) {
 		confDepth := uint64(3)
 		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
 		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
-			RPC:                      "disperser-holesky.eigenda.xyz:443",
-			StatusQueryTimeout:       25 * time.Minute,
+			RPC: "disperser-holesky.eigenda.xyz:443",
+			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
+			// In worst case we had 10 min batching interval + some time for the tx to land onchain,
+			// plus wait for 3 blocks of confirmation.
+			StatusQueryTimeout:       20 * time.Minute,
 			StatusQueryRetryInterval: 5 * time.Second,
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "2d23e142a9e86a9175b9dfa213f20ea01f6c1731e09fa6edf895f70fe279cbb1",
