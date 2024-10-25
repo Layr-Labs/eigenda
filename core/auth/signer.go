@@ -56,6 +56,8 @@ func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
 
 type LocalNoopSigner struct{}
 
+var _ core.BlobRequestSigner = &LocalNoopSigner{}
+
 func NewLocalNoopSigner() *LocalNoopSigner {
 	return &LocalNoopSigner{}
 }

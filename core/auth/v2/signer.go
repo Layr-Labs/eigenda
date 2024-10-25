@@ -2,7 +2,6 @@ package v2
 
 import (
 	"crypto/ecdsa"
-	"encoding/binary"
 	"fmt"
 	"log"
 
@@ -30,13 +29,14 @@ func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
 	}
 }
 
-func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobHeader) ([]byte, error) {
-	// Message you want to sign
+func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
+	blobKey, err := header.BlobKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob key: %v", err)
+	}
 
-	hash := crypto.Keccak256(buf)
-
-	// Sign the hash using the private key
-	sig, err := crypto.Sign(hash, s.PrivateKey)
+	// Sign the blob key using the private key
+	sig, err := crypto.Sign(blobKey[:], s.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign hash: %v", err)
 	}
@@ -53,11 +53,13 @@ func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
 
 type LocalNoopSigner struct{}
 
+var _ core.BlobRequestSigner = &LocalNoopSigner{}
+
 func NewLocalNoopSigner() *LocalNoopSigner {
 	return &LocalNoopSigner{}
 }
 
-func (s *LocalNoopSigner) SignBlobRequest(header core.BlobHeader) ([]byte, error) {
+func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 
