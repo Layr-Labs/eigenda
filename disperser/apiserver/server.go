@@ -328,7 +328,7 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 		return nil, api.NewErrorInvalidArg("payment signature is invalid")
 	}
 	if err != nil {
-		for _, quorumID := range req.CustomQuorumNumbers {
+		for _, quorumID := range req.QuorumNumbers {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DispersePaidBlob")
 		}
 		s.metrics.HandleInvalidArgRpcRequest("DispersePaidBlob")
@@ -1086,7 +1086,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 		return nil, fmt.Errorf("blob size must be greater than 0")
 	}
 
-	if len(req.GetCustomQuorumNumbers()) > 256 {
+	if len(req.GetQuorumNumbers()) > 256 {
 		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
 	}
 
@@ -1102,7 +1102,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 		return nil, fmt.Errorf("failed to get quorum config: %w", err)
 	}
 
-	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
+	if len(req.GetQuorumNumbers()) > int(quorumConfig.QuorumCount) {
 		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
@@ -1115,13 +1115,13 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 	// Unlike regular blob dispersal request validation, there's no check with required quorums
 	// Because Reservation has their specific quorum requirements, and on-demand is only allowed and paid to the required quorums.
 	// Payment specific validations are done within the meterer library.
-	for i := range req.GetCustomQuorumNumbers() {
+	for i := range req.GetQuorumNumbers() {
 
-		if req.GetCustomQuorumNumbers()[i] > core.MaxQuorumID {
-			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetCustomQuorumNumbers()[i])
+		if req.GetQuorumNumbers()[i] > core.MaxQuorumID {
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
 		}
 
-		quorumID := uint8(req.GetCustomQuorumNumbers()[i])
+		quorumID := uint8(req.GetQuorumNumbers()[i])
 		if quorumID >= quorumConfig.QuorumCount {
 			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
 		}
