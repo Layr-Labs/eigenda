@@ -326,6 +326,15 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 	// Check if the address is in the allowlist
 	if len(authenticatedAddress) > 0 {
 		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
+		if !ok {
+			// check fallback address (non-checksummed)
+			fallbackAuthenticatedAddress := strings.ToLower(authenticatedAddress)
+			quorumRates, ok = s.rateConfig.Allowlist[fallbackAuthenticatedAddress]
+			if ok {
+				s.logger.Warn("authenticated address found via fallback lookup", "authenticatedAddress", authenticatedAddress, "fallback", fallbackAuthenticatedAddress)
+				authenticatedAddress = fallbackAuthenticatedAddress
+			}
+		}
 		if ok {
 			rateInfo, ok := quorumRates[quorumID]
 			if ok {
@@ -339,7 +348,10 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 				rates.Name = rateInfo.Name
 				return rates, key, nil
 			}
+		} else {
+			s.logger.Warn("authenticated address not found in allowlist", "authenticatedAddress", authenticatedAddress)
 		}
+
 	}
 
 	// Check if the origin is in the allowlist
