@@ -65,12 +65,12 @@ type disperserClient struct {
 	// or to use a pool of connections here.
 	conn       *grpc.ClientConn
 	client     disperser_rpc.DisperserClient
-	accountant Accountant
+	accountant *Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
 
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant Accountant) DisperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant *Accountant) DisperserClient {
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
@@ -127,6 +127,7 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	return blobStatus, reply.GetRequestId(), nil
 }
 
+// DispersePaidBlob disperses a blob with a payment header and signature. Similar to DisperseBlob but with signed payment header.
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {

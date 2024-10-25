@@ -27,20 +27,20 @@ func TestNewAccountant(t *testing.T) {
 		CumulativePayment: big.NewInt(500),
 	}
 	reservationWindow := uint32(6)
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
-	defer accountant.Stop()
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 
+	assert.NotNil(t, accountant)
 	assert.Equal(t, reservation, accountant.reservation)
 	assert.Equal(t, onDemand, accountant.onDemand)
 	assert.Equal(t, reservationWindow, accountant.reservationWindow)
-	assert.Equal(t, pricePerChargeable, accountant.pricePerChargeable)
-	assert.Equal(t, minChargeableSize, accountant.minChargeableSize)
+	assert.Equal(t, pricePerSymbol, accountant.pricePerSymbol)
+	assert.Equal(t, minNumSymbols, accountant.minNumSymbols)
 	assert.Equal(t, []uint64{0, 0, 0}, accountant.binUsages)
 	assert.Equal(t, big.NewInt(0), accountant.cumulativePayment)
 }
@@ -57,13 +57,13 @@ func TestAccountBlob_Reservation(t *testing.T) {
 		CumulativePayment: big.NewInt(500),
 	}
 	reservationWindow := uint32(5)
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -109,13 +109,13 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 		CumulativePayment: big.NewInt(500),
 	}
 	reservationWindow := uint32(5)
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -124,7 +124,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 
 	header, _, err := accountant.AccountBlob(ctx, dataLength, quorums)
 	metadata := core.ConvertPaymentHeader(header)
-	expectedPayment := big.NewInt(int64(dataLength * uint64(pricePerChargeable) / uint64(minChargeableSize)))
+	expectedPayment := big.NewInt(int64(dataLength * uint64(pricePerSymbol) / uint64(minNumSymbols)))
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
 	assert.Equal(t, expectedPayment, metadata.CumulativePayment)
@@ -138,13 +138,13 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 		CumulativePayment: big.NewInt(500),
 	}
 	reservationWindow := uint32(60)
-	pricePerChargeable := uint32(100)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(100)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -169,13 +169,13 @@ func TestAccountBlobCallSeries(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(5)
-	pricePerChargeable := uint32(100)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(100)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -221,12 +221,12 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -263,13 +263,13 @@ func TestBinRotation(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -312,13 +312,13 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()
@@ -357,13 +357,13 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(5)
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -405,13 +405,13 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerChargeable := uint32(1)
-	minChargeableSize := uint32(100)
+	pricePerSymbol := uint32(1)
+	minNumSymbols := uint32(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerChargeable, minChargeableSize, paymentSigner)
+	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
 	defer accountant.Stop()
 
 	ctx := context.Background()

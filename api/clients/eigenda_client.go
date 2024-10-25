@@ -285,7 +285,7 @@ func (m EigenDAClient) PaidPutBlobAsync(ctx context.Context, data []byte) (resul
 }
 
 func (m EigenDAClient) paidPutBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
-	m.Log.Info("Attempting to disperse blob to EigenDA")
+	m.Log.Info("Attempting to disperse blob to EigenDA with payment")
 
 	// encode blob
 	if m.Codec == nil {
@@ -304,9 +304,9 @@ func (m EigenDAClient) paidPutBlob(ctx context.Context, rawData []byte, resultCh
 		customQuorumNumbers[i] = uint8(e)
 	}
 	// disperse blob
-	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
+	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, customQuorumNumbers)
 	if err != nil {
-		errChan <- fmt.Errorf("error initializing DisperseBlobAuthenticated() client: %w", err)
+		errChan <- fmt.Errorf("error initializing DispersePaidBlob() client: %w", err)
 		return
 	}
 

@@ -2,9 +2,9 @@ package clients
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -18,37 +18,40 @@ type IAccountant interface {
 
 type Accountant struct {
 	// on-chain states
-	reservation        core.ActiveReservation
-	onDemand           core.OnDemandPayment
-	reservationWindow  uint32
-	pricePerChargeable uint32
-	minChargeableSize  uint32
+	reservation       core.ActiveReservation
+	onDemand          core.OnDemandPayment
+	reservationWindow uint32
+	pricePerSymbol    uint32
+	minNumSymbols     uint32
 
 	// local accounting
-	// contains 3 bins; 0 for current bin, 1 for next bin, 2 for overflowed bin
+	// contains 3 bins; index 0 for current bin, 1 for next bin, 2 for overflowed bin
 	binUsages         []uint64
+	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 	stopRotation      chan struct{}
 
 	paymentSigner core.PaymentSigner
 }
 
-func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerChargeable uint32, minChargeableSize uint32, paymentSigner core.PaymentSigner) Accountant {
+func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) *Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
+	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
 	a := Accountant{
-		reservation:        reservation,
-		onDemand:           onDemand,
-		reservationWindow:  reservationWindow,
-		pricePerChargeable: pricePerChargeable,
-		minChargeableSize:  minChargeableSize,
-		binUsages:          []uint64{0, 0, 0},
-		cumulativePayment:  big.NewInt(0),
-		stopRotation:       make(chan struct{}),
-		paymentSigner:      paymentSigner,
+		reservation:       reservation,
+		onDemand:          onDemand,
+		reservationWindow: reservationWindow,
+		pricePerSymbol:    pricePerSymbol,
+		minNumSymbols:     minNumSymbols,
+		binUsages:         []uint64{0, 0, 0},
+		cumulativePayment: big.NewInt(0),
+		stopRotation:      make(chan struct{}),
+		paymentSigner:     paymentSigner,
 	}
 	go a.startBinRotation()
-	return a
+	// TODO: add a routine to refresh the on-chain state occasionally?
+	return &a
 }
 
 func (a *Accountant) startBinRotation() {
@@ -66,7 +69,9 @@ func (a *Accountant) startBinRotation() {
 }
 
 func (a *Accountant) rotateBins() {
-	// Shift bins: bin_i to bin_{i-1}, add 0 to bin2
+	a.usageLock.Lock()
+	defer a.usageLock.Unlock()
+	// Shift bins: bin_i to bin_{i-1}, set 0 to bin2
 	a.binUsages[0] = a.binUsages[1]
 	a.binUsages[1] = a.binUsages[2]
 	a.binUsages[2] = 0
@@ -80,6 +85,8 @@ func (a *Accountant) Stop() {
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, *big.Int, error) {
 	//TODO: do we need to lock the binUsages here in case the blob rotation happens in the middle of the function?
 	// binUsage := a.binUsages[0] + dataLength
+	a.usageLock.Lock()
+	defer a.usageLock.Unlock()
 	a.binUsages[0] += dataLength
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
@@ -99,13 +106,12 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (ui
 	// reservation not available, attempt on-demand
 	//todo: rollback if disperser respond with some type of rejection?
 	a.binUsages[0] -= dataLength
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint32(dataLength))))
+	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(dataLength))))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		return 0, a.cumulativePayment, nil
 	}
-	fmt.Println("Accountant cannot approve payment for this blob")
-	return 0, big.NewInt(0), errors.New("Accountant cannot approve payment for this blob")
+	return 0, big.NewInt(0), fmt.Errorf("Accountant cannot approve payment for this blob")
 }
 
 // accountant provides and records payment information
@@ -131,12 +137,18 @@ func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums
 	return protoPaymentHeader, signature, nil
 }
 
+// TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(dataLength uint32) uint64 {
-	return uint64(core.RoundUpDivide(uint(a.BlobSizeCharged(dataLength)*a.pricePerChargeable), uint(a.minChargeableSize)))
+func (a *Accountant) PaymentCharged(dataLength uint) uint64 {
+	return uint64(a.SymbolsCharged(dataLength)) * uint64(a.pricePerSymbol)
 }
 
-// BlobSizeCharged returns the chargeable data length for a given data length
-func (a *Accountant) BlobSizeCharged(dataLength uint32) uint32 {
-	return max(dataLength, uint32(a.minChargeableSize))
+// SymbolsCharged returns the number of symbols charged for a given data length
+// being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
+func (a *Accountant) SymbolsCharged(dataLength uint) uint32 {
+	if dataLength <= uint(a.minNumSymbols) {
+		return a.minNumSymbols
+	}
+	// Round up to the nearest multiple of MinNumSymbols
+	return uint32(core.RoundUpDivide(uint(dataLength), uint(a.minNumSymbols))) * a.minNumSymbols
 }

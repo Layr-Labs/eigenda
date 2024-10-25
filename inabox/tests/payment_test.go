@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,7 +42,7 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(dummyActiveReservation, dummyOnDemandPayment, 60, 128, 128, paymentSigner))
+		}, signer, clients.NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 60, 128, 128, paymentSigner))
 
 		Expect(disp).To(Not(BeNil()))
 
