@@ -169,7 +169,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
-	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ChainState.GetReservationWindow())
+	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
@@ -295,7 +295,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// test duplicated cumulative payments
 	dataLength := uint(100)
 	priceCharged := mt.PaymentCharged(dataLength)
-	assert.Equal(t, uint64(102*mt.ChainState.GetPricePerSymbol()), priceCharged)
+	assert.Equal(t, uint64(102*mt.ChainPaymentState.GetPricePerSymbol()), priceCharged)
 	blob, header = createMetererInput(binIndex, priceCharged, dataLength, quorumNumbers, accountID2)
 	err = mt.MeterRequest(ctx, *blob, *header)
 	assert.NoError(t, err)
@@ -401,7 +401,7 @@ func TestMeterer_paymentCharged(t *testing.T) {
 		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
-				ChainState: paymentChainState,
+				ChainPaymentState: paymentChainState,
 			}
 			result := m.PaymentCharged(tt.dataLength)
 			assert.Equal(t, tt.expected, result)
@@ -453,7 +453,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
-				ChainState: paymentChainState,
+				ChainPaymentState: paymentChainState,
 			}
 			result := m.SymbolsCharged(tt.dataLength)
 			assert.Equal(t, tt.expected, result)
