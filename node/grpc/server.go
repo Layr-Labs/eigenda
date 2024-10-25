@@ -283,7 +283,10 @@ func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*p
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the batch header hash: %w", err)
 	}
-	sig := s.node.KeyPair.SignMessage(batchHeaderHash)
+	sig, err := s.node.GetSignature(ctx, batchHeaderHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign the batch header: %w", err)
+	}
 
 	s.node.Logger.Info("AttestBatch complete", "duration", time.Since(start))
 	return &pb.AttestBatchReply{

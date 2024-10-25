@@ -272,6 +272,27 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_NODE_INFO_RESOURCES"),
 	}
+
+	BLSRemoteSignerUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-remote-signer-url"),
+		Usage:    "The URL of the BLS remote signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_REMOTE_SIGNER_URL"),
+	}
+
+	BLSPublicKeyHexFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-public-key-hex"),
+		Usage:    "The hex-encoded public key of the BLS signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_PUBLIC_KEY_HEX"),
+	}
+
+	BLSSignerCertFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-signer-cert-file"),
+		Usage:    "The path to the BLS signer certificate file",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -314,6 +335,9 @@ var optionalFlags = []cli.Flag{
 	DataApiUrlFlag,
 	DisableNodeInfoResourcesFlag,
 	EnableGnarkBundleEncodingFlag,
+	BLSRemoteSignerUrlFlag,
+	BLSPublicKeyHexFlag,
+	BLSSignerCertFileFlag,
 }
 
 func init() {
