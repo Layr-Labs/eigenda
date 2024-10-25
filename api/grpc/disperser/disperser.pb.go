@@ -790,6 +790,163 @@ func (x *RetrieveBlobReply) GetData() []byte {
 	return nil
 }
 
+// GetPaymentStateRequest contains parameters to query the payment state of an account.
+type GetPaymentStateRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
+}
+
+func (x *GetPaymentStateRequest) Reset() {
+	*x = GetPaymentStateRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_disperser_disperser_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetPaymentStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentStateRequest) ProtoMessage() {}
+
+func (x *GetPaymentStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_disperser_disperser_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentStateRequest.ProtoReflect.Descriptor instead.
+func (*GetPaymentStateRequest) Descriptor() ([]byte, []int) {
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetPaymentStateRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetPaymentStateRequest) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+// GetPaymentStateReply contains the payment state of an account.
+type GetPaymentStateReply struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// global payment vault parameters
+	PaymentGlobalParams *PaymentGlobalParams `protobuf:"bytes,1,opt,name=payment_global_params,json=paymentGlobalParams,proto3" json:"payment_global_params,omitempty"`
+	// off-chain account reservation usage
+	CurrentBinUsage  uint32 `protobuf:"varint,2,opt,name=current_bin_usage,json=currentBinUsage,proto3" json:"current_bin_usage,omitempty"`
+	NextBinUsage     uint32 `protobuf:"varint,3,opt,name=next_bin_usage,json=nextBinUsage,proto3" json:"next_bin_usage,omitempty"`
+	OverflowBinUsage uint32 `protobuf:"varint,4,opt,name=overflow_bin_usage,json=overflowBinUsage,proto3" json:"overflow_bin_usage,omitempty"`
+	// on-chain account reservation setting
+	Reservation *Reservation `protobuf:"bytes,5,opt,name=reservation,proto3" json:"reservation,omitempty"`
+	// off-chain on-demand payment usage
+	CumulativePayment []byte `protobuf:"bytes,6,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
+	// on-chain on-demand payment deposited
+	OnChainCumulativePayment []byte `protobuf:"bytes,7,opt,name=on_chain_cumulative_payment,json=onChainCumulativePayment,proto3" json:"on_chain_cumulative_payment,omitempty"`
+}
+
+func (x *GetPaymentStateReply) Reset() {
+	*x = GetPaymentStateReply{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_disperser_disperser_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GetPaymentStateReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentStateReply) ProtoMessage() {}
+
+func (x *GetPaymentStateReply) ProtoReflect() protoreflect.Message {
+	mi := &file_disperser_disperser_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentStateReply.ProtoReflect.Descriptor instead.
+func (*GetPaymentStateReply) Descriptor() ([]byte, []int) {
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetPaymentStateReply) GetPaymentGlobalParams() *PaymentGlobalParams {
+	if x != nil {
+		return x.PaymentGlobalParams
+	}
+	return nil
+}
+
+func (x *GetPaymentStateReply) GetCurrentBinUsage() uint32 {
+	if x != nil {
+		return x.CurrentBinUsage
+	}
+	return 0
+}
+
+func (x *GetPaymentStateReply) GetNextBinUsage() uint32 {
+	if x != nil {
+		return x.NextBinUsage
+	}
+	return 0
+}
+
+func (x *GetPaymentStateReply) GetOverflowBinUsage() uint32 {
+	if x != nil {
+		return x.OverflowBinUsage
+	}
+	return 0
+}
+
+func (x *GetPaymentStateReply) GetReservation() *Reservation {
+	if x != nil {
+		return x.Reservation
+	}
+	return nil
+}
+
+func (x *GetPaymentStateReply) GetCumulativePayment() []byte {
+	if x != nil {
+		return x.CumulativePayment
+	}
+	return nil
+}
+
+func (x *GetPaymentStateReply) GetOnChainCumulativePayment() []byte {
+	if x != nil {
+		return x.OnChainCumulativePayment
+	}
+	return nil
+}
+
 // BlobInfo contains information needed to confirm the blob against the EigenDA contracts
 type BlobInfo struct {
 	state         protoimpl.MessageState
@@ -803,7 +960,7 @@ type BlobInfo struct {
 func (x *BlobInfo) Reset() {
 	*x = BlobInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[11]
+		mi := &file_disperser_disperser_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -816,7 +973,7 @@ func (x *BlobInfo) String() string {
 func (*BlobInfo) ProtoMessage() {}
 
 func (x *BlobInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[11]
+	mi := &file_disperser_disperser_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +986,7 @@ func (x *BlobInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobInfo.ProtoReflect.Descriptor instead.
 func (*BlobInfo) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{11}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BlobInfo) GetBlobHeader() *BlobHeader {
@@ -862,7 +1019,7 @@ type BlobHeader struct {
 func (x *BlobHeader) Reset() {
 	*x = BlobHeader{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[12]
+		mi := &file_disperser_disperser_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -875,7 +1032,7 @@ func (x *BlobHeader) String() string {
 func (*BlobHeader) ProtoMessage() {}
 
 func (x *BlobHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[12]
+	mi := &file_disperser_disperser_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -888,7 +1045,7 @@ func (x *BlobHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobHeader.ProtoReflect.Descriptor instead.
 func (*BlobHeader) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{12}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *BlobHeader) GetCommitment() *common.G1Commitment {
@@ -933,7 +1090,7 @@ type BlobQuorumParam struct {
 func (x *BlobQuorumParam) Reset() {
 	*x = BlobQuorumParam{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[13]
+		mi := &file_disperser_disperser_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -946,7 +1103,7 @@ func (x *BlobQuorumParam) String() string {
 func (*BlobQuorumParam) ProtoMessage() {}
 
 func (x *BlobQuorumParam) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[13]
+	mi := &file_disperser_disperser_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -959,7 +1116,7 @@ func (x *BlobQuorumParam) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobQuorumParam.ProtoReflect.Descriptor instead.
 func (*BlobQuorumParam) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{13}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *BlobQuorumParam) GetQuorumNumber() uint32 {
@@ -1027,7 +1184,7 @@ type BlobVerificationProof struct {
 func (x *BlobVerificationProof) Reset() {
 	*x = BlobVerificationProof{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[14]
+		mi := &file_disperser_disperser_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1040,7 +1197,7 @@ func (x *BlobVerificationProof) String() string {
 func (*BlobVerificationProof) ProtoMessage() {}
 
 func (x *BlobVerificationProof) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[14]
+	mi := &file_disperser_disperser_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1053,7 +1210,7 @@ func (x *BlobVerificationProof) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlobVerificationProof.ProtoReflect.Descriptor instead.
 func (*BlobVerificationProof) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{14}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *BlobVerificationProof) GetBatchId() uint32 {
@@ -1113,7 +1270,7 @@ type BatchMetadata struct {
 func (x *BatchMetadata) Reset() {
 	*x = BatchMetadata{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[15]
+		mi := &file_disperser_disperser_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1126,7 +1283,7 @@ func (x *BatchMetadata) String() string {
 func (*BatchMetadata) ProtoMessage() {}
 
 func (x *BatchMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[15]
+	mi := &file_disperser_disperser_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1139,7 +1296,7 @@ func (x *BatchMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchMetadata.ProtoReflect.Descriptor instead.
 func (*BatchMetadata) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{15}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BatchMetadata) GetBatchHeader() *BatchHeader {
@@ -1199,7 +1356,7 @@ type BatchHeader struct {
 func (x *BatchHeader) Reset() {
 	*x = BatchHeader{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_disperser_disperser_proto_msgTypes[16]
+		mi := &file_disperser_disperser_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1212,7 +1369,7 @@ func (x *BatchHeader) String() string {
 func (*BatchHeader) ProtoMessage() {}
 
 func (x *BatchHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_disperser_disperser_proto_msgTypes[16]
+	mi := &file_disperser_disperser_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1225,7 +1382,7 @@ func (x *BatchHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchHeader.ProtoReflect.Descriptor instead.
 func (*BatchHeader) Descriptor() ([]byte, []int) {
-	return file_disperser_disperser_proto_rawDescGZIP(), []int{16}
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *BatchHeader) GetBatchRoot() []byte {
@@ -1254,6 +1411,164 @@ func (x *BatchHeader) GetReferenceBlockNumber() uint32 {
 		return x.ReferenceBlockNumber
 	}
 	return 0
+}
+
+type PaymentGlobalParams struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	GlobalSymbolsPerSecond uint64   `protobuf:"varint,1,opt,name=global_symbols_per_second,json=globalSymbolsPerSecond,proto3" json:"global_symbols_per_second,omitempty"`
+	MinNumSymbols          uint32   `protobuf:"varint,2,opt,name=min_num_symbols,json=minNumSymbols,proto3" json:"min_num_symbols,omitempty"`
+	PricePerSymbol         uint32   `protobuf:"varint,3,opt,name=price_per_symbol,json=pricePerSymbol,proto3" json:"price_per_symbol,omitempty"`
+	ReservationWindow      uint32   `protobuf:"varint,4,opt,name=reservation_window,json=reservationWindow,proto3" json:"reservation_window,omitempty"`
+	OnDemandQuorumNumbers  []uint32 `protobuf:"varint,5,rep,packed,name=on_demand_quorum_numbers,json=onDemandQuorumNumbers,proto3" json:"on_demand_quorum_numbers,omitempty"`
+}
+
+func (x *PaymentGlobalParams) Reset() {
+	*x = PaymentGlobalParams{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_disperser_disperser_proto_msgTypes[19]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *PaymentGlobalParams) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentGlobalParams) ProtoMessage() {}
+
+func (x *PaymentGlobalParams) ProtoReflect() protoreflect.Message {
+	mi := &file_disperser_disperser_proto_msgTypes[19]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentGlobalParams.ProtoReflect.Descriptor instead.
+func (*PaymentGlobalParams) Descriptor() ([]byte, []int) {
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *PaymentGlobalParams) GetGlobalSymbolsPerSecond() uint64 {
+	if x != nil {
+		return x.GlobalSymbolsPerSecond
+	}
+	return 0
+}
+
+func (x *PaymentGlobalParams) GetMinNumSymbols() uint32 {
+	if x != nil {
+		return x.MinNumSymbols
+	}
+	return 0
+}
+
+func (x *PaymentGlobalParams) GetPricePerSymbol() uint32 {
+	if x != nil {
+		return x.PricePerSymbol
+	}
+	return 0
+}
+
+func (x *PaymentGlobalParams) GetReservationWindow() uint32 {
+	if x != nil {
+		return x.ReservationWindow
+	}
+	return 0
+}
+
+func (x *PaymentGlobalParams) GetOnDemandQuorumNumbers() []uint32 {
+	if x != nil {
+		return x.OnDemandQuorumNumbers
+	}
+	return nil
+}
+
+type Reservation struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SymbolsPerSecond uint64   `protobuf:"varint,1,opt,name=symbols_per_second,json=symbolsPerSecond,proto3" json:"symbols_per_second,omitempty"`
+	StartTimestamp   uint32   `protobuf:"varint,2,opt,name=start_timestamp,json=startTimestamp,proto3" json:"start_timestamp,omitempty"`
+	EndTimestamp     uint32   `protobuf:"varint,3,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
+	QuorumNumbers    []uint32 `protobuf:"varint,4,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
+	QuorumSplit      []uint32 `protobuf:"varint,5,rep,packed,name=quorum_split,json=quorumSplit,proto3" json:"quorum_split,omitempty"`
+}
+
+func (x *Reservation) Reset() {
+	*x = Reservation{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_disperser_disperser_proto_msgTypes[20]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Reservation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Reservation) ProtoMessage() {}
+
+func (x *Reservation) ProtoReflect() protoreflect.Message {
+	mi := &file_disperser_disperser_proto_msgTypes[20]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Reservation.ProtoReflect.Descriptor instead.
+func (*Reservation) Descriptor() ([]byte, []int) {
+	return file_disperser_disperser_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Reservation) GetSymbolsPerSecond() uint64 {
+	if x != nil {
+		return x.SymbolsPerSecond
+	}
+	return 0
+}
+
+func (x *Reservation) GetStartTimestamp() uint32 {
+	if x != nil {
+		return x.StartTimestamp
+	}
+	return 0
+}
+
+func (x *Reservation) GetEndTimestamp() uint32 {
+	if x != nil {
+		return x.EndTimestamp
+	}
+	return 0
+}
+
+func (x *Reservation) GetQuorumNumbers() []uint32 {
+	if x != nil {
+		return x.QuorumNumbers
+	}
+	return nil
+}
+
+func (x *Reservation) GetQuorumSplit() []uint32 {
+	if x != nil {
+		return x.QuorumSplit
+	}
+	return nil
 }
 
 var File_disperser_disperser_proto protoreflect.FileDescriptor
@@ -1472,7 +1787,7 @@ func file_disperser_disperser_proto_rawDescGZIP() []byte {
 }
 
 var file_disperser_disperser_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_disperser_disperser_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_disperser_disperser_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_disperser_disperser_proto_goTypes = []interface{}{
 	(BlobStatus)(0),                 // 0: disperser.BlobStatus
 	(*AuthenticatedRequest)(nil),    // 1: disperser.AuthenticatedRequest
@@ -1486,45 +1801,53 @@ var file_disperser_disperser_proto_goTypes = []interface{}{
 	(*BlobStatusReply)(nil),         // 9: disperser.BlobStatusReply
 	(*RetrieveBlobRequest)(nil),     // 10: disperser.RetrieveBlobRequest
 	(*RetrieveBlobReply)(nil),       // 11: disperser.RetrieveBlobReply
-	(*BlobInfo)(nil),                // 12: disperser.BlobInfo
-	(*BlobHeader)(nil),              // 13: disperser.BlobHeader
-	(*BlobQuorumParam)(nil),         // 14: disperser.BlobQuorumParam
-	(*BlobVerificationProof)(nil),   // 15: disperser.BlobVerificationProof
-	(*BatchMetadata)(nil),           // 16: disperser.BatchMetadata
-	(*BatchHeader)(nil),             // 17: disperser.BatchHeader
-	(*common.PaymentHeader)(nil),    // 18: common.PaymentHeader
-	(*common.G1Commitment)(nil),     // 19: common.G1Commitment
+	(*GetPaymentStateRequest)(nil),  // 12: disperser.GetPaymentStateRequest
+	(*GetPaymentStateReply)(nil),    // 13: disperser.GetPaymentStateReply
+	(*BlobInfo)(nil),                // 14: disperser.BlobInfo
+	(*BlobHeader)(nil),              // 15: disperser.BlobHeader
+	(*BlobQuorumParam)(nil),         // 16: disperser.BlobQuorumParam
+	(*BlobVerificationProof)(nil),   // 17: disperser.BlobVerificationProof
+	(*BatchMetadata)(nil),           // 18: disperser.BatchMetadata
+	(*BatchHeader)(nil),             // 19: disperser.BatchHeader
+	(*PaymentGlobalParams)(nil),     // 20: disperser.PaymentGlobalParams
+	(*Reservation)(nil),             // 21: disperser.Reservation
+	(*common.PaymentHeader)(nil),    // 22: common.PaymentHeader
+	(*common.G1Commitment)(nil),     // 23: common.G1Commitment
 }
 var file_disperser_disperser_proto_depIdxs = []int32{
 	5,  // 0: disperser.AuthenticatedRequest.disperse_request:type_name -> disperser.DisperseBlobRequest
 	4,  // 1: disperser.AuthenticatedRequest.authentication_data:type_name -> disperser.AuthenticationData
 	3,  // 2: disperser.AuthenticatedReply.blob_auth_header:type_name -> disperser.BlobAuthHeader
 	7,  // 3: disperser.AuthenticatedReply.disperse_reply:type_name -> disperser.DisperseBlobReply
-	18, // 4: disperser.DispersePaidBlobRequest.payment_header:type_name -> common.PaymentHeader
+	22, // 4: disperser.DispersePaidBlobRequest.payment_header:type_name -> common.PaymentHeader
 	0,  // 5: disperser.DisperseBlobReply.result:type_name -> disperser.BlobStatus
 	0,  // 6: disperser.BlobStatusReply.status:type_name -> disperser.BlobStatus
-	12, // 7: disperser.BlobStatusReply.info:type_name -> disperser.BlobInfo
-	13, // 8: disperser.BlobInfo.blob_header:type_name -> disperser.BlobHeader
-	15, // 9: disperser.BlobInfo.blob_verification_proof:type_name -> disperser.BlobVerificationProof
-	19, // 10: disperser.BlobHeader.commitment:type_name -> common.G1Commitment
-	14, // 11: disperser.BlobHeader.blob_quorum_params:type_name -> disperser.BlobQuorumParam
-	16, // 12: disperser.BlobVerificationProof.batch_metadata:type_name -> disperser.BatchMetadata
-	17, // 13: disperser.BatchMetadata.batch_header:type_name -> disperser.BatchHeader
-	5,  // 14: disperser.Disperser.DisperseBlob:input_type -> disperser.DisperseBlobRequest
-	6,  // 15: disperser.Disperser.DispersePaidBlob:input_type -> disperser.DispersePaidBlobRequest
-	1,  // 16: disperser.Disperser.DisperseBlobAuthenticated:input_type -> disperser.AuthenticatedRequest
-	8,  // 17: disperser.Disperser.GetBlobStatus:input_type -> disperser.BlobStatusRequest
-	10, // 18: disperser.Disperser.RetrieveBlob:input_type -> disperser.RetrieveBlobRequest
-	7,  // 19: disperser.Disperser.DisperseBlob:output_type -> disperser.DisperseBlobReply
-	7,  // 20: disperser.Disperser.DispersePaidBlob:output_type -> disperser.DisperseBlobReply
-	2,  // 21: disperser.Disperser.DisperseBlobAuthenticated:output_type -> disperser.AuthenticatedReply
-	9,  // 22: disperser.Disperser.GetBlobStatus:output_type -> disperser.BlobStatusReply
-	11, // 23: disperser.Disperser.RetrieveBlob:output_type -> disperser.RetrieveBlobReply
-	19, // [19:24] is the sub-list for method output_type
-	14, // [14:19] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	14, // 7: disperser.BlobStatusReply.info:type_name -> disperser.BlobInfo
+	20, // 8: disperser.GetPaymentStateReply.payment_global_params:type_name -> disperser.PaymentGlobalParams
+	21, // 9: disperser.GetPaymentStateReply.reservation:type_name -> disperser.Reservation
+	15, // 10: disperser.BlobInfo.blob_header:type_name -> disperser.BlobHeader
+	17, // 11: disperser.BlobInfo.blob_verification_proof:type_name -> disperser.BlobVerificationProof
+	23, // 12: disperser.BlobHeader.commitment:type_name -> common.G1Commitment
+	16, // 13: disperser.BlobHeader.blob_quorum_params:type_name -> disperser.BlobQuorumParam
+	18, // 14: disperser.BlobVerificationProof.batch_metadata:type_name -> disperser.BatchMetadata
+	19, // 15: disperser.BatchMetadata.batch_header:type_name -> disperser.BatchHeader
+	5,  // 16: disperser.Disperser.DisperseBlob:input_type -> disperser.DisperseBlobRequest
+	6,  // 17: disperser.Disperser.DispersePaidBlob:input_type -> disperser.DispersePaidBlobRequest
+	1,  // 18: disperser.Disperser.DisperseBlobAuthenticated:input_type -> disperser.AuthenticatedRequest
+	8,  // 19: disperser.Disperser.GetBlobStatus:input_type -> disperser.BlobStatusRequest
+	10, // 20: disperser.Disperser.RetrieveBlob:input_type -> disperser.RetrieveBlobRequest
+	12, // 21: disperser.Disperser.GetPaymentState:input_type -> disperser.GetPaymentStateRequest
+	7,  // 22: disperser.Disperser.DisperseBlob:output_type -> disperser.DisperseBlobReply
+	7,  // 23: disperser.Disperser.DispersePaidBlob:output_type -> disperser.DisperseBlobReply
+	2,  // 24: disperser.Disperser.DisperseBlobAuthenticated:output_type -> disperser.AuthenticatedReply
+	9,  // 25: disperser.Disperser.GetBlobStatus:output_type -> disperser.BlobStatusReply
+	11, // 26: disperser.Disperser.RetrieveBlob:output_type -> disperser.RetrieveBlobReply
+	13, // 27: disperser.Disperser.GetPaymentState:output_type -> disperser.GetPaymentStateReply
+	22, // [22:28] is the sub-list for method output_type
+	16, // [16:22] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_disperser_disperser_proto_init() }
@@ -1666,7 +1989,7 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobInfo); i {
+			switch v := v.(*GetPaymentStateRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1678,7 +2001,7 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobHeader); i {
+			switch v := v.(*GetPaymentStateReply); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1690,7 +2013,7 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobQuorumParam); i {
+			switch v := v.(*BlobInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1702,7 +2025,7 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BlobVerificationProof); i {
+			switch v := v.(*BlobHeader); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1714,7 +2037,7 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BatchMetadata); i {
+			switch v := v.(*BlobQuorumParam); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1726,7 +2049,55 @@ func file_disperser_disperser_proto_init() {
 			}
 		}
 		file_disperser_disperser_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BlobVerificationProof); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_disperser_disperser_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BatchMetadata); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_disperser_disperser_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*BatchHeader); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_disperser_disperser_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*PaymentGlobalParams); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_disperser_disperser_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Reservation); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1752,7 +2123,7 @@ func file_disperser_disperser_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_disperser_disperser_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

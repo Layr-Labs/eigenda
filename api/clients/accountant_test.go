@@ -34,6 +34,7 @@ func TestNewAccountant(t *testing.T) {
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	defer accountant.Stop()
 
 	assert.NotNil(t, accountant)
 	assert.Equal(t, reservation, accountant.reservation)

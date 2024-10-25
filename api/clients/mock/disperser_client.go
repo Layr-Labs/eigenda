@@ -138,6 +138,15 @@ func (c *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash 
 	return blob, err
 }
 
+func (c *MockDisperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+	args := c.Called()
+	var reply *disperser_rpc.GetPaymentStateReply
+	if args.Get(0) != nil {
+		reply = (args.Get(0)).(*disperser_rpc.GetPaymentStateReply)
+	}
+	return reply, args.Error(1)
+}
+
 func (c *MockDisperserClient) Close() error {
 	args := c.Called()
 	return args.Error(0)

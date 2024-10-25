@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -44,6 +45,16 @@ func (s *PaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte,
 	return sig, nil
 }
 
+func (s *PaymentSigner) SignAccountID(accountID string) ([]byte, error) {
+	hash := crypto.Keccak256Hash([]byte(accountID))
+	sig, err := crypto.Sign(hash.Bytes(), s.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign account ID: %v", err)
+	}
+
+	return sig, nil
+}
+
 type NoopPaymentSigner struct{}
 
 func NewNoopPaymentSigner() *NoopPaymentSigner {
@@ -79,6 +90,26 @@ func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignat
 	return crypto.VerifySignature(
 		crypto.FromECDSAPub(recoveredPubKey),
 		hash.Bytes(),
+		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
+	)
+}
+
+// VerifyAccountSignature verifies the signature against an account ID
+func VerifyAccountSignature(accountID string, paymentSignature []byte) bool {
+	pubKeyBytes, err := hex.DecodeString(accountID)
+	if err != nil {
+		log.Printf("Failed to decode AccountId: %v\n", err)
+		return false
+	}
+	accountPubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+	if err != nil {
+		log.Printf("Failed to unmarshal public key: %v\n", err)
+		return false
+	}
+
+	return crypto.VerifySignature(
+		crypto.FromECDSAPub(accountPubKey),
+		[]byte(accountID),
 		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
 	)
 }

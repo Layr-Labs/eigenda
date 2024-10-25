@@ -24,6 +24,7 @@ const (
 	Disperser_DisperseBlobAuthenticated_FullMethodName = "/disperser.Disperser/DisperseBlobAuthenticated"
 	Disperser_GetBlobStatus_FullMethodName             = "/disperser.Disperser/GetBlobStatus"
 	Disperser_RetrieveBlob_FullMethodName              = "/disperser.Disperser/RetrieveBlob"
+	Disperser_GetPaymentState_FullMethodName           = "/disperser.Disperser/GetPaymentState"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -66,6 +67,8 @@ type DisperserClient interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error)
+	// This API is used to query the payment state of a given account.
+	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 }
 
 type disperserClient struct {
@@ -143,6 +146,15 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, in *RetrieveBlobRequ
 	return out, nil
 }
 
+func (c *disperserClient) GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error) {
+	out := new(GetPaymentStateReply)
+	err := c.cc.Invoke(ctx, Disperser_GetPaymentState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DisperserServer is the server API for Disperser service.
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
@@ -183,6 +195,8 @@ type DisperserServer interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error)
+	// This API is used to query the payment state of a given account.
+	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -204,6 +218,9 @@ func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRe
 }
 func (UnimplementedDisperserServer) RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveBlob not implemented")
+}
+func (UnimplementedDisperserServer) GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentState not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -316,6 +333,24 @@ func _Disperser_RetrieveBlob_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Disperser_GetPaymentState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPaymentStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).GetPaymentState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_GetPaymentState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).GetPaymentState(ctx, req.(*GetPaymentStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -338,6 +373,10 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RetrieveBlob",
 			Handler:    _Disperser_RetrieveBlob_Handler,
+		},
+		{
+			MethodName: "GetPaymentState",
+			Handler:    _Disperser_GetPaymentState_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

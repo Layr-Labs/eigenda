@@ -89,10 +89,15 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
-	// a subsequent PR contains updates to fill in payment state
+	//todo: update to just supply paymentSigner to the client and client will handle getting payment state and creating the accountant
 	accountant := NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
-
 	disperserClient := NewDisperserClient(disperserConfig, signer, accountant)
+	paymentState, err := disperserClient.GetPaymentState(context.Background())
+
+	if err != nil {
+		return nil, fmt.Errorf("error getting payment state: %w", err)
+	}
+	accountant.SetPaymentState(paymentState)
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

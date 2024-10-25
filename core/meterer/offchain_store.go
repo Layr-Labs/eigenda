@@ -237,3 +237,79 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 
 	return prevPayment, nextPayment, nextDataLength, nil
 }
+
+func (s *OffchainStore) GetBinUsages(ctx context.Context, accountID string, binIndex uint32) (uint64, uint64, uint64, error) {
+	// Fetch the 3 bins start from the current bin
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.reservationTableName),
+		KeyConditionExpression: aws.String("AccountID = :account AND binIndex > :binIndex"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":account":  &types.AttributeValueMemberS{Value: accountID},
+			":binIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
+		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(3),
+	}
+	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to query payments for account: %w", err)
+	}
+
+	usages := make([]uint64, 3)
+	for i := 0; i < len(bins) && i < 3; i++ {
+		usage, err := parseBinUsage(bins[i])
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to parse bin %d usage: %w", i, err)
+		}
+		usages[i] = usage
+	}
+
+	return usages[0], usages[1], usages[2], nil
+}
+
+func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID string) (*big.Int, error) {
+	// Fetch the largest cumulative payment
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.onDemandTableName),
+		KeyConditionExpression: aws.String("AccountID = :account"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":account": &types.AttributeValueMemberS{Value: accountID},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(1),
+	}
+	payments, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query payments for account: %w", err)
+	}
+
+	if len(payments) == 0 {
+		return nil, nil
+	}
+
+	payment, err := strconv.ParseUint(payments[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse payment: %w", err)
+	}
+
+	return big.NewInt(int64(payment)), nil
+}
+
+func parseBinUsage(bin map[string]types.AttributeValue) (uint64, error) {
+	binUsage, ok := bin["BinUsage"]
+	if !ok {
+		return 0, errors.New("BinUsage is not present in the response")
+	}
+
+	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	if !ok {
+		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+	}
+
+	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
+	}
+
+	return binUsageValue, nil
+}

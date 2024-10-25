@@ -350,6 +350,68 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 	return reply, err
 }
 
+func (s *DispersalServer) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	// validate the signature
+	if !auth.VerifyAccountSignature(req.AccountId, req.Signature) {
+		return nil, api.NewErrorInvalidArg("invalid signature")
+	}
+
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+
+	// off-chain account specific payment state
+	now := uint64(time.Now().Unix())
+	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
+	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, currentBinIndex)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+	}
+	// on-Chain account state
+	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+	}
+
+	paymentGlobalParams := pb.PaymentGlobalParams{
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
+	}
+
+	quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+	for i, v := range reservation.QuorumNumbers {
+		quorumNumbers[i] = uint32(v)
+	}
+	// build reply
+	reply := &pb.GetPaymentStateReply{
+		PaymentGlobalParams: &paymentGlobalParams,
+		CurrentBinUsage:     uint32(currentBinUsage),
+		NextBinUsage:        uint32(nextBinUsage),
+		OverflowBinUsage:    uint32(overflowBinUsage),
+		Reservation: &pb.Reservation{
+			SymbolsPerSecond: reservation.SymbolsPerSec,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
+			QuorumNumbers:    quorumNumbers,
+		},
+		CumulativePayment:        largestCumulativePayment.Bytes(),
+		OnChainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+	}
+	return reply, nil
+}
+
 func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
 	unauthRates, ok := s.rateConfig.QuorumRateInfos[quorumID]
 	if !ok {

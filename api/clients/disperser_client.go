@@ -46,6 +46,7 @@ type DisperserClient interface {
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
+	GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error)
 }
 
 // See the NewDisperserClient constructor's documentation for details and usage examples.
@@ -309,6 +310,35 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 		return nil, err
 	}
 	return reply.Data, nil
+}
+
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, fmt.Errorf("error initializing connection: %w", err)
+	}
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	accountID := c.accountant.paymentSigner.GetAccountID()
+
+	signature, err := c.accountant.paymentSigner.SignAccountID(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &disperser_rpc.GetPaymentStateRequest{
+		AccountId: accountID,
+		Signature: signature,
+	}
+
+	reply, err := c.client.GetPaymentState(ctxTimeout, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return reply, nil
 }
 
 func (c *disperserClient) initOnceGrpcConnection() error {
