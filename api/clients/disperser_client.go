@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -63,37 +63,18 @@ type disperserClient struct {
 	// This means a conservative estimate of 100-1000MB/sec, which should be amply sufficient.
 	// If we ever need to increase this, we could either consider asking the disperser to increase its limit,
 	// or to use a pool of connections here.
-	conn   *grpc.ClientConn
-	client disperser_rpc.DisperserClient
+	conn       *grpc.ClientConn
+	client     disperser_rpc.DisperserClient
+	accountant Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
 
-// DisperserClient maintains a single underlying grpc connection to the disperser server,
-// through which it sends requests to disperse blobs, get blob status, and retrieve blobs.
-// The connection is established lazily on the first method call. Don't forget to call Close(),
-// which is safe to call even if the connection was never established.
-//
-// DisperserClient is safe to be used concurrently by multiple goroutines.
-//
-// Example usage:
-//
-//	client := NewDisperserClient(config, signer)
-//	defer client.Close()
-//
-//	// The connection will be established on the first call
-//	status, requestId, err := client.DisperseBlob(ctx, someData, someQuorums)
-//	if err != nil {
-//	    // Handle error
-//	}
-//
-//	// Subsequent calls will use the existing connection
-//	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *disperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant Accountant) DisperserClient {
 	return &disperserClient{
-		config: config,
-		signer: signer,
-		// conn and client are initialized lazily
+		config:     config,
+		signer:     signer,
+		accountant: accountant,
 	}
 }
 
@@ -146,9 +127,49 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	return blobStatus, reply.GetRequestId(), nil
 }
 
-// TODO: implemented in subsequent PR
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, api.NewErrorInternal("not implemented")
+	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error initializing connection: %w", err)
+	}
+
+	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
+	defer cancel()
+
+	quorumNumbers := make([]uint32, len(quorums))
+	for i, q := range quorums {
+		quorumNumbers[i] = uint32(q)
+	}
+
+	// check every 32 bytes of data are within the valid range for a bn254 field element
+	_, err = rs.ToFrArray(data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
+	}
+
+	header, signature, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	request := &disperser_rpc.DispersePaidBlobRequest{
+		Data:                data,
+		CustomQuorumNumbers: quorumNumbers,
+		PaymentHeader:       header,
+		PaymentSignature:    signature,
+	}
+
+	reply, err := c.client.DispersePaidBlob(ctxTimeout, request)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	blobStatus, err := disperser.FromBlobStatusProto(reply.GetResult())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return blobStatus, reply.GetRequestId(), nil
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {

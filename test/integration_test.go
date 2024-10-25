@@ -210,18 +210,16 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
 
-	minimumNumSymbols := uint32(128)
-	pricePerSymbol := uint32(1)
-	reservationLimit := uint64(1024)
-	paymentLimit := big.NewInt(512)
-
 	// this is disperser client's private key used in tests
 	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
 	if err != nil {
 		panic("failed to convert hex to ECDSA")
 	}
 	publicKey := crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
+
 	mockState := &coremock.MockOnchainPaymentState{}
+	reservationLimit := uint64(1024)
+	paymentLimit := big.NewInt(512)
 	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.MatchedBy(func(account string) bool {
 		return account == publicKey
 	})).Return(core.ActiveReservation{SymbolsPerSec: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
@@ -232,11 +230,11 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	})).Return(core.OnDemandPayment{CumulativePayment: paymentLimit}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(core.OnDemandPayment{}, errors.New("payment not found"))
 	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
-	mockState.On("GetMinNumSymbols", mock.Anything).Return(minimumNumSymbols, nil)
-	mockState.On("GetPricePerSymbol", mock.Anything).Return(pricePerSymbol, nil)
-	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
 	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1024), nil)
-	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint32(1), nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint32(128), nil)
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 	if !deployLocalStack {
