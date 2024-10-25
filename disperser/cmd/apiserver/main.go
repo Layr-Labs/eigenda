@@ -113,6 +113,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
 
 		offchainStore, err := mt.NewOffchainStore(
 			config.AwsClientConfig,

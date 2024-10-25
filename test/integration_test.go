@@ -289,6 +289,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 

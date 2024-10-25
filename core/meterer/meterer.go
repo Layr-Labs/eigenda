@@ -52,11 +52,6 @@ func (m *Meterer) Start(ctx context.Context) {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 
-		// initial tick immediately upto Start
-		if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
-			m.logger.Error("Failed to make initial query to the on-chain state", "error", err)
-		}
-
 		for {
 			select {
 			case <-ticker.C:

@@ -2,7 +2,6 @@ package meterer_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -145,6 +144,10 @@ func setup(_ *testing.M) {
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
+	if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
 		config,
@@ -178,7 +181,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
 		return account == accountID2
 	})).Return(account2Reservations, nil)
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, errors.New("reservation not found"))
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, fmt.Errorf("reservation not found"))
 
 	// test invalid quorom ID
 	blob, header := createMetererInput(1, 0, 1000, []uint8{0, 1, 2}, accountID1)
@@ -262,7 +265,7 @@ func TestMetererOnDemand(t *testing.T) {
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
 		return account == accountID2
 	})).Return(account2OnDemandPayments, nil)
-	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(core.OnDemandPayment{}, errors.New("payment not found"))
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(core.OnDemandPayment{}, fmt.Errorf("payment not found"))
 	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 
 	// test unregistered account
