@@ -1073,6 +1073,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	return blob, nil
 }
 
+// TODO: refactor checks with validateRequestAndGetBlob; most checks are the same, but paid requests have different quorum requirements
 func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*core.Blob, error) {
 
 	data := req.GetData()
