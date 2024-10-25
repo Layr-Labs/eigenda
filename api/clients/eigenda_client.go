@@ -165,6 +165,10 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
 // to be reached (guarded by WaitForFinalization config param) before returning.
 // This function is resilient to transient failures and timeouts.
+//
+// Upon return the blob is guaranteed to be: 
+//  - finalized onchain (if Config.WaitForFinalization is true), or
+//  - confirmed at a certain depth (if Config.WaitForFinalization is false, in which case Config.WaitForConfirmationDepth specifies the depth).
 func (m *EigenDAClient) PutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
 	resultChan, errorChan := m.PutBlobAsync(ctx, data)
 	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
