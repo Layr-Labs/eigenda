@@ -287,7 +287,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	if paymentHeader != nil && *paymentHeader != (core.PaymentMetadata{}) {
 		err := s.meterer.MeterRequest(ctx, *blob, *paymentHeader)
 		if err != nil {
-			return nil, err
+			return nil, api.NewErrorResourceExhausted(err.Error())
 		}
 	} else if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
