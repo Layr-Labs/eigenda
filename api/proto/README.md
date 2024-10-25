@@ -41,4 +41,4 @@ The EigenDA v2 Architecture is a fundamental redesign of the protocol. The v2 Ar
 efficiency, and paves the way for upcoming features such as permissionless disperser instances
 and data availability sampling.
 
-We intend on publishing a more detailed roadmap and design overview in the near future, stay tuned!
+For more information, see the [V2 Architecture Overview](../../docs/README-V2.md).
