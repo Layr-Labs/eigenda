@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"math/big"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -494,23 +496,27 @@ type PaymentMetadata struct {
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
-func (pm *PaymentMetadata) Hash() []byte {
-	// Create a byte slice to hold the serialized data
+func (pm *PaymentMetadata) Hash() gethcommon.Hash {
 	data := make([]byte, 0, len(pm.AccountID)+4+pm.CumulativePayment.BitLen()/8+1)
-
-	// Append AccountID
 	data = append(data, []byte(pm.AccountID)...)
 
-	// Append BinIndex
 	binIndexBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
 	data = append(data, binIndexBytes...)
 
-	// Append CumulativePayment
 	paymentBytes := pm.CumulativePayment.Bytes()
 	data = append(data, paymentBytes...)
 
-	return crypto.Keccak256(data)
+	return crypto.Keccak256Hash(data)
+}
+
+// ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
+func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
+	return &PaymentMetadata{
+		AccountID:         header.AccountId,
+		BinIndex:          header.BinIndex,
+		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
+	}
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
