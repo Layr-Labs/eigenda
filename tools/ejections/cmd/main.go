@@ -90,12 +90,25 @@ func RunScan(ctx *cli.Context) error {
 		return ejections[i].BlockTimestamp > ejections[j].BlockTimestamp
 	})
 
+	// Create a sorted slice from the set of quorums
+	quorumSet := make(map[uint8]struct{})
+	for _, ejection := range ejections {
+		quorumSet[ejection.Quorum] = struct{}{}
+	}
+	quorums := make([]uint8, 0, len(quorumSet))
+	for quorum := range quorumSet {
+		quorums = append(quorums, quorum)
+	}
+	sort.Slice(quorums, func(i, j int) bool {
+		return quorums[i] < quorums[j]
+	})
+
 	stateCache := make(map[uint64]*core.OperatorState)
 	ejectedOperatorIds := make(map[core.OperatorID]struct{})
 	for _, ejection := range ejections {
 		previouseBlock := ejection.BlockNumber - 1
 		if _, exists := stateCache[previouseBlock]; !exists {
-			state, err := chainState.GetOperatorState(context.Background(), uint(previouseBlock), []uint8{0, 1})
+			state, err := chainState.GetOperatorState(context.Background(), uint(previouseBlock), quorums)
 			if err != nil {
 				return err
 			}
@@ -176,8 +189,10 @@ func RunScan(ctx *cli.Context) error {
 		return orderedEjectionTransactions[i].BlockNumber > orderedEjectionTransactions[j].BlockNumber
 	})
 	for _, txn := range orderedEjectionTransactions {
-		for quorum, ejections := range txn.QuorumEjections {
-			txnQuorums.AppendRow(table.Row{txn.TransactionHash, txn.BlockTimestamp, quorum, txn.QuorumStakePercentage[quorum], ejections}, rowConfigAutoMerge)
+		for _, quorum := range quorums {
+			if _, exists := txn.QuorumEjections[quorum]; exists {
+				txnQuorums.AppendRow(table.Row{txn.TransactionHash, txn.BlockTimestamp, quorum, txn.QuorumStakePercentage[quorum], txn.QuorumEjections[quorum]}, rowConfigAutoMerge)
+			}
 		}
 	}
 

@@ -108,12 +108,25 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 		return nil, err
 	}
 
+	// create a sorted slice from the set of quorums
+	quorumSet := make(map[uint8]struct{})
+	for _, ejection := range operatorEjections {
+		quorumSet[ejection.Quorum] = struct{}{}
+	}
+	quorums := make([]uint8, 0, len(quorumSet))
+	for quorum := range quorumSet {
+		quorums = append(quorums, quorum)
+	}
+	sort.Slice(quorums, func(i, j int) bool {
+		return quorums[i] < quorums[j]
+	})
+
 	stateCache := make(map[uint64]*core.OperatorState)
 	ejectedOperatorIds := make(map[core.OperatorID]struct{})
 	for _, ejection := range operatorEjections {
 		previouseBlock := ejection.BlockNumber - 1
 		if _, exists := stateCache[previouseBlock]; !exists {
-			state, err := s.chainState.GetOperatorState(context.Background(), uint(previouseBlock), []uint8{0, 1})
+			state, err := s.chainState.GetOperatorState(context.Background(), uint(previouseBlock), quorums)
 			if err != nil {
 				return nil, err
 			}
