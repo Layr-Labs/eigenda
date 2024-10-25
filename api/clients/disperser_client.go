@@ -154,10 +154,10 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 	}
 
 	request := &disperser_rpc.DispersePaidBlobRequest{
-		Data:                data,
-		CustomQuorumNumbers: quorumNumbers,
-		PaymentHeader:       header,
-		PaymentSignature:    signature,
+		Data:             data,
+		QuorumNumbers:    quorumNumbers,
+		PaymentHeader:    header,
+		PaymentSignature: signature,
 	}
 
 	reply, err := c.client.DispersePaidBlob(ctxTimeout, request)
