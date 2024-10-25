@@ -259,7 +259,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 
-	table_names := []string{"reservations-integration-test", "ondemand-integration-test", "global-integration-test"}
+	table_names := []string{"reservations_integration", "ondemand_integration", "global_integration"}
 
 	err = meterer.CreateReservationTable(clientConfig, table_names[0])
 	if err != nil {
@@ -287,6 +287,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	if err != nil {
 		panic("failed to create offchain store")
 	}
+
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
 

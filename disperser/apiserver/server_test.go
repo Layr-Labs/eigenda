@@ -53,7 +53,7 @@ var (
 	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
 
 	deployLocalStack bool
-	localStackPort   = "4568"
+	localStackPort   = "4569"
 	allowlistFile    *os.File
 	testMaxBlobSize  = 2 * 1024 * 1024
 )
@@ -137,7 +137,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
-	dispersalServer := newTestServer(transactor)
+	dispersalServer := newTestServer(transactor, t.Name())
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -193,6 +193,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
+
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
@@ -207,6 +208,7 @@ func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
 	}
 	ctx := peer.NewContext(context.Background(), p)
 
+	// (*dispersalServer).tx.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil).Twice()
 	_, err = dispersalServer.DisperseBlob(ctx, &pb.DisperseBlobRequest{
 		Data:                data,
 		CustomQuorumNumbers: []uint32{2},
@@ -633,7 +635,7 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	dispersalServer = newTestServer(transactor)
+	dispersalServer = newTestServer(transactor, "setup")
 	dispersalServerV2 = newTestServerV2()
 }
 
@@ -646,7 +648,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
+func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
 
 	bucketName := "test-eigenda-blobstore"
@@ -677,9 +679,9 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-
-	table_names := []string{"reservations-apiserver-test", "ondemand-apiserver-test", "global-apiserver-test"}
-
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	// append test name to each table name for an unique store
+	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
 	if err != nil {
 		teardown()
