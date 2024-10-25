@@ -2,7 +2,6 @@ package dataplane
 
 import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
-	"time"
 )
 
 var _ S3Client = &localClient{}
@@ -21,7 +20,7 @@ func NewLocalClient(store kvstore.Store) S3Client {
 	}
 }
 
-func (l *localClient) Upload(key string, data []byte, fragmentSize int, ttl time.Duration) error {
+func (l *localClient) Upload(key string, data []byte, fragmentSize int) error {
 	return l.store.Put([]byte(key), data)
 }
 

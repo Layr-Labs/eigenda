@@ -11,7 +11,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 )
 
 var (
@@ -109,7 +108,7 @@ func RandomOperationsTest(t *testing.T, client S3Client) {
 		data := tu.RandomBytes(dataSize)
 		expectedData[key] = data
 
-		err := client.Upload(key, data, fragmentSize, time.Hour)
+		err := client.Upload(key, data, fragmentSize)
 		assert.NoError(t, err)
 	}
 

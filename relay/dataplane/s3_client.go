@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"sync"
-	"time"
 )
 
 var _ S3Client = &s3Client{}
@@ -71,11 +70,9 @@ func NewS3Client(
 	return client, nil
 }
 
-func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Duration) error {
+func (s *s3Client) Upload(key string, data []byte, fragmentSize int) error {
 	fragments := BreakIntoFragments(key, data, s.config.PrefixChars, fragmentSize)
 	resultChannel := make(chan error, len(fragments))
-
-	expiryTime := time.Now().Add(ttl)
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.config.WriteTimeout)
 	defer cancel()
@@ -83,7 +80,7 @@ func (s *s3Client) Upload(key string, data []byte, fragmentSize int, ttl time.Du
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
 		s.tasks <- func() {
-			s.writeTask(ctx, resultChannel, fragmentCapture, expiryTime)
+			s.writeTask(ctx, resultChannel, fragmentCapture)
 		}
 	}
 
@@ -226,15 +223,13 @@ func (s *s3Client) readTask(
 func (s *s3Client) writeTask(
 	ctx context.Context,
 	resultChannel chan error,
-	fragment *Fragment,
-	expiryTime time.Time) {
+	fragment *Fragment) {
 
 	_, err := s.svc.PutObjectWithContext(ctx,
 		&s3.PutObjectInput{
-			Bucket:  aws.String(s.config.Bucket),
-			Key:     aws.String(fragment.FragmentKey),
-			Body:    bytes.NewReader(fragment.Data),
-			Expires: &expiryTime,
+			Bucket: aws.String(s.config.Bucket),
+			Key:    aws.String(fragment.FragmentKey),
+			Body:   bytes.NewReader(fragment.Data),
 		})
 
 	resultChannel <- err
