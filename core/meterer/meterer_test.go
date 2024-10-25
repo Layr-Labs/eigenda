@@ -43,9 +43,9 @@ var (
 	deployLocalStack           bool
 	localStackPort             = "4566"
 	paymentChainState          = &mock.MockOnchainPaymentState{}
-	ondemandTableName          = "ondemand-meterer-test"
-	reservationTableName       = "reservations-meterer-test"
-	globalReservationTableName = "global-reservation-meterer-test"
+	ondemandTableName          = "ondemand_meterer"
+	reservationTableName       = "reservations_meterer"
+	globalReservationTableName = "global_reservation_meterer"
 )
 
 func TestMain(m *testing.M) {
@@ -144,6 +144,7 @@ func setup(_ *testing.M) {
 		panic("failed to create offchain store")
 	}
 
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
 		config,
@@ -152,6 +153,7 @@ func setup(_ *testing.M) {
 		logging.NewNoopLogger(),
 		// metrics.NewNoopMetrics(),
 	)
+
 	mt.Start(context.Background())
 }
 
