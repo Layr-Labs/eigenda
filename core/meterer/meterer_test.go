@@ -157,6 +157,11 @@ func setup(_ *testing.M) {
 		// metrics.NewNoopMetrics(),
 	)
 
+	// initialize the on-chain state
+	if err := mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
 	mt.Start(context.Background())
 }
 

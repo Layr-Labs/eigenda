@@ -112,6 +112,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
+		// fresh payment state
 		if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
@@ -134,6 +135,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
+
 	}
 
 	var ratelimiter common.RateLimiter
