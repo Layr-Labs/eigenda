@@ -12,9 +12,7 @@ import (
 )
 
 func TestPaymentSigner(t *testing.T) {
-	// Generate a new private key for testing
 	privateKey, err := crypto.GenerateKey()
-	// publicKey := &privateKey.PublicKey
 	require.NoError(t, err)
 
 	privateKeyHex := hex.EncodeToString(crypto.FromECDSA(privateKey))
