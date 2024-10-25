@@ -49,7 +49,7 @@ func NewMeterer(
 // Start starts to periodically refreshing the on-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
 		for {

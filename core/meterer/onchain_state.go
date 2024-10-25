@@ -99,45 +99,13 @@ func GetPaymentVaultParams(ctx context.Context, tx *eth.Reader) (PaymentVaultPar
 	}, nil
 }
 
-// RefreshOnchainPaymentState returns the current onchain payment state (TODO: can optimize based on contract interface)
+// RefreshOnchainPaymentState returns the current onchain payment state
 func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
-	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
 	if err != nil {
 		return err
 	}
-
-	pcs.ReservationsLock.Lock()
-	accountIDs := make([]string, 0, len(pcs.ActiveReservations))
-	for accountID := range pcs.ActiveReservations {
-		accountIDs = append(accountIDs, accountID)
-	}
-
-	activeReservations, err := tx.GetActiveReservations(ctx, blockNumber, accountIDs)
-	if err != nil {
-		return err
-	}
-	pcs.ActiveReservations = activeReservations
-	pcs.ReservationsLock.Unlock()
-
-	pcs.OnDemandLocks.Lock()
-	accountIDs = make([]string, 0, len(pcs.OnDemandPayments))
-	for accountID := range pcs.OnDemandPayments {
-		accountIDs = append(accountIDs, accountID)
-	}
-
-	onDemandPayments, err := tx.GetOnDemandPayments(ctx, blockNumber, accountIDs)
-	if err != nil {
-		return err
-	}
-	pcs.OnDemandPayments = onDemandPayments
-	pcs.OnDemandLocks.Unlock()
-
-	// These parameters should be rarely updated, but we refresh them anyway
-	pcs.PaymentVaultParams, err = GetPaymentVaultParams(ctx, tx)
-	if err != nil {
-		return err
-	}
-
+	pcs.PaymentVaultParams = paymentVaultParams
 	return nil
 }
 
