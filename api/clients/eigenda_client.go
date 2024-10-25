@@ -77,27 +77,25 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	var signer core.BlobRequestSigner
+	var paymentSigner core.PaymentSigner
 	if len(config.SignerPrivateKeyHex) == 64 {
 		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+		paymentSigner = auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
 	} else if len(config.SignerPrivateKeyHex) == 0 {
 		// noop signer is used when we need a read-only eigenda client
 		signer = auth.NewLocalNoopSigner()
+		paymentSigner = auth.NewNoopPaymentSigner()
 	} else {
 		return nil, fmt.Errorf("invalid length for signer private key")
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
-	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
-	//todo: update to just supply paymentSigner to the client and client will handle getting payment state and creating the accountant
-	accountant := NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
-	disperserClient := NewDisperserClient(disperserConfig, signer, accountant)
-	paymentState, err := disperserClient.GetPaymentState(context.Background())
-
+	disperserClient := NewDisperserClient(disperserConfig, signer, paymentSigner)
+	err = disperserClient.InitializePaymentState(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("error getting payment state: %w", err)
+		return nil, fmt.Errorf("error setting payment state: %w", err)
 	}
-	accountant.SetPaymentState(paymentState)
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

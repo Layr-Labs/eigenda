@@ -65,6 +65,10 @@ func (s *NoopPaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]b
 	return nil, fmt.Errorf("noop signer cannot sign blob payment header")
 }
 
+func (s *NoopPaymentSigner) SignAccountID(accountID string) ([]byte, error) {
+	return nil, fmt.Errorf("noop signer cannot sign account ID")
+}
+
 func (s *NoopPaymentSigner) GetAccountID() string {
 	return ""
 }

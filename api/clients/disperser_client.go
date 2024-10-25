@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -46,7 +47,7 @@ type DisperserClient interface {
 	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
-	GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error)
+	InitializePaymentState(ctx context.Context) error
 }
 
 // See the NewDisperserClient constructor's documentation for details and usage examples.
@@ -71,7 +72,9 @@ type disperserClient struct {
 
 var _ DisperserClient = &disperserClient{}
 
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant *Accountant) DisperserClient {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, paymentSigner core.PaymentSigner) DisperserClient {
+	// initialize an empty accountant; update payment state after initialization
+	accountant := NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
@@ -312,7 +315,7 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 	return reply.Data, nil
 }
 
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) getPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, fmt.Errorf("error initializing connection: %w", err)
@@ -339,6 +342,32 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	}
 
 	return reply, nil
+}
+
+func (c *disperserClient) InitializePaymentState(ctx context.Context) error {
+	paymentState, err := c.getPaymentState(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting payment state from disperser: %w", err)
+	}
+	c.accountant.binUsages = []uint64{uint64(paymentState.CurrentBinUsage), uint64(paymentState.NextBinUsage), uint64(paymentState.OverflowBinUsage)}
+	c.accountant.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
+	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
+	for i, q := range paymentState.Reservation.QuorumNumbers {
+		quorumNumbers[i] = uint8(q)
+	}
+	c.accountant.reservation = core.ActiveReservation{
+		StartTimestamp: uint64(paymentState.Reservation.StartTimestamp),
+		EndTimestamp:   uint64(paymentState.Reservation.EndTimestamp),
+		SymbolsPerSec:  paymentState.Reservation.SymbolsPerSecond,
+		QuorumNumbers:  quorumNumbers,
+	}
+	c.accountant.onDemand = core.OnDemandPayment{
+		CumulativePayment: new(big.Int).SetBytes(paymentState.OnChainCumulativePayment),
+	}
+	c.accountant.reservationWindow = paymentState.PaymentGlobalParams.ReservationWindow
+	c.accountant.pricePerSymbol = paymentState.PaymentGlobalParams.PricePerSymbol
+	c.accountant.minNumSymbols = paymentState.PaymentGlobalParams.MinNumSymbols
+	return nil
 }
 
 func (c *disperserClient) initOnceGrpcConnection() error {
