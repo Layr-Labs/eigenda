@@ -80,12 +80,12 @@ type SignatureAggregator interface {
 
 type StdSignatureAggregator struct {
 	Logger     logging.Logger
-	Transactor Transactor
+	Transactor Reader
 	// OperatorAddresses contains the ethereum addresses of the operators corresponding to their operator IDs
 	OperatorAddresses *lru.Cache[OperatorID, gethcommon.Address]
 }
 
-func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*StdSignatureAggregator, error) {
+func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSignatureAggregator, error) {
 	operatorAddrs, err := lru.New[OperatorID, gethcommon.Address](maxNumOperatorAddresses)
 	if err != nil {
 		return nil, err

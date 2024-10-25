@@ -55,12 +55,12 @@ type Metrics struct {
 	socketAddr             string
 	operatorId             core.OperatorID
 	onchainMetricsInterval int64
-	tx                     core.Transactor
+	tx                     core.Reader
 	chainState             core.ChainState
 	allQuorumCache         map[core.QuorumID]bool
 }
 
-func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor, chainState core.ChainState) *Metrics {
+func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Reader, chainState core.ChainState) *Metrics {
 
 	// Add Go module collectors
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))

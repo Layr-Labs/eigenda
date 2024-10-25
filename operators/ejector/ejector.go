@@ -78,7 +78,7 @@ type Ejector struct {
 	wallet                  walletsdk.Wallet
 	ethClient               common.EthClient
 	logger                  logging.Logger
-	transactor              core.Transactor
+	transactor              core.Writer
 	metrics                 *Metrics
 	txnTimeout              time.Duration
 	nonsigningRateThreshold int
@@ -87,7 +87,7 @@ type Ejector struct {
 	mu sync.Mutex
 }
 
-func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Transactor, metrics *Metrics, txnTimeout time.Duration, nonsigningRateThreshold int) *Ejector {
+func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Writer, metrics *Metrics, txnTimeout time.Duration, nonsigningRateThreshold int) *Ejector {
 	return &Ejector{
 		wallet:                  wallet,
 		ethClient:               ethClient,

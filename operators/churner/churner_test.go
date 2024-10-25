@@ -18,7 +18,7 @@ import (
 )
 
 func TestProcessChurnRequest(t *testing.T) {
-	setupMockTransactor()
+	setupMockWriter()
 	mockIndexer := &indexermock.MockIndexedChainState{}
 	config := &churner.Config{
 		LoggerConfig: common.DefaultLoggerConfig(),

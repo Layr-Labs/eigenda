@@ -215,7 +215,7 @@ func createStore(t *testing.T) *node.Store {
 	reg := prometheus.NewRegistry()
 	logger := logging.NewNoopLogger()
 	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
-	tx := &coremock.MockTransactor{}
+	tx := &coremock.MockWriter{}
 	dat, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 6,
 		1: 3,

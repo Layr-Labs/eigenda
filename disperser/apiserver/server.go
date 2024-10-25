@@ -41,7 +41,7 @@ type DispersalServer struct {
 	rateConfig   RateConfig
 
 	blobStore    disperser.BlobStore
-	tx           core.Transactor
+	tx           core.Reader
 	quorumConfig QuorumConfig
 
 	ratelimiter   common.RateLimiter
@@ -66,7 +66,7 @@ type QuorumConfig struct {
 func NewDispersalServer(
 	serverConfig disperser.ServerConfig,
 	store disperser.BlobStore,
-	tx core.Transactor,
+	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
 	ratelimiter common.RateLimiter,
@@ -152,7 +152,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
 		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
-		return api.NewInvalidArgError(fmt.Sprintf("failed to generate challenge: %v", err))
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to generate challenge: %v", err))
 	}
 	challenge := binary.LittleEndian.Uint32(challengeBytes)
 	err = stream.Send(&pb.AuthenticatedReply{Payload: &pb.AuthenticatedReply_BlobAuthHeader{
@@ -249,6 +249,10 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		s.metrics.HandleSuccessfulRpcRequest("DisperseBlob")
 	}
 	return reply, err
+}
+
+func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	return nil, api.NewErrorInternal("not implemented")
 }
 
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need

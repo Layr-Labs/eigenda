@@ -29,7 +29,7 @@ func TestRefreshOnchainPaymentState(t *testing.T) {
 	ctx := context.Background()
 	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
 
-	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Transactor{})
+	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Reader{})
 	assert.NoError(t, err)
 }
 
@@ -42,19 +42,6 @@ func TestGetCurrentBlockNumber(t *testing.T) {
 	assert.Equal(t, uint32(1000), blockNumber)
 }
 
-func TestGetActiveReservations(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	expectedReservations := map[string]core.ActiveReservation{
-		"account1": dummyActiveReservation,
-	}
-	mockState.On("GetActiveReservations", testifymock.Anything, testifymock.Anything).Return(expectedReservations, nil)
-
-	reservations, err := mockState.GetActiveReservations(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedReservations, reservations)
-}
-
 func TestGetActiveReservationByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
@@ -63,19 +50,6 @@ func TestGetActiveReservationByAccount(t *testing.T) {
 	reservation, err := mockState.GetActiveReservationByAccount(ctx, "account1")
 	assert.NoError(t, err)
 	assert.Equal(t, dummyActiveReservation, reservation)
-}
-
-func TestGetOnDemandPayments(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	expectedPayments := map[string]core.OnDemandPayment{
-		"account1": dummyOnDemandPayment,
-	}
-	mockState.On("GetOnDemandPayments", testifymock.Anything, testifymock.Anything).Return(expectedPayments, nil)
-
-	payments, err := mockState.GetOnDemandPayments(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedPayments, payments)
 }
 
 func TestGetOnDemandPaymentByAccount(t *testing.T) {

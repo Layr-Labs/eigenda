@@ -126,7 +126,7 @@ type TestDisperser struct {
 	batcher       *batcher.Batcher
 	server        *apiserver.DispersalServer
 	encoderServer *encoder.Server
-	transactor    *coremock.MockTransactor
+	transactor    *coremock.MockWriter
 	txnManager    *batchermock.MockTxnManager
 }
 
@@ -137,7 +137,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	batcherMetrics := batcher.NewMetrics("9100", logger)
 	dispatcher := dispatcher.NewDispatcher(dispatcherConfig, logger, batcherMetrics.DispatcherMetrics)
 
-	transactor := &coremock.MockTransactor{}
+	transactor := &coremock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, transactor)
 	assert.NoError(t, err)
@@ -192,7 +192,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	serverConfig := disperser.ServerConfig{
 		GrpcPort: fmt.Sprint(disperserGrpcPort),
 	}
-	tx := &coremock.MockTransactor{}
+	tx := &coremock.MockWriter{}
 	tx.On("GetCurrentBlockNumber").Return(uint64(100), nil)
 	tx.On("GetQuorumCount").Return(1, nil)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, ratelimiter, rateConfig, testMaxBlobSize)
@@ -270,7 +270,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		_, v0 := mustMakeTestComponents()
 		val := core.NewShardValidator(v0, asn, cst, id)
 
-		tx := &coremock.MockTransactor{}
+		tx := &coremock.MockWriter{}
 		tx.On("RegisterBLSPublicKey").Return(nil)
 		tx.On("RegisterOperator").Return(nil)
 		tx.On("GetRegisteredQuorumIdsForOperator").Return(registeredQuorums, nil)

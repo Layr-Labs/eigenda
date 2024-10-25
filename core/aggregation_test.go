@@ -31,7 +31,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	logger := logging.NewNoopLogger()
-	transactor := &mock.MockTransactor{}
+	transactor := &mock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, transactor)
 	if err != nil {

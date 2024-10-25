@@ -194,7 +194,7 @@ type (
 		blobstore         disperser.BlobStore
 		promClient        PrometheusClient
 		subgraphClient    SubgraphClient
-		transactor        core.Transactor
+		transactor        core.Reader
 		chainState        core.ChainState
 		indexedChainState core.IndexedChainState
 
@@ -212,7 +212,7 @@ func NewServer(
 	blobstore disperser.BlobStore,
 	promClient PrometheusClient,
 	subgraphClient SubgraphClient,
-	transactor core.Transactor,
+	transactor core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,

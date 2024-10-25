@@ -24,18 +24,9 @@ func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (ui
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Transactor) error {
+func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
 	args := m.Called()
 	return args.Error(0)
-}
-
-func (m *MockOnchainPaymentState) GetActiveReservations(ctx context.Context) (map[string]core.ActiveReservation, error) {
-	args := m.Called()
-	var value map[string]core.ActiveReservation
-	if args.Get(0) != nil {
-		value = args.Get(0).(map[string]core.ActiveReservation)
-	}
-	return value, args.Error(1)
 }
 
 func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
@@ -43,15 +34,6 @@ func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Cont
 	var value core.ActiveReservation
 	if args.Get(0) != nil {
 		value = args.Get(0).(core.ActiveReservation)
-	}
-	return value, args.Error(1)
-}
-
-func (m *MockOnchainPaymentState) GetOnDemandPayments(ctx context.Context) (map[string]core.OnDemandPayment, error) {
-	args := m.Called()
-	var value map[string]core.OnDemandPayment
-	if args.Get(0) != nil {
-		value = args.Get(0).(map[string]core.OnDemandPayment)
 	}
 	return value, args.Error(1)
 }
