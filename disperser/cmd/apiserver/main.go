@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -119,9 +118,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		offchainStore, err := mt.NewOffchainStore(
 			config.AwsClientConfig,
-			"reservations",
-			"ondemand",
-			"global",
+			config.ReservationsTableName,
+			config.OnDemandTableName,
+			config.GlobalRateTableName,
 			logger,
 		)
 		if err != nil {
@@ -132,7 +131,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			mtConfig,
 			&paymentChainState,
 			offchainStore,
-			logging.NewNoopLogger(),
+			logger,
 			// metrics.NewNoopMetrics(),
 		)
 	}

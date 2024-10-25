@@ -153,7 +153,7 @@ func setup(_ *testing.M) {
 		config,
 		paymentChainState,
 		store,
-		logging.NewNoopLogger(),
+		logger,
 		// metrics.NewNoopMetrics(),
 	)
 

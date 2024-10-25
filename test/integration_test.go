@@ -282,7 +282,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		table_names[0],
 		table_names[1],
 		table_names[2],
-		logging.NewNoopLogger(),
+		logger,
 	)
 	if err != nil {
 		panic("failed to create offchain store")
