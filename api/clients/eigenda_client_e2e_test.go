@@ -77,7 +77,8 @@ func TestClientUsingTestnet(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, data, string(blob))
 
-		// assert confirmation depth
+		// assert confirmation depth by making sure the batch metadata hash was registered onchain
+		// at least confDepth blocks ago
 		blockNumCur, err := client.ethClient.BlockNumber(context.Background())
 		assert.NoError(t, err)
 		blockNumAtDepth := new(big.Int).SetUint64(blockNumCur - confDepth)
