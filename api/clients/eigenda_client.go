@@ -130,8 +130,6 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}, nil
 }
 
-// Deprecated: do not rely on this function. Do not use m.Codec directly either.
-// These will eventually be removed and not exposed.
 func (m *EigenDAClient) GetCodec() codecs.BlobCodec {
 	return m.Codec
 }
