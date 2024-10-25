@@ -8,6 +8,7 @@ import (
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
@@ -151,4 +152,24 @@ func (a *Accountant) SymbolsCharged(dataLength uint) uint32 {
 	}
 	// Round up to the nearest multiple of MinNumSymbols
 	return uint32(core.RoundUpDivide(uint(dataLength), uint(a.minNumSymbols))) * a.minNumSymbols
+}
+
+func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) {
+	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
+	for i, quorum := range paymentState.Reservation.QuorumNumbers {
+		quorumNumbers[i] = uint8(quorum)
+	}
+	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
+	for i, quorum := range paymentState.Reservation.QuorumSplit {
+		quorumSplit[i] = uint8(quorum)
+	}
+	a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.OnChainCumulativePayment)
+	a.reservation.SymbolsPerSec = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
+	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
+	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
+	a.reservation.QuorumNumbers = quorumNumbers
+	a.reservation.QuorumSplit = quorumSplit
+	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
+	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
+	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
 }

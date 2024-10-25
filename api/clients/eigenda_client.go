@@ -77,22 +77,25 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	var signer core.BlobRequestSigner
+	var paymentSigner core.PaymentSigner
 	if len(config.SignerPrivateKeyHex) == 64 {
 		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
+		paymentSigner = auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
 	} else if len(config.SignerPrivateKeyHex) == 0 {
 		// noop signer is used when we need a read-only eigenda client
 		signer = auth.NewLocalNoopSigner()
+		paymentSigner = auth.NewNoopPaymentSigner()
 	} else {
 		return nil, fmt.Errorf("invalid length for signer private key")
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
-	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
-	// a subsequent PR contains updates to fill in payment state
-	accountant := NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
-
-	disperserClient := NewDisperserClient(disperserConfig, signer, accountant)
+	disperserClient := NewDisperserClient(disperserConfig, signer, paymentSigner)
+	err = disperserClient.InitializePaymentState(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error setting payment state: %w", err)
+	}
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
@@ -299,12 +302,12 @@ func (m EigenDAClient) paidPutBlob(ctx context.Context, rawData []byte, resultCh
 		return
 	}
 
-	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
+	quorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
 	for i, e := range m.Config.CustomQuorumIDs {
-		customQuorumNumbers[i] = uint8(e)
+		quorumNumbers[i] = uint8(e)
 	}
 	// disperse blob
-	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, customQuorumNumbers)
+	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, quorumNumbers)
 	if err != nil {
 		errChan <- fmt.Errorf("error initializing DispersePaidBlob() client: %w", err)
 		return

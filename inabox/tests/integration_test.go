@@ -28,6 +28,18 @@ func mineAnvilBlocks(numBlocks int) {
 	}
 }
 
+var (
+	dummyActiveReservation = core.ActiveReservation{
+		SymbolsPerSec:  100,
+		StartTimestamp: 1000,
+		EndTimestamp:   2000,
+		QuorumSplit:    []byte{50, 50},
+	}
+	dummyOnDemandPayment = core.OnDemandPayment{
+		CumulativePayment: big.NewInt(1000),
+	}
+)
+
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
@@ -45,7 +57,7 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 60, 128, 128, paymentSigner))
+		}, signer, clients.NewAccountant(dummyActiveReservation, dummyOnDemandPayment, 60, 128, 128, paymentSigner))
 
 		Expect(disp).To(Not(BeNil()))
 
