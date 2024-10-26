@@ -104,6 +104,7 @@ func setup(_ *testing.M) {
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
 		ChainReadTimeout: 3 * time.Second,
+		UpdateInterval:   1 * time.Second,
 	}
 
 	err = meterer.CreateReservationTable(clientConfig, reservationTableName)

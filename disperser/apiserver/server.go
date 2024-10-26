@@ -246,7 +246,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob", &core.PaymentMetadata{})
+	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob", nil)
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
