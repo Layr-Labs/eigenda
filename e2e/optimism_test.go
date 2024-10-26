@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum-optimism/optimism/op-e2e/config"
@@ -125,8 +126,8 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 	testCfg := e2e.TestConfig(useMemory())
 	testCfg.UseKeccak256ModeS3 = true
 
-	tsConfig := e2e.TestSuiteConfig(gt, testCfg)
-	proxyTS, shutDown := e2e.CreateTestSuite(gt, tsConfig)
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig)
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
@@ -167,11 +168,7 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 	optimism.sequencer.ActL2PipelineFull(t)
 	optimism.ActL1Finalized(t)
 
-	// assert that EigenDA proxy's was written and read from
-	stat := proxyTS.Server.GetS3Stats()
-
-	require.Equal(t, 1, stat.Entries)
-	require.Equal(t, 1, stat.Reads)
+	requireDispersalRetrievalEigenDA(gt, proxyTS.Metrics.HTTPServerRequestsTotal, commitments.OptimismKeccak)
 }
 
 func TestOptimismGenericCommitment(gt *testing.T) {
@@ -179,8 +176,8 @@ func TestOptimismGenericCommitment(gt *testing.T) {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	tsConfig := e2e.TestSuiteConfig(gt, e2e.TestConfig(useMemory()))
-	proxyTS, shutDown := e2e.CreateTestSuite(gt, tsConfig)
+	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
+	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig)
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
@@ -221,11 +218,5 @@ func TestOptimismGenericCommitment(gt *testing.T) {
 	optimism.sequencer.ActL2PipelineFull(t)
 	optimism.ActL1Finalized(t)
 
-	// assert that EigenDA proxy's was written and read from
-
-	if useMemory() {
-		stat := proxyTS.Server.GetEigenDAStats()
-		require.Equal(t, 1, stat.Entries)
-		require.Equal(t, 1, stat.Reads)
-	}
+	requireDispersalRetrievalEigenDA(gt, proxyTS.Metrics.HTTPServerRequestsTotal, commitments.OptimismGeneric)
 }

@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
@@ -26,7 +25,6 @@ import (
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 
-	"github.com/stretchr/testify/require"
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
 	redistc "github.com/testcontainers/testcontainers-go/modules/redis"
 )
@@ -106,8 +104,9 @@ func startRedisContainer() error {
 }
 
 type Cfg struct {
-	UseMemory  bool
-	Expiration time.Duration
+	UseMemory        bool
+	Expiration       time.Duration
+	WriteThreadCount int
 	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
 	UseS3Caching       bool
@@ -123,6 +122,7 @@ func TestConfig(useMemory bool) *Cfg {
 		UseS3Caching:       false,
 		UseRedisCaching:    false,
 		UseS3Fallback:      false,
+		WriteThreadCount:   0,
 	}
 }
 
@@ -141,11 +141,10 @@ func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
 
 func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 	// generate random string
-	bucketName := "eigenda-proxy-test-" + RandString(10)
+	bucketName := "eigenda-proxy-test-" + RandStr(10)
 	createS3Bucket(bucketName)
 
 	eigendaCfg.S3Config = s3.Config{
-		Profiling:       true,
 		Bucket:          bucketName,
 		Path:            "",
 		Endpoint:        minioEndpoint,
@@ -153,24 +152,23 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 		AccessKeySecret: "minioadmin",
 		AccessKeyID:     "minioadmin",
 		CredentialType:  s3.CredentialTypeStatic,
-		Backup:          false,
 	}
 	return server.CLIConfig{
 		EigenDAConfig: eigendaCfg,
 	}
 }
 
-func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
+func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 	// load signer key from environment
 	pk := os.Getenv(privateKey)
 	if pk == "" && !testCfg.UseMemory {
-		t.Fatal("SIGNER_PRIVATE_KEY environment variable not set")
+		panic("SIGNER_PRIVATE_KEY environment variable not set")
 	}
 
 	// load node url from environment
 	ethRPC := os.Getenv(ethRPC)
 	if ethRPC == "" && !testCfg.UseMemory {
-		t.Fatal("ETHEREUM_RPC environment variable is not set")
+		panic("ETHEREUM_RPC environment variable is not set")
 	}
 
 	var pollInterval time.Duration
@@ -181,7 +179,10 @@ func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 	}
 
 	maxBlobLengthBytes, err := utils.ParseBytesAmount("16mib")
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
+
 	eigendaCfg := server.Config{
 		EdaClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
@@ -209,6 +210,7 @@ func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 			BlobExpiration:   testCfg.Expiration,
 			MaxBlobSizeBytes: maxBlobLengthBytes,
 		},
+		AsyncPutWorkers: testCfg.WriteThreadCount,
 	}
 
 	if testCfg.UseMemory {
@@ -243,41 +245,51 @@ func TestSuiteConfig(t *testing.T, testCfg *Cfg) server.CLIConfig {
 }
 
 type TestSuite struct {
-	Ctx    context.Context
-	Log    log.Logger
-	Server *server.Server
+	Ctx     context.Context
+	Log     log.Logger
+	Server  *server.Server
+	Metrics *metrics.EmulatedMetricer
 }
 
-func CreateTestSuite(t *testing.T, testSuiteCfg server.CLIConfig) (TestSuite, func()) {
+func CreateTestSuite(testSuiteCfg server.CLIConfig) (TestSuite, func()) {
 	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
 		Level:  log.LevelDebug,
 		Format: oplog.FormatLogFmt,
 		Color:  true,
 	}).New("role", svcName)
 
+	m := metrics.NewEmulatedMetricer()
 	ctx := context.Background()
-	store, err := server.LoadStoreRouter(
+	sm, err := server.LoadStoreManager(
 		ctx,
 		testSuiteCfg,
 		log,
+		m,
 	)
-	require.NoError(t, err)
-	server := server.NewServer(host, 0, store, log, metrics.NoopMetrics)
 
-	t.Log("Starting proxy server...")
-	err = server.Start()
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
+
+	proxySvr := server.NewServer(host, 0, sm, log, m)
+
+	log.Info("Starting proxy server...")
+	err = proxySvr.Start()
+	if err != nil {
+		panic(err)
+	}
 
 	kill := func() {
-		if err := server.Stop(); err != nil {
-			panic(err)
+		if err := proxySvr.Stop(); err != nil {
+			log.Error("failed to stop proxy server", "err", err)
 		}
 	}
 
 	return TestSuite{
-		Ctx:    ctx,
-		Log:    log,
-		Server: server,
+		Ctx:     ctx,
+		Log:     log,
+		Server:  proxySvr,
+		Metrics: m,
 	}, kill
 }
 
@@ -320,11 +332,15 @@ func createS3Bucket(bucketName string) {
 	}
 }
 
-func RandString(n int) string {
+func RandStr(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+func RandBytes(n int) []byte {
+	return []byte(RandStr(n))
 }

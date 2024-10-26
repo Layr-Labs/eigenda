@@ -26,6 +26,7 @@ type Config struct {
 	MemstoreConfig  memstore.Config
 
 	// routing
+	AsyncPutWorkers int
 	FallbackTargets []string
 	CacheTargets    []string
 
@@ -117,6 +118,11 @@ func (cfg *Config) Check() error {
 		if utils.Contains(cfg.CacheTargets, t) {
 			return fmt.Errorf("target %s is in both fallback and cache targets", t)
 		}
+	}
+
+	// verify that thread counts are sufficiently set
+	if cfg.AsyncPutWorkers >= 100 {
+		return fmt.Errorf("number of secondary write workers can't be greater than 100")
 	}
 
 	return nil

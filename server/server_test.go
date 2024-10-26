@@ -28,7 +28,7 @@ func TestHandleOPCommitments(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRouter := mocks.NewMockIRouter(ctrl)
+	mockRouter := mocks.NewMockIManager(ctrl)
 
 	m := metrics.NewMetrics("default")
 	server := NewServer("localhost", 8080, mockRouter, log.New(), m)
@@ -104,7 +104,7 @@ func TestHandlerPut(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockRouter := mocks.NewMockIRouter(ctrl)
+	mockRouter := mocks.NewMockIManager(ctrl)
 	server := NewServer("localhost", 8080, mockRouter, log.New(), metrics.NoopMetrics)
 
 	tests := []struct {

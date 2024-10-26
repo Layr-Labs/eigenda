@@ -133,8 +133,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 	}
 }
 
+// MaxBlobLengthBytes ... there's def a better way to deal with this... perhaps a generic flag that can parse the string into a uint64?
 // this var is set by the action in the MaxBlobLengthFlagName flag
-// TODO: there's def a better way to deal with this... perhaps a generic flag that can parse the string into a uint64?
 var MaxBlobLengthBytes uint64
 
 func ReadConfig(ctx *cli.Context) Config {

@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -45,16 +45,14 @@ type Config struct {
 	AccessKeySecret string
 	Bucket          string
 	Path            string
-	Backup          bool
-	Timeout         time.Duration
-	Profiling       bool
 }
 
+// Store ... S3 store
+// client safe for concurrent use: https://github.com/minio/minio-go/issues/598#issuecomment-569457863
 type Store struct {
 	cfg              Config
 	client           *minio.Client
 	putObjectOptions minio.PutObjectOptions
-	stats            *store.Stats
 }
 
 func isGoogleEndpoint(endpoint string) bool {
@@ -79,10 +77,6 @@ func NewS3(cfg Config) (*Store, error) {
 		cfg:              cfg,
 		client:           client,
 		putObjectOptions: putObjectOptions,
-		stats: &store.Stats{
-			Entries: 0,
-			Reads:   0,
-		},
 	}, nil
 }
 
@@ -101,10 +95,6 @@ func (s *Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if s.cfg.Profiling {
-		s.stats.Reads++
-	}
-
 	return data, nil
 }
 
@@ -114,24 +104,16 @@ func (s *Store) Put(ctx context.Context, key []byte, value []byte) error {
 		return err
 	}
 
-	if s.cfg.Profiling {
-		s.stats.Entries++
-	}
-
 	return nil
 }
 
 func (s *Store) Verify(key []byte, value []byte) error {
 	h := crypto.Keccak256Hash(value)
 	if !bytes.Equal(h[:], key) {
-		return errors.New("key does not match value")
+		return fmt.Errorf("key does not match value, expected: %s got: %s", hex.EncodeToString(key), h.Hex())
 	}
 
 	return nil
-}
-
-func (s *Store) Stats() *store.Stats {
-	return s.stats
 }
 
 func (s *Store) BackendType() store.BackendType {

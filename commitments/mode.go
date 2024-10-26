@@ -7,7 +7,7 @@ import (
 type CommitmentMeta struct {
 	Mode CommitmentMode
 	// CertVersion is shared for all modes and denotes version of the EigenDA certificate
-	CertVersion byte
+	CertVersion uint8
 }
 
 type CommitmentMode string

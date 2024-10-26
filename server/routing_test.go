@@ -18,7 +18,7 @@ import (
 func TestRouting(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockRouter := mocks.NewMockIRouter(ctrl)
+	mockRouter := mocks.NewMockIManager(ctrl)
 
 	m := metrics.NewMetrics("default")
 	server := NewServer("localhost", 8080, mockRouter, log.New(), m)

@@ -29,15 +29,16 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to pretty print config: %w", err)
 	}
 
+	m := metrics.NewMetrics("default")
+
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	daRouter, err := server.LoadStoreRouter(ctx, cfg, log)
+	sm, err := server.LoadStoreManager(ctx, cfg, log, m)
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
-	m := metrics.NewMetrics("default")
-	server := server.NewServer(cliCtx.String(flags.ListenAddrFlagName), cliCtx.Int(flags.PortFlagName), daRouter, log, m)
+	server := server.NewServer(cliCtx.String(flags.ListenAddrFlagName), cliCtx.Int(flags.PortFlagName), sm, log, m)
 
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start the DA server: %w", err)

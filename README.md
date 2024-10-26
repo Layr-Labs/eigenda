@@ -65,6 +65,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
 | `--s3.enable-tls` |  | `$EIGENDA_PROXY_S3_ENABLE_TLS` | Enable TLS connection to S3 endpoint. |
 | `--routing.fallback-targets` | `[]` | `$EIGENDA_PROXY_FALLBACK_TARGETS` | Fall back backend targets. Supports S3. | Backup storage locations to read from in the event of eigenda retrieval failure. |
 | `--routing.cache-targets` | `[]` | `$EIGENDA_PROXY_CACHE_TARGETS` | Caching targets. Supports S3. | Caches data to backend targets after dispersing to DA, retrieved from before trying read from EigenDA. |
+| `--routing.concurrent-write-threads` | `0` | `$EIGENDA_PROXY_CONCURRENT_WRITE_THREADS` | Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. |
 | `--s3.timeout` | `5s` | `$EIGENDA_PROXY_S3_TIMEOUT` | timeout for S3 storage operations (e.g. get, put) |
 | `--redis.db` | `0` |  `$EIGENDA_PROXY_REDIS_DB` | redis database to use after connecting to server |
 | `--redis.endpoint` | `""` | `$EIGENDA_PROXY_REDIS_ENDPOINT` | redis endpoint url |
@@ -96,6 +97,9 @@ An optional `--eigenda-eth-confirmation-depth` flag can be provided to specify a
 ### In-Memory Backend
 
 An ephemeral memory store backend can be used for faster feedback testing when testing rollup integrations. To target this feature, use the CLI flags `--memstore.enabled`, `--memstore.expiration`.
+
+### Asynchronous Secondary Insertions
+An optional `--routing.concurrent-write-routines` flag can be provided to enable asynchronous processing for secondary writes - allowing for more efficient dispersals in the presence of a hefty secondary routing layer. This flag specifies the number of write routines spun-up with supported thread counts in range `[1, 100)`.
 
 ### Storage Fallback
 An optional storage fallback CLI flag `--routing.fallback-targets` can be leveraged to ensure resiliency when **reading**. When enabled, a blob is persisted to a fallback target after being successfully dispersed. Fallback targets use the keccak256 hash of the existing EigenDA commitment as their key, for succinctness. In the event that blobs cannot be read from EigenDA, they will then be retrieved in linear order from the provided fallback targets. 
@@ -209,6 +213,9 @@ The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/
 ### Unit
 
 Unit tests can be ran via invoking `make test`.
+
+### Integration
+End-to-end (E2E) tests can be ran via `make e2e-test`.
 
 ### Holesky
 

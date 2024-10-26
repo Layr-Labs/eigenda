@@ -96,7 +96,7 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 
 func (svr *Server) handleGetShared(ctx context.Context, w http.ResponseWriter, comm []byte, meta commitments.CommitmentMeta) error {
 	svr.log.Info("Processing GET request", "commitment", hex.EncodeToString(comm), "commitmentMeta", meta)
-	input, err := svr.router.Get(ctx, comm, meta.Mode)
+	input, err := svr.sm.Get(ctx, comm, meta.Mode)
 	if err != nil {
 		err = MetaError{
 			Err:  fmt.Errorf("get request failed with commitment %v: %w", comm, err),
@@ -174,7 +174,7 @@ func (svr *Server) handlePostShared(w http.ResponseWriter, r *http.Request, comm
 		return err
 	}
 
-	commitment, err := svr.router.Put(r.Context(), meta.Mode, comm, input)
+	commitment, err := svr.sm.Put(r.Context(), meta.Mode, comm, input)
 	if err != nil {
 		err = MetaError{
 			Err:  fmt.Errorf("put request failed with commitment %v (commitment mode %v): %w", comm, meta.Mode, err),

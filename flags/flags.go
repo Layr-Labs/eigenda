@@ -28,8 +28,10 @@ const (
 	PortFlagName       = "port"
 
 	// routing flags
+	// TODO: change "routing" --> "secondary"
 	FallbackTargetsFlagName = "routing.fallback-targets"
 	CacheTargetsFlagName    = "routing.cache-targets"
+	ConcurrentWriteThreads  = "routing.concurrent-write-routines"
 )
 
 const EnvVarPrefix = "EIGENDA_PROXY"
@@ -43,13 +45,13 @@ func CLIFlags() []cli.Flag {
 	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:    ListenAddrFlagName,
-			Usage:   "server listening address",
+			Usage:   "Server listening address",
 			Value:   "0.0.0.0",
 			EnvVars: prefixEnvVars("ADDR"),
 		},
 		&cli.IntFlag{
 			Name:    PortFlagName,
-			Usage:   "server listening port",
+			Usage:   "Server listening port",
 			Value:   3100,
 			EnvVars: prefixEnvVars("PORT"),
 		},
@@ -64,6 +66,12 @@ func CLIFlags() []cli.Flag {
 			Usage:   "List of caching targets to use fast reads from EigenDA.",
 			Value:   cli.NewStringSlice(),
 			EnvVars: prefixEnvVars("CACHE_TARGETS"),
+		},
+		&cli.IntFlag{
+			Name:    ConcurrentWriteThreads,
+			Usage:   "Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes.",
+			Value:   0,
+			EnvVars: prefixEnvVars("CONCURRENT_WRITE_THREADS"),
 		},
 	}
 

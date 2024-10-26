@@ -134,17 +134,17 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 // Put inserts a value into the store.
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	time.Sleep(e.config.PutLatency)
-	if uint64(len(value)) > e.config.MaxBlobSizeBytes {
+	encodedVal, err := e.codec.EncodeBlob(value)
+	if err != nil {
+		return nil, err
+	}
+
+	if uint64(len(encodedVal)) > e.config.MaxBlobSizeBytes {
 		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", store.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
 	}
 
 	e.Lock()
 	defer e.Unlock()
-
-	encodedVal, err := e.codec.EncodeBlob(value)
-	if err != nil {
-		return nil, err
-	}
 
 	commitment, err := e.verifier.Commit(encodedVal)
 	if err != nil {

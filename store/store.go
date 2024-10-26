@@ -65,8 +65,6 @@ type Stats struct {
 }
 
 type Store interface {
-	// Stats returns the current usage metrics of the key-value data store.
-	Stats() *Stats
 	// Backend returns the backend type provider of the store.
 	BackendType() BackendType
 	// Verify verifies the given key-value pair.
