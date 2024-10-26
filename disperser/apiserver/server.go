@@ -214,7 +214,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated", &core.PaymentMetadata{})
+	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated", nil)
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -284,7 +284,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
 	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
-	if paymentHeader != nil && *paymentHeader != (core.PaymentMetadata{}) {
+	if paymentHeader != nil {
 		err := s.meterer.MeterRequest(ctx, *blob, *paymentHeader)
 		if err != nil {
 			return nil, api.NewErrorResourceExhausted(err.Error())

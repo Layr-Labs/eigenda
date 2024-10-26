@@ -32,6 +32,8 @@ type Config struct {
 	RateConfig            apiserver.RateConfig
 	EnableRatelimiter     bool
 	EnablePaymentMeterer  bool
+	UpdateInterval        int
+	ChainReadTimeout      int
 	ReservationsTableName string
 	OnDemandTableName     string
 	GlobalRateTableName   string
@@ -90,6 +92,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		GlobalRateTableName:   ctx.GlobalString(flags.GlobalRateTableName.Name),
 		BucketTableName:       ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:       ctx.GlobalInt(flags.BucketStoreSize.Name),
+		UpdateInterval:        ctx.GlobalInt(flags.UpdateInterval.Name),
+		ChainReadTimeout:      ctx.GlobalInt(flags.ChainReadTimeout.Name),
 		EthClientConfig:       geth.ReadEthClientConfigRPCOnly(ctx),
 		MaxBlobSize:           ctx.GlobalInt(flags.MaxBlobSize.Name),
 

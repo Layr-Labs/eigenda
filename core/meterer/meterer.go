@@ -15,6 +15,9 @@ type Config struct {
 
 	// ChainReadTimeout is the timeout for reading payment state from chain
 	ChainReadTimeout time.Duration
+
+	// UpdateInterval is the interval for refreshing the on-chain state
+	UpdateInterval time.Duration
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
@@ -47,9 +50,9 @@ func NewMeterer(
 }
 
 // Start starts to periodically refreshing the on-chain state
-func (m *Meterer) Start(ctx context.Context) {
+func (m *Meterer) Start(ctx context.Context, updateInterval time.Duration) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(updateInterval)
 		defer ticker.Stop()
 
 		for {

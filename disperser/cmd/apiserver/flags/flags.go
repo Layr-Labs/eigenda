@@ -104,6 +104,20 @@ var (
 		Value:  "global_rate",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
 	}
+	UpdateInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "update-interval"),
+		Usage:    "update interval for refreshing the on-chain state",
+		Value:    1 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
+		Required: false,
+	}
+	ChainReadTimeout = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
+		Usage:    "timeout for reading from the chain",
+		Value:    10,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_READ_TIMEOUT"),
+		Required: false,
+	}
 	BucketTableName = cli.StringFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "rate-bucket-table-name"),
 		Usage:  "name of the dynamodb table to store rate limiter buckets. If not provided, a local store will be used",
