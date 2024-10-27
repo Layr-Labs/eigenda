@@ -32,7 +32,7 @@ type EigenDAClientConfig struct {
 	SvcManagerAddr string
 
 	// The number of Ethereum blocks to wait after the blob's batch has been included onchain, before returning from PutBlob calls.
-	// Only makes sense to wait for < 24 blocks (2 epochs). Otherwise, use WaitForFinalization instead.
+	// In most cases only makes sense if < 64 blocks (2 epochs). Otherwise, consider using WaitForFinalization instead.
 	//
 	// When WaitForFinalization is true, this field is ignored.
 	WaitForConfirmationDepth uint64
@@ -70,8 +70,8 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 			log.Println("Warning: WaitForFinalization is set to true, WaitForConfirmationDepth will be ignored")
 		}
 	} else {
-		if c.WaitForConfirmationDepth > 24 {
-			log.Printf("Warning: WaitForConfirmationDepth is set to %v > 24 (2 epochs == finality). Consider setting WaitForFinalization to true instead.\n", c.WaitForConfirmationDepth)
+		if c.WaitForConfirmationDepth > 64 {
+			log.Printf("Warning: WaitForConfirmationDepth is set to %v > 64 (2 epochs == finality). Consider setting WaitForFinalization to true instead.\n", c.WaitForConfirmationDepth)
 		}
 	}
 	if c.SvcManagerAddr == "" {
