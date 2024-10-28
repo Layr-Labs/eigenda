@@ -44,16 +44,17 @@ const (
 	// FAILED means that the blob has failed permanently (for reasons other than insufficient
 	// signatures, which is a separate state). This status is somewhat of a catch-all category,
 	// containg (but not necessarily exclusively as errors can be added in the future):
-	// - blob has expired
-	// - internal logic error while requesting encoder API
-	// - blob retry has exceeded its limit while waiting for blob finalization after confirmation
+	//  - blob has expired
+	//  - internal logic error while requesting encoding
+	//  - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
+	//  Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
 	Failed
 	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
 	Finalized
 	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
 	InsufficientSignatures
-	// DISPERSING means that the blob is currently being dispersed to DA Nodes, 
+	// DISPERSING means that the blob is currently being dispersed to DA Nodes,
 	// and the batcher is gathering their signatures.
 	Dispersing
 )

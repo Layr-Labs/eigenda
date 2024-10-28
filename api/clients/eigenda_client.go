@@ -267,7 +267,14 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 					alreadyWaitingForDispersal = true
 				}
 			case grpcdisperser.BlobStatus_FAILED:
-				// TODO: when exactly does this happen? I think only happens if ethereum reorged and the blob was lost
+				// This can happen for a few reasons:
+				// 1. blob has expired, a client retrieve after 14 days. Sounds like 400 errors, but not sure this can happen during dispersal...
+				// 2. internal logic error while requesting encoding (shouldn't happen), but should probably return 503
+				// 3. wait for blob finalization from confirmation and blob retry has exceeded its limit. 
+				//    Probably from a chain re-org. See https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. 
+				//    So we should be returning 500 to force a blob resubmission (not eigenda's fault but until 
+				//    we have idempotency this is unfortunately the only solution)
+				// TODO: we should create new BlobStatus categories to separate these cases out. For now returning 500 is fine.
 				errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("blob dispersal (requestID=%s) reached failed status. please resubmit the blob.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES:
