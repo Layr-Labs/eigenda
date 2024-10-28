@@ -5,7 +5,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -51,9 +50,8 @@ var clientBuilders = []*clientBuilder{
 		build: func() (S3Client, error) {
 
 			config := DefaultS3Config()
-			config.AWSConfig.Endpoint = aws.String(localstackHost)
-			config.AWSConfig.S3ForcePathStyle = aws.Bool(true)
-			config.AWSConfig.WithRegion("us-east-1")
+			config.EndpointURL = localstackHost
+			config.Region = "us-east-1"
 
 			err := os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
 			if err != nil {

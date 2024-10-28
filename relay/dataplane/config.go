@@ -1,15 +1,19 @@
 package dataplane
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
 	"time"
 )
 
 // S3Config is the configuration for an S3Client.
 type S3Config struct {
-	// The AWS configuration to use when interacting with S3.
-	// Default uses the aws.Config default except for region which is set to "us-east-2".
-	AWSConfig *aws.Config
+	// The URL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
+	EndpointURL string
+	// The region to use when interacting with S3. Default is "us-east-2".
+	Region string
+	// The access key to use when interacting with S3.
+	AccessKey string
+	// The secret key to use when interacting with S3.
+	SecretAccessKey string
 	// The name of the S3 bucket to use. All data written to the S3Client will be written to this bucket.
 	// This is a required field.
 	Bucket string
@@ -33,9 +37,7 @@ type S3Config struct {
 // DefaultS3Config returns a new S3Config with default values.
 func DefaultS3Config() *S3Config {
 	return &S3Config{
-		AWSConfig: &aws.Config{
-			Region: aws.String("us-east-2"),
-		},
+		Region:              "us-east-2",
 		AutoCreateBucket:    false,
 		PrefixChars:         3,
 		Parallelism:         32,
