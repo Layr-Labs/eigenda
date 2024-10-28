@@ -14,7 +14,6 @@ import (
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -197,7 +196,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
-	blobStatus, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
 		errChan <- &api.ErrorAPIGeneric{
 			Err: fmt.Errorf("error submitting authenticated blob to disperser: %w", err),
@@ -206,14 +205,6 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 			Code:  0,
 			Fault: api.ErrorFaultUnknown,
 		}
-		return
-	}
-
-	// process response
-	if *blobStatus == disperser.Failed {
-		// Don't think this state should be reachable. DisperseBlobAuthenticated should return an error instead of a failed status.
-		// TODO: we should document that endpoint in the proto file to mention this. If it is the case, then we can remove this code.
-		errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("dispersed blob immediately in failed status, something bad happened: %w", err))
 		return
 	}
 
