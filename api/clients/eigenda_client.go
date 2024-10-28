@@ -246,9 +246,18 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
 				errChan <- api.NewErrorAPIGeneric(http.StatusServiceUnavailable,
 					fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctx.Err()))
+			} else if latestBlobStatus == grpcdisperser.BlobStatus_CONFIRMED {
+				// Timeout'ing in confirmed state means one of two things:
+				// 1. (if timeout was long enough to finalize in normal conditions): problem with ethereum, so we return 504
+				// 2. (if timeout was not long enough to finalize in normal conditions): eigenda-client is badly configured, should be a 408 (TODO)
+				errChan <- api.NewErrorAPIGeneric(http.StatusGatewayTimeout,
+					fmt.Errorf("timed out waiting for blob that landed onchain to finalize (request id=%s). "+
+						"Either timeout not long enough, or ethereum might be experiencing difficulties: %w. ", base64RequestID, ctx.Err()))
+			} else {
+				// this should not be reachable...
+				errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError,
+					fmt.Errorf("timed out in a state that shouldn't be possible (request id=%s): %w", base64RequestID, ctx.Err()))
 			}
-			// but not else (otherwise it might be a problem with ethereum, so fallbacking to ethda wouldnt help)
-			errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("timed out waiting for blob that landed onchain to finalize (request id=%s): %w. Either timeout not long enough, or ethereum might be experiencing difficulties.", base64RequestID, ctx.Err()))
 			return
 		case <-ticker.C:
 			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
@@ -270,9 +279,9 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				// This can happen for a few reasons:
 				// 1. blob has expired, a client retrieve after 14 days. Sounds like 400 errors, but not sure this can happen during dispersal...
 				// 2. internal logic error while requesting encoding (shouldn't happen), but should probably return 503
-				// 3. wait for blob finalization from confirmation and blob retry has exceeded its limit. 
-				//    Probably from a chain re-org. See https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. 
-				//    So we should be returning 500 to force a blob resubmission (not eigenda's fault but until 
+				// 3. wait for blob finalization from confirmation and blob retry has exceeded its limit.
+				//    Probably from a chain re-org. See https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
+				//    So we should be returning 500 to force a blob resubmission (not eigenda's fault but until
 				//    we have idempotency this is unfortunately the only solution)
 				// TODO: we should create new BlobStatus categories to separate these cases out. For now returning 500 is fine.
 				errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("blob dispersal (requestID=%s) reached failed status. please resubmit the blob.", base64RequestID))
