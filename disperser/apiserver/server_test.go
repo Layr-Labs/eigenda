@@ -453,6 +453,13 @@ func TestParseAllowlist(t *testing.T) {
     "quorumID": 1,
     "blobRate": 0.1,
     "byteRate": 4092
+  },
+  {
+    "name": "bar",
+    "account": "0xcb14cFAaC122E52024232583e7354589AedE74Ff",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
   }
 ]
 	`)
@@ -466,7 +473,6 @@ func TestParseAllowlist(t *testing.T) {
 	assert.Contains(t, rateConfig.Allowlist, "5.5.5.5")
 	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(0))
 	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(1))
-	assert.Contains(t, rateConfig.Allowlist["5.5.5.5"], uint8(1))
 	assert.NotContains(t, rateConfig.Allowlist["5.5.5.5"], uint8(0))
 	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Name, "eigenlabs")
 	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
@@ -477,6 +483,13 @@ func TestParseAllowlist(t *testing.T) {
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Name, "foo")
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
+
+	// verify checksummed address is normalized to lowercase
+	assert.Contains(t, rateConfig.Allowlist, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	assert.Contains(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func TestLoadAllowlistFromFile(t *testing.T) {
@@ -513,6 +526,7 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	assert.Contains(t, al["0.1.2.3"], uint8(1))
 	assert.Contains(t, al["5.5.5.5"], uint8(1))
 	assert.NotContains(t, al["5.5.5.5"], uint8(0))
+	assert.NotContains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
 	assert.Equal(t, al["0.1.2.3"][0].Name, "eigenlabs")
 	assert.Equal(t, al["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
 	assert.Equal(t, al["0.1.2.3"][0].Throughput, uint32(1024))
@@ -538,6 +552,13 @@ func TestLoadAllowlistFromFile(t *testing.T) {
     "quorumID": 1,
     "blobRate": 1,
     "byteRate": 1234
+  },
+  {
+    "name": "bar",
+    "account": "0xcb14cFAaC122E52024232583e7354589AedE74Ff",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
   }
 ]
 	`)
@@ -556,6 +577,13 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	assert.Equal(t, al["7.7.7.7"][1].Name, "world")
 	assert.Equal(t, al["7.7.7.7"][1].BlobRate, uint32(1*1e6))
 	assert.Equal(t, al["7.7.7.7"][1].Throughput, uint32(1234))
+
+	// verify checksummed address is normalized to lowercase
+	assert.Contains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	assert.Contains(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func overwriteFile(t *testing.T, f *os.File, content string) {
@@ -677,7 +705,7 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 					BlobRate:   5 * 1e6,
 				},
 			},
-			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
+			"0x1aa8226f6d354380dde75ee6b634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
 				0: {
 					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
