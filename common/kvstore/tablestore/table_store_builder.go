@@ -135,7 +135,7 @@ func validateSchema(
 	base kvstore.Store[[]byte],
 	metadataKeyBuilder kvstore.KeyBuilder) error {
 
-	schemaKey := metadataKeyBuilder.StringKey(metadataSchemaVersionKey)
+	schemaKey := metadataKeyBuilder.Key([]byte(metadataSchemaVersionKey))
 	onDiskSchemaBytes, err := base.Get(schemaKey.Raw())
 
 	if err != nil {
@@ -328,7 +328,7 @@ func handleIncompleteDeletion(
 	metadataKeyBuilder kvstore.KeyBuilder,
 	namespaceKeyBuilder kvstore.KeyBuilder) error {
 
-	deletionKey := metadataKeyBuilder.StringKey(metadataDeletionKey)
+	deletionKey := metadataKeyBuilder.Key([]byte(metadataDeletionKey))
 	deletionValue, err := base.Get(deletionKey.Raw())
 	if errors.Is(err, kvstore.ErrNotFound) {
 		// No deletion in progress, nothing to do.
@@ -389,7 +389,7 @@ func createTable(
 	batch := base.NewBatch()
 
 	var tableID uint32
-	tableIDBytes, err := base.Get(metadataKeyBuilder.StringKey(nextTableIDKey).Raw())
+	tableIDBytes, err := base.Get(metadataKeyBuilder.Key([]byte(nextTableIDKey)).Raw())
 	if err != nil {
 		if errors.Is(err, kvstore.ErrNotFound) {
 			tableIDBytes = make([]byte, 4)
@@ -407,8 +407,10 @@ func createTable(
 	nextTableIDBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(nextTableIDBytes, nextTableID)
 
-	batch.Put(namespaceKeyBuilder.Uint32Key(tableID).Raw(), []byte(name))
-	batch.Put(metadataKeyBuilder.StringKey(nextTableIDKey).Raw(), nextTableIDBytes)
+	keyBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(keyBytes, tableID)
+	batch.Put(namespaceKeyBuilder.Key(keyBytes).Raw(), []byte(name))
+	batch.Put(metadataKeyBuilder.Key([]byte(nextTableIDKey)).Raw(), nextTableIDBytes)
 
 	err = batch.Apply()
 	if err != nil {
@@ -429,7 +431,7 @@ func dropTable(
 	// This single atomic operation ensures that the table is deleted completely, even if we crash
 	// in the middle of the operation. When next starting up, if an entry is observed in this location,
 	// then the interrupted deletion can be completed.
-	deletionKey := metadataKeyBuilder.StringKey(metadataDeletionKey)
+	deletionKey := metadataKeyBuilder.Key([]byte(metadataDeletionKey))
 
 	deletionValue := make([]byte, 4+len(name))
 	binary.BigEndian.PutUint32(deletionValue, tableID)
@@ -455,7 +457,9 @@ func dropTable(
 	}
 
 	// All table entries have been deleted. Now delete the table from the namespace table.
-	tableKey := namespaceKeyBuilder.Uint32Key(tableID)
+	keyBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(keyBytes, tableID)
+	tableKey := namespaceKeyBuilder.Key(keyBytes)
 	err = base.Delete(tableKey.Raw())
 	if err != nil {
 		return fmt.Errorf("error deleting from namespace table: %w", err)

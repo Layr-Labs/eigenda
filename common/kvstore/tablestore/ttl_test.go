@@ -118,11 +118,11 @@ func TestRandomDataExpired(t *testing.T) {
 			expired := !currentTime.Before(keyExpirationTime)
 
 			if expired {
-				value, err := tStore.Get(kb.StringKey(key))
+				value, err := tStore.Get(kb.Key([]byte(key)))
 				assert.Error(t, err)
 				assert.Nil(t, value)
 			} else {
-				value, err := tStore.Get(kb.StringKey(key))
+				value, err := tStore.Get(kb.Key([]byte(key)))
 				assert.NoError(t, err)
 				expectedValue := data[key]
 				assert.Equal(t, expectedValue, value)
@@ -195,11 +195,11 @@ func TestBatchRandomDataExpired(t *testing.T) {
 			expired := !currentTime.Before(keyExpirationTime)
 
 			if expired {
-				value, err := tStore.Get(kb.StringKey(key))
+				value, err := tStore.Get(kb.Key([]byte(key)))
 				assert.Error(t, err)
 				assert.Nil(t, value)
 			} else {
-				value, err := tStore.Get(kb.StringKey(key))
+				value, err := tStore.Get(kb.Key([]byte(key)))
 				assert.NoError(t, err)
 				expectedValue := data[key]
 				assert.Equal(t, expectedValue, value)
@@ -353,7 +353,7 @@ func TestBigBatchOfDeletions(t *testing.T) {
 
 	// All keys should be expired
 	for key := range data {
-		value, err := tStore.Get(kb.StringKey(key))
+		value, err := tStore.Get(kb.Key([]byte(key)))
 		assert.Error(t, err)
 		assert.Nil(t, value)
 	}

@@ -168,28 +168,28 @@ func TestUniqueKeySpace(t *testing.T) {
 
 	// Write to the tables
 
-	err = store.Put(kb1.StringKey("key1"), []byte("value1"))
+	err = store.Put(kb1.Key([]byte("key1")), []byte("value1"))
 	assert.NoError(t, err)
-	err = store.Put(kb2.StringKey("key1"), []byte("value2"))
+	err = store.Put(kb2.Key([]byte("key1")), []byte("value2"))
 	assert.NoError(t, err)
 
-	value, err := store.Get(kb1.StringKey("key1"))
+	value, err := store.Get(kb1.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value1"), value)
 
-	value, err = store.Get(kb2.StringKey("key1"))
+	value, err = store.Get(kb2.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value2"), value)
 
 	// Delete a key from one table but not the other
 
-	err = store.Delete(kb1.StringKey("key1"))
+	err = store.Delete(kb1.Key([]byte("key1")))
 	assert.NoError(t, err)
 
-	_, err = store.Get(kb1.StringKey("key1"))
+	_, err = store.Get(kb1.Key([]byte("key1")))
 	assert.Equal(t, kvstore.ErrNotFound, err)
 
-	value, err = store.Get(kb2.StringKey("key1"))
+	value, err = store.Get(kb2.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value2"), value)
 
@@ -781,7 +781,7 @@ func TestIteration(t *testing.T) {
 	it.Release()
 
 	// Iterate over the "qwer" keys from table 1
-	it, err = store.NewIterator(kb1.StringKey("qwer"))
+	it, err = store.NewIterator(kb1.Key([]byte("qwer")))
 	assert.NoError(t, err)
 
 	count = 0
@@ -801,7 +801,7 @@ func TestIteration(t *testing.T) {
 	it.Release()
 
 	// Iterate over the "asdf" keys from table 2
-	it, err = store.NewIterator(kb2.StringKey("asdf"))
+	it, err = store.NewIterator(kb2.Key([]byte("asdf")))
 	assert.NoError(t, err)
 
 	count = 0
@@ -1032,7 +1032,7 @@ func TestRandomOperations(t *testing.T) {
 			}
 
 			delete(expectedData[tableName], k)
-			err = store.Delete(table.StringKey(k))
+			err = store.Delete(table.Key([]byte(k)))
 			assert.NoError(t, err)
 		}
 
@@ -1044,7 +1044,7 @@ func TestRandomOperations(t *testing.T) {
 
 				for k := range tableData {
 					expectedValue := tableData[k]
-					value, err := store.Get(table.StringKey(k))
+					value, err := store.Get(table.Key([]byte(k)))
 					assert.NoError(t, err)
 					assert.Equal(t, expectedValue, value)
 				}
