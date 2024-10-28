@@ -129,7 +129,7 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 				"requester_id":   params.RequesterID,
 				"requester_name": params.RequesterName,
 				"bucket_index":   strconv.Itoa(i),
-			}).Set(float64(bucketParams.BucketLevels[i]))
+			}).Set(float64(bucketLevels[i]))
 		}
 	}
 
