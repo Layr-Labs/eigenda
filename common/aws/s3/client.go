@@ -72,6 +72,17 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 	return ref, err
 }
 
+func (s *client) CreateBucket(ctx context.Context, bucket string) error {
+	_, err := s.s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	var partMiBs int64 = 10
 	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {

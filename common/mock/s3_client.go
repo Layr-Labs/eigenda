@@ -17,6 +17,10 @@ func NewS3Client() *S3Client {
 	return &S3Client{bucket: make(map[string][]byte)}
 }
 
+func (s *S3Client) CreateBucket(ctx context.Context, bucket string) error {
+	return nil
+}
+
 func (s *S3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	data, ok := s.bucket[key]
 	if !ok {
