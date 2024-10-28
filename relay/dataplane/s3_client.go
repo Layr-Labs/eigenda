@@ -96,7 +96,10 @@ func NewS3Client(
 }
 
 func (s *client) Upload(key string, data []byte, fragmentSize int) error {
-	fragments := BreakIntoFragments(key, data, s.config.PrefixChars, fragmentSize)
+	fragments, err := BreakIntoFragments(key, data, s.config.PrefixChars, fragmentSize)
+	if err != nil {
+		return err
+	}
 	resultChannel := make(chan error, len(fragments))
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.config.WriteTimeout)
@@ -123,7 +126,10 @@ func (s *client) Download(key string, fileSize int, fragmentSize int) ([]byte, e
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys := GetFragmentKeys(key, s.config.PrefixChars, GetFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := GetFragmentKeys(key, s.config.PrefixChars, GetFragmentCount(fileSize, fragmentSize))
+	if err != nil {
+		return nil, err
+	}
 	resultChannel := make(chan *readResult, len(fragmentKeys))
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.config.WriteTimeout)
