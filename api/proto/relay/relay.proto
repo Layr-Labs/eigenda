@@ -7,23 +7,103 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 // Experimental: the following definitions are experimental and subject to change. //
 /////////////////////////////////////////////////////////////////////////////////////
 
+// Relay is a service that provides access to public relay functionality.
 service Relay {
-	// Note: the relay API is still being fleshed out. This definition is not yet complete.
+  // GetBlobs retrieves blobs stored by the relay.
+  rpc GetBlobs(GetBlobsRequest) returns (GetBlobsReply) {}
 
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
+  // GetChunks retrieves chunks from blobs stored by the relay.
+  rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 }
 
-// Request a specific chunk
-message GetChunkRequest {
-	// The hash of the blob's header.
-	bytes header_hash = 1;
-	// The index of the chunk within the blob.
-	uint32 chunk_index = 2;
+// A request to fetch one or more blobs.
+message GetBlobsRequest {
+  // The hashes of the blobs to retrieve. The order of these requested headers will
+  // be equal to the order of the blobs in the reply.
+  repeated bytes blob_hashes = 1;
+
+  // If this is an authenticated request, this should hold the ID of the requester. If this
+  // is an unauthenticated request, this field should be empty.
+  uint64 requester_id = 2;
+
+  // If this is an authenticated request, this field will hold a signature by the requester
+  // on the blob hashes being requested.
+  bytes requester_signature = 3;
 }
 
-// Reply to GetChunkRequest
-message GetChunkReply {
-	// The chunk requested.
-	common.ChunkData chunk = 1;
+// The reply to a GetBlobs request.
+message GetBlobsReply {
+  // The blobs requested. The order of these blobs will be equal to the order of the
+  // requested header hashes.
+  repeated RequestedBlob blobs = 1;
+}
+
+// A blob that was requested or an error explaining why the requested blob could not be fetched.
+message RequestedBlob {
+  oneof data {
+    // The blob requested.
+    bytes blob = 1;
+    // An error (if any) that occurred while trying to fetch the blob.
+    RelayError error = 2;
+  }
+}
+
+// Request chunks from blobs stored by this relay.
+message GetChunksRequest {
+  // The chunk requests. Chunks are returned in the same order as they are requested.
+  repeated ChunkRequest chunk_requests = 1;
+
+  // If this is an authenticated request, this should hold the ID of the requester. If this
+  // is an unauthenticated request, this field should be empty.
+  uint64 requester_id = 2;
+
+  // If this is an authenticated request, this field will hold a signature by the requester
+  // on the chunks being requested.
+  bytes requester_signature = 3;
+}
+
+// A request for chunks within a specific blob.
+message ChunkRequest {
+  // The hash of the blob's header.
+  bytes header_hash = 1;
+  // The index of the chunk within the blob.
+  repeated uint32 chunk_indices = 2;
+}
+
+// The reply to a GetChunks request.
+message GetChunksReply {
+  // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
+  repeated BlobChunks data = 1;
+}
+
+// A grouping of chunks from a specific blob that were requested.
+message BlobChunks {
+  oneof blob {
+    // The chunks requested.
+    Chunks chunks = 1;
+    // An error (if any) that occurred while trying to fetch the chunks.
+    RelayError error = 2;
+  }
+}
+
+message Chunks {
+  repeated common.ChunkData chunks = 1;
+}
+
+// An error that occurred while trying to fetch a blob or chunks.
+message RelayError {
+  // The error code that occurred while trying to fetch a blob or chunks.
+  RelayErrorCode error_code = 1;
+  // A message explaining the error that occurred.
+  string message = 2;
+}
+
+// The error codes that can occur while trying to fetch a blob or chunks.
+enum RelayErrorCode {
+  // This relay does not know about the requested blob or the requested blob is assigned to a different relay.
+  UNKNOWN_BLOB = 0;
+  // The relay is too busy to handle the request.
+  BUSY = 1;
+  // An internal relay error occurred while trying to fetch the blob.
+  INTERNAL_ERROR = 2;
 }
