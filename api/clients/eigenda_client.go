@@ -148,7 +148,10 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 // to determine whether the error is a client or server fault, as well as get its status code.
 // A 503 error returned is used to signify that eigenda is temporarily unavailable,
 // and suggest to the caller (most likely some rollup batcher via the eigenda-proxy)
-// to fallback to ethda for some amount of time.
+// to fallback to ethda for some amount of time. 3 reasons for returning 503:
+// 1. Failed to put the blob in the disperser's queue (disperser is down)
+// 2. Timed out before getting confirmed onchain (batcher is down)
+// 3. Insufficient signatures (eigenda network is down)
 // See https://github.com/ethereum-optimism/specs/issues/434 for more details.
 //
 // Seriously considered literally returning the ErrorAPI interface instead of error,
@@ -268,8 +271,10 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 				errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("blob dispersal (requestID=%s) reached failed status. please resubmit the blob.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES:
-				// this might be a temporary condition where some eigenda nodes were temporarily offline, so we should retry
-				errChan <- api.NewErrorAPIGeneric(http.StatusInternalServerError, fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. please resubmit the blob.", base64RequestID))
+				// Some quorum failed to sign the blob, indicating that the whole network is having issues.
+				// We hence return 503 to let the batcher failover to ethda. This could however be a very unlucky
+				// temporary issue, so the caller should retry at least one more time before failing over.
+				errChan <- api.NewErrorAPIGeneric(http.StatusServiceUnavailable, fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. eigenda nodes are probably down.", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {
