@@ -325,7 +325,7 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the address is in the allowlist
 	if len(authenticatedAddress) > 0 {
-		// normalize to lowercase (non-checksummed) address
+		// normalize to lowercase (non-checksummed) address or IP address
 		authenticatedAddress = strings.ToLower(authenticatedAddress)
 
 		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]

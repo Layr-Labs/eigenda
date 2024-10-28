@@ -165,7 +165,7 @@ func ReadAllowlistFromFile(f string) (Allowlist, error) {
 	}
 
 	for _, entry := range allowlistEntries {
-		// normalize to lowercase (non-checksummed) address
+		// normalize to lowercase (non-checksummed) address or IP address
 		account := strings.ToLower(entry.Account)
 		rateInfoByQuorum, ok := allowlist[account]
 		if !ok {
