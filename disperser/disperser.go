@@ -54,8 +54,9 @@ const (
 	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
 	InsufficientSignatures
-	// DISPERSING means that the blob is currently being dispersed to DA Nodes,
-	// and the batcher is gathering their signatures.
+	// The DISPERSING state is comprised of two separate phases:
+	//  - Dispersing to DA nodes and collecting signature
+	//  - Submitting the transaction on chain and waiting for tx receipt
 	Dispersing
 )
 
