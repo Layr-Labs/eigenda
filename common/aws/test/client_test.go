@@ -71,12 +71,15 @@ var clientBuilders = []*clientBuilder{
 				return nil, err
 			}
 
-			client, err := s3.NewClient(nil, *config, logger)
+			client, err := s3.NewClient(context.Background(), *config, logger)
 			if err != nil {
 				return nil, err
 			}
 
 			err = client.CreateBucket(context.Background(), bucket)
+			if err != nil {
+				return nil, err
+			}
 
 			return client, nil
 		},

@@ -7,10 +7,15 @@ import (
 )
 
 var (
-	RegionFlagName          = "aws.region"
-	AccessKeyIdFlagName     = "aws.access-key-id"
-	SecretAccessKeyFlagName = "aws.secret-access-key"
-	EndpointURLFlagName     = "aws.endpoint-url"
+	RegionFlagName                      = "aws.region"
+	AccessKeyIdFlagName                 = "aws.access-key-id"
+	SecretAccessKeyFlagName             = "aws.secret-access-key"
+	EndpointURLFlagName                 = "aws.endpoint-url"
+	FragmentPrefixCharsFlagName         = "aws.fragment-prefix-chars"
+	FragmentParallelismFactorFlagName   = "aws.fragment-parallelism-factor"
+	FragmentParallelismConstantFlagName = "aws.fragment-parallelism-constant"
+	FragmentReadTimeoutFlagName         = "aws.fragment-read-timeout"
+	FragmentWriteTimeoutFlagName        = "aws.fragment-write-timeout"
 )
 
 type ClientConfig struct {
@@ -69,17 +74,55 @@ func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Value:    "",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "AWS_ENDPOINT_URL"),
 		},
-
-		// TODO add flags for new args
+		cli.IntFlag{
+			Name:     common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName),
+			Usage:    "The number of characters of the key to use as the prefix for fragmented files",
+			Required: false,
+			Value:    3,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "FRAGMENT_PREFIX_CHARS"),
+		},
+		cli.IntFlag{
+			Name:     common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName),
+			Usage:    "Add this many threads times the number of cores to the worker pool",
+			Required: false,
+			Value:    8,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "FRAGMENT_PARALLELISM_FACTOR"),
+		},
+		cli.IntFlag{
+			Name:     common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName),
+			Usage:    "Add this many threads to the worker pool",
+			Required: false,
+			Value:    0,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "FRAGMENT_PARALLELISM_CONSTANT"),
+		},
+		cli.DurationFlag{
+			Name:     common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName),
+			Usage:    "The maximum time to wait for a single fragmented read",
+			Required: false,
+			Value:    30 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "FRAGMENT_READ_TIMEOUT"),
+		},
+		cli.DurationFlag{
+			Name:     common.PrefixFlag(flagPrefix, FragmentWriteTimeoutFlagName),
+			Usage:    "The maximum time to wait for a single fragmented write",
+			Required: false,
+			Value:    30 * time.Second,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "FRAGMENT_WRITE_TIMEOUT"),
+		},
 	}
 }
 
 func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 	return ClientConfig{
-		Region:          ctx.GlobalString(common.PrefixFlag(flagPrefix, RegionFlagName)),
-		AccessKey:       ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
-		SecretAccessKey: ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
-		EndpointURL:     ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
+		Region:                      ctx.GlobalString(common.PrefixFlag(flagPrefix, RegionFlagName)),
+		AccessKey:                   ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
+		SecretAccessKey:             ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
+		EndpointURL:                 ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
+		FragmentPrefixChars:         ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentPrefixCharsFlagName)),
+		FragmentParallelismFactor:   ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName)),
+		FragmentParallelismConstant: ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName)),
+		FragmentReadTimeout:         ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName)),
+		FragmentWriteTimeout:        ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentWriteTimeoutFlagName)),
 	}
 }
 
