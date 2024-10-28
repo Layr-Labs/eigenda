@@ -8,7 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"sync"
+	"github.com/gammazero/workerpool"
+	"runtime"
 )
 
 var _ S3Client = &client{}
@@ -22,10 +23,7 @@ type client struct {
 	cancel context.CancelFunc
 	// the S3 client to use.
 	client *s3.Client
-	// tasks are placed into this channel to be processed by workers.
-	tasks chan func()
-	// this wait group is completed when all workers have finished.
-	wg *sync.WaitGroup
+	pool   *workerpool.WorkerPool
 }
 
 // NewS3Client creates a new S3Client instance.
@@ -35,9 +33,6 @@ func NewS3Client(
 
 	if cfg.Bucket == "" {
 		return nil, errors.New("config.Bucket is required")
-	}
-	if cfg.Parallelism < 1 {
-		return nil, errors.New("parameter config.Parallelism must be at least 1")
 	}
 
 	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
@@ -73,23 +68,30 @@ func NewS3Client(
 
 	ctx, cancel := context.WithCancel(ctx)
 
+	workers := 0
+	if cfg.ParallelismConstant > 0 {
+		workers = cfg.ParallelismConstant
+	}
+	if cfg.ParallelismFactor > 0 {
+		workers = cfg.ParallelismFactor * runtime.NumCPU()
+	}
+
+	if workers == 0 {
+		workers = 1
+	}
+	pool := workerpool.New(workers)
+
 	c := &client{
 		config: cfg,
 		ctx:    ctx,
 		cancel: cancel,
-		tasks:  make(chan func()),
 		client: s3Client,
-		wg:     &sync.WaitGroup{},
+		pool:   pool,
 	}
 
 	err = c.createBucketIfNeeded()
 	if err != nil {
 		return nil, err
-	}
-
-	c.wg.Add(cfg.Parallelism)
-	for i := 0; i < cfg.Parallelism; i++ {
-		go c.worker()
 	}
 
 	return c, nil
@@ -107,9 +109,9 @@ func (s *client) Upload(key string, data []byte, fragmentSize int) error {
 
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
-		s.tasks <- func() {
+		s.pool.Submit(func() {
 			s.writeTask(ctx, resultChannel, fragmentCapture)
-		}
+		})
 	}
 
 	for range fragments {
@@ -138,9 +140,9 @@ func (s *client) Download(key string, fileSize int, fragmentSize int) ([]byte, e
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey
 		boundI := i
-		s.tasks <- func() {
+		s.pool.Submit(func() {
 			s.readTask(ctx, resultChannel, boundFragmentKey, boundI)
-		}
+		})
 	}
 
 	fragments := make([]*Fragment, len(fragmentKeys))
@@ -162,7 +164,7 @@ func (s *client) Download(key string, fileSize int, fragmentSize int) ([]byte, e
 // Close closes the S3 client.
 func (s *client) Close() error {
 	s.cancel()
-	s.wg.Wait()
+	s.pool.StopWait()
 	return nil
 }
 
@@ -189,19 +191,6 @@ func (s *client) createBucketIfNeeded() error {
 		})
 
 	return err
-}
-
-// worker is a function that processes tasks until the context is cancelled.
-func (s *client) worker() {
-	defer s.wg.Done()
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		case task := <-s.tasks:
-			task()
-		}
-	}
 }
 
 // readResult is the result of a read task.

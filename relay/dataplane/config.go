@@ -23,9 +23,14 @@ type S3Config struct {
 	// The number of characters of the key to use as the prefix. A value of "3" for the key "ABCDEFG" would result in
 	// the prefix "ABC". Default is 3.
 	PrefixChars int
-	// This framework utilizes a pool of workers to help upload/download files. This value specifies the number of
-	// workers to use. Default is 32.
-	Parallelism int
+	// This framework utilizes a pool of workers to help upload/download files. A non-zero value for this parameter
+	// adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number
+	// of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most
+	// of the time.
+	ParallelismFactor int
+	// This framework utilizes a pool of workers to help upload/download files. A non-zero value for this parameter
+	// adds a constant number of workers. Default is 0.
+	ParallelismConstant int
 	// The capacity of the task channel. Default is 256. It is suggested that this value exceed the number of workers.
 	TaskChannelCapacity int
 	// If a single read takes longer than this value then the read will be aborted. Default is 30 seconds.
@@ -40,7 +45,8 @@ func DefaultS3Config() *S3Config {
 		Region:              "us-east-2",
 		AutoCreateBucket:    false,
 		PrefixChars:         3,
-		Parallelism:         32,
+		ParallelismFactor:   8,
+		ParallelismConstant: 0,
 		TaskChannelCapacity: 256,
 		ReadTimeout:         30 * time.Second,
 		WriteTimeout:        30 * time.Second,
