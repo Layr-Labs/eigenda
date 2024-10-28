@@ -34,8 +34,6 @@ type ClientConfig struct {
 	// This framework utilizes a pool of workers to help upload/download files. A non-zero value for this parameter
 	// adds a constant number of workers. Default is 0.
 	FragmentParallelismConstant int
-	// The capacity of the task channel. Default is 256. It is suggested that this value exceed the number of workers.
-	FragmentTaskChannelCapacity int // TODO still used?
 	// If a single fragmented read takes longer than this value then the read will be aborted. Default is 30 seconds.
 	FragmentReadTimeout time.Duration
 	// If a single fragmented write takes longer than this value then the write will be aborted. Default is 30 seconds.
@@ -71,6 +69,8 @@ func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {
 			Value:    "",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "AWS_ENDPOINT_URL"),
 		},
+
+		// TODO add flags for new args
 	}
 }
 
@@ -80,5 +80,17 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 		AccessKey:       ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
 		SecretAccessKey: ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
 		EndpointURL:     ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
+	}
+}
+
+// DefaultClientConfig returns a new ClientConfig with default values.
+func DefaultClientConfig() *ClientConfig {
+	return &ClientConfig{
+		Region:                      "us-east-2",
+		FragmentPrefixChars:         3,
+		FragmentParallelismFactor:   8,
+		FragmentParallelismConstant: 0,
+		FragmentReadTimeout:         30 * time.Second,
+		FragmentWriteTimeout:        30 * time.Second,
 	}
 }

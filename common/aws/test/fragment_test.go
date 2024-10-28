@@ -1,7 +1,8 @@
-package dataplane
+package test
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -15,40 +16,40 @@ func TestGetFragmentCount(t *testing.T) {
 	// Test a file smaller than a fragment
 	fileSize := rand.Intn(100) + 100
 	fragmentSize := fileSize * 2
-	fragmentCount := GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount := s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 1, fragmentCount)
 
 	// Test a file that can fit in a single fragment
 	fileSize = rand.Intn(100) + 100
 	fragmentSize = fileSize
-	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount = s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 1, fragmentCount)
 
 	// Test a file that is one byte larger than a fragment
 	fileSize = rand.Intn(100) + 100
 	fragmentSize = fileSize - 1
-	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount = s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, 2, fragmentCount)
 
 	// Test a file that is one less than a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount := rand.Intn(10) + 1
 	fileSize = fragmentSize*expectedFragmentCount - 1
-	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount = s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 
 	// Test a file that is a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount = rand.Intn(10) + 1
 	fileSize = fragmentSize * expectedFragmentCount
-	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount = s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 
 	// Test a file that is one more than a multiple of the fragment size
 	fragmentSize = rand.Intn(100) + 100
 	expectedFragmentCount = rand.Intn(10) + 2
 	fileSize = fragmentSize*(expectedFragmentCount-1) + 1
-	fragmentCount = GetFragmentCount(fileSize, fragmentSize)
+	fragmentCount = s3.GetFragmentCount(fileSize, fragmentSize)
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 }
 
@@ -62,7 +63,7 @@ func TestPrefix(t *testing.T) {
 	for i := 0; i < keyLength*2; i++ {
 		fragmentCount := rand.Intn(10) + 10
 		fragmentIndex := rand.Intn(fragmentCount)
-		fragmentKey, err := GetFragmentKey(key, i, fragmentCount, fragmentIndex)
+		fragmentKey, err := s3.GetFragmentKey(key, i, fragmentCount, fragmentIndex)
 		assert.NoError(t, err)
 
 		parts := strings.Split(fragmentKey, "/")
@@ -86,7 +87,7 @@ func TestKeyBody(t *testing.T) {
 		key := tu.RandomString(keyLength)
 		fragmentCount := rand.Intn(10) + 10
 		fragmentIndex := rand.Intn(fragmentCount)
-		fragmentKey, err := GetFragmentKey(key, rand.Intn(10), fragmentCount, fragmentIndex)
+		fragmentKey, err := s3.GetFragmentKey(key, rand.Intn(10), fragmentCount, fragmentIndex)
 		assert.NoError(t, err)
 
 		parts := strings.Split(fragmentKey, "/")
@@ -106,7 +107,7 @@ func TestKeyIndex(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		fragmentCount := rand.Intn(10) + 10
 		index := rand.Intn(fragmentCount)
-		fragmentKey, err := GetFragmentKey(tu.RandomString(10), rand.Intn(10), fragmentCount, index)
+		fragmentKey, err := s3.GetFragmentKey(tu.RandomString(10), rand.Intn(10), fragmentCount, index)
 		assert.NoError(t, err)
 
 		parts := strings.Split(fragmentKey, "/")
@@ -126,7 +127,7 @@ func TestKeyPostfix(t *testing.T) {
 	segmentCount := rand.Intn(10) + 10
 
 	for i := 0; i < segmentCount; i++ {
-		fragmentKey, err := GetFragmentKey(tu.RandomString(10), rand.Intn(10), segmentCount, i)
+		fragmentKey, err := s3.GetFragmentKey(tu.RandomString(10), rand.Intn(10), segmentCount, i)
 		assert.NoError(t, err)
 
 		if i == segmentCount-1 {
@@ -141,7 +142,7 @@ func TestExampleInGodoc(t *testing.T) {
 	fileKey := "abc123"
 	prefixLength := 2
 	fragmentCount := 3
-	fragmentKeys, err := GetFragmentKeys(fileKey, prefixLength, fragmentCount)
+	fragmentKeys, err := s3.GetFragmentKeys(fileKey, prefixLength, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(fragmentKeys))
 	assert.Equal(t, "ab/abc123-0", fragmentKeys[0])
@@ -156,12 +157,12 @@ func TestGetFragmentKeys(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentCount := rand.Intn(10) + 10
 
-	fragmentKeys, err := GetFragmentKeys(fileKey, prefixLength, fragmentCount)
+	fragmentKeys, err := s3.GetFragmentKeys(fileKey, prefixLength, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentCount, len(fragmentKeys))
 
 	for i := 0; i < fragmentCount; i++ {
-		expectedKey, err := GetFragmentKey(fileKey, prefixLength, fragmentCount, i)
+		expectedKey, err := s3.GetFragmentKey(fileKey, prefixLength, fragmentCount, i)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedKey, fragmentKeys[i])
 
@@ -191,14 +192,14 @@ func TestGetFragments(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
-	assert.Equal(t, GetFragmentCount(len(data), fragmentSize), len(fragments))
+	assert.Equal(t, s3.GetFragmentCount(len(data), fragmentSize), len(fragments))
 
 	totalSize := 0
 
 	for i, fragment := range fragments {
-		fragmentKey, err := GetFragmentKey(fileKey, prefixLength, len(fragments), i)
+		fragmentKey, err := s3.GetFragmentKey(fileKey, prefixLength, len(fragments), i)
 		assert.NoError(t, err)
 		assert.Equal(t, fragmentKey, fragment.FragmentKey)
 
@@ -223,11 +224,11 @@ func TestGetFragmentsSmallFile(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := GetFragmentKey(fileKey, prefixLength, 1, 0)
+	fragmentKey, err := s3.GetFragmentKey(fileKey, prefixLength, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -242,11 +243,11 @@ func TestGetFragmentsExactlyOnePerfectlySizedFile(t *testing.T) {
 	data := tu.RandomBytes(fragmentSize)
 	prefixLength := rand.Intn(3) + 1
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := GetFragmentKey(fileKey, prefixLength, 1, 0)
+	fragmentKey, err := s3.GetFragmentKey(fileKey, prefixLength, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -261,9 +262,9 @@ func TestRecombineFragments(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
-	recombinedData, err := RecombineFragments(fragments)
+	recombinedData, err := s3.RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 
@@ -273,7 +274,7 @@ func TestRecombineFragments(t *testing.T) {
 		fragments[i], fragments[j] = fragments[j], fragments[i]
 	}
 
-	recombinedData, err = RecombineFragments(fragments)
+	recombinedData, err = s3.RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 }
@@ -286,10 +287,10 @@ func TestRecombineFragmentsSmallFile(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
-	recombinedData, err := RecombineFragments(fragments)
+	recombinedData, err := s3.RecombineFragments(fragments)
 	assert.NoError(t, err)
 	assert.Equal(t, data, recombinedData)
 }
@@ -302,13 +303,13 @@ func TestMissingFragment(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
 
 	fragmentIndexToSkip := rand.Intn(len(fragments))
 	fragments = append(fragments[:fragmentIndexToSkip], fragments[fragmentIndexToSkip+1:]...)
 
-	_, err = RecombineFragments(fragments[:len(fragments)-1])
+	_, err = s3.RecombineFragments(fragments[:len(fragments)-1])
 	assert.Error(t, err)
 }
 
@@ -320,10 +321,10 @@ func TestMissingFinalFragment(t *testing.T) {
 	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := s3.BreakIntoFragments(fileKey, data, prefixLength, fragmentSize)
 	assert.NoError(t, err)
 	fragments = fragments[:len(fragments)-1]
 
-	_, err = RecombineFragments(fragments)
+	_, err = s3.RecombineFragments(fragments)
 	assert.Error(t, err)
 }

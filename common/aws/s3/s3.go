@@ -18,6 +18,9 @@ type Client interface {
 	// file fragments if the bucket contains files uploaded via FragmentedUploadObject.
 	ListObjects(ctx context.Context, bucket string, prefix string) ([]Object, error)
 
+	// CreateBucket creates a bucket in S3.
+	CreateBucket(ctx context.Context, bucket string) error
+
 	// FragmentedUploadObject uploads a file to S3. The fragmentSize parameter specifies the maximum size of each
 	// file uploaded to S3. If the file is larger than fragmentSize then it will be broken into
 	// smaller parts and uploaded in parallel. The file will be reassembled on download.

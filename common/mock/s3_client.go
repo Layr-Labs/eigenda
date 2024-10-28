@@ -45,6 +45,10 @@ func (s *S3Client) ListObjects(ctx context.Context, bucket string, prefix string
 	return objects, nil
 }
 
+func (s *S3Client) CreateBucket(ctx context.Context, bucket string) error {
+	return nil
+}
+
 func (s *S3Client) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,

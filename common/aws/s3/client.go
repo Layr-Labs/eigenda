@@ -176,6 +176,17 @@ func (s *client) ListObjects(ctx context.Context, bucket string, prefix string) 
 	return objects, nil
 }
 
+func (s *client) CreateBucket(ctx context.Context, bucket string) error {
+	_, err := s.s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *client) FragmentedUploadObject(
 	ctx context.Context,
 	bucket string,
