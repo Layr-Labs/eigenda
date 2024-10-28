@@ -1,12 +1,11 @@
-package auth
+package v2
 
 import (
 	"crypto/ecdsa"
-	"encoding/binary"
 	"fmt"
 	"log"
 
-	"github.com/Layr-Labs/eigenda/core"
+	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -19,7 +18,6 @@ type LocalBlobRequestSigner struct {
 var _ core.BlobRequestSigner = &LocalBlobRequestSigner{}
 
 func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
-
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
@@ -31,15 +29,14 @@ func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
 	}
 }
 
-func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
+	blobKey, err := header.BlobKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get blob key: %v", err)
+	}
 
-	// Message you want to sign
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, header.Nonce)
-	hash := crypto.Keccak256(buf)
-
-	// Sign the hash using the private key
-	sig, err := crypto.Sign(hash, s.PrivateKey)
+	// Sign the blob key using the private key
+	sig, err := crypto.Sign(blobKey[:], s.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign hash: %v", err)
 	}
@@ -62,7 +59,7 @@ func NewLocalNoopSigner() *LocalNoopSigner {
 	return &LocalNoopSigner{}
 }
 
-func (s *LocalNoopSigner) SignBlobRequest(header core.BlobAuthHeader) ([]byte, error) {
+func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 

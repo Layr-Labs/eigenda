@@ -81,7 +81,7 @@ func NewDispersalServer(
 	}
 	logger.Info("allowlist config", "file", rateConfig.AllowlistFile, "refreshInterval", rateConfig.AllowlistRefreshInterval.String())
 
-	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+	authenticator := auth.NewAuthenticator()
 
 	return &DispersalServer{
 		serverConfig:  serverConfig,
