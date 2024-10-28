@@ -3,6 +3,7 @@ package aws
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
+	"time"
 )
 
 var (
@@ -13,10 +14,32 @@ var (
 )
 
 type ClientConfig struct {
-	Region          string
-	AccessKey       string
+	// The region to use when interacting with S3. Default is "us-east-2".
+	Region string
+	// The access key to use when interacting with S3.
+	AccessKey string
+	// The secret key to use when interacting with S3.
 	SecretAccessKey string
-	EndpointURL     string
+	// The URL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
+	EndpointURL string
+
+	// The number of characters of the key to use as the prefix for fragmented files.
+	// A value of "3" for the key "ABCDEFG" will result in the prefix "ABC". Default is 3.
+	FragmentPrefixChars int
+	// This framework utilizes a pool of workers to help upload/download files. A non-zero value for this parameter
+	// adds a number of workers equal to the number of cores times this value. Default is 8. In general, the number
+	// of workers here can be a lot larger than the number of cores because the workers will be blocked on I/O most
+	// of the time.
+	FragmentParallelismFactor int
+	// This framework utilizes a pool of workers to help upload/download files. A non-zero value for this parameter
+	// adds a constant number of workers. Default is 0.
+	FragmentParallelismConstant int
+	// The capacity of the task channel. Default is 256. It is suggested that this value exceed the number of workers.
+	FragmentTaskChannelCapacity int // TODO still used?
+	// If a single fragmented read takes longer than this value then the read will be aborted. Default is 30 seconds.
+	FragmentReadTimeout time.Duration
+	// If a single fragmented write takes longer than this value then the write will be aborted. Default is 30 seconds.
+	FragmentWriteTimeout time.Duration
 }
 
 func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {

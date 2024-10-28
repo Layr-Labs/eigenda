@@ -44,3 +44,26 @@ func (s *S3Client) ListObjects(ctx context.Context, bucket string, prefix string
 	}
 	return objects, nil
 }
+
+func (s *S3Client) FragmentedUploadObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	data []byte,
+	fragmentSize int) error {
+	s.bucket[key] = data
+	return nil
+}
+
+func (s *S3Client) FragmentedDownloadObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	fileSize int,
+	fragmentSize int) ([]byte, error) {
+	data, ok := s.bucket[key]
+	if !ok {
+		return []byte{}, s3.ErrObjectNotFound
+	}
+	return data, nil
+}
