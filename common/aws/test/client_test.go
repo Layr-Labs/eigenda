@@ -96,7 +96,12 @@ func setupLocalstack() error {
 	if err != nil {
 		teardownLocalstack()
 		if err.Error() == "container already exists" {
-			return setupLocalstack()
+			// Try again now that local stack is properly shut down
+			dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+			if err != nil {
+				teardownLocalstack()
+				return err
+			}
 		} else {
 			return err
 		}
