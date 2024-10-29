@@ -285,7 +285,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
 	if paymentHeader != nil {
-		err := s.meterer.MeterRequest(ctx, *paymentHeader, uint(blobSize), blob.GetQuorumNumbers())
+		blobLength := encoding.GetBlobLength(uint(blobSize))
+		err := s.meterer.MeterRequest(ctx, *paymentHeader, blobLength, blob.GetQuorumNumbers())
 		if err != nil {
 			return nil, api.NewErrorResourceExhausted(err.Error())
 		}

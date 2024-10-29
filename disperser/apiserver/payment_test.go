@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -37,7 +38,7 @@ func TestDispersePaidBlob(t *testing.T) {
 
 	dispersalServer := newTestServer(transactor, t.Name())
 
-	data := make([]byte, 1024)
+	data := make([]byte, 1024*encoding.BYTES_PER_SYMBOL)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -56,13 +57,13 @@ func TestDispersePaidBlob(t *testing.T) {
 	pk := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeb"
 	signer := auth.NewPaymentSigner(pk)
 
-	dataLength := len(data)
+	symbolLength := encoding.GetBlobLength(uint(len(data)))
 	// disperse on-demand payment
 	for i := 1; i < 3; i++ {
 		pm := pbcommon.PaymentHeader{
 			AccountId:         signer.GetAccountID(),
 			BinIndex:          0,
-			CumulativePayment: big.NewInt(int64(dataLength * i)).Bytes(),
+			CumulativePayment: big.NewInt(int64(int(symbolLength) * i)).Bytes(),
 		}
 		sig, err := signer.SignBlobPayment(&pm)
 		assert.NoError(t, err)
@@ -81,7 +82,7 @@ func TestDispersePaidBlob(t *testing.T) {
 	pm := pbcommon.PaymentHeader{
 		AccountId:         signer.GetAccountID(),
 		BinIndex:          0,
-		CumulativePayment: big.NewInt(int64(dataLength*3) - 1).Bytes(),
+		CumulativePayment: big.NewInt(int64(symbolLength*3) - 1).Bytes(),
 	}
 	sig, err := signer.SignBlobPayment(&pm)
 	assert.NoError(t, err)
