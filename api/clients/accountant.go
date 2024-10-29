@@ -26,12 +26,17 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; index 0 for current bin, 1 for next bin, 2 for overflowed bin
-	binUsages         []uint64
+	binRecords        []BinRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 	stopRotation      chan struct{}
 
 	paymentSigner core.PaymentSigner
+}
+
+type BinRecord struct {
+	Index uint32
+	Usage uint64
 }
 
 func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) *Accountant {
@@ -44,68 +49,42 @@ func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPay
 		reservationWindow: reservationWindow,
 		pricePerSymbol:    pricePerSymbol,
 		minNumSymbols:     minNumSymbols,
-		binUsages:         []uint64{0, 0, 0},
+		binRecords:        []BinRecord{{Index: 0, Usage: 0}, {Index: 1, Usage: 0}, {Index: 2, Usage: 0}},
 		cumulativePayment: big.NewInt(0),
 		stopRotation:      make(chan struct{}),
 		paymentSigner:     paymentSigner,
 	}
-	go a.startBinRotation()
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
 }
 
-func (a *Accountant) startBinRotation() {
-	ticker := time.NewTicker(time.Duration(a.reservationWindow) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			a.rotateBins()
-		case <-a.stopRotation:
-			return
-		}
-	}
-}
-
-func (a *Accountant) rotateBins() {
-	a.usageLock.Lock()
-	defer a.usageLock.Unlock()
-	// Shift bins: bin_i to bin_{i-1}, set 0 to bin2
-	a.binUsages[0] = a.binUsages[1]
-	a.binUsages[1] = a.binUsages[2]
-	a.binUsages[2] = 0
-}
-
-func (a *Accountant) Stop() {
-	close(a.stopRotation)
-}
-
 // accountant calculates and records payment information
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, *big.Int, error) {
-	//TODO: do we need to lock the binUsages here in case the blob rotation happens in the middle of the function?
-	// binUsage := a.binUsages[0] + dataLength
-	a.usageLock.Lock()
-	defer a.usageLock.Unlock()
-	a.binUsages[0] += dataLength
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
+	// index := time.Now().Unix() / int64(a.reservationWindow)
+
+	a.usageLock.Lock()
+	defer a.usageLock.Unlock()
+	relativeBinRecord := a.GetRelativeBinRecord(currentBinIndex)
+	relativeBinRecord.Usage += dataLength
 
 	// first attempt to use the active reservation
 	binLimit := a.reservation.SymbolsPerSec * uint64(a.reservationWindow)
-	if a.binUsages[0] <= binLimit {
+	if relativeBinRecord.Usage <= binLimit {
 		return currentBinIndex, big.NewInt(0), nil
 	}
 
+	overflowBinRecord := a.GetOverflowBinRecord(currentBinIndex)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if a.binUsages[2] == 0 && a.binUsages[0]-dataLength < binLimit && dataLength <= binLimit {
-		a.binUsages[2] += a.binUsages[0] - binLimit
+	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-dataLength < binLimit && dataLength <= binLimit {
+		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
 		return currentBinIndex, big.NewInt(0), nil
 	}
 
 	// reservation not available, attempt on-demand
 	//todo: rollback if disperser respond with some type of rejection?
-	a.binUsages[0] -= dataLength
+	relativeBinRecord.Usage -= dataLength
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(dataLength))))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
@@ -151,4 +130,30 @@ func (a *Accountant) SymbolsCharged(dataLength uint) uint32 {
 	}
 	// Round up to the nearest multiple of MinNumSymbols
 	return uint32(core.RoundUpDivide(uint(dataLength), uint(a.minNumSymbols))) * a.minNumSymbols
+}
+
+func (a *Accountant) GetRelativeBinRecord(index uint32) BinRecord {
+	relativeIndex := index % 3
+
+	if a.binRecords[relativeIndex].Index != uint32(index) {
+		a.binRecords[relativeIndex] = BinRecord{
+			Index: uint32(index),
+			Usage: 0,
+		}
+	}
+
+	return a.binRecords[relativeIndex]
+}
+
+func (a *Accountant) GetOverflowBinRecord(index uint32) BinRecord {
+	relativeIndex := (index + 2) % 3
+
+	if a.binRecords[relativeIndex].Index != uint32(index+2) {
+		a.binRecords[relativeIndex] = BinRecord{
+			Index: uint32(index + 2),
+			Usage: 0,
+		}
+	}
+
+	return a.binRecords[relativeIndex]
 }
