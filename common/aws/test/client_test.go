@@ -77,7 +77,7 @@ var clientBuilders = []*clientBuilder{
 			}
 
 			err = client.CreateBucket(context.Background(), bucket)
-			if err != nil {
+			if err != nil && err.Error() != "container already existsstat" {
 				return nil, err
 			}
 
