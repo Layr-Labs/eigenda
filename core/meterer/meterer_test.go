@@ -158,7 +158,7 @@ func setup(_ *testing.M) {
 		// metrics.NewNoopMetrics(),
 	)
 
-	mt.Start(context.Background(), config.UpdateInterval)
+	mt.Start(context.Background())
 }
 
 func teardown() {
