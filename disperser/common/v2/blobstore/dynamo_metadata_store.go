@@ -32,16 +32,14 @@ type BlobMetadataStore struct {
 	dynamoDBClient *commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
-	ttl            time.Duration
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
-	logger.Debugf("creating blob metadata store v2 with table %s with TTL: %s", tableName, ttl)
+func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string) *BlobMetadataStore {
+	logger.Debugf("creating blob metadata store v2 with table %s", tableName)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
 		logger:         logger.With("component", "blobMetadataStoreV2"),
 		tableName:      tableName,
-		ttl:            ttl,
 	}
 }
 

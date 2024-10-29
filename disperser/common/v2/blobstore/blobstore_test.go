@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
+	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -31,10 +31,13 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4571"
 
+	s3Client          s3.Client
 	dynamoClient      *dynamodb.Client
+	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
 
 	UUID              = uuid.New()
+	s3BucketName      = "test-eigenda-blobstore"
 	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 
 	mockCommitment = encoding.BlobCommitments{}
@@ -82,7 +85,19 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
+	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
+
+	s3Client, err = s3.NewClient(context.Background(), cfg, logger)
+	if err != nil {
+		teardown()
+		panic("failed to create s3 client: " + err.Error())
+	}
+	err = s3Client.CreateBucket(context.Background(), s3BucketName)
+	if err != nil {
+		teardown()
+		panic("failed to create s3 bucket: " + err.Error())
+	}
+	blobStore = blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))
