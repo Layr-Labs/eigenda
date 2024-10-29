@@ -230,14 +230,16 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	return headerHash, nil
 }
 
+type RelayKey uint16
+
 type BlobCertificate struct {
-	BlobHeader
+	BlobHeader *BlobHeader
 
 	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
 	ReferenceBlockNumber uint64
 
 	// RelayKeys
-	RelayKeys []uint16
+	RelayKeys []RelayKey
 }
 
 type BlobVersionParameters struct {
