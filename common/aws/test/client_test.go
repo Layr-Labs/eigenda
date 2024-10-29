@@ -93,9 +93,13 @@ var clientBuilders = []*clientBuilder{
 func setupLocalstack() error {
 	var err error
 	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-	if err != nil && err.Error() != "container already exists" {
+	if err != nil {
 		teardownLocalstack()
-		return err
+		if err.Error() == "container already exists" {
+			return setupLocalstack()
+		} else {
+			return err
+		}
 	}
 	return nil
 }
