@@ -21,8 +21,8 @@ var (
 )
 
 const (
-	localstackPort = "4566"
-	localstackHost = "http://0.0.0.0:4566"
+	localstackPort = "5678"
+	localstackHost = "http://0.0.0.0:5678"
 	bucket         = "eigen-test"
 )
 
