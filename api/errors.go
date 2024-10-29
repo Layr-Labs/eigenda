@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -88,7 +90,7 @@ func NewErrorFailover(err error) *ErrorFailover {
 }
 
 func (e *ErrorFailover) Error() string {
-	return e.Err.Error()
+	return fmt.Sprintf("Failover: %s", e.Err.Error())
 }
 
 func (e *ErrorFailover) Unwrap() error {
