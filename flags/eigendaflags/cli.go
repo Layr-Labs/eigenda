@@ -1,6 +1,9 @@
 package eigendaflags
 
 import (
+	"fmt"
+	"log"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -21,6 +24,9 @@ var (
 	PutBlobEncodingVersionFlagName       = withFlagPrefix("put-blob-encoding-version")
 	DisablePointVerificationModeFlagName = withFlagPrefix("disable-point-verification-mode")
 	WaitForFinalizationFlagName          = withFlagPrefix("wait-for-finalization")
+	ConfirmationDepthFlagName            = withFlagPrefix("confirmation-depth")
+	EthRPCURLFlagName                    = withFlagPrefix("eth-rpc")
+	SvcManagerAddrFlagName               = withFlagPrefix("svc-manager-addr")
 )
 
 func withFlagPrefix(s string) string {
@@ -101,11 +107,41 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  []string{withEnvPrefix(envPrefix, "WAIT_FOR_FINALIZATION")},
 			Value:    false,
 			Category: category,
+			Hidden:   true,
+			Action: func(_ *cli.Context, _ bool) error {
+				return fmt.Errorf("flag --%s is deprecated, instead use --%s finalized", WaitForFinalizationFlagName, ConfirmationDepthFlagName)
+			},
+		},
+		&cli.StringFlag{
+			Name: ConfirmationDepthFlagName,
+			Usage: "Number of Ethereum blocks to wait after the blob's batch has been included on-chain, " +
+				"before returning from PutBlob calls. Can either be a number or 'finalized'.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "CONFIRMATION_DEPTH")},
+			Value:    "0",
+			Category: category,
+			Action: func(_ *cli.Context, val string) error {
+				return validateConfirmationFlag(val)
+			},
+		},
+		&cli.StringFlag{
+			Name:     EthRPCURLFlagName,
+			Usage:    "URL of the Ethereum RPC endpoint. Needed to confirm blobs landed onchain.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC")},
+			Category: category,
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     SvcManagerAddrFlagName,
+			Usage:    "Address of the EigenDAServiceManager contract. Required to confirm blobs landed onchain. See https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
+			Category: category,
+			Required: true,
 		},
 	}
 }
 
 func ReadConfig(ctx *cli.Context) clients.EigenDAClientConfig {
+	waitForFinalization, confirmationDepth := parseConfirmationFlag(ctx.String(ConfirmationDepthFlagName))
 	return clients.EigenDAClientConfig{
 		RPC:                          ctx.String(DisperserRPCFlagName),
 		StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
@@ -116,6 +152,40 @@ func ReadConfig(ctx *cli.Context) clients.EigenDAClientConfig {
 		SignerPrivateKeyHex:          ctx.String(SignerPrivateKeyHexFlagName),
 		PutBlobEncodingVersion:       codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
 		DisablePointVerificationMode: ctx.Bool(DisablePointVerificationModeFlagName),
-		WaitForFinalization:          ctx.Bool(WaitForFinalizationFlagName),
+		WaitForFinalization:          waitForFinalization,
+		WaitForConfirmationDepth:     confirmationDepth,
+		EthRpcUrl:                    ctx.String(EthRPCURLFlagName),
+		SvcManagerAddr:               ctx.String(SvcManagerAddrFlagName),
 	}
+}
+
+// parse the val (either "finalized" or a number) into waitForFinalization (bool) and confirmationDepth (uint64).
+func parseConfirmationFlag(val string) (bool, uint64) {
+	if val == "finalized" {
+		return true, 0
+	}
+
+	depth, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		panic("this should never happen, as the flag is validated before this point")
+	}
+
+	return false, depth
+}
+
+func validateConfirmationFlag(val string) error {
+	if val == "finalized" {
+		return nil
+	}
+
+	depth, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return fmt.Errorf("confirmation-depth must be either 'finalized' or a number, got: %s", val)
+	}
+
+	if depth >= 64 {
+		log.Printf("Warning: confirmation depth set to %d, which is > 2 epochs (64). Consider using 'finalized' instead.\n", depth)
+	}
+
+	return nil
 }

@@ -71,7 +71,7 @@ func (r *Store) Put(ctx context.Context, key []byte, value []byte) error {
 	return r.client.Set(ctx, string(key), string(value), r.eviction).Err()
 }
 
-func (r *Store) Verify(_ []byte, _ []byte) error {
+func (r *Store) Verify(_ context.Context, _, _ []byte) error {
 	return nil
 }
 

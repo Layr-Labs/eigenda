@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/Layr-Labs/eigenda-proxy/utils"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli/v2"
+
+	"github.com/Layr-Labs/eigenda-proxy/utils"
+	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 )
 
 var (
@@ -23,9 +25,6 @@ const srsOrder = 268435456 // 2 ^ 32
 var (
 	// cert verification flags
 	CertVerificationDisabledFlagName = withFlagPrefix("cert-verification-disabled")
-	EthRPCFlagName                   = withFlagPrefix("eth-rpc")
-	SvcManagerAddrFlagName           = withFlagPrefix("svc-manager-addr")
-	EthConfirmationDepthFlagName     = withFlagPrefix("eth-confirmation-depth")
 
 	// kzg flags
 	G1PathFlagName         = withFlagPrefix("g1-path")
@@ -53,25 +52,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:    "Whether to verify certificates received from EigenDA disperser.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFICATION_DISABLED")},
 			Value:    false,
-			Category: category,
-		},
-		&cli.StringFlag{
-			Name:     EthRPCFlagName,
-			Usage:    "JSON RPC node endpoint for the Ethereum network used for finalizing DA blobs. See available list here: https://docs.eigenlayer.xyz/eigenda/networks/",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC")},
-			Category: category,
-		},
-		&cli.StringFlag{
-			Name:     SvcManagerAddrFlagName,
-			Usage:    "The deployed EigenDA service manager address. The list can be found here: https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
-			Category: category,
-		},
-		&cli.Uint64Flag{
-			Name:     EthConfirmationDepthFlagName,
-			Usage:    "The number of Ethereum blocks to wait before considering a submitted blob's DA batch submission confirmed. `0` means wait for inclusion only.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH")},
-			Value:    0,
 			Category: category,
 		},
 		// kzg flags
@@ -137,7 +117,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 // this var is set by the action in the MaxBlobLengthFlagName flag
 var MaxBlobLengthBytes uint64
 
-func ReadConfig(ctx *cli.Context) Config {
+// ReadConfig takes an eigendaClientConfig as input because the verifier config
+// reuses some configs that are also used by the eigenda client.
+// Not sure if urfave has a way to do flag aliases so opted for this approach.
+func ReadConfig(ctx *cli.Context, edaClientConfig clients.EigenDAClientConfig) Config {
 	kzgCfg := &kzg.KzgConfig{
 		G1Path:          ctx.String(G1PathFlagName),
 		G2PowerOf2Path:  ctx.String(G2PowerOf2PathFlagName),
@@ -148,10 +131,12 @@ func ReadConfig(ctx *cli.Context) Config {
 	}
 
 	return Config{
-		KzgConfig:            kzgCfg,
-		VerifyCerts:          !ctx.Bool(CertVerificationDisabledFlagName),
-		RPCURL:               ctx.String(EthRPCFlagName),
-		SvcManagerAddr:       ctx.String(SvcManagerAddrFlagName),
-		EthConfirmationDepth: uint64(ctx.Int64(EthConfirmationDepthFlagName)), // #nosec G115
+		KzgConfig:   kzgCfg,
+		VerifyCerts: !ctx.Bool(CertVerificationDisabledFlagName),
+		// reuse some configs from the eigenda client
+		RPCURL:               edaClientConfig.EthRpcUrl,
+		SvcManagerAddr:       edaClientConfig.SvcManagerAddr,
+		EthConfirmationDepth: edaClientConfig.WaitForConfirmationDepth,
+		WaitForFinalization:  edaClientConfig.WaitForFinalization,
 	}
 }

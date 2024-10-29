@@ -107,7 +107,7 @@ func (s *Store) Put(ctx context.Context, key []byte, value []byte) error {
 	return nil
 }
 
-func (s *Store) Verify(key []byte, value []byte) error {
+func (s *Store) Verify(_ context.Context, key []byte, value []byte) error {
 	h := crypto.Keccak256Hash(value)
 	if !bytes.Equal(h[:], key) {
 		return fmt.Errorf("key does not match value, expected: %s got: %s", hex.EncodeToString(key), h.Hex())

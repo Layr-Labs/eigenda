@@ -2,7 +2,6 @@ package eigenda
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -66,46 +65,27 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to re-encode blob: %w", err)
 	}
+	// TODO: We should move this length check inside PutBlob
 	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
 		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", store.ErrProxyOversizedBlob, len(value), e.cfg.MaxBlobSizeBytes)
 	}
 
-	dispersalStart := time.Now()
 	blobInfo, err := e.client.PutBlob(ctx, value)
 	if err != nil {
+		// TODO: we will want to filter for errors here and return a 503 when needed
+		// ie when dispersal itself failed, or that we timed out waiting for batch to land onchain
 		return nil, err
 	}
 	cert := (*verify.Certificate)(blobInfo)
 
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to verify commitment: %w", err)
 	}
 
-	dispersalDuration := time.Since(dispersalStart)
-	remainingTimeout := e.cfg.StatusQueryTimeout - dispersalDuration
-
-	ticker := time.NewTicker(12 * time.Second) // avg. eth block time
-	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), remainingTimeout)
-	defer cancel()
-
-	done := false
-	for !done {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("timed out when trying to verify the DA certificate for a blob batch after dispersal")
-		case <-ticker.C:
-			err = e.verifier.VerifyCert(cert)
-			switch {
-			case err == nil:
-				done = true
-			case errors.Is(err, verify.ErrBatchMetadataHashNotFound):
-				e.log.Info("Blob confirmed, waiting for sufficient confirmation depth...", "targetDepth", e.cfg.EthConfirmationDepth)
-			default:
-				return nil, err
-			}
-		}
+	err = e.verifier.VerifyCert(ctx, cert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify DA cert: %w", err)
 	}
 
 	bytes, err := rlp.EncodeToBytes(cert)
@@ -128,7 +108,7 @@ func (e Store) BackendType() store.BackendType {
 
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e Store) Verify(key []byte, value []byte) error {
+func (e Store) Verify(ctx context.Context, key []byte, value []byte) error {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
@@ -148,5 +128,5 @@ func (e Store) Verify(key []byte, value []byte) error {
 	}
 
 	// verify DA certificate against EigenDA's batch metadata that's bridged to Ethereum
-	return e.verifier.VerifyCert(&cert)
+	return e.verifier.VerifyCert(ctx, &cert)
 }

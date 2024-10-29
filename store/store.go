@@ -68,7 +68,7 @@ type Store interface {
 	// Backend returns the backend type provider of the store.
 	BackendType() BackendType
 	// Verify verifies the given key-value pair.
-	Verify(key []byte, value []byte) error
+	Verify(ctx context.Context, key []byte, value []byte) error
 }
 
 type GeneratedKeyStore interface {

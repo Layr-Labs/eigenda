@@ -37,11 +37,12 @@ type Config struct {
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
+	edaClientConfig := eigendaflags.ReadConfig(ctx)
 	return Config{
 		RedisConfig:     redis.ReadConfig(ctx),
 		S3Config:        s3.ReadConfig(ctx),
-		EdaClientConfig: eigendaflags.ReadConfig(ctx),
-		VerifierConfig:  verify.ReadConfig(ctx),
+		EdaClientConfig: edaClientConfig,
+		VerifierConfig:  verify.ReadConfig(ctx, edaClientConfig),
 		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
 		MemstoreConfig:  memstore.ReadConfig(ctx),
 		FallbackTargets: ctx.StringSlice(flags.FallbackTargetsFlagName),
@@ -80,7 +81,7 @@ func (cfg *Config) Check() error {
 	// TODO: move this verification logic to verify/cli.go
 	if cfg.VerifierConfig.VerifyCerts {
 		if cfg.MemstoreEnabled {
-			return fmt.Errorf("cannot enable cert verification when memstore is enabled")
+			return fmt.Errorf("cannot enable cert verification when memstore is enabled. use --%s", verify.CertVerificationDisabledFlagName)
 		}
 		if cfg.VerifierConfig.RPCURL == "" {
 			return fmt.Errorf("cert verification enabled but eth rpc is not set")

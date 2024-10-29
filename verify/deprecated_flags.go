@@ -3,6 +3,7 @@ package verify
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda-proxy/flags/eigendaflags"
 	"github.com/urfave/cli/v2"
 )
 
@@ -41,7 +42,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
 					DeprecatedEthRPCFlagName, withDeprecatedEnvPrefix(envPrefix, "ETH_RPC"),
-					EthRPCFlagName, withEnvPrefix(envPrefix, "ETH_RPC"))
+					eigendaflags.EthRPCURLFlagName, withEnvPrefix(envPrefix, "ETH_RPC"))
 			},
 			Category: category,
 		},
@@ -52,7 +53,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
 					DeprecatedSvcManagerAddrFlagName, withDeprecatedEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR"),
-					SvcManagerAddrFlagName, withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR"))
+					eigendaflags.SvcManagerAddrFlagName, withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR"))
 			},
 			Category: category,
 		},
@@ -64,7 +65,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Action: func(_ *cli.Context, _ uint64) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
 					DeprecatedEthConfirmationDepthFlagName, withDeprecatedEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH"),
-					EthConfirmationDepthFlagName, withEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH"))
+					eigendaflags.ConfirmationDepthFlagName, withEnvPrefix(envPrefix, "CONFIRMATION_DEPTH"))
 			},
 			Category: category,
 		},

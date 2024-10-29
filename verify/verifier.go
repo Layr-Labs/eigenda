@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -10,9 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
 
-	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -25,6 +25,7 @@ type Config struct {
 	RPCURL               string
 	SvcManagerAddr       string
 	EthConfirmationDepth uint64
+	WaitForFinalization  bool
 }
 
 // TODO: right now verification and confirmation depth are tightly coupled. we should decouple them
@@ -60,32 +61,26 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 }
 
 // verifies V0 eigenda certificate type
-func (v *Verifier) VerifyCert(cert *Certificate) error {
+func (v *Verifier) VerifyCert(ctx context.Context, cert *Certificate) error {
 	if !v.verifyCerts {
 		return nil
 	}
 
-	// 1 - verify batch
-	header := binding.IEigenDAServiceManagerBatchHeader{
-		BlobHeadersRoot:       [32]byte(cert.Proof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
-		QuorumNumbers:         cert.Proof().GetBatchMetadata().GetBatchHeader().GetQuorumNumbers(),
-		ReferenceBlockNumber:  cert.Proof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber(),
-		SignedStakeForQuorums: cert.Proof().GetBatchMetadata().GetBatchHeader().GetQuorumSignedPercentages(),
-	}
-
-	err := v.cv.VerifyBatch(&header, cert.Proof().GetBatchId(), [32]byte(cert.Proof().BatchMetadata.GetSignatoryRecordHash()), cert.Proof().BatchMetadata.GetConfirmationBlockNumber())
+	// 1 - verify batch in the cert is confirmed onchain
+	err := v.cv.verifyBatchConfirmedOnChain(ctx, cert.Proof().GetBatchId(), cert.Proof().GetBatchMetadata())
 	if err != nil {
 		return fmt.Errorf("failed to verify batch: %w", err)
 	}
 
 	// 2 - verify merkle inclusion proof
-	err = v.cv.VerifyMerkleProof(cert.Proof().GetInclusionProof(), cert.BatchHeaderRoot(), cert.Proof().GetBlobIndex(), cert.ReadBlobHeader())
+	err = v.cv.verifyMerkleProof(cert.Proof().GetInclusionProof(), cert.BatchHeaderRoot(), cert.Proof().GetBlobIndex(), cert.ReadBlobHeader())
 	if err != nil {
 		return fmt.Errorf("failed to verify merkle proof: %w", err)
 	}
 
 	// 3 - verify security parameters
-	err = v.VerifySecurityParams(cert.ReadBlobHeader(), header)
+	batchHeader := cert.Proof().GetBatchMetadata().GetBatchHeader()
+	err = v.verifySecurityParams(cert.ReadBlobHeader(), batchHeader)
 	if err != nil {
 		return fmt.Errorf("failed to verify security parameters: %w", err)
 	}
@@ -138,8 +133,8 @@ func (v *Verifier) VerifyCommitment(expectedCommit *common.G1Commitment, blob []
 	return nil
 }
 
-// VerifySecurityParams ensures that returned security parameters are valid
-func (v *Verifier) VerifySecurityParams(blobHeader BlobHeader, batchHeader binding.IEigenDAServiceManagerBatchHeader) error {
+// verifySecurityParams ensures that returned security parameters are valid
+func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disperser.BatchHeader) error {
 	confirmedQuorums := make(map[uint8]bool)
 
 	// require that the security param in each blob is met
@@ -163,7 +158,7 @@ func (v *Verifier) VerifySecurityParams(blobHeader BlobHeader, batchHeader bindi
 			return fmt.Errorf("adversary threshold percentage must be greater than or equal to quorum adversary threshold percentage")
 		}
 
-		if batchHeader.SignedStakeForQuorums[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
+		if batchHeader.QuorumSignedPercentages[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
 			return fmt.Errorf("signed stake for quorum must be greater than or equal to confirmation threshold percentage")
 		}
 

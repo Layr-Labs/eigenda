@@ -28,7 +28,7 @@ type ISecondary interface {
 	CachingEnabled() bool
 	FallbackEnabled() bool
 	HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error
-	MultiSourceRead(context.Context, []byte, bool, func([]byte, []byte) error) ([]byte, error)
+	MultiSourceRead(context.Context, []byte, bool, func(context.Context, []byte, []byte) error) ([]byte, error)
 	WriteSubscriptionLoop(ctx context.Context)
 }
 
@@ -141,7 +141,7 @@ func (sm *SecondaryManager) WriteSubscriptionLoop(ctx context.Context) {
 // MultiSourceRead ... reads from a set of backends and returns the first successfully read blob
 // NOTE: - this can also be parallelized when reading from multiple sources and discarding connections that fail
 //   - for complete optimization we can profile secondary storage backends to determine the fastest / most reliable and always rout to it first
-func (sm *SecondaryManager) MultiSourceRead(ctx context.Context, commitment []byte, fallback bool, verify func([]byte, []byte) error) ([]byte, error) {
+func (sm *SecondaryManager) MultiSourceRead(ctx context.Context, commitment []byte, fallback bool, verify func(context.Context, []byte, []byte) error) ([]byte, error) {
 	var sources []PrecomputedKeyStore
 	if fallback {
 		sources = sm.fallbacks
@@ -167,7 +167,7 @@ func (sm *SecondaryManager) MultiSourceRead(ctx context.Context, commitment []by
 
 		// verify cert:data using provided verification function
 		sm.verifyLock.Lock()
-		err = verify(commitment, data)
+		err = verify(ctx, commitment, data)
 		if err != nil {
 			cb(Failed)
 			log.Warn("Failed to verify blob", "err", err, "backend", src.BackendType())

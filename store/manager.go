@@ -56,7 +56,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		}
 
 		// 2 - verify blob hash against commitment key digest
-		err = m.s3.Verify(key, value)
+		err = m.s3.Verify(ctx, key, value)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		data, err := m.eigenda.Get(ctx, key)
 		if err == nil {
 			// verify
-			err = m.eigenda.Verify(key, data)
+			err = m.eigenda.Verify(ctx, key, data)
 			if err != nil {
 				return nil, err
 			}
@@ -158,7 +158,7 @@ func (m *Manager) putKeccak256Mode(ctx context.Context, key []byte, value []byte
 		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")
 	}
 
-	err := m.s3.Verify(key, value)
+	err := m.s3.Verify(ctx, key, value)
 	if err != nil {
 		return nil, err
 	}
