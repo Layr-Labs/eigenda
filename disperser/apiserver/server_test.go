@@ -703,7 +703,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	mockState.On("GetPricePerSymbol").Return(uint32(1), nil)
+	mockState.On("GetPricePerSymbol").Return(uint32(encoding.BYTES_PER_SYMBOL), nil)
 	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
 	mockState.On("GetGlobalSymbolsPerSecond").Return(uint64(4096), nil)
 	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)

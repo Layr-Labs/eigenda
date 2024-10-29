@@ -38,7 +38,7 @@ func TestDispersePaidBlob(t *testing.T) {
 
 	dispersalServer := newTestServer(transactor, t.Name())
 
-	data := make([]byte, 1024*encoding.BYTES_PER_SYMBOL)
+	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -63,7 +63,7 @@ func TestDispersePaidBlob(t *testing.T) {
 		pm := pbcommon.PaymentHeader{
 			AccountId:         signer.GetAccountID(),
 			BinIndex:          0,
-			CumulativePayment: big.NewInt(int64(int(symbolLength) * i)).Bytes(),
+			CumulativePayment: big.NewInt(int64(int(symbolLength) * i * encoding.BYTES_PER_SYMBOL)).Bytes(),
 		}
 		sig, err := signer.SignBlobPayment(&pm)
 		assert.NoError(t, err)
@@ -82,7 +82,7 @@ func TestDispersePaidBlob(t *testing.T) {
 	pm := pbcommon.PaymentHeader{
 		AccountId:         signer.GetAccountID(),
 		BinIndex:          0,
-		CumulativePayment: big.NewInt(int64(symbolLength*3) - 1).Bytes(),
+		CumulativePayment: big.NewInt(int64(symbolLength*3)*encoding.BYTES_PER_SYMBOL - 1).Bytes(),
 	}
 	sig, err := signer.SignBlobPayment(&pm)
 	assert.NoError(t, err)

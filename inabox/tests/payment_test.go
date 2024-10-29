@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -46,8 +47,8 @@ var _ = Describe("Inabox Integration", func() {
 
 		Expect(disp).To(Not(BeNil()))
 
-		singleBlobSize := uint32(128)
-		data := make([]byte, singleBlobSize)
+		blobLength := uint32(4)
+		data := make([]byte, blobLength*encoding.BYTES_PER_SYMBOL)
 		_, err = rand.Read(data)
 		Expect(err).To(BeNil())
 
@@ -59,8 +60,8 @@ var _ = Describe("Inabox Integration", func() {
 		reservationBytesLimit := 1024
 		paymentLimit := 512
 		// TODO: payment calculation unit consistency
-		for i := 0; i < (int(reservationBytesLimit+paymentLimit))/int(singleBlobSize); i++ {
-			blobStatus, key, err := disp.DisperseBlob(ctx, paddedData, []uint8{0})
+		for i := 0; i < (int(reservationBytesLimit+paymentLimit))/int(blobLength); i++ {
+			blobStatus, key, err := disp.DispersePaidBlob(ctx, paddedData, []uint8{0})
 			Expect(err).To(BeNil())
 			Expect(key).To(Not(BeNil()))
 			Expect(blobStatus).To(Not(BeNil()))

@@ -25,7 +25,7 @@ type Accountant struct {
 	minNumSymbols     uint32
 
 	// local accounting
-	// contains 3 bins; index 0 for current bin, 1 for next bin, 2 for overflowed bin
+	// contains 3 bins; circular wrapping of indices
 	binRecords        []BinRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
@@ -62,7 +62,6 @@ func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPay
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
-	// index := time.Now().Unix() / int64(a.reservationWindow)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()

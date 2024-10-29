@@ -213,11 +213,11 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid bin index for reservation")
 
 	// test bin usage metering
-	dataLength := uint(20)
+	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
 		header = createPaymentHeader(binIndex, 0, accountID2)
-		err = mt.MeterRequest(ctx, *header, dataLength, quoromNumbers)
+		err = mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID": &types.AttributeValueMemberS{Value: accountID2},
@@ -296,20 +296,20 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
-	dataLength := uint(100)
-	priceCharged := mt.PaymentCharged(dataLength)
+	symbolLength := uint(100)
+	priceCharged := mt.PaymentCharged(symbolLength)
 	assert.Equal(t, uint64(102*mt.ChainPaymentState.GetPricePerSymbol()), priceCharged)
 	header = createPaymentHeader(binIndex, priceCharged, accountID2)
-	err = mt.MeterRequest(ctx, *header, dataLength, quorumNumbers)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.NoError(t, err)
 	header = createPaymentHeader(binIndex, priceCharged, accountID2)
-	err = mt.MeterRequest(ctx, *header, dataLength, quorumNumbers)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
 		header = createPaymentHeader(binIndex, uint64(priceCharged)*uint64(i+1), accountID2)
-		err = mt.MeterRequest(ctx, *header, dataLength, quorumNumbers)
+		err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 		assert.NoError(t, err)
 	}
 
@@ -320,10 +320,10 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := uint64(priceCharged) * uint64(9)
-	dataLength = uint(2)
-	priceCharged = mt.PaymentCharged(dataLength)
+	symbolLength = uint(2)
+	priceCharged = mt.PaymentCharged(symbolLength)
 	header = createPaymentHeader(binIndex, previousCumulativePayment+priceCharged-1, accountID2)
-	err = mt.MeterRequest(ctx, *header, dataLength, quorumNumbers)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
 	previousCumulativePayment = previousCumulativePayment + priceCharged
 
@@ -355,42 +355,42 @@ func TestMetererOnDemand(t *testing.T) {
 func TestMeterer_paymentCharged(t *testing.T) {
 	tests := []struct {
 		name           string
-		dataLength     uint
+		symbolLength   uint
 		pricePerSymbol uint32
 		minNumSymbols  uint32
 		expected       uint64
 	}{
 		{
 			name:           "Data length equal to min chargeable size",
-			dataLength:     1024,
+			symbolLength:   1024,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1024,
 		},
 		{
 			name:           "Data length less than min chargeable size",
-			dataLength:     512,
+			symbolLength:   512,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1024,
 		},
 		{
 			name:           "Data length greater than min chargeable size",
-			dataLength:     2048,
+			symbolLength:   2048,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       2048,
 		},
 		{
 			name:           "Large data length",
-			dataLength:     1 << 20, // 1 MB
+			symbolLength:   1 << 20, // 1 MB
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1 << 20,
 		},
 		{
 			name:           "Price not evenly divisible by min chargeable size",
-			dataLength:     1536,
+			symbolLength:   1536,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       2048,
@@ -405,7 +405,7 @@ func TestMeterer_paymentCharged(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
 			}
-			result := m.PaymentCharged(tt.dataLength)
+			result := m.PaymentCharged(tt.symbolLength)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -414,37 +414,37 @@ func TestMeterer_paymentCharged(t *testing.T) {
 func TestMeterer_symbolsCharged(t *testing.T) {
 	tests := []struct {
 		name          string
-		dataLength    uint
+		symbolLength  uint
 		minNumSymbols uint32
 		expected      uint32
 	}{
 		{
 			name:          "Data length equal to min number of symobols",
-			dataLength:    1024,
+			symbolLength:  1024,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
 		{
 			name:          "Data length less than min number of symbols",
-			dataLength:    512,
+			symbolLength:  512,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
 		{
 			name:          "Data length greater than min number of symbols",
-			dataLength:    2048,
+			symbolLength:  2048,
 			minNumSymbols: 1024,
 			expected:      2048,
 		},
 		{
 			name:          "Large data length",
-			dataLength:    1 << 20, // 1 MB
+			symbolLength:  1 << 20, // 1 MB
 			minNumSymbols: 1024,
 			expected:      1 << 20,
 		},
 		{
 			name:          "Very small data length",
-			dataLength:    16,
+			symbolLength:  16,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
@@ -457,7 +457,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
 			}
-			result := m.SymbolsCharged(tt.dataLength)
+			result := m.SymbolsCharged(tt.symbolLength)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
