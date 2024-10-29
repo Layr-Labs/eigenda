@@ -285,7 +285,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
 	if paymentHeader != nil {
-		err := s.meterer.MeterRequest(ctx, *blob, *paymentHeader)
+		err := s.meterer.MeterRequest(ctx, *paymentHeader, uint(blobSize), blob.GetQuorumNumbers())
 		if err != nil {
 			return nil, api.NewErrorResourceExhausted(err.Error())
 		}
@@ -1084,6 +1084,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 
 	data := req.GetData()
 	blobSize := len(data)
+
 	// The blob size in bytes must be in range [1, maxBlobSize].
 	if blobSize > s.maxBlobSize {
 		return nil, fmt.Errorf("blob size cannot exceed %v Bytes", s.maxBlobSize)

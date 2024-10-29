@@ -70,15 +70,14 @@ func (m *Meterer) Start(ctx context.Context) {
 
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
-func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.PaymentMetadata) error {
-	headerQuorums := blob.GetQuorumNumbers()
+func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, blobLength uint, quorumNumbers []uint8) error {
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
 		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, &reservation, blob.RequestHeader.BlobAuthHeader.Length, headerQuorums); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, &reservation, blobLength, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
@@ -86,7 +85,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.
 		if err != nil {
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
-		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, blob.RequestHeader.BlobAuthHeader.Length, headerQuorums); err != nil {
+		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, blobLength, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}

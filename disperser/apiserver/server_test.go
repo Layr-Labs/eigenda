@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
 	"os"
 	"runtime"
@@ -701,6 +703,22 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to make initial query to the on-chain state")
 	}
 
+	mockState.On("GetPricePerSymbol").Return(uint32(1), nil)
+	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
+	mockState.On("GetGlobalSymbolsPerSecond").Return(uint64(4096), nil)
+	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)
+	mockState.On("GetOnDemandQuorumNumbers").Return([]uint8{0, 1}, nil)
+	mockState.On("GetReservationWindow").Return(uint32(1), nil)
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(core.OnDemandPayment{
+		CumulativePayment: big.NewInt(3000),
+	}, nil)
+	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(core.ActiveReservation{
+		SymbolsPerSec:  2048,
+		StartTimestamp: 0,
+		EndTimestamp:   math.MaxUint32,
+		QuorumNumbers:  []uint8{0, 1},
+		QuorumSplit:    []byte{50, 50},
+	}, nil)
 	// append test name to each table name for an unique store
 	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
@@ -730,7 +748,8 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		teardown()
 		panic("failed to create offchain store")
 	}
-	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background(), nil)
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
@@ -787,7 +806,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), meterer, ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), mt, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {
