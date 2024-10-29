@@ -319,6 +319,11 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 }
 
 func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	// If EnablePaymentMeter is false, meterer gets set to nil at start
+	// In that case, the function should not continue. (checking )
+	if s.meterer == nil {
+		return nil, api.NewErrorInternal("payment feature is not enabled")
+	}
 	blob, err := s.validatePaidRequestAndGetBlob(ctx, req)
 	binIndex := req.PaymentHeader.BinIndex
 	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
