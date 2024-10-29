@@ -34,9 +34,12 @@ func NewPaymentSigner(privateKeyHex string) *PaymentSigner {
 func (s *PaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
 	header.AccountId = s.GetAccountID()
 	pm := core.ConvertPaymentHeader(header)
-	hash := pm.Hash()
+	hash, err := pm.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash payment header: %v", err)
+	}
 
-	sig, err := crypto.Sign(hash.Bytes(), s.PrivateKey)
+	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign hash: %v", err)
 	}
@@ -61,9 +64,12 @@ func (s *NoopPaymentSigner) GetAccountID() string {
 // VerifyPaymentSignature verifies the signature against the payment metadata
 func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignature []byte) bool {
 	pm := core.ConvertPaymentHeader(paymentHeader)
-	hash := pm.Hash()
+	hash, err := pm.Hash()
+	if err != nil {
+		return false
+	}
 
-	recoveredPubKey, err := crypto.SigToPub(hash.Bytes(), paymentSignature)
+	recoveredPubKey, err := crypto.SigToPub(hash[:], paymentSignature)
 	if err != nil {
 		log.Printf("Failed to recover public key from signature: %v\n", err)
 		return false
@@ -78,7 +84,7 @@ func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignat
 
 	return crypto.VerifySignature(
 		crypto.FromECDSAPub(recoveredPubKey),
-		hash.Bytes(),
+		hash[:],
 		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
 	)
 }
