@@ -77,7 +77,7 @@ var clientBuilders = []*clientBuilder{
 			}
 
 			err = client.CreateBucket(context.Background(), bucket)
-			if err != nil && err.Error() != "container already exists" {
+			if err != nil {
 				return nil, err
 			}
 
@@ -93,7 +93,7 @@ var clientBuilders = []*clientBuilder{
 func setupLocalstack() error {
 	var err error
 	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-	if err != nil {
+	if err != nil && err.Error() != "container already exists" {
 		teardownLocalstack()
 		return err
 	}
