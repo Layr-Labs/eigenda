@@ -81,7 +81,7 @@ func NewDispersalServer(
 	}
 	logger.Info("allowlist config", "file", rateConfig.AllowlistFile, "refreshInterval", rateConfig.AllowlistRefreshInterval.String())
 
-	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+	authenticator := auth.NewAuthenticator()
 
 	return &DispersalServer{
 		serverConfig:  serverConfig,
@@ -325,6 +325,9 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 
 	// Check if the address is in the allowlist
 	if len(authenticatedAddress) > 0 {
+		// normalize to lowercase (non-checksummed) address or IP address
+		authenticatedAddress = strings.ToLower(authenticatedAddress)
+
 		quorumRates, ok := s.rateConfig.Allowlist[authenticatedAddress]
 		if ok {
 			rateInfo, ok := quorumRates[quorumID]
@@ -339,6 +342,8 @@ func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, qu
 				rates.Name = rateInfo.Name
 				return rates, key, nil
 			}
+		} else {
+			s.logger.Warn("authenticated address not found in allowlist", "authenticatedAddress", authenticatedAddress)
 		}
 	}
 

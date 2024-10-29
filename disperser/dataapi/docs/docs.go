@@ -992,11 +992,17 @@ const docTemplate = `{
                 "block_timestamp": {
                     "type": "string"
                 },
+                "operator_address": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
                 "quorum": {
                     "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
                 },
                 "transaction_hash": {
                     "type": "string"

@@ -2,6 +2,7 @@ package clients
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -22,6 +23,19 @@ type EigenDAClientConfig struct {
 
 	// The amount of time to wait between status queries of a newly dispersed blob
 	StatusQueryRetryInterval time.Duration
+
+	// The Ethereum RPC URL to use for querying the Ethereum blockchain.
+	// This is used to make sure that the blob has been confirmed on-chain.
+	EthRpcUrl string
+
+	// The address of the EigenDAServiceManager contract, used to make sure that the blob has been confirmed on-chain.
+	SvcManagerAddr string
+
+	// The number of Ethereum blocks to wait after the blob's batch has been included onchain, before returning from PutBlob calls.
+	// In most cases only makes sense if < 64 blocks (2 epochs). Otherwise, consider using WaitForFinalization instead.
+	//
+	// When WaitForFinalization is true, this field is ignored.
+	WaitForConfirmationDepth uint64
 
 	// If true, will wait for the blob to finalize, if false, will wait only for the blob to confirm.
 	WaitForFinalization bool
@@ -51,6 +65,22 @@ type EigenDAClientConfig struct {
 }
 
 func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
+	if c.WaitForFinalization {
+		if c.WaitForConfirmationDepth != 0 {
+			log.Println("Warning: WaitForFinalization is set to true, WaitForConfirmationDepth will be ignored")
+		}
+	} else {
+		if c.WaitForConfirmationDepth > 64 {
+			log.Printf("Warning: WaitForConfirmationDepth is set to %v > 64 (2 epochs == finality). Consider setting WaitForFinalization to true instead.\n", c.WaitForConfirmationDepth)
+		}
+	}
+	if c.SvcManagerAddr == "" {
+		return fmt.Errorf("EigenDAClientConfig.SvcManagerAddr not set. Needed to verify blob confirmed on-chain.")
+	}
+	if c.EthRpcUrl == "" {
+		return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set. Needed to verify blob confirmed on-chain.")
+	}
+
 	if c.StatusQueryRetryInterval == 0 {
 		c.StatusQueryRetryInterval = 5 * time.Second
 	}
