@@ -21,8 +21,8 @@ var (
 )
 
 const (
-	localstackPort = "5678"
-	localstackHost = "http://0.0.0.0:5678"
+	localstackPort = "4570"
+	localstackHost = "http://0.0.0.0:4570"
 	bucket         = "eigen-test"
 )
 
@@ -91,17 +91,25 @@ var clientBuilders = []*clientBuilder{
 }
 
 func setupLocalstack() error {
-	var err error
-	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-	if err != nil && err.Error() == "container already exists" {
-		teardownLocalstack()
-		return err
+	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+
+	if deployLocalStack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
+		if err != nil && err.Error() == "container already exists" {
+			teardownLocalstack()
+			return err
+		}
 	}
 	return nil
 }
 
 func teardownLocalstack() {
-	deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+
+	if deployLocalStack {
+		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
 }
 
 func RandomOperationsTest(t *testing.T, client s3.Client) {
