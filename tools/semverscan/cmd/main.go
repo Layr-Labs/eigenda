@@ -68,13 +68,24 @@ func RunScan(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch current block number - %s", err)
 	}
-	operatorState, err := ics.GetIndexedOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	operators, err := ics.GetIndexedOperators(context.Background(), currentBlock)
 	if err != nil {
 		return fmt.Errorf("failed to fetch indexed operator state - %s", err)
 	}
-	logger.Info("Queried operator state", "count", len(operatorState.IndexedOperators))
+	if config.OperatorId != "" {
+		operatorId, err := core.OperatorIDFromHex(config.OperatorId)
+		if err != nil {
+			return fmt.Errorf("failed to parse operator id %s - %v", config.OperatorId, err)
+		}
+		for operator := range operators {
+			if operator.Hex() != operatorId.Hex() {
+				delete(operators, operator)
+			}
+		}
+	}
+	logger.Info("Queried operator state", "count", len(operators))
 
-	semvers := semver.ScanOperators(operatorState.IndexedOperators, config.Workers, config.Timeout, logger)
+	semvers := semver.ScanOperators(operators, config.UseRetrievalClient, config.Workers, config.Timeout, logger)
 	displayResults(semvers)
 	return nil
 }

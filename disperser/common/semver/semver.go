@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numWorkers int, nodeInfoTimeout time.Duration, logger logging.Logger) map[string]int {
+func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, useRetrievalSocket bool, numWorkers int, nodeInfoTimeout time.Duration, logger logging.Logger) map[string]int {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	semvers := make(map[string]int)
@@ -21,8 +21,13 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 	worker := func() {
 		for operatorId := range operatorChan {
 			operatorSocket := core.OperatorSocket(operators[operatorId].Socket)
-			dispersalSocket := operatorSocket.GetDispersalSocket()
-			semver := GetSemverInfo(context.Background(), dispersalSocket, operatorId, logger, nodeInfoTimeout)
+			var socket string
+			if useRetrievalSocket {
+				socket = operatorSocket.GetRetrievalSocket()
+			} else {
+				socket = operatorSocket.GetDispersalSocket()
+			}
+			semver := GetSemverInfo(context.Background(), socket, useRetrievalSocket, operatorId, logger, nodeInfoTimeout)
 
 			mu.Lock()
 			semvers[semver]++
@@ -49,7 +54,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, numW
 }
 
 // query operator host info endpoint if available
-func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
+func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
 	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "unreachable"
@@ -57,8 +62,14 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 	defer conn.Close()
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	client := node.NewDispersalClient(conn)
-	reply, err := client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	var reply *node.NodeInfoReply
+	if userRetrievalClient {
+		client := node.NewRetrievalClient(conn)
+		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	} else {
+		client := node.NewDispersalClient(conn)
+		reply, err = client.NodeInfo(ctxWithTimeout, &node.NodeInfoRequest{})
+	}
 	if err != nil {
 		var semver string
 		if strings.Contains(err.Error(), "unknown method NodeInfo") {
@@ -82,6 +93,6 @@ func GetSemverInfo(ctx context.Context, socket string, operatorId core.OperatorI
 		reply.Semver = "src-compile"
 	}
 
-	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
+	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)
 	return reply.Semver
 }
