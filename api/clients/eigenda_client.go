@@ -263,7 +263,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 			//
 			// Assuming that the timeout is correctly set (long enough to both land onchain + finalize),
 			// 1. means that there is a problem with EigenDA, so we return an ErrorFailover to let the batcher failover to ethda
-			// 2. means that there is a problem with Ethereum, so we return 500.
+			// 2. means that there is a problem with Ethereum, so we return DeadlineExceeded (504).
 			//    batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
 			//    eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
 			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
