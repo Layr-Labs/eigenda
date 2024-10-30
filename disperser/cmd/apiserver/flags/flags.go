@@ -76,10 +76,47 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnablePaymentMeterer = cli.BoolFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-meterer"),
+		Usage:  "enable payment meterer",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
+	}
 	EnableRatelimiter = cli.BoolFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-ratelimiter"),
 		Usage:  "enable rate limiter",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_RATELIMITER"),
+	}
+	ReservationsTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "reservations-table-name"),
+		Usage:  "name of the dynamodb table to store reservation usages",
+		Value:  "reservations",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATIONS_TABLE_NAME"),
+	}
+	OnDemandTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "on-demand-table-name"),
+		Usage:  "name of the dynamodb table to store on-demand payments",
+		Value:  "on_demand",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_TABLE_NAME"),
+	}
+	GlobalRateTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "global-rate-table-name"),
+		Usage:  "name of the dynamodb table to store global rate usage. If not provided, a local store will be used",
+		Value:  "global_rate",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
+	}
+	UpdateInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "update-interval"),
+		Usage:    "update interval for refreshing the on-chain state",
+		Value:    1 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
+		Required: false,
+	}
+	ChainReadTimeout = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
+		Usage:    "timeout for reading from the chain",
+		Value:    10,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_READ_TIMEOUT"),
+		Required: false,
 	}
 	BucketTableName = cli.StringFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "rate-bucket-table-name"),
@@ -117,9 +154,13 @@ var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	EnableMetrics,
 	EnableRatelimiter,
+	EnablePaymentMeterer,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
 	MaxBlobSize,
+	ReservationsTableName,
+	OnDemandTableName,
+	GlobalRateTableName,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -52,7 +53,7 @@ var (
 	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
 
 	deployLocalStack bool
-	localStackPort   = "4568"
+	localStackPort   = "4569"
 	allowlistFile    *os.File
 	testMaxBlobSize  = 2 * 1024 * 1024
 )
@@ -136,7 +137,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
-	dispersalServer := newTestServer(transactor)
+	dispersalServer := newTestServer(transactor, t.Name())
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -192,6 +193,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
+
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
@@ -632,7 +634,7 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	dispersalServer = newTestServer(transactor)
+	dispersalServer = newTestServer(transactor, "setup")
 	dispersalServerV2 = newTestServerV2()
 }
 
@@ -645,7 +647,7 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
+func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
 
 	bucketName := "test-eigenda-blobstore"
@@ -674,6 +676,43 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create bucket store")
 	}
+
+	mockState := &mock.MockOnchainPaymentState{}
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
+	// append test name to each table name for an unique store
+	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
+	err = meterer.CreateReservationTable(awsConfig, table_names[0])
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
+	store, err := meterer.NewOffchainStore(
+		awsConfig,
+		table_names[0],
+		table_names[1],
+		table_names[2],
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
@@ -730,7 +769,7 @@ func newTestServer(transactor core.Writer) *apiserver.DispersalServer {
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), meterer, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {
