@@ -209,7 +209,7 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
 
-	header, signature, err := c.accountant.AccountBlob(ctx, uint64(len(data)), quorums)
+	header, signature, err := c.accountant.AccountBlob(ctx, uint64(encoding.GetBlobLength(uint(len(data)))), quorums)
 	if err != nil {
 		return nil, nil, err
 	}

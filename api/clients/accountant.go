@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
@@ -59,42 +60,51 @@ func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPay
 }
 
 // accountant calculates and records payment information
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, dataLength uint64) (uint32, *big.Int, error) {
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
 	relativeBinRecord := a.GetRelativeBinRecord(currentBinIndex)
-	relativeBinRecord.Usage += dataLength
+	relativeBinRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
 	binLimit := a.reservation.SymbolsPerSec * uint64(a.reservationWindow)
 	if relativeBinRecord.Usage <= binLimit {
+		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+			return 0, big.NewInt(0), err
+		}
 		return currentBinIndex, big.NewInt(0), nil
 	}
 
-	overflowBinRecord := a.GetOverflowBinRecord(currentBinIndex)
+	overflowBinRecord := a.GetRelativeBinRecord(currentBinIndex + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-dataLength < binLimit && dataLength <= binLimit {
+	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
 		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
+		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+			return 0, big.NewInt(0), err
+		}
 		return currentBinIndex, big.NewInt(0), nil
 	}
 
 	// reservation not available, attempt on-demand
-	//todo: rollback if disperser respond with some type of rejection?
-	relativeBinRecord.Usage -= dataLength
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(dataLength))))
+	//todo: rollback later if disperser respond with some type of rejection?
+	relativeBinRecord.Usage -= numSymbols
+	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(numSymbols))))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
+		if err := QuorumCheck(quorumNumbers, []uint8{0, 1}); err != nil {
+			return 0, big.NewInt(0), err
+		}
 		return 0, a.cumulativePayment, nil
 	}
-	return 0, big.NewInt(0), fmt.Errorf("Accountant cannot approve payment for this blob")
+	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
 // accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
-	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, dataLength)
+func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
+	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,23 +127,22 @@ func (a *Accountant) AccountBlob(ctx context.Context, dataLength uint64, quorums
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(dataLength uint) uint64 {
-	return uint64(a.SymbolsCharged(dataLength)) * uint64(a.pricePerSymbol)
+func (a *Accountant) PaymentCharged(numSymbols uint) uint64 {
+	return uint64(a.SymbolsCharged(numSymbols)) * uint64(a.pricePerSymbol)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(dataLength uint) uint32 {
-	if dataLength <= uint(a.minNumSymbols) {
+func (a *Accountant) SymbolsCharged(numSymbols uint) uint32 {
+	if numSymbols <= uint(a.minNumSymbols) {
 		return a.minNumSymbols
 	}
 	// Round up to the nearest multiple of MinNumSymbols
-	return uint32(core.RoundUpDivide(uint(dataLength), uint(a.minNumSymbols))) * a.minNumSymbols
+	return uint32(core.RoundUpDivide(uint(numSymbols), uint(a.minNumSymbols))) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativeBinRecord(index uint32) BinRecord {
+func (a *Accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 	relativeIndex := index % 3
-
 	if a.binRecords[relativeIndex].Index != uint32(index) {
 		a.binRecords[relativeIndex] = BinRecord{
 			Index: uint32(index),
@@ -141,18 +150,18 @@ func (a *Accountant) GetRelativeBinRecord(index uint32) BinRecord {
 		}
 	}
 
-	return a.binRecords[relativeIndex]
+	return &a.binRecords[relativeIndex]
 }
 
-func (a *Accountant) GetOverflowBinRecord(index uint32) BinRecord {
-	relativeIndex := (index + 2) % 3
-
-	if a.binRecords[relativeIndex].Index != uint32(index+2) {
-		a.binRecords[relativeIndex] = BinRecord{
-			Index: uint32(index + 2),
-			Usage: 0,
+// QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers
+func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
+	if len(quorumNumbers) == 0 {
+		return fmt.Errorf("no quorum numbers provided")
+	}
+	for _, quorum := range quorumNumbers {
+		if !slices.Contains(allowedNumbers, quorum) {
+			return fmt.Errorf("provided quorum number %v not allowed", quorum)
 		}
 	}
-
-	return a.binRecords[relativeIndex]
+	return nil
 }
