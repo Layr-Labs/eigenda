@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -11,37 +10,39 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-type PaymentSigner struct {
+type paymentSigner struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-var _ core.PaymentSigner = &PaymentSigner{}
+var _ core.PaymentSigner = &paymentSigner{}
 
-func NewPaymentSigner(privateKeyHex string) *PaymentSigner {
-
+func NewPaymentSigner(privateKeyHex string) (*paymentSigner, error) {
+	if len(privateKeyHex) == 0 {
+		return nil, fmt.Errorf("private key cannot be empty")
+	}
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
-		log.Fatalf("Failed to parse private key: %v", err)
+		return nil, fmt.Errorf("failed to convert hex to ECDSA private key: %w", err)
 	}
 
-	return &PaymentSigner{
+	return &paymentSigner{
 		PrivateKey: privateKey,
-	}
+	}, nil
 }
 
 // SignBlobPayment signs the payment header and returns the signature
-func (s *PaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
+func (s *paymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
 	header.AccountId = s.GetAccountID()
 	pm := core.ConvertPaymentHeader(header)
 	hash, err := pm.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash payment header: %v", err)
+		return nil, fmt.Errorf("failed to hash payment header: %w", err)
 	}
 
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign hash: %v", err)
+		return nil, fmt.Errorf("failed to sign hash: %w", err)
 	}
 
 	return sig, nil
@@ -62,35 +63,39 @@ func (s *NoopPaymentSigner) GetAccountID() string {
 }
 
 // VerifyPaymentSignature verifies the signature against the payment metadata
-func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignature []byte) bool {
+func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignature []byte) error {
 	pm := core.ConvertPaymentHeader(paymentHeader)
 	hash, err := pm.Hash()
 	if err != nil {
-		return false
+		return fmt.Errorf("failed to hash payment header: %w", err)
 	}
 
 	recoveredPubKey, err := crypto.SigToPub(hash[:], paymentSignature)
 	if err != nil {
-		log.Printf("Failed to recover public key from signature: %v\n", err)
-		return false
+		return fmt.Errorf("failed to recover public key from signature: %w", err)
 	}
 
 	recoveredAddress := crypto.PubkeyToAddress(*recoveredPubKey)
 	accountId := common.HexToAddress(paymentHeader.AccountId)
 	if recoveredAddress != accountId {
-		log.Printf("Signature address %s does not match account id %s\n", recoveredAddress.Hex(), accountId.Hex())
-		return false
+		return fmt.Errorf("signature address %s does not match account id %s", recoveredAddress.Hex(), accountId.Hex())
 	}
 
-	return crypto.VerifySignature(
+	ok := crypto.VerifySignature(
 		crypto.FromECDSAPub(recoveredPubKey),
 		hash[:],
 		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
 	)
+
+	if !ok {
+		return fmt.Errorf("invalid signature")
+	}
+
+	return nil
 }
 
 // GetAccountID returns the Ethereum address of the signer
-func (s *PaymentSigner) GetAccountID() string {
+func (s *paymentSigner) GetAccountID() string {
 	publicKey := crypto.FromECDSAPub(&s.PrivateKey.PublicKey)
 	hash := crypto.Keccak256(publicKey[1:])
 
