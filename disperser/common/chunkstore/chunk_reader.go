@@ -15,8 +15,12 @@ import (
 type ChunkReader interface {
 	// GetChunkProofs reads a slice of proofs from the chunk store.
 	GetChunkProofs(ctx context.Context, blobKey disperser.BlobKey) ([]*encoding.Proof, error)
-	// GetChunkCoefficients reads a slice of frames from the chunk store.
-	GetChunkCoefficients(ctx context.Context, blobKey disperser.BlobKey) ([]*rs.Frame, error)
+	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
+	// should match the metadata returned by PutChunkCoefficients.
+	GetChunkCoefficients(
+		ctx context.Context,
+		blobKey disperser.BlobKey,
+		metadata *ChunkCoefficientMetadata) ([]*rs.Frame, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
@@ -30,6 +34,9 @@ type chunkReader struct {
 }
 
 // NewChunkReader creates a new ChunkReader.
+//
+// This chunk reader will only return data for the shards specified in the shards parameter.
+// If empty, it will return data for all shards. (Note: shard feature is not yet implemented.)
 func NewChunkReader(
 	logger logging.Logger,
 	chunkMetadataStore *ChunkMetadataStore,
@@ -46,7 +53,10 @@ func NewChunkReader(
 	}
 }
 
-func (r *chunkReader) GetChunkProofs(ctx context.Context, blobKey disperser.BlobKey) ([]*encoding.Proof, error) {
+func (r *chunkReader) GetChunkProofs(
+	ctx context.Context,
+	blobKey disperser.BlobKey) ([]*encoding.Proof, error) {
+
 	s3Key := blobKey.String()
 
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
@@ -76,10 +86,16 @@ func (r *chunkReader) GetChunkProofs(ctx context.Context, blobKey disperser.Blob
 	return proofs, nil
 }
 
-func (r *chunkReader) GetChunkCoefficients(ctx context.Context, blobKey disperser.BlobKey) ([]*rs.Frame, error) {
+func (r *chunkReader) GetChunkCoefficients(
+	ctx context.Context,
+	blobKey disperser.BlobKey,
+	metadata *ChunkCoefficientMetadata) ([]*rs.Frame, error) {
+
 	s3Key := blobKey.String()
 
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
+	// TODO: Implement fragmented download
+	//bytes, err := r.client.FragmentedDownloadObject(ctx, r.bucket, s3Key, metadata.DataSize, metadata.FragmentSize)
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)

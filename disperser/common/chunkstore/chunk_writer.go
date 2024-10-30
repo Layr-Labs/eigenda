@@ -11,12 +11,24 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
+// ChunkCoefficientMetadata contains metadata about how chunk coefficients are stored.
+// Required for reading chunk coefficients using ChunkReader.GetChunkCoefficients().
+type ChunkCoefficientMetadata struct {
+	// The total size of file containing all chunk coefficients for the blob.
+	DataSize int
+	// The maximum fragment size used to store the chunk coefficients.
+	FragmentSize int
+}
+
 // ChunkWriter writes chunks that can be read by ChunkReader.
 type ChunkWriter interface {
 	// PutChunkProofs writes a slice of proofs to the chunk store.
 	PutChunkProofs(ctx context.Context, blobKey disperser.BlobKey, proofs []*encoding.Proof) error
 	// PutChunkCoefficients writes a slice of frames to the chunk store.
-	PutChunkCoefficients(ctx context.Context, blobKey disperser.BlobKey, frames []*rs.Frame) error
+	PutChunkCoefficients(
+		ctx context.Context,
+		blobKey disperser.BlobKey,
+		frames []*rs.Frame) (*ChunkCoefficientMetadata, error)
 }
 
 var _ ChunkWriter = (*chunkWriter)(nil)
@@ -62,13 +74,17 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey disperser.Blob
 	return nil
 }
 
-func (c *chunkWriter) PutChunkCoefficients(ctx context.Context, blobKey disperser.BlobKey, frames []*rs.Frame) error {
+func (c *chunkWriter) PutChunkCoefficients(
+	ctx context.Context,
+	blobKey disperser.BlobKey,
+	frames []*rs.Frame) (*ChunkCoefficientMetadata, error) {
+
 	s3Key := blobKey.String()
 
 	bytes, err := rs.EncodeFrames(frames)
 	if err != nil {
 		c.logger.Error("Failed to encode frames: %v", err)
-		return fmt.Errorf("failed to encode frames: %w", err)
+		return nil, fmt.Errorf("failed to encode frames: %w", err)
 	}
 
 	err = c.s3Client.UploadObject(ctx, c.bucketName, s3Key, bytes)
@@ -77,8 +93,11 @@ func (c *chunkWriter) PutChunkCoefficients(ctx context.Context, blobKey disperse
 
 	if err != nil {
 		c.logger.Error("Failed to upload chunks to S3: %v", err)
-		return fmt.Errorf("failed to upload chunks to S3: %w", err)
+		return nil, fmt.Errorf("failed to upload chunks to S3: %w", err)
 	}
 
-	return nil
+	return &ChunkCoefficientMetadata{
+		DataSize:     len(bytes),
+		FragmentSize: c.fragmentSize,
+	}, nil
 }

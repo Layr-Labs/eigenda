@@ -70,6 +70,7 @@ func TestEncodeDecodeFrames_AreInverses(t *testing.T) {
 	require.NotNil(t, enc)
 
 	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	assert.NoError(t, err)
 
 	framesPointers := make([]*rs.Frame, len(frames))
 	for i, frame := range frames {
