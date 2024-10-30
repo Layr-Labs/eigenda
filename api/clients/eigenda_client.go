@@ -234,7 +234,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
 	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
 	if err != nil {
-		// Disperser-client returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
+		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
 		errChan <- fmt.Errorf("error submitting authenticated blob to disperser: %w", err)
 		return
@@ -276,8 +276,8 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 					fmt.Sprintf("timed out waiting for blob that landed onchain to finalize (request id=%s). "+
 						"Either timeout not long enough, or ethereum might be experiencing difficulties: %v. ", base64RequestID, ctx.Err()))
 			} else {
-				// this should not be reachable...
-				errChan <- api.NewErrorInternal(fmt.Sprintf("timed out in a state that shouldn't be possible (request id=%s): %s", base64RequestID, ctx.Err()))
+				// this should not be reachable... indicates something wrong with either this client or eigenda, so we failover to ethda
+				errChan <- api.NewErrorFailover(fmt.Errorf("timed out in a state that shouldn't be possible (request id=%s): %w", base64RequestID, ctx.Err()))
 			}
 			return
 		case <-ticker.C:
