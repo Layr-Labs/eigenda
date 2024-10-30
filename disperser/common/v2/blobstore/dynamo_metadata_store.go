@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ const (
 
 	blobKeyPrefix  = "BlobKey#"
 	blobMetadataSK = "BlobMetadata"
+	blobCertSK     = "BlobCertificate"
 )
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -49,7 +51,12 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 		return err
 	}
 
-	return s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return disperser.ErrAlreadyExists
+	}
+
+	return err
 }
 
 func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.BlobKey) (*v2.BlobMetadata, error) {
@@ -116,6 +123,46 @@ func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 	}
 
 	return count, nil
+}
+
+func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *core.BlobCertificate) error {
+	item, err := MarshalBlobCertificate(blobCert)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return disperser.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core.BlobKey) (*core.BlobCertificate, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: blobCertSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: certificate not found for key %s", disperser.ErrMetadataNotFound, blobKey.Hex())
+	}
+
+	cert, err := UnmarshalBlobCertificate(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert, nil
 }
 
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
@@ -271,4 +318,30 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*v2.BlobMetadata, error) {
 		return nil, err
 	}
 	return &metadata, nil
+}
+
+func MarshalBlobCertificate(blobCert *core.BlobCertificate) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(blobCert)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal blob certificate: %w", err)
+	}
+
+	// Add PK and SK fields
+	blobKey, err := blobCert.BlobHeader.BlobKey()
+	if err != nil {
+		return nil, err
+	}
+	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + blobKey.Hex()}
+	fields["SK"] = &types.AttributeValueMemberS{Value: blobCertSK}
+
+	return fields, nil
+}
+
+func UnmarshalBlobCertificate(item commondynamodb.Item) (*core.BlobCertificate, error) {
+	cert := core.BlobCertificate{}
+	err := attributevalue.UnmarshalMap(item, &cert)
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
 }

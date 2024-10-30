@@ -33,8 +33,9 @@ const (
 )
 
 var (
-	once      sync.Once
-	clientRef *Client
+	once               sync.Once
+	clientRef          *Client
+	ErrConditionFailed = errors.New("condition failed")
 )
 
 type Item = map[string]types.AttributeValue
@@ -108,11 +109,24 @@ func (c *Client) PutItem(ctx context.Context, tableName string, item Item) (err 
 	return nil
 }
 
-func (c *Client) PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string) (err error) {
+func (c *Client) PutItemWithCondition(
+	ctx context.Context,
+	tableName string,
+	item Item,
+	condition string,
+	expressionAttributeNames map[string]string,
+	expressionAttributeValues map[string]types.AttributeValue,
+) (err error) {
 	_, err = c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(tableName), Item: item,
-		ConditionExpression: aws.String(condition),
+		ConditionExpression:       aws.String(condition),
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ExpressionAttributeValues: expressionAttributeValues,
 	})
+	var ccfe *types.ConditionalCheckFailedException
+	if errors.As(err, &ccfe) {
+		return ErrConditionFailed
+	}
 	if err != nil {
 		return fmt.Errorf("failed to put item in table %s: %w", tableName, err)
 	}

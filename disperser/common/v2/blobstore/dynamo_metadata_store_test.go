@@ -9,6 +9,7 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	core "github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/stretchr/testify/assert"
@@ -81,6 +82,10 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int32(1), queuedCount)
 
+	// attempt to put metadata with the same key should fail
+	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	assert.ErrorIs(t, err, disperser.ErrAlreadyExists)
+
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey1.Hex()},
@@ -89,6 +94,59 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey2.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		},
+	})
+}
+
+func TestBlobMetadataStoreCerts(t *testing.T) {
+	ctx := context.Background()
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: &corev2.BlobHeader{
+			BlobVersion:     0,
+			QuorumNumbers:   []core.QuorumID{0},
+			BlobCommitments: mockCommitment,
+			PaymentMetadata: core.PaymentMetadata{
+				AccountID:         "0x123",
+				BinIndex:          0,
+				CumulativePayment: big.NewInt(532),
+			},
+			Signature: []byte("signature"),
+		},
+		ReferenceBlockNumber: uint64(100),
+		RelayKeys:            []corev2.RelayKey{0, 2, 4},
+	}
+	err := blobMetadataStore.PutBlobCertificate(ctx, blobCert)
+	assert.NoError(t, err)
+
+	blobKey, err := blobCert.BlobHeader.BlobKey()
+	assert.NoError(t, err)
+	fetchedCert, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, blobCert, fetchedCert)
+
+	// blob cert with the same key should fail
+	blobCert1 := &corev2.BlobCertificate{
+		BlobHeader: &corev2.BlobHeader{
+			BlobVersion:     0,
+			QuorumNumbers:   []core.QuorumID{0},
+			BlobCommitments: mockCommitment,
+			PaymentMetadata: core.PaymentMetadata{
+				AccountID:         "0x123",
+				BinIndex:          0,
+				CumulativePayment: big.NewInt(532),
+			},
+			Signature: []byte("signature"),
+		},
+		ReferenceBlockNumber: uint64(1234),
+		RelayKeys:            []corev2.RelayKey{0},
+	}
+	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1)
+	assert.ErrorIs(t, err, disperser.ErrAlreadyExists)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobCertificate"},
 		},
 	})
 }
