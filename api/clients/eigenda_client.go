@@ -210,7 +210,7 @@ func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultCh
 	return
 }
 
-func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
+func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	// encode blob
@@ -232,7 +232,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
-	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctx, data, customQuorumNumbers)
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
@@ -246,8 +246,11 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	ticker := time.NewTicker(m.Config.StatusQueryRetryInterval)
 	defer ticker.Stop()
 
+	confirmationCh := time.NewTimer(m.Config.ConfirmationTimeout).C
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, m.Config.StatusQueryTimeout)
+	// finality here can either mean reaching some confirmationDepth or reaching actual finality
+	// depending on the WaitForFinalization config param.
+	ctxFinality, cancel = context.WithTimeout(ctxFinality, m.Config.StatusQueryTimeout)
 	defer cancel()
 
 	alreadyWaitingForDispersal := false
@@ -255,33 +258,37 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 	var latestBlobStatus grpcdisperser.BlobStatus
 	for {
 		select {
-		case <-ctx.Done():
-			// We can only land here if blob is still in
-			// 1. processing or dispersing status: waiting to land onchain
-			// 2. or confirmed status: landed onchain, waiting for finalization
-			// because all other statuses return immediately below.
-			//
-			// Assuming that the timeout is correctly set (long enough to both land onchain + finalize),
-			// 1. means that there is a problem with EigenDA, so we return an ErrorFailover to let the batcher failover to ethda
-			// 2. means that there is a problem with Ethereum, so we return DeadlineExceeded (504).
-			//    batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
-			//    eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
+		// The two first timeout cases can only happen while blob is still in
+		// 1. processing or dispersing status: waiting to land onchain
+		// 2. or confirmed status: landed onchain, waiting for finalization
+		// because all other statuses return immediately once reached (see below).
+		case <-confirmationCh:
 			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
-				errChan <- api.NewErrorFailover(fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctx.Err()))
+				errChan <- api.NewErrorFailover(fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctxFinality.Err()))
+			}
+			// set to nil so this case doesn't get triggered again
+			confirmationCh = nil
+		case <-ctxFinality.Done():
+			// this should have been triggered above because confirmationTimeout < ctxFinality timeout,
+			// but we leave this assert here as a safety net.
+			if latestBlobStatus == grpcdisperser.BlobStatus_PROCESSING || latestBlobStatus == grpcdisperser.BlobStatus_DISPERSING {
+				errChan <- api.NewErrorFailover(fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctxFinality.Err()))
 			} else if latestBlobStatus == grpcdisperser.BlobStatus_CONFIRMED {
-				// Timeout'ing in confirmed state means one of two things:
-				// 1. (if timeout was long enough to finalize in normal conditions): problem with ethereum, so we return 504 (DeadlineExceeded)
-				// 2. TODO: (if timeout was not long enough to finalize in normal conditions): eigenda-client is badly configured, should be a 400 (INVALID_ARGUMENT)
+				// Assuming that the ctxFinality timeout is correctly set (long enough for batch to land onchain + finalize),
+				// still being in confirmed state here means that there is a problem with Ethereum, so we return DeadlineExceeded (504).
+				// batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
+				// eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
+				// TODO: (if timeout was not long enough to finalize in normal conditions): eigenda-client is badly configured, should be a 400 (INVALID_ARGUMENT)
 				errChan <- api.NewErrorDeadlineExceeded(
 					fmt.Sprintf("timed out waiting for blob that landed onchain to finalize (request id=%s). "+
-						"Either timeout not long enough, or ethereum might be experiencing difficulties: %v. ", base64RequestID, ctx.Err()))
+						"Either timeout not long enough, or ethereum might be experiencing difficulties: %v. ", base64RequestID, ctxFinality.Err()))
 			} else {
 				// this should not be reachable... indicates something wrong with either this client or eigenda, so we failover to ethda
-				errChan <- api.NewErrorFailover(fmt.Errorf("timed out in a state that shouldn't be possible (request id=%s): %w", base64RequestID, ctx.Err()))
+				errChan <- api.NewErrorFailover(fmt.Errorf("timed out in a state that shouldn't be possible (request id=%s): %w", base64RequestID, ctxFinality.Err()))
 			}
 			return
 		case <-ticker.C:
-			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
+			statusRes, err := m.Client.GetBlobStatus(ctxFinality, requestID)
 			if err != nil {
 				m.Log.Warn("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
 				continue
@@ -324,7 +331,7 @@ func (m *EigenDAClient) putBlob(ctx context.Context, rawData []byte, resultChan 
 					}
 				} else {
 					batchId := statusRes.Info.BlobVerificationProof.GetBatchId()
-					batchConfirmed, err := m.batchIdConfirmedAtDepth(ctx, batchId, m.Config.WaitForConfirmationDepth)
+					batchConfirmed, err := m.batchIdConfirmedAtDepth(ctxFinality, batchId, m.Config.WaitForConfirmationDepth)
 					if err != nil {
 						m.Log.Warn("Error checking if batch ID is confirmed at depth. Will retry...", "requestID", base64RequestID, "err", err)
 					}
