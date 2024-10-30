@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -21,7 +20,6 @@ import (
 )
 
 func StartDockertestWithLocalstackContainer(localStackPort string) (*dockertest.Pool, *dockertest.Resource, error) {
-	debug.PrintStack() // TODO do not merge
 	fmt.Println("Starting Localstack container")
 	pool, err := dockertest.NewPool("")
 	if err != nil {
