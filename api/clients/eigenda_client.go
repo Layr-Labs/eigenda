@@ -354,7 +354,9 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 				resultChan <- statusRes.Info
 				return
 			default:
-				// this should never happen. If it does, the blob is in a heisenberg state... it could either eventually get confirmed or fail
+				// This should never happen. If it does, the blob is in a heisenberg state... it could either eventually get confirmed or fail.
+				// However, this doesn't mean there's a major outage with EigenDA, so we return a 500 error to let the caller redisperse the blob,
+				// rather than an api.ErrorFailover to failover to EthDA.
 				errChan <- api.NewErrorInternal(fmt.Sprintf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID))
 				return
 			}
