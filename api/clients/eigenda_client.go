@@ -21,7 +21,6 @@ import (
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/disperser"
 )
 
 // IEigenDAClient is a wrapper around the DisperserClient interface which
@@ -46,7 +45,6 @@ type EigenDAClient struct {
 	ethClient   *ethclient.Client
 	edasmCaller *edasm.ContractEigenDAServiceManagerCaller
 	Codec       codecs.BlobCodec
-	accountant  Accountant
 }
 
 var _ IEigenDAClient = &EigenDAClient{}
@@ -111,10 +109,19 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
-	if err != nil {
-		return nil, fmt.Errorf("new payment signer: %w", err)
+
+	var paymentSigner core.PaymentSigner
+	if len(config.PaymentSignerPrivateKeyHex) == 64 {
+		paymentSigner, err = auth.NewPaymentSigner(config.PaymentSignerPrivateKeyHex)
+		if err != nil {
+			return nil, fmt.Errorf("new payment signer: %w", err)
+		}
+	} else if len(config.PaymentSignerPrivateKeyHex) == 0 {
+		paymentSigner = auth.NewNoopPaymentSigner()
+	} else {
+		return nil, fmt.Errorf("invalid length for signer private key")
 	}
+
 	// a subsequent PR contains updates to fill in payment state
 	accountant := NewAccountant(core.ActiveReservation{}, core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
 	disperserClient, err := NewDisperserClient(disperserConfig, signer, accountant)
@@ -246,7 +253,13 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
-	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
+	var requestID []byte
+	// clients with a payment signer setting can disperse paid blobs
+	if len(m.Config.PaymentSignerPrivateKeyHex) > 0 {
+		_, requestID, err = m.Client.DispersePaidBlob(ctxFinality, data, customQuorumNumbers)
+	} else {
+		_, requestID, err = m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
+	}
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
@@ -372,125 +385,6 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 				// However, this doesn't mean there's a major outage with EigenDA, so we return a 500 error to let the caller redisperse the blob,
 				// rather than an api.ErrorFailover to failover to EthDA.
 				errChan <- api.NewErrorInternal(fmt.Sprintf("unknown reply status %d. ask for assistance from EigenDA team, using requestID %s", statusRes.Status, base64RequestID))
-				return
-			}
-		}
-	}
-}
-
-// PaidPutBlob behaves like PutBlob but with authenticated payment.
-func (m EigenDAClient) PaidPutBlob(ctx context.Context, data []byte) (*grpcdisperser.BlobInfo, error) {
-	resultChan, errorChan := m.PaidPutBlobAsync(ctx, data)
-	select { // no timeout here because we depend on the configured timeout in PutBlobAsync
-	case result := <-resultChan:
-		return result, nil
-	case err := <-errorChan:
-		return nil, err
-	}
-}
-
-func (m EigenDAClient) PaidPutBlobAsync(ctx context.Context, data []byte) (resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
-	resultChan = make(chan *grpcdisperser.BlobInfo, 1)
-	errChan = make(chan error, 1)
-	go m.paidPutBlob(ctx, data, resultChan, errChan)
-	return
-}
-
-func (m EigenDAClient) paidPutBlob(ctx context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
-	m.Log.Info("Attempting to disperse blob to EigenDA with payment")
-
-	// encode blob
-	if m.Codec == nil {
-		errChan <- fmt.Errorf("Codec cannot be nil")
-		return
-	}
-
-	data, err := m.Codec.EncodeBlob(rawData)
-	if err != nil {
-		errChan <- fmt.Errorf("error encoding blob: %w", err)
-		return
-	}
-
-	customQuorumNumbers := make([]uint8, len(m.Config.CustomQuorumIDs))
-	for i, e := range m.Config.CustomQuorumIDs {
-		customQuorumNumbers[i] = uint8(e)
-	}
-	// disperse blob
-	blobStatus, requestID, err := m.Client.DispersePaidBlob(ctx, data, customQuorumNumbers)
-	if err != nil {
-		errChan <- fmt.Errorf("error initializing DispersePaidBlob() client: %w", err)
-		return
-	}
-
-	// process response
-	if *blobStatus == disperser.Failed {
-		m.Log.Error("Unable to disperse blob to EigenDA, aborting", "err", err)
-		errChan <- fmt.Errorf("reply status is %d", blobStatus)
-		return
-	}
-
-	base64RequestID := base64.StdEncoding.EncodeToString(requestID)
-	m.Log.Info("Blob dispersed to EigenDA, now waiting for confirmation", "requestID", base64RequestID)
-
-	ticker := time.NewTicker(m.Config.StatusQueryRetryInterval)
-	defer ticker.Stop()
-
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, m.Config.StatusQueryTimeout)
-	defer cancel()
-
-	alreadyWaitingForDispersal := false
-	alreadyWaitingForFinalization := false
-	for {
-		select {
-		case <-ctx.Done():
-			errChan <- fmt.Errorf("timed out waiting for EigenDA blob to confirm blob with request id=%s: %w", base64RequestID, ctx.Err())
-			return
-		case <-ticker.C:
-			statusRes, err := m.Client.GetBlobStatus(ctx, requestID)
-			if err != nil {
-				m.Log.Error("Unable to retrieve blob dispersal status, will retry", "requestID", base64RequestID, "err", err)
-				continue
-			}
-
-			switch statusRes.Status {
-			case grpcdisperser.BlobStatus_PROCESSING, grpcdisperser.BlobStatus_DISPERSING:
-				// to prevent log clutter, we only log at info level once
-				if alreadyWaitingForDispersal {
-					m.Log.Debug("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
-				} else {
-					m.Log.Info("Blob submitted, waiting for dispersal from EigenDA", "requestID", base64RequestID)
-					alreadyWaitingForDispersal = true
-				}
-			case grpcdisperser.BlobStatus_FAILED:
-				m.Log.Error("EigenDA blob dispersal failed in processing", "requestID", base64RequestID, "err", err)
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing, requestID=%s: %w", base64RequestID, err)
-				return
-			case grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES:
-				m.Log.Error("EigenDA blob dispersal failed in processing with insufficient signatures", "requestID", base64RequestID, "err", err)
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with insufficient signatures, requestID=%s: %w", base64RequestID, err)
-				return
-			case grpcdisperser.BlobStatus_CONFIRMED:
-				if m.Config.WaitForFinalization {
-					// to prevent log clutter, we only log at info level once
-					if alreadyWaitingForFinalization {
-						m.Log.Debug("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
-					} else {
-						m.Log.Info("EigenDA blob confirmed, waiting for finalization", "requestID", base64RequestID)
-						alreadyWaitingForFinalization = true
-					}
-				} else {
-					m.Log.Info("EigenDA blob confirmed", "requestID", base64RequestID)
-					resultChan <- statusRes.Info
-					return
-				}
-			case grpcdisperser.BlobStatus_FINALIZED:
-				batchHeaderHashHex := fmt.Sprintf("0x%s", hex.EncodeToString(statusRes.Info.BlobVerificationProof.BatchMetadata.BatchHeaderHash))
-				m.Log.Info("Successfully dispersed blob to EigenDA", "requestID", base64RequestID, "batchHeaderHash", batchHeaderHashHex)
-				resultChan <- statusRes.Info
-				return
-			default:
-				errChan <- fmt.Errorf("EigenDA blob dispersal failed in processing with reply status %d", statusRes.Status)
 				return
 			}
 		}

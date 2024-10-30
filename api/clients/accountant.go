@@ -30,7 +30,6 @@ type Accountant struct {
 	binRecords        []BinRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
-	stopRotation      chan struct{}
 
 	paymentSigner core.PaymentSigner
 }
@@ -52,14 +51,17 @@ func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPay
 		minNumSymbols:     minNumSymbols,
 		binRecords:        []BinRecord{{Index: 0, Usage: 0}, {Index: 1, Usage: 0}, {Index: 2, Usage: 0}},
 		cumulativePayment: big.NewInt(0),
-		stopRotation:      make(chan struct{}),
 		paymentSigner:     paymentSigner,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
 }
 
-// accountant calculates and records payment information
+// BlobPaymentInfo calculates and records payment information. The accountant
+// will attempt to use the active reservation first and check for quorum settings,
+// then on-demand if the reservation is not available. The returned values are
+// bin index for reservation payments and cumulative payment for on-demand payments,
+// and both fields are used to create the payment header and signature
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)

@@ -88,7 +88,7 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 
 	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
 
-	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer)
+	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("new disperser-client: %w", err)

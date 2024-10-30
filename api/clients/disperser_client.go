@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -190,6 +191,10 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 
 // DispersePaidBlob disperses a blob with a payment header and signature. Similar to DisperseBlob but with signed payment header.
 func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+	if c.accountant == nil {
+		return nil, nil, api.NewErrorInternal("not implemented")
+	}
+
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error initializing connection: %w", err)
@@ -210,6 +215,9 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 	}
 
 	header, signature, err := c.accountant.AccountBlob(ctx, uint64(encoding.GetBlobLength(uint(len(data)))), quorums)
+	if header == nil {
+		return nil, nil, errors.New("accountant returned nil pointer to header")
+	}
 	if err != nil {
 		return nil, nil, err
 	}
