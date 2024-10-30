@@ -32,7 +32,8 @@ type Config struct {
 	// but all other methods use the default 4MiB max message size, whereas RetrieveBlob
 	// potentially needs a larger size.
 	//
-	// If not set, the default value is 100MiB, to be backward compatible.
+	// If not set, default value is 100MiB for forward compatibility.
+	// Check official documentation for current max blob size on mainnet.
 	MaxRetrieveBlobSizeBytes int
 }
 
@@ -293,8 +294,8 @@ func (c *DisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 	if c.config.MaxRetrieveBlobSizeBytes == 0 {
-		// max blob size on mainnet is currently 16MiB but we set this to 100MiB for backward compatibility
-		// to what it originally was before this config was added
+		// Set to 100MiB for forward compatibility.
+		// Check official documentation for current max blob size on mainnet.
 		c.config.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
 	}
 	reply, err := c.client.RetrieveBlob(ctxTimeout,
@@ -302,7 +303,7 @@ func (c *DisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 			BatchHeaderHash: batchHeaderHash,
 			BlobIndex:       blobIndex,
 		},
-		grpc.MaxCallRecvMsgSize(c.config.MaxRetrieveBlobSizeBytes))
+		grpc.MaxCallRecvMsgSize(c.config.MaxRetrieveBlobSizeBytes)) // for client
 	if err != nil {
 		return nil, err
 	}
