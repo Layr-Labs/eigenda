@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -114,7 +113,7 @@ func (c *disperserClient) Close() error {
 func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error initializing connection: %w", err)
+		return nil, nil, api.NewErrorFailover(err)
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
@@ -156,17 +155,17 @@ func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quo
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error initializing connection: %w", err)
+		return nil, nil, api.NewErrorFailover(err)
 	}
 
 	if c.signer == nil {
-		return nil, nil, fmt.Errorf("uninitialized signer for authenticated dispersal")
+		return nil, nil, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 
 	// first check if signer is valid
 	accountId, err := c.signer.GetAccountID()
 	if err != nil {
-		return nil, nil, fmt.Errorf("please configure signer key if you want to use authenticated endpoint %w", err)
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
 	}
 
 	quorumNumbers := make([]uint32, len(quorums))
@@ -177,7 +176,10 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617, %w", err)
+		return nil, nil, api.NewErrorInvalidArg(
+			fmt.Sprintf("encountered an error to convert a 32-bytes into a valid field element, "+
+				"please use the correct format where every 32bytes(big-endian) is less than "+
+				"21888242871839275222246405745257275088548364400416034343698204186575808495617, %v", err))
 	}
 
 	request := &disperser_rpc.DisperseBlobRequest{
@@ -187,11 +189,12 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
-
 	defer cancel()
 
 	stream, err := c.client.DisperseBlobAuthenticated(ctxTimeout)
 	if err != nil {
+		// grpc client errors return grpc errors, so we can just wrap the error in a normal wrapError,
+		// no need to wrap in another grpc error as we do with other errors above.
 		return nil, nil, fmt.Errorf("error while calling DisperseBlobAuthenticated: %w", err)
 	}
 
@@ -210,7 +213,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 	authHeaderReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_BlobAuthHeader)
 	if !ok {
-		return nil, nil, errors.New("expected challenge")
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("client expected challenge from disperser, instead received: %v", reply))
 	}
 
 	authHeader := core.BlobAuthHeader{
@@ -218,10 +221,9 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 		AccountID:       "",
 		Nonce:           authHeaderReply.BlobAuthHeader.ChallengeParameter,
 	}
-
 	authData, err := c.signer.SignBlobRequest(authHeader)
 	if err != nil {
-		return nil, nil, errors.New("error signing blob request")
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("error signing blob request: %v", err))
 	}
 
 	// Process challenge and send back challenge_reply
@@ -240,17 +242,17 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	}
 	disperseReply, ok := reply.Payload.(*disperser_rpc.AuthenticatedReply_DisperseReply) // Process the final disperse_reply
 	if !ok {
-		return nil, nil, errors.New("expected DisperseReply")
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("client expected DisperseReply from disperser, instead received: %v", reply))
 	}
 
 	blobStatus, err := disperser.FromBlobStatusProto(disperseReply.DisperseReply.GetResult())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("parsing blob status: %v", err))
 	}
 
 	// Assert: only status that makes sense is processing. Anything else is a bug on disperser side.
 	if *blobStatus != disperser.Processing {
-		return nil, nil, fmt.Errorf("expected status to be Processing, got %v", *blobStatus)
+		return nil, nil, api.NewErrorInternal(fmt.Sprintf("expected status to be Processing, got %v", *blobStatus))
 	}
 
 	return blobStatus, disperseReply.DisperseReply.GetRequestId(), nil
@@ -259,7 +261,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
-		return nil, fmt.Errorf("error initializing connection: %w", err)
+		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -268,19 +270,13 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (
 	request := &disperser_rpc.BlobStatusRequest{
 		RequestId: requestID,
 	}
-
-	reply, err := c.client.GetBlobStatus(ctxTimeout, request)
-	if err != nil {
-		return nil, err
-	}
-
-	return reply, nil
+	return c.client.GetBlobStatus(ctxTimeout, request)
 }
 
 func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
-		return nil, fmt.Errorf("error initializing connection: %w", err)
+		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -295,6 +291,8 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 	return reply.Data, nil
 }
 
+// initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
+// If initialization fails, it caches the error and will return it on every subsequent call.
 func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
@@ -308,7 +306,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 		c.conn = conn
 		c.client = disperser_rpc.NewDisperserClient(conn)
 	})
-	return initErr
+	return fmt.Errorf("initializing grpc connection: %w", initErr)
 }
 
 func getGrpcDialOptions(useSecureGrpcFlag bool) []grpc.DialOption {
