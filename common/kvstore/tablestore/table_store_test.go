@@ -33,7 +33,8 @@ func TestTableList(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	tStore, err := LevelDB.Start(logger, dbPath)
+	config := DefaultLevelDBConfig(dbPath)
+	tStore, err := Start(logger, config)
 	assert.NoError(t, err)
 
 	tables := tStore.GetTables()
@@ -44,89 +45,102 @@ func TestTableList(t *testing.T) {
 
 	// Add some tables
 
-	tStore, err = LevelDB.Start(logger, dbPath, "table1")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 
 	tables = tStore.GetTables()
 	assert.Equal(t, 1, len(tables))
-	assert.Equal(t, "table1", tables[0].Name())
+	assert.Equal(t, "table1", tables[0])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
-	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 2, len(tables))
 	sort.SliceStable(tables, func(i, j int) bool {
-		return tables[i].Name() < tables[j].Name()
+		return tables[i] < tables[j]
 	})
-	assert.Equal(t, "table1", tables[0].Name())
-	assert.Equal(t, "table2", tables[1].Name())
+	assert.Equal(t, "table1", tables[0])
+	assert.Equal(t, "table2", tables[1])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
-	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2", "table3"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
 	sort.SliceStable(tables, func(i, j int) bool {
-		return tables[i].Name() < tables[j].Name()
+		return tables[i] < tables[j]
 	})
-	assert.Equal(t, "table1", tables[0].Name())
-	assert.Equal(t, "table2", tables[1].Name())
-	assert.Equal(t, "table3", tables[2].Name())
+	assert.Equal(t, "table1", tables[0])
+	assert.Equal(t, "table2", tables[1])
+	assert.Equal(t, "table3", tables[2])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
 	// Restarting with the same tables should work.
-	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2", "table3"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
 	sort.SliceStable(tables, func(i, j int) bool {
-		return tables[i].Name() < tables[j].Name()
+		return tables[i] < tables[j]
 	})
-	assert.Equal(t, "table1", tables[0].Name())
-	assert.Equal(t, "table2", tables[1].Name())
-	assert.Equal(t, "table3", tables[2].Name())
+	assert.Equal(t, "table1", tables[0])
+	assert.Equal(t, "table2", tables[1])
+	assert.Equal(t, "table3", tables[2])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
 	// Delete a table
-
-	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table3")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table3"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 2, len(tables))
 	sort.SliceStable(tables, func(i, j int) bool {
-		return tables[i].Name() < tables[j].Name()
+		return tables[i] < tables[j]
 	})
-	assert.Equal(t, "table1", tables[0].Name())
+	assert.Equal(t, "table1", tables[0])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
 	// Add a table back in (this uses a different code path)
-	tStore, err = LevelDB.Start(logger, dbPath, "table1", "table3", "table4")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table3", "table4"}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 	tables = tStore.GetTables()
 	assert.Equal(t, 3, len(tables))
 	sort.SliceStable(tables, func(i, j int) bool {
-		return tables[i].Name() < tables[j].Name()
+		return tables[i] < tables[j]
 	})
-	assert.Equal(t, "table1", tables[0].Name())
-	assert.Equal(t, "table3", tables[1].Name())
-	assert.Equal(t, "table4", tables[2].Name())
+	assert.Equal(t, "table1", tables[0])
+	assert.Equal(t, "table3", tables[1])
+	assert.Equal(t, "table4", tables[2])
 
 	err = tStore.Shutdown()
 	assert.NoError(t, err)
 
 	// Delete the rest of the tables
-	tStore, err = LevelDB.Start(logger, dbPath)
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{}
+	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
 
 	tables = tStore.GetTables()
@@ -141,57 +155,64 @@ func TestUniqueKeySpace(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Start(logger, dbPath, "table1", "table2")
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"table1", "table2"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	// Write to the tables
 
-	err = table1.Put([]byte("key1"), []byte("value1"))
+	err = store.Put(kb1.Key([]byte("key1")), []byte("value1"))
 	assert.NoError(t, err)
-	err = table2.Put([]byte("key1"), []byte("value2"))
+	err = store.Put(kb2.Key([]byte("key1")), []byte("value2"))
 	assert.NoError(t, err)
 
-	value, err := table1.Get([]byte("key1"))
+	value, err := store.Get(kb1.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value1"), value)
 
-	value, err = table2.Get([]byte("key1"))
+	value, err = store.Get(kb2.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value2"), value)
 
 	// Delete a key from one table but not the other
 
-	err = table1.Delete([]byte("key1"))
+	err = store.Delete(kb1.Key([]byte("key1")))
 	assert.NoError(t, err)
 
-	_, err = table1.Get([]byte("key1"))
+	_, err = store.Get(kb1.Key([]byte("key1")))
 	assert.Equal(t, kvstore.ErrNotFound, err)
 
-	value, err = table2.Get([]byte("key1"))
+	value, err = store.Get(kb2.Key([]byte("key1")))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value2"), value)
+
+	err = store.Destroy()
+	assert.NoError(t, err)
 }
 
 func TestBatchOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Start(logger, dbPath, "table1", "table2", "table3")
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"table1", "table2", "table3"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
-	table3, err := store.GetTable("table3")
+	kb3, err := store.GetKeyBuilder("table3")
 	assert.NoError(t, err)
 
 	// Test a batch with just puts
@@ -203,15 +224,15 @@ func TestBatchOperations(t *testing.T) {
 
 		v := make([]byte, 8)
 		binary.BigEndian.PutUint64(v, uint64(i))
-		batch.Put(table1.TableKey(k), v)
+		batch.Put(kb1.Key(k), v)
 
 		v = make([]byte, 8)
 		binary.BigEndian.PutUint64(v, uint64(i+10))
-		batch.Put(table2.TableKey(k), v)
+		batch.Put(kb2.Key(k), v)
 
 		v = make([]byte, 8)
 		binary.BigEndian.PutUint64(v, uint64(i+20))
-		batch.Put(table3.TableKey(k), v)
+		batch.Put(kb3.Key(k), v)
 	}
 
 	err = batch.Apply()
@@ -221,15 +242,15 @@ func TestBatchOperations(t *testing.T) {
 		k := make([]byte, 8)
 		binary.BigEndian.PutUint64(k, uint64(i))
 
-		value, err := table1.Get(k)
+		value, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
 
-		value, err = table2.Get(k)
+		value, err = store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(i+10), binary.BigEndian.Uint64(value))
 
-		value, err = table3.Get(k)
+		value, err = store.Get(kb3.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(i+20), binary.BigEndian.Uint64(value))
 	}
@@ -243,9 +264,9 @@ func TestBatchOperations(t *testing.T) {
 			k := make([]byte, 8)
 			binary.BigEndian.PutUint64(k, uint64(i))
 
-			batch.Delete(table1.TableKey(k))
-			batch.Delete(table2.TableKey(k))
-			batch.Delete(table3.TableKey(k))
+			batch.Delete(kb1.Key(k))
+			batch.Delete(kb2.Key(k))
+			batch.Delete(kb3.Key(k))
 		}
 	}
 
@@ -257,24 +278,24 @@ func TestBatchOperations(t *testing.T) {
 		binary.BigEndian.PutUint64(k, uint64(i))
 
 		if i%2 == 1 {
-			_, err = table1.Get(k)
+			_, err = store.Get(kb1.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 
-			_, err = table2.Get(k)
+			_, err = store.Get(kb2.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 
-			_, err = table3.Get(k)
+			_, err = store.Get(kb3.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 		} else {
-			value, err := table1.Get(k)
+			value, err := store.Get(kb1.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
 
-			value, err = table2.Get(k)
+			value, err = store.Get(kb2.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i+10), binary.BigEndian.Uint64(value))
 
-			value, err = table3.Get(k)
+			value, err = store.Get(kb3.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i+20), binary.BigEndian.Uint64(value))
 		}
@@ -288,21 +309,21 @@ func TestBatchOperations(t *testing.T) {
 		k := make([]byte, 8)
 		binary.BigEndian.PutUint64(k, uint64(i))
 		if i%4 == 0 {
-			batch.Delete(table1.TableKey(k))
-			batch.Delete(table2.TableKey(k))
-			batch.Delete(table3.TableKey(k))
+			batch.Delete(kb1.Key(k))
+			batch.Delete(kb2.Key(k))
+			batch.Delete(kb3.Key(k))
 		} else if i%2 == 1 {
 			v := make([]byte, 8)
 			binary.BigEndian.PutUint64(v, uint64(2*i))
-			batch.Put(table1.TableKey(k), v)
+			batch.Put(kb1.Key(k), v)
 
 			v = make([]byte, 8)
 			binary.BigEndian.PutUint64(v, uint64(2*i+10))
-			batch.Put(table2.TableKey(k), v)
+			batch.Put(kb2.Key(k), v)
 
 			v = make([]byte, 8)
 			binary.BigEndian.PutUint64(v, uint64(2*i+20))
-			batch.Put(table3.TableKey(k), v)
+			batch.Put(kb3.Key(k), v)
 		}
 	}
 
@@ -314,36 +335,36 @@ func TestBatchOperations(t *testing.T) {
 		binary.BigEndian.PutUint64(k, uint64(i))
 
 		if i%4 == 0 {
-			_, err = table1.Get(k)
+			_, err = store.Get(kb1.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 
-			_, err = table2.Get(k)
+			_, err = store.Get(kb2.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 
-			_, err = table3.Get(k)
+			_, err = store.Get(kb3.Key(k))
 			assert.Equal(t, kvstore.ErrNotFound, err)
 		} else if i%2 == 1 {
-			val, err := table1.Get(k)
+			val, err := store.Get(kb1.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(2*i), binary.BigEndian.Uint64(val))
 
-			val, err = table2.Get(k)
+			val, err = store.Get(kb2.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(2*i+10), binary.BigEndian.Uint64(val))
 
-			val, err = table3.Get(k)
+			val, err = store.Get(kb3.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(2*i+20), binary.BigEndian.Uint64(val))
 		} else {
-			val, err := table1.Get(k)
+			val, err := store.Get(kb1.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i), binary.BigEndian.Uint64(val))
 
-			val, err = table2.Get(k)
+			val, err = store.Get(kb2.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i+10), binary.BigEndian.Uint64(val))
 
-			val, err = table3.Get(k)
+			val, err = store.Get(kb3.Key(k))
 			assert.NoError(t, err)
 			assert.Equal(t, uint64(i+20), binary.BigEndian.Uint64(val))
 		}
@@ -359,16 +380,18 @@ func TestDropTable(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath, "table1", "table2", "table3")
+	config := DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2", "table3"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
-	table3, err := store.GetTable("table3")
+	kb3, err := store.GetKeyBuilder("table3")
 	assert.NoError(t, err)
 
 	// Insert some data into the tables
@@ -379,13 +402,13 @@ func TestDropTable(t *testing.T) {
 		k := make([]byte, 8)
 		binary.BigEndian.PutUint64(k, uint64(i))
 
-		err = table1.Put(k, value)
+		err = store.Put(kb1.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table2.Put(k, value)
+		err = store.Put(kb2.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table3.Put(k, value)
+		err = store.Put(kb3.Key(k), value)
 		assert.NoError(t, err)
 	}
 
@@ -397,15 +420,15 @@ func TestDropTable(t *testing.T) {
 		expectedValue := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue, uint64(i))
 
-		value, err := table1.Get(k)
+		value, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table2.Get(k)
+		value, err = store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		_, err = table3.Get(k)
+		_, err = store.Get(kb3.Key(k))
 		assert.NoError(t, err)
 	}
 
@@ -413,16 +436,18 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Start(logger, dbPath, "table1", "table3")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table3"}
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err = store.GetTable("table1")
+	kb1, err = store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	_, err = store.GetTable("table2")
+	_, err = store.GetKeyBuilder("table2")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	table3, err = store.GetTable("table3")
+	kb3, err = store.GetKeyBuilder("table3")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -432,11 +457,11 @@ func TestDropTable(t *testing.T) {
 		expectedValue := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue, uint64(i))
 
-		value, err := table1.Get(k)
+		value, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table3.Get(k)
+		value, err = store.Get(kb3.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 	}
@@ -445,16 +470,18 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Start(logger, dbPath, "table3")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table3"}
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	_, err = store.GetTable("table1")
+	_, err = store.GetKeyBuilder("table1")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	_, err = store.GetTable("table2")
+	_, err = store.GetKeyBuilder("table2")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	table3, err = store.GetTable("table3")
+	kb3, err = store.GetKeyBuilder("table3")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -464,7 +491,7 @@ func TestDropTable(t *testing.T) {
 		expectedValue := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue, uint64(i))
 
-		value, err := table3.Get(k)
+		value, err := store.Get(kb3.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 	}
@@ -473,16 +500,18 @@ func TestDropTable(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Start(logger, dbPath)
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{}
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	_, err = store.GetTable("table1")
+	_, err = store.GetKeyBuilder("table1")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	_, err = store.GetTable("table2")
+	_, err = store.GetKeyBuilder("table2")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	_, err = store.GetTable("table3")
+	_, err = store.GetKeyBuilder("table3")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
 	err = store.Destroy()
@@ -497,22 +526,24 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath, "table1", "table2", "table3", "table4", "table5")
+	config := DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2", "table3", "table4", "table5"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
-	table3, err := store.GetTable("table3")
+	kb3, err := store.GetKeyBuilder("table3")
 	assert.NoError(t, err)
 
-	table4, err := store.GetTable("table4")
+	kb4, err := store.GetKeyBuilder("table4")
 	assert.NoError(t, err)
 
-	table5, err := store.GetTable("table5")
+	kb5, err := store.GetKeyBuilder("table5")
 	assert.NoError(t, err)
 
 	// Insert some data into the tables
@@ -523,19 +554,19 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 		k := make([]byte, 8)
 		binary.BigEndian.PutUint64(k, uint64(i))
 
-		err = table1.Put(k, value)
+		err = store.Put(kb1.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table2.Put(k, value)
+		err = store.Put(kb2.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table3.Put(k, value)
+		err = store.Put(kb3.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table4.Put(k, value)
+		err = store.Put(kb4.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table5.Put(k, value)
+		err = store.Put(kb5.Key(k), value)
 		assert.NoError(t, err)
 	}
 
@@ -547,23 +578,23 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 		expectedValue := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue, uint64(i))
 
-		value, err := table1.Get(k)
+		value, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table2.Get(k)
+		value, err = store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table3.Get(k)
+		value, err = store.Get(kb3.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table4.Get(k)
+		value, err = store.Get(kb4.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table5.Get(k)
+		value, err = store.Get(kb5.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 	}
@@ -572,34 +603,36 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Start(logger, dbPath, "table1", "table5", "table6", "table7", "table8", "table9")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table5", "table6", "table7", "table8", "table9"}
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err = store.GetTable("table1")
+	kb1, err = store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	_, err = store.GetTable("table2")
+	_, err = store.GetKeyBuilder("table2")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	_, err = store.GetTable("table3")
+	_, err = store.GetKeyBuilder("table3")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	_, err = store.GetTable("table4")
+	_, err = store.GetKeyBuilder("table4")
 	assert.Equal(t, kvstore.ErrTableNotFound, err)
 
-	table5, err = store.GetTable("table5")
+	kb2, err = store.GetKeyBuilder("table5")
 	assert.NoError(t, err)
 
-	table6, err := store.GetTable("table6")
+	table6, err := store.GetKeyBuilder("table6")
 	assert.NoError(t, err)
 
-	table7, err := store.GetTable("table7")
+	table7, err := store.GetKeyBuilder("table7")
 	assert.NoError(t, err)
 
-	table8, err := store.GetTable("table8")
+	table8, err := store.GetKeyBuilder("table8")
 	assert.NoError(t, err)
 
-	table9, err := store.GetTable("table9")
+	table9, err := store.GetKeyBuilder("table9")
 	assert.NoError(t, err)
 
 	// Check data in the tables that were not dropped
@@ -610,34 +643,22 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 		expectedValue := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue, uint64(i))
 
-		value, err := table1.Get(k)
+		value, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 
-		value, err = table5.Get(k)
+		value, err = store.Get(kb5.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue, value)
 	}
 
-	// Verify the table IDs. There should be no gaps, and the tables that did not get dropped should have the same IDs
-	// as before.
-	tableView1 := table1.(*tableView)
-	assert.Equal(t, uint32(0), tableView1.prefix)
-
-	tableView5 := table5.(*tableView)
-	assert.Equal(t, uint32(4), tableView5.prefix)
-
-	tableView6 := table6.(*tableView)
-	assert.Equal(t, uint32(1), tableView6.prefix)
-
-	tableView7 := table7.(*tableView)
-	assert.Equal(t, uint32(2), tableView7.prefix)
-
-	tableView8 := table8.(*tableView)
-	assert.Equal(t, uint32(3), tableView8.prefix)
-
-	tableView9 := table9.(*tableView)
-	assert.Equal(t, uint32(5), tableView9.prefix)
+	// Verify the table IDs.
+	assert.Equal(t, uint32(0), getTableID(kb1))
+	assert.Equal(t, uint32(4), getTableID(kb2))
+	assert.Equal(t, uint32(5), getTableID(table6))
+	assert.Equal(t, uint32(6), getTableID(table7))
+	assert.Equal(t, uint32(7), getTableID(table8))
+	assert.Equal(t, uint32(8), getTableID(table9))
 
 	err = store.Destroy()
 	assert.NoError(t, err)
@@ -645,17 +666,24 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	verifyDBIsDeleted(t)
 }
 
+func getTableID(kb kvstore.KeyBuilder) uint32 {
+	prefix := kb.(*keyBuilder).prefix
+	return binary.BigEndian.Uint32(prefix)
+}
+
 func TestIteration(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := MapStore.Start(logger, dbPath, "table1", "table2")
+	config := DefaultMapStoreConfig()
+	config.Schema = []string{"table1", "table2"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	// Prefix "qwer"
@@ -664,12 +692,12 @@ func TestIteration(t *testing.T) {
 
 		value := make([]byte, 8)
 		binary.BigEndian.PutUint64(value, uint64(i))
-		err = table1.Put(k, value)
+		err = store.Put(kb1.Key(k), value)
 		assert.NoError(t, err)
 
 		value = make([]byte, 8)
 		binary.BigEndian.PutUint64(value, uint64(2*i))
-		err = table2.Put(k, value)
+		err = store.Put(kb2.Key(k), value)
 		assert.NoError(t, err)
 	}
 
@@ -679,17 +707,17 @@ func TestIteration(t *testing.T) {
 
 		value := make([]byte, 8)
 		binary.BigEndian.PutUint64(value, uint64(i))
-		err = table1.Put(k, value)
+		err = store.Put(kb1.Key(k), value)
 		assert.NoError(t, err)
 
 		value = make([]byte, 8)
 		binary.BigEndian.PutUint64(value, uint64(2*i))
-		err = table2.Put(k, value)
+		err = store.Put(kb2.Key(k), value)
 		assert.NoError(t, err)
 	}
 
 	// Iterate table 1 with no prefix filter
-	it, err := table1.NewIterator(nil)
+	it, err := store.NewTableIterator(kb1)
 	assert.NoError(t, err)
 
 	count := 0
@@ -721,7 +749,7 @@ func TestIteration(t *testing.T) {
 	it.Release()
 
 	// Iterate table 2 with no prefix filter
-	it, err = table2.NewIterator(nil)
+	it, err = store.NewTableIterator(kb2)
 	assert.NoError(t, err)
 
 	count = 0
@@ -753,7 +781,7 @@ func TestIteration(t *testing.T) {
 	it.Release()
 
 	// Iterate over the "qwer" keys from table 1
-	it, err = table1.NewIterator([]byte("qwer"))
+	it, err = store.NewIterator(kb1.Key([]byte("qwer")))
 	assert.NoError(t, err)
 
 	count = 0
@@ -773,7 +801,7 @@ func TestIteration(t *testing.T) {
 	it.Release()
 
 	// Iterate over the "asdf" keys from table 2
-	it, err = table2.NewIterator([]byte("asdf"))
+	it, err = store.NewIterator(kb2.Key([]byte("asdf")))
 	assert.NoError(t, err)
 
 	count = 0
@@ -802,13 +830,15 @@ func TestRestart(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
+	config := DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -821,22 +851,23 @@ func TestRestart(t *testing.T) {
 		value2 := make([]byte, 8)
 		binary.BigEndian.PutUint64(value2, uint64(i*2))
 
-		err = table1.Put(k, value1)
+		err = store.Put(kb1.Key(k), value1)
 		assert.NoError(t, err)
 
-		err = table2.Put(k, value2)
+		err = store.Put(kb2.Key(k), value2)
 		assert.NoError(t, err)
 	}
 
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Start(logger, dbPath, "table1", "table2")
+	// Restart the store
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err = store.GetTable("table1")
+	kb1, err = store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
-	table2, err = store.GetTable("table2")
+	kb2, err = store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -849,11 +880,11 @@ func TestRestart(t *testing.T) {
 		expectedValue2 := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue2, uint64(i*2))
 
-		value1, err := table1.Get(k)
+		value1, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue1, value1)
 
-		value2, err := table2.Get(k)
+		value2, err := store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue2, value2)
 	}
@@ -871,7 +902,7 @@ type expectedTableData map[string][]byte
 type expectedStoreData map[string]expectedTableData
 
 // getTableNameList returns a list of table names from a table map.
-func getTableNameList(tableMap map[string]kvstore.Table) []string {
+func getTableNameList(tableMap map[string]kvstore.KeyBuilder) []string {
 	names := make([]string, 0, len(tableMap))
 	for name := range tableMap {
 		names = append(names, name)
@@ -887,10 +918,11 @@ func TestRandomOperations(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath)
+	config := DefaultLevelDBConfig(dbPath)
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	tables := make(map[string]kvstore.Table)
+	tables := make(map[string]kvstore.KeyBuilder)
 	expectedData := make(expectedStoreData)
 
 	for i := 0; i < 10000; i++ {
@@ -902,11 +934,13 @@ func TestRandomOperations(t *testing.T) {
 			err = store.Shutdown()
 			assert.NoError(t, err)
 
-			store, err = LevelDB.Start(logger, dbPath, getTableNameList(tables)...)
+			config = DefaultLevelDBConfig(dbPath)
+			config.Schema = getTableNameList(tables)
+			store, err = Start(logger, config)
 			assert.NoError(t, err)
 
 			for tableName := range tables {
-				table, err := store.GetTable(tableName)
+				table, err := store.GetKeyBuilder(tableName)
 				assert.NoError(t, err)
 				tables[tableName] = table
 			}
@@ -920,7 +954,9 @@ func TestRandomOperations(t *testing.T) {
 			name := tu.RandomString(8)
 			tableNames = append(tableNames, name)
 
-			store, err = LevelDB.Start(logger, dbPath, tableNames...)
+			config = DefaultLevelDBConfig(dbPath)
+			config.Schema = tableNames
+			store, err = Start(logger, config)
 			assert.NoError(t, err)
 
 			expectedData[name] = make(expectedTableData)
@@ -928,7 +964,7 @@ func TestRandomOperations(t *testing.T) {
 			tables[name] = nil
 
 			for tableName := range tables {
-				table, err := store.GetTable(tableName)
+				table, err := store.GetKeyBuilder(tableName)
 				assert.NoError(t, err)
 				tables[tableName] = table
 			}
@@ -945,14 +981,16 @@ func TestRandomOperations(t *testing.T) {
 			}
 			delete(tables, name)
 
-			store, err = LevelDB.Start(logger, dbPath, getTableNameList(tables)...)
+			config = DefaultLevelDBConfig(dbPath)
+			config.Schema = getTableNameList(tables)
+			store, err = Start(logger, config)
 			assert.NoError(t, err)
 
 			// Delete all expected data for the table
 			delete(expectedData, name)
 
 			for tableName := range tables {
-				table, err := store.GetTable(tableName)
+				table, err := store.GetKeyBuilder(tableName)
 				assert.NoError(t, err)
 				tables[tableName] = table
 			}
@@ -971,7 +1009,7 @@ func TestRandomOperations(t *testing.T) {
 
 			expectedData[tableName][string(k)] = v
 
-			err = table.Put(k, v)
+			err = store.Put(table.Key(k), v)
 			assert.NoError(t, err)
 		} else {
 			// Delete a value
@@ -994,7 +1032,7 @@ func TestRandomOperations(t *testing.T) {
 			}
 
 			delete(expectedData[tableName], k)
-			err = table.Delete([]byte(k))
+			err = store.Delete(table.Key([]byte(k)))
 			assert.NoError(t, err)
 		}
 
@@ -1006,7 +1044,7 @@ func TestRandomOperations(t *testing.T) {
 
 				for k := range tableData {
 					expectedValue := tableData[k]
-					value, err := table.Get([]byte(k))
+					value, err := store.Get(table.Key([]byte(k)))
 					assert.NoError(t, err)
 					assert.Equal(t, expectedValue, value)
 				}
@@ -1018,12 +1056,12 @@ func TestRandomOperations(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-var _ kvstore.Store = &explodingStore{}
+var _ kvstore.Store[[]byte] = &explodingStore{}
 
 // explodingStore is a store that returns an error after a certain number of operations.
 // Used to intentionally crash table deletion to exercise table deletion recovery.
 type explodingStore struct {
-	base               kvstore.Store
+	base               kvstore.Store[[]byte]
 	deletionsRemaining int
 }
 
@@ -1043,7 +1081,7 @@ func (e *explodingStore) Delete(key []byte) error {
 	return e.base.Delete(key)
 }
 
-func (e *explodingStore) NewBatch() kvstore.StoreBatch {
+func (e *explodingStore) NewBatch() kvstore.Batch[[]byte] {
 	panic("not used")
 }
 
@@ -1065,13 +1103,15 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
+	config := DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	// Write some data to the tables
@@ -1082,10 +1122,10 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		value := make([]byte, 8)
 		binary.BigEndian.PutUint64(value, uint64(i))
 
-		err = table1.Put(k, value)
+		err = store.Put(kb1.Key(k), value)
 		assert.NoError(t, err)
 
-		err = table2.Put(k, value)
+		err = store.Put(kb2.Key(k), value)
 		assert.NoError(t, err)
 	}
 
@@ -1101,27 +1141,31 @@ func TestInterruptedTableDeletion(t *testing.T) {
 		deletionsRemaining: 50,
 	}
 
-	_, err = start(logger, explodingBase, true, "table2")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table2"}
+	_, err = start(logger, explodingBase, config)
 	assert.Error(t, err)
 
 	err = explodingBase.Shutdown()
 	assert.NoError(t, err)
 
 	// Restart the store. The table should be gone by the time the method returns.
-	store, err = LevelDB.Start(logger, dbPath, "table2")
+	config = DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table2"}
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
 	tables := store.GetTables()
 	assert.Equal(t, 1, len(tables))
-	assert.Equal(t, "table2", tables[0].Name())
-	table2, err = store.GetTable("table2")
+	assert.Equal(t, "table2", tables[0])
+	kb2, err = store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	// Check that the data in the remaining table is still there. We shouldn't see any data from the deleted table.
 	for i := 0; i < 100; i++ {
 		k := make([]byte, 8)
 		binary.BigEndian.PutUint64(k, uint64(i))
-		value, err := table2.Get(k)
+		value, err := store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(i), binary.BigEndian.Uint64(value))
 	}
@@ -1138,13 +1182,15 @@ func TestLoadWithoutModifiedSchema(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	store, err := LevelDB.Start(logger, dbPath, "table1", "table2")
+	config := DefaultLevelDBConfig(dbPath)
+	config.Schema = []string{"table1", "table2"}
+	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err := store.GetTable("table1")
+	kb1, err := store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
 
-	table2, err := store.GetTable("table2")
+	kb2, err := store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -1157,22 +1203,24 @@ func TestLoadWithoutModifiedSchema(t *testing.T) {
 		value2 := make([]byte, 8)
 		binary.BigEndian.PutUint64(value2, uint64(i*2))
 
-		err = table1.Put(k, value1)
+		err = store.Put(kb1.Key(k), value1)
 		assert.NoError(t, err)
 
-		err = table2.Put(k, value2)
+		err = store.Put(kb2.Key(k), value2)
 		assert.NoError(t, err)
 	}
 
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	store, err = LevelDB.Load(logger, dbPath)
+	// Load the store without the schema
+	config = DefaultLevelDBConfig(dbPath)
+	store, err = Start(logger, config)
 	assert.NoError(t, err)
 
-	table1, err = store.GetTable("table1")
+	kb1, err = store.GetKeyBuilder("table1")
 	assert.NoError(t, err)
-	table2, err = store.GetTable("table2")
+	kb2, err = store.GetKeyBuilder("table2")
 	assert.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -1185,11 +1233,11 @@ func TestLoadWithoutModifiedSchema(t *testing.T) {
 		expectedValue2 := make([]byte, 8)
 		binary.BigEndian.PutUint64(expectedValue2, uint64(i*2))
 
-		value1, err := table1.Get(k)
+		value1, err := store.Get(kb1.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue1, value1)
 
-		value2, err := table2.Get(k)
+		value2, err := store.Get(kb2.Key(k))
 		assert.NoError(t, err)
 		assert.Equal(t, expectedValue2, value2)
 	}

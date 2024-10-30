@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-var _ kvstore.Store = &mapStore{}
+var _ kvstore.Store[[]byte] = &mapStore{}
 
 // mapStore is a simple in-memory implementation of KVStore. Designed more as a correctness test than a
 // production implementation -- there are things that may not be performant with this implementation.
@@ -19,7 +19,7 @@ type mapStore struct {
 }
 
 // NewStore creates a new mapStore.
-func NewStore() kvstore.Store {
+func NewStore() kvstore.Store[[]byte] {
 	return &mapStore{
 		data: make(map[string][]byte),
 	}
@@ -79,7 +79,7 @@ func (store *mapStore) WriteBatch(keys, values [][]byte) error {
 }
 
 // NewBatch creates a new batch for the store.
-func (store *mapStore) NewBatch() kvstore.StoreBatch {
+func (store *mapStore) NewBatch() kvstore.Batch[[]byte] {
 	return &batch{
 		store:  store,
 		keys:   make([][]byte, 0),
