@@ -38,7 +38,7 @@ type EigenDAClient struct {
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
 	Config      EigenDAClientConfig
 	Log         log.Logger
-	Client      DisperserClient
+	Client      IDisperserClient
 	ethClient   *ethclient.Client
 	edasmCaller *edasm.ContractEigenDAServiceManagerCaller
 	Codec       codecs.BlobCodec

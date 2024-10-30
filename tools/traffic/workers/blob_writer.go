@@ -5,13 +5,14 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"sync"
-	"time"
 )
 
 // BlobWriter sends blobs to a disperser at a configured rate.
@@ -29,7 +30,7 @@ type BlobWriter struct {
 	config *config.WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
-	disperser clients.DisperserClient
+	disperser clients.IDisperserClient
 
 	// Unconfirmed keys are sent here.
 	unconfirmedKeyChannel chan *UnconfirmedKey
@@ -53,7 +54,7 @@ func NewBlobWriter(
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
 	config *config.WorkerConfig,
-	disperser clients.DisperserClient,
+	disperser clients.IDisperserClient,
 	unconfirmedKeyChannel chan *UnconfirmedKey,
 	generatorMetrics metrics.Metrics) BlobWriter {
 

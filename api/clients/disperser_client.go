@@ -26,6 +26,14 @@ type Config struct {
 	// TODO: do we want to add config timeouts for those separate requests?
 	Timeout           time.Duration
 	UseSecureGrpcFlag bool
+	// MaxRetrieveBlobSizeBytes is the maximum size of a blob that can be retrieved by using
+	// the RetrieveBlob method. This is used to set the max message size for the grpc client.
+	// DisperserClient uses a single underlying grpc channel shared for all methods,
+	// but all other methods use the default 4MiB max message size, whereas RetrieveBlob
+	// potentially needs a larger size.
+	//
+	// If not set, the default value is 100MiB, to be backward compatible.
+	MaxRetrieveBlobSizeBytes int
 }
 
 // Deprecated: Use &Config{...} directly instead
@@ -38,7 +46,7 @@ func NewConfig(hostname, port string, timeout time.Duration, useSecureGrpcFlag b
 	}
 }
 
-type DisperserClient interface {
+type IDisperserClient interface {
 	Close() error
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	// DisperseBlobAuthenticated disperses a blob with an authenticated request.
@@ -50,7 +58,7 @@ type DisperserClient interface {
 }
 
 // See the NewDisperserClient constructor's documentation for details and usage examples.
-type disperserClient struct {
+type DisperserClient struct {
 	config *Config
 	signer core.BlobRequestSigner
 	// conn and client are not initialized in the constructor, but are initialized lazily
@@ -64,11 +72,14 @@ type disperserClient struct {
 	// This means a conservative estimate of 100-1000MB/sec, which should be amply sufficient.
 	// If we ever need to increase this, we could either consider asking the disperser to increase its limit,
 	// or to use a pool of connections here.
+	// TODO: we should refactor or make a new constructor which allows setting conn and/or client
+	//       via dependency injection. This would allow for testing via https://pkg.go.dev/google.golang.org/grpc/test/bufconn
+	//       instead of a real network connection for eg.
 	conn   *grpc.ClientConn
 	client disperser_rpc.DisperserClient
 }
 
-var _ DisperserClient = &disperserClient{}
+var _ IDisperserClient = &DisperserClient{}
 
 // DisperserClient maintains a single underlying grpc connection to the disperser server,
 // through which it sends requests to disperse blobs, get blob status, and retrieve blobs.
@@ -90,8 +101,8 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *disperserClient {
-	return &disperserClient{
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *DisperserClient {
+	return &DisperserClient{
 		config: config,
 		signer: signer,
 		// conn and client are initialized lazily
@@ -100,7 +111,7 @@ func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *disperse
 
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *disperserClient) Close() error {
+func (c *DisperserClient) Close() error {
 	if c.conn != nil {
 		err := c.conn.Close()
 		c.conn = nil
@@ -110,7 +121,7 @@ func (c *disperserClient) Close() error {
 	return nil
 }
 
-func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+func (c *DisperserClient) DisperseBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, nil, api.NewErrorFailover(err)
@@ -148,11 +159,11 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 }
 
 // TODO: implemented in subsequent PR
-func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+func (c *DisperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	return nil, nil, api.NewErrorInternal("not implemented")
 }
 
-func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
+func (c *DisperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, nil, api.NewErrorFailover(err)
@@ -258,7 +269,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	return blobStatus, disperseReply.DisperseReply.GetRequestId(), nil
 }
 
-func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
+func (c *DisperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (*disperser_rpc.BlobStatusReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -273,7 +284,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, requestID []byte) (
 	return c.client.GetBlobStatus(ctxTimeout, request)
 }
 
-func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
+func (c *DisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -281,10 +292,17 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
-	reply, err := c.client.RetrieveBlob(ctxTimeout, &disperser_rpc.RetrieveBlobRequest{
-		BatchHeaderHash: batchHeaderHash,
-		BlobIndex:       blobIndex,
-	})
+	if c.config.MaxRetrieveBlobSizeBytes == 0 {
+		// max blob size on mainnet is currently 16MiB but we set this to 100MiB for backward compatibility
+		// to what it originally was before this config was added
+		c.config.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
+	}
+	reply, err := c.client.RetrieveBlob(ctxTimeout,
+		&disperser_rpc.RetrieveBlobRequest{
+			BatchHeaderHash: batchHeaderHash,
+			BlobIndex:       blobIndex,
+		},
+		grpc.MaxCallRecvMsgSize(c.config.MaxRetrieveBlobSizeBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +311,7 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
 // If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *disperserClient) initOnceGrpcConnection() error {
+func (c *DisperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)

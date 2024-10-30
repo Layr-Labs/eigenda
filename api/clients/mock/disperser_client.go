@@ -23,7 +23,7 @@ type MockDisperserClient struct {
 	mockRetrievalStore map[string][]byte
 }
 
-var _ clients.DisperserClient = (*MockDisperserClient)(nil)
+var _ clients.IDisperserClient = (*MockDisperserClient)(nil)
 
 func NewMockDisperserClient() *MockDisperserClient {
 	return &MockDisperserClient{
