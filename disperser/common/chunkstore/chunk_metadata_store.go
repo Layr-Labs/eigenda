@@ -17,6 +17,7 @@ type ChunkMetadataStore interface {
 
 var _ ChunkMetadataStore = (*chunkMetadataStore)(nil)
 
+// chunkMetadataStore is currently just a placeholder. A real implementation will follow in a future PR.
 type chunkMetadataStore struct {
 }
 
