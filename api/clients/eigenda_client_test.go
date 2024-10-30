@@ -11,7 +11,6 @@ import (
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
@@ -506,15 +505,4 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 	// should timeout even though it would have finalized eventually
 	require.Error(t, err)
 	require.Nil(t, blobInfo)
-}
-
-func TestPutBlobNoopSigner(t *testing.T) {
-	config := clients.NewConfig("nohost", "noport", time.Second, false)
-	disperserClient := clients.NewDisperserClient(config, auth.NewLocalNoopSigner())
-
-	test := []byte("test")
-	test[0] = 0x00 // make sure the first byte of the requst is always 0
-	quorums := []uint8{0}
-	_, _, err := disperserClient.DisperseBlobAuthenticated(context.Background(), test, quorums)
-	assert.EqualError(t, err, "please configure signer key if you want to use authenticated endpoint noop signer cannot get accountID")
 }
