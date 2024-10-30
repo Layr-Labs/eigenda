@@ -14,6 +14,18 @@ const (
 
 var (
 	/* Required Flags */
+	EnableKzgFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-kzg"),
+		Usage:    "enable KZG",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_KZG"),
+	}
+	EnableRsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-rs"),
+		Usage:    "enable RS",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_RS"),
+	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which encoder listens for grpc calls",
@@ -46,6 +58,19 @@ var (
 		Usage:    "start metrics server",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	PprofHTTPPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
+		Usage:    "the http port which the pprof server is listening",
+		Required: false,
+		Value:    "6060",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_HTTP_PORT"),
+	}
+	EnablePprof = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "start prrof server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
 	}
 	MaxConcurrentRequestsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-requests"),
@@ -89,12 +114,16 @@ var (
 )
 
 var requiredFlags = []cli.Flag{
+	EnableKzgFlag,
+	EnableRsFlag,
 	GrpcPortFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	MetricsHTTPPort,
 	EnableMetrics,
+	PprofHTTPPort,
+	EnablePprof,
 	MaxConcurrentRequestsFlag,
 	RequestPoolSizeFlag,
 	EnableGnarkChunkEncodingFlag,

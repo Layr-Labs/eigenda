@@ -44,7 +44,7 @@ func TestFrameSerialization(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test Serialize
-			serialized, err := tt.frame.Serialize()
+			serialized, err := Serialize(tt.frame)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Frame.Serialize() error = %v, wantErr %v", err, tt.wantErr)
 				return

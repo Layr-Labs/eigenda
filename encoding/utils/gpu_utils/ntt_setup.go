@@ -14,12 +14,10 @@ import (
 )
 
 // batchSize is number of batches
-func SetupNTT() (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
+func SetupNTT(maxScale uint8) (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
 	cfg := core.GetDefaultNTTInitDomainConfig()
 
-	// maximally possible
-	exp := 20
-	e := initDomain(exp, cfg)
+	e := initDomain(int(maxScale), cfg)
 	if e != runtime.Success {
 		log.Println("Error")
 	}

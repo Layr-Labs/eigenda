@@ -152,10 +152,11 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		if err != nil {
 			gpuErr = fmt.Errorf("msm error: %w", err)
 		}
-		msmDone = time.Now()
 
 		// Free the flatten coeff store
 		flattenStoreCopyToDevice.Free()
+
+		msmDone = time.Now()
 
 		// Compute the first ecntt, and set new batch size for ntt
 		p.NttCfg.BatchSize = int32(numPoly)
@@ -176,9 +177,9 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 			gpuErr = fmt.Errorf("second ECNtt error: %w", err)
 		}
 
-		secondECNttDone = time.Now()
-
 		prunedSumVecInv.Free()
+
+		secondECNttDone = time.Now()
 
 		flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
 		flatProofsBatchHost.CopyFromDeviceAsync(&flatProofsBatch, *p.Stream)
@@ -192,8 +193,10 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		return nil, gpuErr
 	}
 
+	end := time.Now()
+
 	slog.Info("Multiproof Time Decomp",
-		"total", secondECNttDone.Sub(begin),
+		"total", end.Sub(begin),
 		"preproc", preprocessDone.Sub(begin),
 		"msm", msmDone.Sub(preprocessDone),
 		"fft1", firstECNttDone.Sub(msmDone),

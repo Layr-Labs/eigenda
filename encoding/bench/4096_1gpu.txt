@@ -1,0 +1,153 @@
+2024/10/21 21:30:04 maxprocs: Leaving GOMAXPROCS=16: CPU quota undefined
+Config output benchmark_results.json
+* Task Starts
+2024/10/21 21:30:04     Reading G1 points (33554432 bytes) takes 17.823651ms
+2024/10/21 21:30:05     Parsing takes 765.528593ms
+2024/10/21 21:30:05     Reading G2 points (67108864 bytes) takes 32.158235ms
+2024/10/21 21:30:16     Parsing takes 11.398047526s
+numthread 16
+Running benchmark: numChunks=4096, chunkLen=2, blobLength=1024
+2024/10/21 21:30:28 Getting sub tables
+2024/10/21 21:30:28 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:28     Loading Table uses 49.426884ms
+2024/10/21 21:30:28 Transposing sub tables
+2024/10/21 21:30:28 Creating FFT settings
+2024/10/21 21:30:28 Creating KZG settings
+[WARNING] Defaulting to Ingonyama icicle-cuda-license-server at `5053@license.icicle.ingonyama.com`. For more information about icicle-cuda-license, please contact support@ingonyama.com.
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:28 INFO Extending evaluation duration duration=3.381057ms
+2024/10/21 21:30:28 INFO RS Encode Summary input_size_bytes=32768 num_chunks=4096 chunk_length=2 duration=5.787848ms
+2024/10/21 21:30:29 INFO Multiproof Time Decomp total=155.461361ms preproc=3.745477ms msm=91.701692ms fft1=59.974299ms fft2=39.893µs
+2024/10/21 21:30:29 INFO Encoding process details RS_encode_duration=5.824231ms Commiting_duration=1.169752ms LengthCommit_duration=1.384959ms lengthProof_duration=1.904171ms multiProof_duration=186.224387ms SRSOrder=268435456 SRSOrder_shift=268434432
+2024/10/21 21:30:29 INFO Total encoding duration duration=186.266031ms
+Running benchmark: numChunks=4096, chunkLen=4, blobLength=2048
+2024/10/21 21:30:33 Getting sub tables
+2024/10/21 21:30:33 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:33     Loading Table uses 49.001318ms
+2024/10/21 21:30:33 Transposing sub tables
+2024/10/21 21:30:33 Creating FFT settings
+2024/10/21 21:30:33 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:33 INFO Extending evaluation duration duration=6.701821ms
+2024/10/21 21:30:33 INFO RS Encode Summary input_size_bytes=65536 num_chunks=4096 chunk_length=4 duration=9.103571ms
+2024/10/21 21:30:33 INFO Multiproof Time Decomp total=59.493789ms preproc=4.447432ms msm=20.888863ms fft1=33.974539ms fft2=182.955µs
+2024/10/21 21:30:33 INFO Encoding process details RS_encode_duration=9.131113ms Commiting_duration=1.377809ms LengthCommit_duration=1.90385ms lengthProof_duration=2.104316ms multiProof_duration=86.600374ms SRSOrder=268435456 SRSOrder_shift=268433408
+2024/10/21 21:30:33 INFO Total encoding duration duration=86.624586ms
+Running benchmark: numChunks=4096, chunkLen=8, blobLength=4096
+2024/10/21 21:30:37 Getting sub tables
+2024/10/21 21:30:37 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:37     Loading Table uses 72.65334ms
+2024/10/21 21:30:37 Transposing sub tables
+2024/10/21 21:30:37 Creating FFT settings
+2024/10/21 21:30:37 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:37 INFO Extending evaluation duration duration=13.367698ms
+2024/10/21 21:30:37 INFO RS Encode Summary input_size_bytes=131072 num_chunks=4096 chunk_length=8 duration=16.54393ms
+2024/10/21 21:30:37 INFO Multiproof Time Decomp total=71.404862ms preproc=5.153588ms msm=27.229306ms fft1=38.988435ms fft2=33.533µs
+2024/10/21 21:30:37 INFO Encoding process details RS_encode_duration=16.564341ms Commiting_duration=2.044182ms LengthCommit_duration=4.598534ms lengthProof_duration=4.739455ms multiProof_duration=98.699721ms SRSOrder=268435456 SRSOrder_shift=268431360
+2024/10/21 21:30:37 INFO Total encoding duration duration=98.722233ms
+Running benchmark: numChunks=4096, chunkLen=16, blobLength=8192
+2024/10/21 21:30:42 Getting sub tables
+2024/10/21 21:30:42 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:42     Loading Table uses 85.268269ms
+2024/10/21 21:30:42 Transposing sub tables
+2024/10/21 21:30:42 Creating FFT settings
+2024/10/21 21:30:42 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:42 INFO Extending evaluation duration duration=27.623526ms
+2024/10/21 21:30:42 INFO RS Encode Summary input_size_bytes=262144 num_chunks=4096 chunk_length=16 duration=31.633474ms
+2024/10/21 21:30:42 INFO Multiproof Time Decomp total=89.975431ms preproc=8.566588ms msm=38.992586ms fft1=42.379614ms fft2=36.643µs
+2024/10/21 21:30:42 INFO Encoding process details RS_encode_duration=31.661336ms Commiting_duration=2.747347ms LengthCommit_duration=4.726354ms lengthProof_duration=5.144627ms multiProof_duration=117.444976ms SRSOrder=268435456 SRSOrder_shift=268427264
+2024/10/21 21:30:42 INFO Total encoding duration duration=117.470388ms
+Running benchmark: numChunks=4096, chunkLen=32, blobLength=16384
+2024/10/21 21:30:47 Getting sub tables
+2024/10/21 21:30:47 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:47     Loading Table uses 181.612743ms
+2024/10/21 21:30:47 Transposing sub tables
+2024/10/21 21:30:47 Creating FFT settings
+2024/10/21 21:30:47 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:47 INFO Extending evaluation duration duration=67.884143ms
+2024/10/21 21:30:47 INFO RS Encode Summary input_size_bytes=524288 num_chunks=4096 chunk_length=32 duration=74.755787ms
+2024/10/21 21:30:47 INFO Multiproof Time Decomp total=130.413971ms preproc=15.79389ms msm=67.832748ms fft1=46.74447ms fft2=42.863µs
+2024/10/21 21:30:47 INFO Encoding process details RS_encode_duration=74.781439ms Commiting_duration=4.757867ms LengthCommit_duration=8.932347ms lengthProof_duration=9.557387ms multiProof_duration=158.250475ms SRSOrder=268435456 SRSOrder_shift=268419072
+2024/10/21 21:30:47 INFO Total encoding duration duration=158.277247ms
+Running benchmark: numChunks=4096, chunkLen=64, blobLength=32768
+2024/10/21 21:30:52 Getting sub tables
+2024/10/21 21:30:52 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:53     Loading Table uses 384.868791ms
+2024/10/21 21:30:53 Transposing sub tables
+2024/10/21 21:30:53 Creating FFT settings
+2024/10/21 21:30:53 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:53 INFO Extending evaluation duration duration=133.084183ms
+2024/10/21 21:30:53 INFO RS Encode Summary input_size_bytes=1048576 num_chunks=4096 chunk_length=64 duration=145.225744ms
+2024/10/21 21:30:53 INFO Multiproof Time Decomp total=206.262835ms preproc=28.354775ms msm=122.367385ms fft1=55.504202ms fft2=36.473µs
+2024/10/21 21:30:53 INFO Encoding process details RS_encode_duration=145.262807ms Commiting_duration=7.900865ms LengthCommit_duration=19.136364ms lengthProof_duration=18.909586ms multiProof_duration=235.77185ms SRSOrder=268435456 SRSOrder_shift=268402688
+2024/10/21 21:30:53 INFO Total encoding duration duration=235.798902ms
+Running benchmark: numChunks=4096, chunkLen=128, blobLength=65536
+2024/10/21 21:30:58 Getting sub tables
+2024/10/21 21:30:58 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:30:59     Loading Table uses 682.374216ms
+2024/10/21 21:30:59 Transposing sub tables
+2024/10/21 21:30:59 Creating FFT settings
+2024/10/21 21:30:59 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:30:59 INFO Extending evaluation duration duration=268.879001ms
+2024/10/21 21:30:59 INFO RS Encode Summary input_size_bytes=2097152 num_chunks=4096 chunk_length=128 duration=293.060665ms
+2024/10/21 21:30:59 INFO Multiproof Time Decomp total=283.704704ms preproc=55.450329ms msm=157.289318ms fft1=70.806174ms fft2=158.883µs
+2024/10/21 21:30:59 INFO Encoding process details RS_encode_duration=293.105788ms Commiting_duration=16.998435ms LengthCommit_duration=35.189695ms lengthProof_duration=46.184185ms multiProof_duration=317.657721ms SRSOrder=268435456 SRSOrder_shift=268369920
+2024/10/21 21:30:59 INFO Total encoding duration duration=317.678863ms
+Running benchmark: numChunks=4096, chunkLen=256, blobLength=131072
+2024/10/21 21:31:05 Getting sub tables
+2024/10/21 21:31:05 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:31:06     Loading Table uses 1.372268207s
+2024/10/21 21:31:06 Transposing sub tables
+2024/10/21 21:31:07 Creating FFT settings
+2024/10/21 21:31:07 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:31:08 INFO Multiproof Time Decomp total=566.383897ms preproc=107.087786ms msm=369.20353ms fft1=90.035236ms fft2=57.345µs
+2024/10/21 21:31:08 INFO Extending evaluation duration duration=638.422697ms
+2024/10/21 21:31:08 INFO RS Encode Summary input_size_bytes=4194304 num_chunks=4096 chunk_length=256 duration=692.865586ms
+2024/10/21 21:31:08 INFO Encoding process details RS_encode_duration=692.90968ms Commiting_duration=31.665996ms LengthCommit_duration=69.853779ms lengthProof_duration=76.044929ms multiProof_duration=607.229059ms SRSOrder=268435456 SRSOrder_shift=268304384
+2024/10/21 21:31:08 INFO Total encoding duration duration=693.004497ms
+Running benchmark: numChunks=4096, chunkLen=512, blobLength=262144
+2024/10/21 21:31:14 Getting sub tables
+2024/10/21 21:31:14 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:31:17     Loading Table uses 2.715307321s
+2024/10/21 21:31:17 Transposing sub tables
+2024/10/21 21:31:17 Creating FFT settings
+2024/10/21 21:31:17 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:31:19 INFO Multiproof Time Decomp total=1.054546212s preproc=157.367985ms msm=697.316199ms fft1=199.816534ms fft2=45.494µs
+2024/10/21 21:31:19 INFO Extending evaluation duration duration=1.450561344s
+2024/10/21 21:31:19 INFO RS Encode Summary input_size_bytes=8388608 num_chunks=4096 chunk_length=512 duration=1.564917065s
+2024/10/21 21:31:19 INFO Encoding process details RS_encode_duration=1.564966049s Commiting_duration=55.572009ms LengthCommit_duration=123.847912ms lengthProof_duration=119.707704ms multiProof_duration=1.22915237s SRSOrder=268435456 SRSOrder_shift=268173312
+2024/10/21 21:31:19 INFO Total encoding duration duration=1.565068387s
+Running benchmark: numChunks=4096, chunkLen=1024, blobLength=524288
+2024/10/21 21:31:27 Getting sub tables
+2024/10/21 21:31:27 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:31:33     Loading Table uses 5.489293307s
+2024/10/21 21:31:33 Transposing sub tables
+2024/10/21 21:31:33 Creating FFT settings
+2024/10/21 21:31:33 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:31:37 INFO Multiproof Time Decomp total=1.670930988s preproc=427.251711ms msm=918.231235ms fft1=325.405528ms fft2=42.514µs
+2024/10/21 21:31:38 INFO Extending evaluation duration duration=2.629237565s
+2024/10/21 21:31:38 INFO RS Encode Summary input_size_bytes=16777216 num_chunks=4096 chunk_length=1024 duration=2.878687621s
+2024/10/21 21:31:38 INFO Encoding process details RS_encode_duration=2.878736945s Commiting_duration=154.649742ms LengthCommit_duration=300.633718ms lengthProof_duration=304.238703ms multiProof_duration=1.756105s SRSOrder=268435456 SRSOrder_shift=267911168
+2024/10/21 21:31:38 INFO Total encoding duration duration=2.878874945s
+Running benchmark: numChunks=4096, chunkLen=2048, blobLength=1048576
+2024/10/21 21:31:48 Getting sub tables
+2024/10/21 21:31:48 Detected Precomputed FFT sliced G1 table
+2024/10/21 21:31:59     Loading Table uses 10.967875603s
+2024/10/21 21:31:59 Transposing sub tables
+2024/10/21 21:31:59 Creating FFT settings
+2024/10/21 21:32:00 Creating KZG settings
+[INFO] ICICLE backend loaded from /opt/icicle/lib/backend
+2024/10/21 21:32:06 INFO Multiproof Time Decomp total=3.919787098s preproc=729.903999ms msm=2.923484981s fft1=266.358315ms fft2=39.803µs
+2024/10/21 21:32:08 INFO Extending evaluation duration duration=5.915471622s
+2024/10/21 21:32:09 INFO RS Encode Summary input_size_bytes=33554432 num_chunks=4096 chunk_length=2048 duration=6.448033007s
+2024/10/21 21:32:09 INFO Encoding process details RS_encode_duration=6.44808117s Commiting_duration=219.597863ms LengthCommit_duration=398.56561ms lengthProof_duration=403.150403ms multiProof_duration=4.156542729s SRSOrder=268435456 SRSOrder_shift=267386880
+2024/10/21 21:32:09 INFO Total encoding duration duration=6.448147346s
+Benchmark results written to benchmark_results.json

@@ -94,7 +94,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	gpuLock := sync.Mutex{}
 
 	// Setup NTT
-	nttCfg, icicle_err := gpu_utils.SetupNTT()
+	nttCfg, icicle_err := gpu_utils.SetupNTT(n)
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup NTT")
 	}

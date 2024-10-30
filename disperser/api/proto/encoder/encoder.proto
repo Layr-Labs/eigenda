@@ -21,7 +21,7 @@ message MultiProofReply {
 
 message RSEncodedFrame {
   bytes coeffs = 1;                // serialized coefficients using your rs.Frame.Serialize()
-  uint32 bit_reversed_index = 3;   // ReverseBits(i)
+  uint32 bit_reversed_index = 2;   // ReverseBits(i)
 }
 
 message RSEncodeBlobReply {

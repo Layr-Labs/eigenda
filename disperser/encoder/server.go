@@ -196,7 +196,6 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 	}
 
 	var chunksData [][]byte
-
 	var format pb.ChunkEncodingFormat
 	if s.config.EnableGnarkChunkEncoding {
 		format = pb.ChunkEncodingFormat_GNARK

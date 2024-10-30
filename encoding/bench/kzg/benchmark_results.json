@@ -1,0 +1,90 @@
+[
+  {
+    "num_chunks": 8192,
+    "chunk_length": 1,
+    "blob_length": 1024,
+    "encode_time": 13138350293,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 2,
+    "blob_length": 2048,
+    "encode_time": 13159256506,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 4,
+    "blob_length": 4096,
+    "encode_time": 13319900605,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 8,
+    "blob_length": 8192,
+    "encode_time": 13472965727,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 16,
+    "blob_length": 16384,
+    "encode_time": 13800565763,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 32,
+    "blob_length": 32768,
+    "encode_time": 14428307395,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 64,
+    "blob_length": 65536,
+    "encode_time": 15496717742,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 128,
+    "blob_length": 131072,
+    "encode_time": 17634848652,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 256,
+    "blob_length": 262144,
+    "encode_time": 21442840519,
+    "verify_time": 30,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 512,
+    "blob_length": 524288,
+    "encode_time": 30385737811,
+    "verify_time": 31,
+    "verify_result": false
+  },
+  {
+    "num_chunks": 8192,
+    "chunk_length": 1024,
+    "blob_length": 1048576,
+    "encode_time": 42084931016,
+    "verify_time": 20,
+    "verify_result": false
+  }
+]

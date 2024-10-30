@@ -143,7 +143,6 @@ func (g *Prover) PreloadAllEncoders() error {
 }
 
 func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (encoding.BlobCommitments, []*encoding.Frame, error) {
-
 	enc, err := e.GetKzgEncoder(params)
 	if err != nil {
 		return encoding.BlobCommitments{}, nil, err

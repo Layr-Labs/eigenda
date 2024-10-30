@@ -33,32 +33,44 @@ func (g *Encoder) EncodeBytes(inputBytes []byte) ([]Frame, []uint32, error) {
 // in the form of field element. The extra returned integer list corresponds to which leading
 // coset root of unity, the frame is proving against, which can be deduced from a frame's index
 func (g *Encoder) Encode(inputFr []fr.Element) ([]Frame, []uint32, error) {
-	start := time.Now()
-	intermediate := time.Now()
+	totalStart := time.Now()
 
+	padStart := time.Now()
 	pdCoeffs, err := g.PadPolyEval(inputFr)
 	if err != nil {
 		return nil, nil, err
 	}
+	padDuration := time.Since(padStart)
+	slog.Info("Padding evaluation duration", "duration", padDuration)
 
+	extendStart := time.Now()
 	polyEvals, err := g.Computer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	slog.Debug("Extending evaluation duration", "duration", time.Since(intermediate))
+	extendDuration := time.Since(extendStart)
+	slog.Info("Extending evaluation duration", "duration", extendDuration)
 
 	// create frames to group relevant info
+	frameStart := time.Now()
 	frames, indices, err := g.MakeFrames(polyEvals)
 	if err != nil {
 		return nil, nil, err
 	}
+	frameDuration := time.Since(frameStart)
+	slog.Info("MakeFrames duration", "duration", frameDuration)
 
+	totalDuration := time.Since(totalStart)
+
+	// Enhanced summary with all timing information
 	slog.Info("RS Encode Summary",
 		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
 		"num_chunks", g.NumChunks,
 		"chunk_length", g.ChunkLength,
-		"duration", time.Since(start),
+		"padding_duration", padDuration,
+		"extension_duration", extendDuration,
+		"frame_creation_duration", frameDuration,
+		"total_duration", totalDuration,
 	)
 
 	return frames, indices, nil

@@ -61,9 +61,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			PprofHttpPort:            ctx.GlobalString(flags.PprofHttpPort.Name),
 			EnablePprof:              ctx.GlobalBool(flags.EnablePprof.Name),
 		},
-		MetricsConfig: encoder.MetrisConfig{
+		MetricsConfig: encoder.MetricsConfig{
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
+		},
+		PprofConfig: encoder.PprofConfig{
+			HTTPPort:    ctx.GlobalString(flags.PprofHTTPPort.Name),
+			EnablePprof: ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 	}
 	return config, nil

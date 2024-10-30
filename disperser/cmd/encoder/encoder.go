@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -17,7 +18,16 @@ func NewEncoderGRPCServer(config Config, _logger logging.Logger) (*EncoderGRPCSe
 	logger := _logger.With("component", "EncoderGRPCServer")
 
 	// Create KZG Prover
-	p, err := prover.NewProver(&config.EncoderConfig, true)
+	var kzgProver *prover.Prover
+	var err error
+	if config.ServerConfig.EnableKzg {
+		kzgProver, err = prover.NewProver(&config.KzgConfig, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create encoder: %w", err)
+		}
+	} else {
+		slog.Info("KZG is not enabled")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %w", err)
 	}
@@ -30,7 +40,15 @@ func NewEncoderGRPCServer(config Config, _logger logging.Logger) (*EncoderGRPCSe
 		logger.Info("Enabled metrics for Encoder", "socket", httpSocket)
 	}
 
-	server := encoder.NewServer(*config.ServerConfig, logger, p, metrics)
+	// Start pprof server
+	pprofProfiler := encoder.NewPprofProfiler(config.PprofConfig.HTTPPort, logger)
+	if config.PprofConfig.EnablePprof {
+		port := config.PprofConfig.HTTPPort
+		go pprofProfiler.Start(port, logger)
+		logger.Info("Enabled pprof for Encoder", "port", port)
+	}
+
+	server := encoder.NewServer(*config.ServerConfig, logger, kzgProver, metrics)
 
 	return &EncoderGRPCServer{
 		Server: server,

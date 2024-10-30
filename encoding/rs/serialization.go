@@ -10,7 +10,7 @@ const BYTES_PER_SYMBOL = 32 // fr.Element serializes to 32 bytes
 
 // Serialize serializes Frame to a compact byte format
 // Each fr.Element is serialized consecutively
-func (f *Frame) Serialize() ([]byte, error) {
+func Serialize(f *Frame) ([]byte, error) {
 	// Pre-allocate buffer for all coefficients
 	coded := make([]byte, 0, BYTES_PER_SYMBOL*len(f.Coeffs))
 
