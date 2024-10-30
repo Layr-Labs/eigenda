@@ -100,7 +100,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, r
 	}
 
 	header := corev2.BlobCertificate{
-		BlobHeader: corev2.BlobHeader{
+		BlobHeader: &corev2.BlobHeader{
 			BlobVersion:     version,
 			QuorumNumbers:   quorums,
 			BlobCommitments: commitments,
@@ -114,7 +114,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, r
 
 // prepareBlobs takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertificate, blobs [][]byte) (map[core.OperatorID][]*corev2.BlobShard, core.IndexedChainState) {
+func prepareBlobs(t *testing.T, operatorCount uint, certs []corev2.BlobCertificate, blobs [][]byte) (map[core.OperatorID][]*corev2.BlobShard, core.IndexedChainState) {
 
 	cst, err := mock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
@@ -123,11 +123,11 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertifi
 	})
 	assert.NoError(t, err)
 
-	blobsMap := make([]map[core.QuorumID]map[core.OperatorID][]*encoding.Frame, 0, len(headers))
+	blobsMap := make([]map[core.QuorumID]map[core.OperatorID][]*encoding.Frame, 0, len(certs))
 
-	for z, header := range headers {
-
+	for z, cert := range certs {
 		blob := blobs[z]
+		header := cert.BlobHeader
 
 		params, err := header.GetEncodingParams()
 		if err != nil {
@@ -139,7 +139,7 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertifi
 			t.Fatal(err)
 		}
 
-		state, err := cst.GetOperatorState(context.Background(), uint(header.ReferenceBlockNumber), header.QuorumNumbers)
+		state, err := cst.GetOperatorState(context.Background(), uint(cert.ReferenceBlockNumber), header.QuorumNumbers)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,7 +177,7 @@ func prepareBlobs(t *testing.T, operatorCount uint, headers []corev2.BlobCertifi
 				}
 				if len(inverseMap[operatorID]) < blobIndex+1 {
 					inverseMap[operatorID] = append(inverseMap[operatorID], &corev2.BlobShard{
-						BlobCertificate: headers[blobIndex],
+						BlobCertificate: certs[blobIndex],
 						Chunks:          make(map[core.QuorumID][]*encoding.Frame),
 					})
 				}
