@@ -165,7 +165,7 @@ func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []
 	// first check if signer is valid
 	accountId, err := c.signer.GetAccountID()
 	if err != nil {
-		return nil, nil, api.NewErrorInternal(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
+		return nil, nil, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
 	}
 
 	quorumNumbers := make([]uint32, len(quorums))
@@ -306,7 +306,10 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 		c.conn = conn
 		c.client = disperser_rpc.NewDisperserClient(conn)
 	})
-	return fmt.Errorf("initializing grpc connection: %w", initErr)
+	if initErr != nil {
+		return fmt.Errorf("initializing grpc connection: %w", initErr)
+	}
+	return nil
 }
 
 func getGrpcDialOptions(useSecureGrpcFlag bool) []grpc.DialOption {
