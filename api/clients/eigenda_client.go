@@ -33,6 +33,8 @@ type IEigenDAClient interface {
 }
 
 // See the NewEigenDAClient constructor's documentation for details and usage examples.
+// TODO: Refactor this struct and interface above to use same naming convention as disperser client.
+//       Also need to make the fields private and use the constructor in the tests.
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
