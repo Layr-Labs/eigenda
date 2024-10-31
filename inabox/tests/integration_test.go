@@ -141,6 +141,15 @@ var _ = Describe("Inabox Integration", func() {
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve blob 1 from quorum 1
 		)
+		Expect(err).To(BeNil())
+
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve blob 1 from quorum 2
+		)
 		Expect(err).NotTo(BeNil())
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
@@ -159,6 +168,14 @@ var _ = Describe("Inabox Integration", func() {
 			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve from quorum 1
+		)
+		Expect(err).To(BeNil())
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve from quorum 2
 		)
 		Expect(err).NotTo(BeNil())
 	})
