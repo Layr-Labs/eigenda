@@ -102,20 +102,36 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *disperserClient {
-	if config == nil {
-		config = &Config{}
-	}
-	if config.MaxRetrieveBlobSizeBytes == 0 {
-		// Set to 100MiB for forward compatibility.
-		// Check official documentation for current max blob size on mainnet.
-		config.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner) (*disperserClient, error) {
+	if err := checkConfigAndSetDefaults(config); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 	return &disperserClient{
 		config: config,
 		signer: signer,
 		// conn and client are initialized lazily
+	}, nil
+}
+
+func checkConfigAndSetDefaults(c *Config) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
 	}
+	if c.Hostname == "" {
+		return fmt.Errorf("config.Hostname is empty")
+	}
+	if c.Port == "" {
+		return fmt.Errorf("config.Port is empty")
+	}
+	if c.Timeout == 0 {
+		return fmt.Errorf("config.Timeout is 0")
+	}
+	if c.MaxRetrieveBlobSizeBytes == 0 {
+		// Set to 100MiB for forward compatibility.
+		// Check official documentation for current max blob size on mainnet.
+		c.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
+	}
+	return nil
 }
 
 // Close closes the grpc connection to the disperser server.
