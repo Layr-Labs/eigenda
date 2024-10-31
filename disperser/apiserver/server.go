@@ -329,7 +329,6 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 	binIndex := req.PaymentHeader.BinIndex
 	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
 	//todo: before disperse blob, validate the signature
-	signature := req.PaymentSignature
 	if err != nil {
 		for _, quorumID := range req.QuorumNumbers {
 			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DispersePaidBlob")
@@ -338,7 +337,7 @@ func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.Disperse
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	if err = auth.VerifyPaymentSignature(req.GetPaymentHeader(), signature); err != nil {
+	if err = auth.VerifyPaymentSignature(core.ConvertToPaymentMetadata(req.GetPaymentHeader()), req.PaymentSignature); err != nil {
 		return nil, api.NewErrorInvalidArg("payment signature is invalid")
 	}
 
@@ -1117,7 +1116,7 @@ func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req
 	seenQuorums := make(map[uint8]struct{})
 
 	// TODO: validate payment signature against payment metadata
-	if err = auth.VerifyPaymentSignature(req.GetPaymentHeader(), req.GetPaymentSignature()); err != nil {
+	if err = auth.VerifyPaymentSignature(core.ConvertToPaymentMetadata(req.GetPaymentHeader()), req.GetPaymentSignature()); err != nil {
 		return nil, fmt.Errorf("payment signature is invalid: %w", err)
 	}
 	// Unlike regular blob dispersal request validation, there's no check with required quorums

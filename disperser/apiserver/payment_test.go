@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
-	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/assert"
@@ -60,17 +59,17 @@ func TestDispersePaidBlob(t *testing.T) {
 	symbolLength := encoding.GetBlobLength(uint(len(data)))
 	// disperse on-demand payment
 	for i := 1; i < 3; i++ {
-		pm := pbcommon.PaymentHeader{
-			AccountId:         signer.GetAccountID(),
+		pm := &core.PaymentMetadata{
+			AccountID:         signer.GetAccountID(),
 			BinIndex:          0,
-			CumulativePayment: big.NewInt(int64(int(symbolLength) * i * encoding.BYTES_PER_SYMBOL)).Bytes(),
+			CumulativePayment: big.NewInt(int64(int(symbolLength) * i * encoding.BYTES_PER_SYMBOL)),
 		}
-		sig, err := signer.SignBlobPayment(&pm)
+		sig, err := signer.SignBlobPayment(pm)
 		assert.NoError(t, err)
 		reply, err := dispersalServer.DispersePaidBlob(ctx, &pb.DispersePaidBlobRequest{
 			Data:             data,
 			QuorumNumbers:    quorums,
-			PaymentHeader:    &pm,
+			PaymentHeader:    pm.ConvertToProtoPaymentHeader(),
 			PaymentSignature: sig,
 		})
 		assert.NoError(t, err)
@@ -79,17 +78,17 @@ func TestDispersePaidBlob(t *testing.T) {
 	}
 
 	// exceeded payment limit
-	pm := pbcommon.PaymentHeader{
-		AccountId:         signer.GetAccountID(),
+	pm := &core.PaymentMetadata{
+		AccountID:         signer.GetAccountID(),
 		BinIndex:          0,
-		CumulativePayment: big.NewInt(int64(symbolLength*3)*encoding.BYTES_PER_SYMBOL - 1).Bytes(),
+		CumulativePayment: big.NewInt(int64(symbolLength*3)*encoding.BYTES_PER_SYMBOL - 1),
 	}
-	sig, err := signer.SignBlobPayment(&pm)
+	sig, err := signer.SignBlobPayment(pm)
 	assert.NoError(t, err)
 	_, err = dispersalServer.DispersePaidBlob(ctx, &pb.DispersePaidBlobRequest{
 		Data:             data,
 		QuorumNumbers:    quorums,
-		PaymentHeader:    &pm,
+		PaymentHeader:    pm.ConvertToProtoPaymentHeader(),
 		PaymentSignature: sig,
 	})
 	assert.Error(t, err)
@@ -99,17 +98,17 @@ func TestDispersePaidBlob(t *testing.T) {
 	// TODO: somehow meterer is not defined as a method or field in dispersalServer; reservationWindow we set was 1
 	for i := 0; i < 2; i++ {
 		binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), 1)
-		pm = pbcommon.PaymentHeader{
-			AccountId:         signer.GetAccountID(),
+		pm := &core.PaymentMetadata{
+			AccountID:         signer.GetAccountID(),
 			BinIndex:          binIndex,
-			CumulativePayment: big.NewInt(0).Bytes(),
+			CumulativePayment: big.NewInt(0),
 		}
-		sig, err = signer.SignBlobPayment(&pm)
+		sig, err = signer.SignBlobPayment(pm)
 		assert.NoError(t, err)
 		reply, err := dispersalServer.DispersePaidBlob(ctx, &pb.DispersePaidBlobRequest{
 			Data:             data,
 			QuorumNumbers:    []uint32{1},
-			PaymentHeader:    &pm,
+			PaymentHeader:    pm.ConvertToProtoPaymentHeader(),
 			PaymentSignature: sig,
 		})
 		assert.NoError(t, err)
@@ -118,33 +117,33 @@ func TestDispersePaidBlob(t *testing.T) {
 
 	}
 	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), 1)
-	pm = pbcommon.PaymentHeader{
-		AccountId:         signer.GetAccountID(),
+	pm = &core.PaymentMetadata{
+		AccountID:         signer.GetAccountID(),
 		BinIndex:          binIndex,
-		CumulativePayment: big.NewInt(0).Bytes(),
+		CumulativePayment: big.NewInt(0),
 	}
-	sig, err = signer.SignBlobPayment(&pm)
+	sig, err = signer.SignBlobPayment(pm)
 	assert.NoError(t, err)
 	_, err = dispersalServer.DispersePaidBlob(ctx, &pb.DispersePaidBlobRequest{
 		Data:             data,
 		QuorumNumbers:    []uint32{1},
-		PaymentHeader:    &pm,
+		PaymentHeader:    pm.ConvertToProtoPaymentHeader(),
 		PaymentSignature: sig,
 	})
 	assert.Contains(t, err.Error(), "bin has already been filled")
 
 	// invalid bin index
 	binIndex = meterer.GetBinIndex(uint64(time.Now().Unix())/2, 1)
-	pm = pbcommon.PaymentHeader{
-		AccountId:         signer.GetAccountID(),
+	pm = &core.PaymentMetadata{
+		AccountID:         signer.GetAccountID(),
 		BinIndex:          binIndex,
-		CumulativePayment: big.NewInt(0).Bytes(),
+		CumulativePayment: big.NewInt(0),
 	}
-	sig, err = signer.SignBlobPayment(&pm)
+	sig, err = signer.SignBlobPayment(pm)
 	_, err = dispersalServer.DispersePaidBlob(ctx, &pb.DispersePaidBlobRequest{
 		Data:             data,
 		QuorumNumbers:    []uint32{1},
-		PaymentHeader:    &pm,
+		PaymentHeader:    pm.ConvertToProtoPaymentHeader(),
 		PaymentSignature: sig,
 	})
 	assert.Contains(t, err.Error(), "invalid bin index for reservation")

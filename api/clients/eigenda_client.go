@@ -123,7 +123,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	// a subsequent PR contains updates to fill in payment state
-	accountant := NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 0, 0, 0, paymentSigner)
+	accountant := NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 0, 0, 0, paymentSigner, config.PaymentNumBins)
 	disperserClient, err := NewDisperserClient(disperserConfig, signer, accountant)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)

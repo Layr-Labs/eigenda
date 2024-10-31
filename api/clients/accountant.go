@@ -13,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
 
+var minNumBins uint32 = 3
+
 type IAccountant interface {
 	AccountBlob(ctx context.Context, data []byte, quorums []uint8) (uint32, uint64, error)
 }
@@ -32,6 +34,7 @@ type accountant struct {
 	cumulativePayment *big.Int
 
 	paymentSigner core.PaymentSigner
+	numBins       uint32
 }
 
 type BinRecord struct {
@@ -39,7 +42,7 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) *accountant {
+func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner, numBins uint32) *accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
@@ -52,6 +55,7 @@ func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandP
 		binRecords:        []BinRecord{{Index: 0, Usage: 0}, {Index: 1, Usage: 0}, {Index: 2, Usage: 0}},
 		cumulativePayment: big.NewInt(0),
 		paymentSigner:     paymentSigner,
+		numBins:           max(numBins, minNumBins),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -119,7 +123,7 @@ func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums
 	}
 	protoPaymentHeader := pm.ConvertToProtoPaymentHeader()
 
-	signature, err := a.paymentSigner.SignBlobPayment(protoPaymentHeader)
+	signature, err := a.paymentSigner.SignBlobPayment(pm)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -144,7 +148,7 @@ func (a *accountant) SymbolsCharged(numSymbols uint) uint32 {
 }
 
 func (a *accountant) GetRelativeBinRecord(index uint32) *BinRecord {
-	relativeIndex := index % 3
+	relativeIndex := index % a.numBins
 	if a.binRecords[relativeIndex].Index != uint32(index) {
 		a.binRecords[relativeIndex] = BinRecord{
 			Index: uint32(index),

@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const numBins = uint32(3)
+
 func TestNewAccountant(t *testing.T) {
 	reservation := core.ActiveReservation{
 		SymbolsPerSec:  100,
@@ -34,7 +36,7 @@ func TestNewAccountant(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	assert.NotNil(t, accountant)
 	assert.Equal(t, reservation, accountant.reservation)
@@ -64,7 +66,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	symbolLength := uint64(500)
@@ -115,7 +117,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	numSymbols := uint64(1500)
@@ -144,7 +146,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	numSymbols := uint64(2000)
@@ -172,7 +174,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -222,7 +224,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -265,7 +267,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -311,7 +313,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 	now := time.Now().Unix()
@@ -358,7 +360,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	paymentSigner := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner)
+	accountant := NewAccountant(&reservation, &onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}

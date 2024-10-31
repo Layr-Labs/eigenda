@@ -64,6 +64,9 @@ type EigenDAClientConfig struct {
 	// if set to "", will result in a non-paying client and cannot disperse paid blobs.
 	PaymentSignerPrivateKeyHex string
 
+	// Payment number of bins indicate how many bins are kept at all times; the minimum is set to 3.
+	PaymentNumBins uint32
+
 	// Whether to disable TLS for an insecure connection when connecting to a local EigenDA disperser instance.
 	DisableTLS bool
 

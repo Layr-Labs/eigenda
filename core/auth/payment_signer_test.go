@@ -2,9 +2,10 @@ package auth_test
 
 import (
 	"encoding/hex"
+	"math/big"
 	"testing"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -20,10 +21,10 @@ func TestPaymentSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("SignBlobPayment", func(t *testing.T) {
-		header := &commonpb.PaymentHeader{
+		header := &core.PaymentMetadata{
+			AccountID:         "",
 			BinIndex:          1,
-			CumulativePayment: []byte{0x01, 0x02, 0x03},
-			AccountId:         "",
+			CumulativePayment: big.NewInt(1),
 		}
 
 		signature, err := signer.SignBlobPayment(header)
@@ -36,10 +37,10 @@ func TestPaymentSigner(t *testing.T) {
 	})
 
 	t.Run("VerifyPaymentSignature_InvalidSignature", func(t *testing.T) {
-		header := &commonpb.PaymentHeader{
+		header := &core.PaymentMetadata{
 			BinIndex:          1,
-			CumulativePayment: []byte{0x01, 0x02, 0x03},
-			AccountId:         "",
+			CumulativePayment: big.NewInt(1),
+			AccountID:         "",
 		}
 
 		// Create an invalid signature
@@ -49,10 +50,10 @@ func TestPaymentSigner(t *testing.T) {
 	})
 
 	t.Run("VerifyPaymentSignature_ModifiedHeader", func(t *testing.T) {
-		header := &commonpb.PaymentHeader{
+		header := &core.PaymentMetadata{
 			BinIndex:          1,
-			CumulativePayment: []byte{0x01, 0x02, 0x03},
-			AccountId:         "",
+			CumulativePayment: big.NewInt(1),
+			AccountID:         "",
 		}
 
 		signature, err := signer.SignBlobPayment(header)

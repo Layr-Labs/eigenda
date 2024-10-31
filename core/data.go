@@ -572,12 +572,21 @@ func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
 	}
 }
 
-// Hash returns the Keccak256 hash of the PaymentMetadata
+// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
 func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader {
 	return &commonpb.PaymentHeader{
 		AccountId:         pm.AccountID,
 		BinIndex:          pm.BinIndex,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
+// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
+func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+	return &PaymentMetadata{
+		AccountID:         ph.AccountId,
+		BinIndex:          ph.BinIndex,
+		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
 	}
 }
 

@@ -43,7 +43,7 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, clients.NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 60, 128, 128, paymentSigner))
+		}, signer, clients.NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 60, 128, 128, paymentSigner, 3))
 
 		Expect(disp).To(Not(BeNil()))
 
