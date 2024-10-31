@@ -51,7 +51,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	assert.NoError(t, err)
-	commitmentProto, err := commitments.ToProfobuf()
+	commitmentProto, err := commitments.ToProtobuf()
 	assert.NoError(t, err)
 	blobHeaderProto := &pbcommonv2.BlobHeader{
 		Version:       0,
@@ -126,7 +126,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: invalidReqProto,
 	})
 	assert.ErrorContains(t, err, "blob header must contain commitments")
-	commitmentProto, err := commitments.ToProfobuf()
+	commitmentProto, err := commitments.ToProtobuf()
 	assert.NoError(t, err)
 
 	// request with too many quorums
