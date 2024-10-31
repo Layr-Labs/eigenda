@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -27,12 +28,16 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new logger: %w", err)
 	}
 
+	dispserserClient, err := clients.NewDisperserClient(&config.Config, signer)
+	if err != nil {
+		return nil, fmt.Errorf("new disperser-client: %w", err)
+	}
 	return &TrafficGenerator{
 		Logger:          logger,
-		DisperserClient: clients.NewDisperserClient(&config.Config, signer),
+		DisperserClient: dispserserClient,
 		Config:          config,
 	}, nil
 }

@@ -36,12 +36,12 @@ var _ = Describe("Inabox Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		disp := clients.NewDisperserClient(&clients.Config{
+		disp, err := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
 		}, signer)
-
+		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 
 		data := make([]byte, 1024)
