@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -42,15 +45,18 @@ import (
 )
 
 var (
-	queue             disperser.BlobStore
-	dispersalServer   *apiserver.DispersalServer
-	dispersalServerV2 *apiserver.DispersalServerV2
+	queue           disperser.BlobStore
+	dispersalServer *apiserver.DispersalServer
 
-	dockertestPool     *dockertest.Pool
-	dockertestResource *dockertest.Resource
-	UUID               = uuid.New()
-	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	bucketTableName    = fmt.Sprintf("test-BucketStore-%v", UUID)
+	dockertestPool      *dockertest.Pool
+	dockertestResource  *dockertest.Resource
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
+	s3BucketName        = "test-eigenda-blobstore"
+	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
+	prover              encoding.Prover
+	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
 	localStackPort   = "4569"
@@ -618,7 +624,7 @@ func setup() {
 
 	}
 
-	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName)
+	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName, v2MetadataTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
@@ -634,8 +640,21 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
+	config := &kzg.KzgConfig{
+		G1Path:          "./resources/kzg/g1.point.300000",
+		G2Path:          "./resources/kzg/g2.point.300000",
+		CacheDir:        "./resources/kzg/SRSTables",
+		SRSOrder:        8192,
+		SRSNumberToLoad: 8192,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+	prover, err = p.NewProver(config, true)
+	if err != nil {
+		teardown()
+		panic(fmt.Sprintf("failed to initialize KZG prover: %s", err.Error()))
+	}
+
 	dispersalServer = newTestServer(transactor, "setup")
-	dispersalServerV2 = newTestServerV2()
 }
 
 func teardown() {
@@ -650,7 +669,6 @@ func teardown() {
 func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
 
-	bucketName := "test-eigenda-blobstore"
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
@@ -764,7 +782,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		AllowlistRefreshInterval: 10 * time.Minute,
 	}
 
-	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	queue = blobstore.NewSharedStorage(s3BucketName, s3Client, blobMetadataStore, logger)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",

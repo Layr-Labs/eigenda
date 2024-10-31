@@ -137,7 +137,7 @@ func localstack(ctx *cli.Context) error {
 	}
 
 	if ctx.Bool(deployResourcesFlagName) {
-		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName)
+		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName, "")
 	}
 
 	return nil
