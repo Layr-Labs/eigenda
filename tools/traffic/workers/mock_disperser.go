@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var _ clients.IDisperserClient = (*MockDisperserClient)(nil)
+var _ clients.DisperserClient = (*MockDisperserClient)(nil)
 
 type MockDisperserClient struct {
 	mock mock.Mock

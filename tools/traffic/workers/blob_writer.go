@@ -30,7 +30,7 @@ type BlobWriter struct {
 	config *config.WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
-	disperser clients.IDisperserClient
+	disperser clients.DisperserClient
 
 	// Unconfirmed keys are sent here.
 	unconfirmedKeyChannel chan *UnconfirmedKey
@@ -54,7 +54,7 @@ func NewBlobWriter(
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
 	config *config.WorkerConfig,
-	disperser clients.IDisperserClient,
+	disperser clients.DisperserClient,
 	unconfirmedKeyChannel chan *UnconfirmedKey,
 	generatorMetrics metrics.Metrics) BlobWriter {
 

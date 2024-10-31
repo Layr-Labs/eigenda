@@ -31,7 +31,7 @@ type result struct {
 	err  error
 }
 
-func disperse(t *testing.T, ctx context.Context, client clients.IDisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
+func disperse(t *testing.T, ctx context.Context, client clients.DisperserClient, resultChan chan result, data []byte, param core.SecurityParam) {
 
 	blobStatus, key, err := client.DisperseBlob(ctx, data, []uint8{param.QuorumID})
 	if err != nil {

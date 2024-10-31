@@ -19,7 +19,7 @@ import (
 
 type TrafficGenerator struct {
 	Logger          logging.Logger
-	DisperserClient clients.IDisperserClient
+	DisperserClient clients.DisperserClient
 	Config          *Config
 }
 

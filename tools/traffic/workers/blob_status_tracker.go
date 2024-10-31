@@ -35,7 +35,7 @@ type BlobStatusTracker struct {
 	confirmedBlobs *table.BlobStore
 
 	// The disperser client used to monitor the disperser service.
-	disperser clients.IDisperserClient
+	disperser clients.DisperserClient
 
 	// The keys of blobs that have not yet been confirmed by the disperser service.
 	unconfirmedBlobs []*UnconfirmedKey
@@ -64,7 +64,7 @@ func NewBlobStatusTracker(
 	config *config.WorkerConfig,
 	keyChannel chan *UnconfirmedKey,
 	table *table.BlobStore,
-	disperser clients.IDisperserClient,
+	disperser clients.DisperserClient,
 	generatorMetrics metrics.Metrics) BlobStatusTracker {
 
 	return BlobStatusTracker{

@@ -49,7 +49,7 @@ type Generator struct {
 	waitGroup        *sync.WaitGroup
 	generatorMetrics metrics.Metrics
 	logger           *logging.Logger
-	disperserClient  clients.IDisperserClient
+	disperserClient  clients.DisperserClient
 	eigenDAClient    *clients.EigenDAClient
 	config           *config.Config
 
