@@ -69,9 +69,12 @@ func RunScan(ctx *cli.Context) error {
 		return fmt.Errorf("failed to fetch current block number - %s", err)
 	}
 	operatorState, err := chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		return fmt.Errorf("failed to fetch operator state - %s", err)
+	}
 	operators, err := ics.GetIndexedOperators(context.Background(), currentBlock)
 	if err != nil {
-		return fmt.Errorf("failed to fetch indexed operator state - %s", err)
+		return fmt.Errorf("failed to fetch indexed operators info - %s", err)
 	}
 	if config.OperatorId != "" {
 		operatorId, err := core.OperatorIDFromHex(config.OperatorId)

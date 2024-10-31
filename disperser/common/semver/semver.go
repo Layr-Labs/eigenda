@@ -124,7 +124,7 @@ func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool,
 
 	// local node source compiles without semver
 	if reply.Semver == "" {
-		reply.Semver = "src-compile"
+		reply.Semver = "0.8.4"
 	}
 
 	logger.Info("NodeInfo", "operatorId", operatorId.Hex(), "socket", socket, "userRetrievalClient", userRetrievalClient, "semver", reply.Semver, "os", reply.Os, "arch", reply.Arch, "numCpu", reply.NumCpu, "memBytes", reply.MemBytes)

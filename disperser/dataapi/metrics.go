@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -110,9 +111,9 @@ func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 }
 
 // UpdateSemverMetrics updates the semver metrics
-func (g *Metrics) UpdateSemverCounts(semverData map[string]int) {
-	for semver, count := range semverData {
-		g.Semvers.WithLabelValues(semver).Set(float64(count))
+func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics) {
+	for semver, metrics := range semverData {
+		g.Semvers.WithLabelValues(semver).Set(float64(metrics.Operators))
 	}
 }
 

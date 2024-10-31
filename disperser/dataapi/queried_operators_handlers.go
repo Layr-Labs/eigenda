@@ -296,11 +296,15 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportRespon
 		return nil, fmt.Errorf("failed to fetch indexed operator info - %s", err)
 	}
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch operator state - %s", err)
+	}
 
 	nodeInfoWorkers := 20
 	nodeInfoTimeout := time.Duration(1 * time.Second)
 	useRetrievalClient := false
-	semvers := semver.ScanOperators(operators, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
+	semvers := semver.ScanOperators(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
 
 	// Create HostInfoReportResponse instance
 	semverReport := &SemverReportResponse{
