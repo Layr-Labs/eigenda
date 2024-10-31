@@ -194,7 +194,7 @@ func (s *client) FragmentedUploadObject(
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := BreakIntoFragments(key, data, s.cfg.FragmentPrefixChars, fragmentSize)
+	fragments, err := breakIntoFragments(key, data, s.cfg.FragmentPrefixChars, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func (s *client) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := GetFragmentKeys(key, s.cfg.FragmentPrefixChars, GetFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := getFragmentKeys(key, s.cfg.FragmentPrefixChars, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (s *client) FragmentedDownloadObject(
 		return nil, ctx.Err()
 	}
 
-	return RecombineFragments(fragments)
+	return recombineFragments(fragments)
 
 }
 
