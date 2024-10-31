@@ -183,6 +183,7 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 		panic(err)
 	}
 
+	svcManagerAddr := "0xD4A7E1Bd8015057293f0D0A557088c286942e84b" // holesky testnet
 	eigendaCfg := server.Config{
 		EdaClientConfig: clients.EigenDAClientConfig{
 			RPC:                      holeskyDA,
@@ -190,11 +191,13 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 			StatusQueryRetryInterval: pollInterval,
 			DisableTLS:               false,
 			SignerPrivateKeyHex:      pk,
+			EthRpcUrl:                ethRPC,
+			SvcManagerAddr:           svcManagerAddr,
 		},
 		VerifierConfig: verify.Config{
 			VerifyCerts:          false,
 			RPCURL:               ethRPC,
-			SvcManagerAddr:       "0xD4A7E1Bd8015057293f0D0A557088c286942e84b", // incompatible with non holeskly networks
+			SvcManagerAddr:       svcManagerAddr,
 			EthConfirmationDepth: 0,
 			KzgConfig: &kzg.KzgConfig{
 				G1Path:          "../resources/g1.point",

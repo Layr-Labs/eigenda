@@ -12,6 +12,7 @@ import (
 )
 
 // withMetrics is a middleware that records metrics for the route path.
+// It does not write anything to the response, that is the job of the handlers.
 func withMetrics(
 	handleFn func(http.ResponseWriter, *http.Request) error,
 	m metrics.Metricer,
@@ -30,9 +31,10 @@ func withMetrics(
 			}
 			return err
 		}
-		// we assume that every route will set the status header
+		// TODO: some routes don't have a version byte, such as /put simple commitments
 		versionByte, err := parseVersionByte(w, r)
 		if err != nil {
+			// we assume that every route will set the status header
 			recordDur(w.Header().Get("status"), string(mode), string(versionByte))
 			return fmt.Errorf("metrics middleware: error parsing version byte: %w", err)
 		}

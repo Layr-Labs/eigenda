@@ -3,11 +3,7 @@ name: holesky-test
 on:
   push:
     branches: [ "main" ]
-  # pull_request_target is needed so that external contributors that create PRs from a forked repo
-  # have access to the secrets needed to run the tests. There are security implications to this,
-  # see https://stackoverflow.com/questions/74957218/what-is-the-difference-between-pull-request-and-pull-request-target-event-in-git
-  # MAKE SURE TO ONLY ALLOW RUNNING THIS WORKFLOW AFTER REVIEWING THE PR!
-  pull_request_target:
+  pull_request:
     branches: [ "main" ]
 
 jobs:

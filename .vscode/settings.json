@@ -1,6 +1,11 @@
 {
   "go.testEnvVars": {
-    "INTEGRATION": "true"
+    // Only one of INTEGRATION or TESTNET should be true.
+    "INTEGRATION": "true",
+    "TESTNET": "false",
+    // To test against TESTNET, set SIGNER_PRIVATE_KEY and ETHEREUM_RPC.
+    "SIGNER_PRIVATE_KEY": "",
+    "ETHEREUM_RPC": "https://ethereum-holesky-rpc.publicnode.com"
   },
   "go.testFlags": [
     "-test.parallel",
