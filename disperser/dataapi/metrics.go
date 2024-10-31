@@ -68,6 +68,27 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 			},
 			[]string{"semver"},
 		),
+		SemversStakePctQuorum0: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_0",
+				Help: "Node semver stake percentage in quorum 0",
+			},
+			[]string{"semver_stake_pct_quorum_0"},
+		),
+		SemversStakePctQuorum1: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_1",
+				Help: "Node semver stake percentage in quorum 1",
+			},
+			[]string{"semver_stake_pct_quorum_1"},
+		),
+		SemversStakePctQuorum2: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_2",
+				Help: "Node semver stake percentage in quorum 2",
+			},
+			[]string{"semver_stake_pct_quorum_2"},
+		),
 		OperatorsStake: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespace,
@@ -119,7 +140,6 @@ func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics
 	for semver, metrics := range semverData {
 		g.Semvers.WithLabelValues(semver).Set(float64(metrics.Operators))
 		for quorum, stakePct := range metrics.QuorumStakePercentage {
-			g.logger.Debug("Logging semver quorum stake percentage", "semver", semver, "quorum", quorum, "stake", stakePct)
 			switch quorum {
 			case 0:
 				g.SemversStakePctQuorum0.WithLabelValues(semver).Set(stakePct)
