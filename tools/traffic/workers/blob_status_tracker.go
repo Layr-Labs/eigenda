@@ -2,15 +2,16 @@ package workers
 
 import (
 	"context"
+	"math/rand"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 // BlobStatusTracker periodically polls the disperser service to verify the status of blobs that were recently written.

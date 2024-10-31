@@ -88,7 +88,11 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 
 	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
 
-	disperserClient := clients.NewDisperserClient(config.DisperserClientConfig, signer)
+	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("new disperser-client: %w", err)
+	}
 	statusVerifier := workers.NewBlobStatusTracker(
 		&ctx,
 		&waitGroup,
@@ -134,7 +138,7 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		waitGroup:        &waitGroup,
 		generatorMetrics: generatorMetrics,
 		logger:           &logger,
-		disperserClient:  clients.NewDisperserClient(config.DisperserClientConfig, signer),
+		disperserClient:  disperserClient,
 		eigenDAClient:    client,
 		config:           config,
 		writers:          writers,
