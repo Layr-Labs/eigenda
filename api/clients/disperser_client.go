@@ -103,6 +103,14 @@ var _ IDisperserClient = &DisperserClient{}
 //	// Subsequent calls will use the existing connection
 //	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
 func NewDisperserClient(config *Config, signer core.BlobRequestSigner) *DisperserClient {
+	if config == nil {
+		config = &Config{}
+	}
+	if config.MaxRetrieveBlobSizeBytes == 0 {
+		// Set to 100MiB for forward compatibility.
+		// Check official documentation for current max blob size on mainnet.
+		config.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
+	}
 	return &DisperserClient{
 		config: config,
 		signer: signer,
@@ -293,11 +301,6 @@ func (c *DisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
-	if c.config.MaxRetrieveBlobSizeBytes == 0 {
-		// Set to 100MiB for forward compatibility.
-		// Check official documentation for current max blob size on mainnet.
-		c.config.MaxRetrieveBlobSizeBytes = 100 * 1024 * 1024
-	}
 	reply, err := c.client.RetrieveBlob(ctxTimeout,
 		&disperser_rpc.RetrieveBlobRequest{
 			BatchHeaderHash: batchHeaderHash,
