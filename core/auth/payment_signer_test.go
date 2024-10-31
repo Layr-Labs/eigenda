@@ -16,7 +16,8 @@ func TestPaymentSigner(t *testing.T) {
 	require.NoError(t, err)
 
 	privateKeyHex := hex.EncodeToString(crypto.FromECDSA(privateKey))
-	signer := auth.NewPaymentSigner(privateKeyHex)
+	signer, err := auth.NewPaymentSigner(privateKeyHex)
+	require.NoError(t, err)
 
 	t.Run("SignBlobPayment", func(t *testing.T) {
 		header := &commonpb.PaymentHeader{
@@ -30,8 +31,8 @@ func TestPaymentSigner(t *testing.T) {
 		assert.NotEmpty(t, signature)
 
 		// Verify the signature
-		isValid := auth.VerifyPaymentSignature(header, signature)
-		assert.True(t, isValid)
+		err = auth.VerifyPaymentSignature(header, signature)
+		assert.NoError(t, err)
 	})
 
 	t.Run("VerifyPaymentSignature_InvalidSignature", func(t *testing.T) {
@@ -43,8 +44,8 @@ func TestPaymentSigner(t *testing.T) {
 
 		// Create an invalid signature
 		invalidSignature := make([]byte, 65)
-		isValid := auth.VerifyPaymentSignature(header, invalidSignature)
-		assert.False(t, isValid)
+		err = auth.VerifyPaymentSignature(header, invalidSignature)
+		assert.Error(t, err)
 	})
 
 	t.Run("VerifyPaymentSignature_ModifiedHeader", func(t *testing.T) {
@@ -60,8 +61,8 @@ func TestPaymentSigner(t *testing.T) {
 		// Modify the header after signing
 		header.BinIndex = 2
 
-		isValid := auth.VerifyPaymentSignature(header, signature)
-		assert.False(t, isValid)
+		err = auth.VerifyPaymentSignature(header, signature)
+		assert.Error(t, err)
 	})
 }
 
