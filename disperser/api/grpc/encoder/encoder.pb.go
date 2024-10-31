@@ -69,7 +69,8 @@ func (ChunkEncodingFormat) EnumDescriptor() ([]byte, []int) {
 	return file_encoder_encoder_proto_rawDescGZIP(), []int{0}
 }
 
-// BlomCommitments contains the blob's commitment, degree proof, and the actual degree
+// BlobCommitments contains the blob's commitment, degree proof, and the actual degree
+// DEPRECATED: use common.BlobCommitment instead
 type BlobCommitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
