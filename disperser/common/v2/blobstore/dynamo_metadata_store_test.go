@@ -117,14 +117,19 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		ReferenceBlockNumber: uint64(100),
 		RelayKeys:            []corev2.RelayKey{0, 2, 4},
 	}
-	err := blobMetadataStore.PutBlobCertificate(ctx, blobCert)
+	fragmentInfo := &encoding.FragmentInfo{
+		TotalChunkSizeBytes: 100,
+		NumFragments:        10,
+	}
+	err := blobMetadataStore.PutBlobCertificate(ctx, blobCert, fragmentInfo)
 	assert.NoError(t, err)
 
 	blobKey, err := blobCert.BlobHeader.BlobKey()
 	assert.NoError(t, err)
-	fetchedCert, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey)
+	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	assert.NoError(t, err)
 	assert.Equal(t, blobCert, fetchedCert)
+	assert.Equal(t, fragmentInfo, fetchedFragmentInfo)
 
 	// blob cert with the same key should fail
 	blobCert1 := &corev2.BlobCertificate{
@@ -142,7 +147,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		ReferenceBlockNumber: uint64(1234),
 		RelayKeys:            []corev2.RelayKey{0},
 	}
-	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1)
+	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
 	deleteItems(t, []commondynamodb.Key{
@@ -180,29 +185,29 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update the blob status to invalid status
-	err = blobMetadataStore.MarkBlobCertified(ctx, blobKey)
+	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
 	assert.ErrorIs(t, err, blobstore.ErrInvalidStateTransition)
 
 	// Update the blob status to a valid status
-	err = blobMetadataStore.MarkBlobEncoded(ctx, blobKey, &encoding.FragmentInfo{
-		TotalChunkSizeBytes: 100,
-		NumFragments:        10,
-	})
+	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Encoded)
 	assert.NoError(t, err)
 
 	// Update the blob status to same status
-	err = blobMetadataStore.MarkBlobEncoded(ctx, blobKey, &encoding.FragmentInfo{
-		TotalChunkSizeBytes: 200,
-		NumFragments:        20,
-	})
+	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Encoded)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedMetadata.BlobStatus, v2.Encoded)
 	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata.UpdatedAt)
-	assert.Equal(t, fetchedMetadata.TotalChunkSizeBytes, 100)
-	assert.Equal(t, fetchedMetadata.NumFragments, 10)
+
+	// Update the blob status to a valid status
+	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+	assert.NoError(t, err)
+
+	fetchedMetadata, err = blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	assert.NoError(t, err)
+	assert.Equal(t, fetchedMetadata.BlobStatus, v2.Failed)
 
 	deleteItems(t, []commondynamodb.Key{
 		{

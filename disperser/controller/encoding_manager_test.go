@@ -131,13 +131,15 @@ func TestHandleBatch(t *testing.T) {
 	assert.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
 	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
-	fetchedCert, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
+	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
 	assert.Equal(t, uint32(fetchedCert.ReferenceBlockNumber), blockNumber)
 	for _, relayKey := range fetchedCert.RelayKeys {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
+	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
+	assert.Equal(t, fetchedFragmentInfo.NumFragments, uint32(5))
 }
 
 func TestHandleBatchNoBlobs(t *testing.T) {
@@ -188,13 +190,15 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 	assert.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
 	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
-	fetchedCert, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
+	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
 	assert.Equal(t, uint32(fetchedCert.ReferenceBlockNumber), blockNumber)
 	for _, relayKey := range fetchedCert.RelayKeys {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
+	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
+	assert.Equal(t, fetchedFragmentInfo.NumFragments, uint32(5))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 }
 
@@ -236,9 +240,10 @@ func TestHandleBatchRetryFailure(t *testing.T) {
 	assert.Equal(t, commonv2.Failed, fetchedMetadata.BlobStatus)
 	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
-	fetchedCert, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
+	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
 	assert.ErrorIs(t, err, dispcommon.ErrMetadataNotFound)
 	assert.Nil(t, fetchedCert)
+	assert.Nil(t, fetchedFragmentInfo)
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 }
 

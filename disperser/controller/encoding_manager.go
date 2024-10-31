@@ -145,7 +145,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				}
 
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-				err = e.blobMetadataStore.PutBlobCertificate(storeCtx, cert)
+				err = e.blobMetadataStore.PutBlobCertificate(storeCtx, cert, fragmentInfo)
 				cancel()
 				if err != nil && !errors.Is(err, dispcommon.ErrAlreadyExists) {
 					e.logger.Error("failed to put blob certificate", "err", err)
@@ -153,7 +153,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				}
 
 				storeCtx, cancel = context.WithTimeout(ctx, e.StoreTimeout)
-				err = e.blobMetadataStore.MarkBlobEncoded(storeCtx, blobKey, fragmentInfo)
+				err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Encoded)
 				cancel()
 				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
@@ -165,7 +165,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 			}
 
 			storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-			err = e.blobMetadataStore.MarkBlobFailed(storeCtx, blobKey)
+			err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
 			cancel()
 			if err != nil {
 				e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
