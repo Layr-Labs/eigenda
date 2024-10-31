@@ -81,7 +81,7 @@ type disperserClient struct {
 	conn   *grpc.ClientConn
 	client disperser_rpc.DisperserClient
 
-	accountant *Accountant
+	accountant Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -106,7 +106,7 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant *Accountant) (*disperserClient, error) {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner, accountant Accountant) (*disperserClient, error) {
 	if err := checkConfigAndSetDefaults(config); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}

@@ -16,9 +16,11 @@ import (
 var minNumBins uint32 = 3
 var requiredQuorums = []uint8{0, 1}
 
-type IAccountant interface {
-	AccountBlob(ctx context.Context, data []byte, quorums []uint8) (uint32, uint64, error)
+type Accountant interface {
+	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error)
 }
+
+var _ Accountant = &accountant{}
 
 type accountant struct {
 	// on-chain states
