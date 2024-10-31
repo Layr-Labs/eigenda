@@ -14,6 +14,7 @@ import (
 )
 
 var minNumBins uint32 = 3
+var requiredQuorums = []uint8{0, 1}
 
 type IAccountant interface {
 	AccountBlob(ctx context.Context, data []byte, quorums []uint8) (uint32, uint64, error)
@@ -100,7 +101,7 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(numSymbols))))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
-		if err := QuorumCheck(quorumNumbers, []uint8{0, 1}); err != nil {
+		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
 			return 0, big.NewInt(0), err
 		}
 		return 0, a.cumulativePayment, nil
