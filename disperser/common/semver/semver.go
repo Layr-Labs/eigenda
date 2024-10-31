@@ -2,6 +2,7 @@ package semver
 
 import (
 	"context"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -13,10 +14,17 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, useRetrievalSocket bool, numWorkers int, nodeInfoTimeout time.Duration, logger logging.Logger) map[string]int {
+type SemverMetrics struct {
+	Semver                string            `json:"semver"`
+	Operators             uint8             `json:"count"`
+	OperatorIds           []string          `json:"operators"`
+	QuorumStakePercentage map[uint8]float64 `json:"stake_percentage"`
+}
+
+func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, operatorState *core.OperatorState, useRetrievalSocket bool, numWorkers int, nodeInfoTimeout time.Duration, logger logging.Logger) map[string]*SemverMetrics {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	semvers := make(map[string]int)
+	semvers := make(map[string]*SemverMetrics)
 	operatorChan := make(chan core.OperatorID, len(operators))
 	worker := func() {
 		for operatorId := range operatorChan {
@@ -30,7 +38,33 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, useR
 			semver := GetSemverInfo(context.Background(), socket, useRetrievalSocket, operatorId, logger, nodeInfoTimeout)
 
 			mu.Lock()
-			semvers[semver]++
+			if _, exists := semvers[semver]; !exists {
+				semvers[semver] = &SemverMetrics{
+					Semver:                semver,
+					Operators:             1,
+					OperatorIds:           []string{operatorId.Hex()},
+					QuorumStakePercentage: make(map[uint8]float64),
+				}
+			} else {
+				semvers[semver].Operators += 1
+				semvers[semver].OperatorIds = append(semvers[semver].OperatorIds, operatorId.Hex())
+			}
+
+			// Calculate stake percentage for each quorum
+			for quorum, totalOperatorInfo := range operatorState.Totals {
+				stakePercentage := float64(0)
+				if stake, ok := operatorState.Operators[quorum][operatorId]; ok {
+					totalStake := new(big.Float).SetInt(totalOperatorInfo.Stake)
+					operatorStake := new(big.Float).SetInt(stake.Stake)
+					stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
+				}
+
+				if _, exists := semvers[semver].QuorumStakePercentage[quorum]; !exists {
+					semvers[semver].QuorumStakePercentage[quorum] = stakePercentage
+				} else {
+					semvers[semver].QuorumStakePercentage[quorum] += stakePercentage
+				}
+			}
 			mu.Unlock()
 		}
 		wg.Done()
