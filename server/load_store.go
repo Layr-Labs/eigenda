@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda"
@@ -18,29 +19,29 @@ import (
 // TODO - create structured abstraction for dependency injection vs. overloading stateless functions
 
 // populateTargets ... creates a list of storage backends based on the provided target strings
-func populateTargets(targets []string, s3 store.PrecomputedKeyStore, redis *redis.Store) []store.PrecomputedKeyStore {
-	stores := make([]store.PrecomputedKeyStore, len(targets))
+func populateTargets(targets []string, s3 common.PrecomputedKeyStore, redis *redis.Store) []common.PrecomputedKeyStore {
+	stores := make([]common.PrecomputedKeyStore, len(targets))
 
 	for i, f := range targets {
-		b := store.StringToBackendType(f)
+		b := common.StringToBackendType(f)
 
 		switch b {
-		case store.RedisBackendType:
+		case common.RedisBackendType:
 			if redis == nil {
 				panic(fmt.Sprintf("Redis backend is not configured but specified in targets: %s", f))
 			}
 			stores[i] = redis
 
-		case store.S3BackendType:
+		case common.S3BackendType:
 			if s3 == nil {
 				panic(fmt.Sprintf("S3 backend is not configured but specified in targets: %s", f))
 			}
 			stores[i] = s3
 
-		case store.EigenDABackendType, store.MemoryBackendType:
+		case common.EigenDABackendType, common.MemoryBackendType:
 			panic(fmt.Sprintf("Invalid target for fallback: %s", f))
 
-		case store.Unknown:
+		case common.UnknownBackendType:
 			fallthrough
 
 		default:
@@ -55,21 +56,21 @@ func populateTargets(targets []string, s3 store.PrecomputedKeyStore, redis *redi
 func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metrics.Metricer) (store.IManager, error) {
 	// create S3 backend store (if enabled)
 	var err error
-	var s3Store store.PrecomputedKeyStore
+	var s3Store *s3.Store
 	var redisStore *redis.Store
 
-	if cfg.EigenDAConfig.S3Config.Bucket != "" && cfg.EigenDAConfig.S3Config.Endpoint != "" {
+	if cfg.EigenDAConfig.StorageConfig.S3Config.Bucket != "" && cfg.EigenDAConfig.StorageConfig.S3Config.Endpoint != "" {
 		log.Info("Using S3 backend")
-		s3Store, err = s3.NewS3(cfg.EigenDAConfig.S3Config)
+		s3Store, err = s3.NewStore(cfg.EigenDAConfig.StorageConfig.S3Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create S3 store: %w", err)
 		}
 	}
 
-	if cfg.EigenDAConfig.RedisConfig.Endpoint != "" {
+	if cfg.EigenDAConfig.StorageConfig.RedisConfig.Endpoint != "" {
 		log.Info("Using Redis backend")
 		// create Redis backend store
-		redisStore, err = redis.NewStore(&cfg.EigenDAConfig.RedisConfig)
+		redisStore, err = redis.NewStore(&cfg.EigenDAConfig.StorageConfig.RedisConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Redis store: %w", err)
 		}
@@ -91,7 +92,7 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metr
 	}
 
 	// create EigenDA backend store
-	var eigenDA store.GeneratedKeyStore
+	var eigenDA common.GeneratedKeyStore
 	if cfg.EigenDAConfig.MemstoreEnabled {
 		log.Info("Using memstore backend for EigenDA")
 		eigenDA, err = memstore.New(ctx, verifier, log, cfg.EigenDAConfig.MemstoreConfig)
@@ -120,15 +121,15 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metr
 	}
 
 	// create secondary storage router
-	fallbacks := populateTargets(cfg.EigenDAConfig.FallbackTargets, s3Store, redisStore)
-	caches := populateTargets(cfg.EigenDAConfig.CacheTargets, s3Store, redisStore)
+	fallbacks := populateTargets(cfg.EigenDAConfig.StorageConfig.FallbackTargets, s3Store, redisStore)
+	caches := populateTargets(cfg.EigenDAConfig.StorageConfig.CacheTargets, s3Store, redisStore)
 	secondary := store.NewSecondaryManager(log, m, caches, fallbacks)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
 		// NOTE: in the future the number of threads could be made configurable via env
-		log.Debug("Starting secondary write loop(s)", "count", cfg.EigenDAConfig.AsyncPutWorkers)
+		log.Debug("Starting secondary write loop(s)", "count", cfg.EigenDAConfig.StorageConfig.AsyncPutWorkers)
 
-		for i := 0; i < cfg.EigenDAConfig.AsyncPutWorkers; i++ {
+		for i := 0; i < cfg.EigenDAConfig.StorageConfig.AsyncPutWorkers; i++ {
 			go secondary.WriteSubscriptionLoop(ctx)
 		}
 	}

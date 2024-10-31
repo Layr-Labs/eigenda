@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
-	"github.com/Layr-Labs/eigenda-proxy/utils"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -127,7 +128,7 @@ func TestConfig(useMemory bool) *Cfg {
 }
 
 func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
-	eigendaCfg.RedisConfig = redis.Config{
+	eigendaCfg.StorageConfig.RedisConfig = redis.Config{
 		Endpoint: redisEndpoint,
 		Password: "",
 		DB:       0,
@@ -144,7 +145,7 @@ func createS3Config(eigendaCfg server.Config) server.CLIConfig {
 	bucketName := "eigenda-proxy-test-" + RandStr(10)
 	createS3Bucket(bucketName)
 
-	eigendaCfg.S3Config = s3.Config{
+	eigendaCfg.StorageConfig.S3Config = s3.Config{
 		Bucket:          bucketName,
 		Path:            "",
 		Endpoint:        minioEndpoint,
@@ -178,7 +179,7 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 		pollInterval = time.Minute * 1
 	}
 
-	maxBlobLengthBytes, err := utils.ParseBytesAmount("16mib")
+	maxBlobLengthBytes, err := common.ParseBytesAmount("16mib")
 	if err != nil {
 		panic(err)
 	}
@@ -213,7 +214,10 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 			BlobExpiration:   testCfg.Expiration,
 			MaxBlobSizeBytes: maxBlobLengthBytes,
 		},
-		AsyncPutWorkers: testCfg.WriteThreadCount,
+
+		StorageConfig: store.Config{
+			AsyncPutWorkers: testCfg.WriteThreadCount,
+		},
 	}
 
 	if testCfg.UseMemory {
@@ -226,15 +230,15 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 		cfg = createS3Config(eigendaCfg)
 
 	case testCfg.UseS3Caching:
-		eigendaCfg.CacheTargets = []string{"S3"}
+		eigendaCfg.StorageConfig.CacheTargets = []string{"S3"}
 		cfg = createS3Config(eigendaCfg)
 
 	case testCfg.UseS3Fallback:
-		eigendaCfg.FallbackTargets = []string{"S3"}
+		eigendaCfg.StorageConfig.FallbackTargets = []string{"S3"}
 		cfg = createS3Config(eigendaCfg)
 
 	case testCfg.UseRedisCaching:
-		eigendaCfg.CacheTargets = []string{"redis"}
+		eigendaCfg.StorageConfig.CacheTargets = []string{"redis"}
 		cfg = createRedisConfig(eigendaCfg)
 
 	default:

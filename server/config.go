@@ -5,13 +5,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/eigenda-proxy/flags"
 	"github.com/Layr-Labs/eigenda-proxy/flags/eigendaflags"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
-	"github.com/Layr-Labs/eigenda-proxy/utils"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 
@@ -20,53 +16,24 @@ import (
 
 type Config struct {
 	EdaClientConfig clients.EigenDAClientConfig
+	MemstoreConfig  memstore.Config
+	StorageConfig   store.Config
 	VerifierConfig  verify.Config
 
 	MemstoreEnabled bool
-	MemstoreConfig  memstore.Config
-
-	// routing
-	AsyncPutWorkers int
-	FallbackTargets []string
-	CacheTargets    []string
-
-	// secondary storage
-	RedisConfig redis.Config
-	S3Config    s3.Config
 }
 
 // ReadConfig ... parses the Config from the provided flags or environment variables.
 func ReadConfig(ctx *cli.Context) Config {
 	edaClientConfig := eigendaflags.ReadConfig(ctx)
 	return Config{
-		RedisConfig:     redis.ReadConfig(ctx),
-		S3Config:        s3.ReadConfig(ctx),
 		EdaClientConfig: edaClientConfig,
-		VerifierConfig:  verify.ReadConfig(ctx, edaClientConfig),
-		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
 		MemstoreConfig:  memstore.ReadConfig(ctx),
-		FallbackTargets: ctx.StringSlice(flags.FallbackTargetsFlagName),
-		CacheTargets:    ctx.StringSlice(flags.CacheTargetsFlagName),
-	}
-}
+		StorageConfig:   store.ReadConfig(ctx),
+		VerifierConfig:  verify.ReadConfig(ctx, edaClientConfig),
 
-// checkTargets ... verifies that a backend target slice is constructed correctly
-func (cfg *Config) checkTargets(targets []string) error {
-	if len(targets) == 0 {
-		return nil
+		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
 	}
-
-	if utils.ContainsDuplicates(targets) {
-		return fmt.Errorf("duplicate targets provided: %+v", targets)
-	}
-
-	for _, t := range targets {
-		if store.StringToBackendType(t) == store.Unknown {
-			return fmt.Errorf("unknown fallback target provided: %s", t)
-		}
-	}
-
-	return nil
 }
 
 // Check ... verifies that configuration values are adequately set
@@ -91,42 +58,7 @@ func (cfg *Config) Check() error {
 		}
 	}
 
-	if cfg.S3Config.CredentialType == s3.CredentialTypeUnknown && cfg.S3Config.Endpoint != "" {
-		return fmt.Errorf("s3 credential type must be set")
-	}
-	if cfg.S3Config.CredentialType == s3.CredentialTypeStatic {
-		if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
-			return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
-		}
-	}
-
-	if cfg.RedisConfig.Endpoint == "" && cfg.RedisConfig.Password != "" {
-		return fmt.Errorf("redis password is set, but endpoint is not")
-	}
-
-	err := cfg.checkTargets(cfg.FallbackTargets)
-	if err != nil {
-		return err
-	}
-
-	err = cfg.checkTargets(cfg.CacheTargets)
-	if err != nil {
-		return err
-	}
-
-	// verify that same target is not in both fallback and cache targets
-	for _, t := range cfg.FallbackTargets {
-		if utils.Contains(cfg.CacheTargets, t) {
-			return fmt.Errorf("target %s is in both fallback and cache targets", t)
-		}
-	}
-
-	// verify that thread counts are sufficiently set
-	if cfg.AsyncPutWorkers >= 100 {
-		return fmt.Errorf("number of secondary write workers can't be greater than 100")
-	}
-
-	return nil
+	return cfg.StorageConfig.Check()
 }
 
 type CLIConfig struct {

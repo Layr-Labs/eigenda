@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -21,15 +22,15 @@ type IManager interface {
 type Manager struct {
 	log log.Logger
 	// primary storage backends
-	eigenda GeneratedKeyStore   // ALT DA commitment type for OP mode && simple commitment mode for standard /client
-	s3      PrecomputedKeyStore // OP commitment mode && keccak256 commitment type
+	eigenda common.GeneratedKeyStore   // ALT DA commitment type for OP mode && simple commitment mode for standard /client
+	s3      common.PrecomputedKeyStore // OP commitment mode && keccak256 commitment type
 
 	// secondary storage backends (caching and fallbacks)
 	secondary ISecondary
 }
 
 // NewManager ... Init
-func NewManager(eigenda GeneratedKeyStore, s3 PrecomputedKeyStore, l log.Logger,
+func NewManager(eigenda common.GeneratedKeyStore, s3 common.PrecomputedKeyStore, l log.Logger,
 	secondary ISecondary) (IManager, error) {
 	return &Manager{
 		log:       l,

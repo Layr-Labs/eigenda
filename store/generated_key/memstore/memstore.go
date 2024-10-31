@@ -11,10 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/api/grpc/common"
+	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -49,7 +49,7 @@ type MemStore struct {
 	reads int
 }
 
-var _ store.GeneratedKeyStore = (*MemStore)(nil)
+var _ common.GeneratedKeyStore = (*MemStore)(nil)
 
 // New ... constructor
 func New(
@@ -140,7 +140,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	}
 
 	if uint64(len(encodedVal)) > e.config.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", store.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
+		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", common.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
 	}
 
 	e.Lock()
@@ -164,7 +164,7 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 
 	cert := &verify.Certificate{
 		BlobHeader: &disperser.BlobHeader{
-			Commitment: &common.G1Commitment{
+			Commitment: &eigenda_common.G1Commitment{
 				X: commitment.X.Marshal(),
 				Y: commitment.Y.Marshal(),
 			},
@@ -222,16 +222,6 @@ func (e *MemStore) Verify(_ context.Context, _, _ []byte) error {
 	return nil
 }
 
-// Stats ... returns the current usage metrics of the in-memory key-value data store.
-func (e *MemStore) Stats() *store.Stats {
-	e.RLock()
-	defer e.RUnlock()
-	return &store.Stats{
-		Entries: len(e.store),
-		Reads:   e.reads,
-	}
-}
-
-func (e *MemStore) BackendType() store.BackendType {
-	return store.MemoryBackendType
+func (e *MemStore) BackendType() common.BackendType {
+	return common.MemoryBackendType
 }

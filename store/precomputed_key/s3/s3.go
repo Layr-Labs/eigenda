@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/minio/minio-go/v7"
 
@@ -34,7 +34,7 @@ func StringToCredentialType(s string) CredentialType {
 	}
 }
 
-var _ store.PrecomputedKeyStore = (*Store)(nil)
+var _ common.PrecomputedKeyStore = (*Store)(nil)
 
 type CredentialType string
 type Config struct {
@@ -59,7 +59,7 @@ func isGoogleEndpoint(endpoint string) bool {
 	return strings.Contains(endpoint, "storage.googleapis.com")
 }
 
-func NewS3(cfg Config) (*Store, error) {
+func NewStore(cfg Config) (*Store, error) {
 	putObjectOptions := minio.PutObjectOptions{}
 	if isGoogleEndpoint(cfg.Endpoint) {
 		putObjectOptions.DisableContentSha256 = true // Avoid chunk signatures on GCS: https://github.com/minio/minio-go/issues/1922
@@ -116,8 +116,8 @@ func (s *Store) Verify(_ context.Context, key []byte, value []byte) error {
 	return nil
 }
 
-func (s *Store) BackendType() store.BackendType {
-	return store.S3BackendType
+func (s *Store) BackendType() common.BackendType {
+	return common.S3BackendType
 }
 
 func creds(cfg Config) *credentials.Credentials {

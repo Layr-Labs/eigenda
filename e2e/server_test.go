@@ -6,7 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
@@ -100,7 +100,7 @@ func TestProxyCaching(t *testing.T) {
 	defer kill()
 
 	requireSimpleClientSetGet(t, ts, e2e.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, store.S3BackendType)
+	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.SimpleCommitmentMode)
 }
 
@@ -119,7 +119,7 @@ func TestProxyCachingWithRedis(t *testing.T) {
 	defer kill()
 
 	requireSimpleClientSetGet(t, ts, e2e.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, store.RedisBackendType)
+	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.RedisBackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.SimpleCommitmentMode)
 }
 
@@ -163,6 +163,6 @@ func TestProxyReadFallback(t *testing.T) {
 	require.Equal(t, expectedBlob, actualBlob)
 
 	requireSimpleClientSetGet(t, ts, e2e.RandBytes(1_000_000))
-	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, store.S3BackendType)
+	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.SimpleCommitmentMode)
 }

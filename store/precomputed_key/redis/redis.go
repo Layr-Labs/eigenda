@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -27,7 +27,7 @@ type Store struct {
 	client *redis.Client
 }
 
-var _ store.PrecomputedKeyStore = (*Store)(nil)
+var _ common.PrecomputedKeyStore = (*Store)(nil)
 
 // NewStore ... constructor
 func NewStore(cfg *Config) (*Store, error) {
@@ -75,6 +75,6 @@ func (r *Store) Verify(_ context.Context, _, _ []byte) error {
 	return nil
 }
 
-func (r *Store) BackendType() store.BackendType {
-	return store.RedisBackendType
+func (r *Store) BackendType() common.BackendType {
+	return common.RedisBackendType
 }

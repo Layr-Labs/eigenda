@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -54,7 +55,7 @@ func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode c
 }
 
 // requireWriteReadSecondary ... ensure that secondary backend was successfully written/read to/from
-func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt store.BackendType) {
+func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.BackendType) {
 	writeCount, err := cm.Get(http.MethodPut, store.Success, bt.String())
 	require.NoError(t, err)
 	require.True(t, writeCount > 0)

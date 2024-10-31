@@ -1,10 +1,10 @@
-package utils_test
+package common_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/utils"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 )
 
 func TestParseByteAmount(t *testing.T) {
@@ -46,7 +46,7 @@ func TestParseByteAmount(t *testing.T) {
 		t.Run(fmt.Sprintf("Input: %s", tc.input), func(t *testing.T) {
 			t.Parallel()
 
-			got, err := utils.ParseBytesAmount(tc.input)
+			got, err := common.ParseBytesAmount(tc.input)
 			if (err != nil) != tc.wantErr {
 				t.Errorf("wantErr: %v, got error: %v", tc.wantErr, err)
 			}

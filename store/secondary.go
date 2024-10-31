@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -44,8 +45,8 @@ type SecondaryManager struct {
 	log log.Logger
 	m   metrics.Metricer
 
-	caches    []PrecomputedKeyStore
-	fallbacks []PrecomputedKeyStore
+	caches    []common.PrecomputedKeyStore
+	fallbacks []common.PrecomputedKeyStore
 
 	verifyLock       sync.RWMutex
 	topic            chan PutNotify
@@ -53,9 +54,9 @@ type SecondaryManager struct {
 }
 
 // NewSecondaryManager ... creates a new secondary storage router
-func NewSecondaryManager(log log.Logger, m metrics.Metricer, caches []PrecomputedKeyStore, fallbacks []PrecomputedKeyStore) ISecondary {
+func NewSecondaryManager(log log.Logger, m metrics.Metricer, caches []common.PrecomputedKeyStore, fallbacks []common.PrecomputedKeyStore) ISecondary {
 	return &SecondaryManager{
-		topic:      make(chan PutNotify), // yes channel is un-buffered which dispersing consumption across routines helps alleviate
+		topic:      make(chan PutNotify), // channel is un-buffered which dispersing consumption across routines helps alleviate
 		log:        log,
 		m:          m,
 		caches:     caches,
@@ -142,7 +143,7 @@ func (sm *SecondaryManager) WriteSubscriptionLoop(ctx context.Context) {
 // NOTE: - this can also be parallelized when reading from multiple sources and discarding connections that fail
 //   - for complete optimization we can profile secondary storage backends to determine the fastest / most reliable and always rout to it first
 func (sm *SecondaryManager) MultiSourceRead(ctx context.Context, commitment []byte, fallback bool, verify func(context.Context, []byte, []byte) error) ([]byte, error) {
-	var sources []PrecomputedKeyStore
+	var sources []common.PrecomputedKeyStore
 	if fallback {
 		sources = sm.fallbacks
 	} else {

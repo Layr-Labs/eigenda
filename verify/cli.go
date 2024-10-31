@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	"github.com/Layr-Labs/eigenda-proxy/utils"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 )
@@ -93,7 +93,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			HasBeenSet: true,
 			Action: func(_ *cli.Context, maxBlobLengthStr string) error {
 				// parse the string to a uint64 and set the maxBlobLengthBytes var to be used by ReadConfig()
-				numBytes, err := utils.ParseBytesAmount(maxBlobLengthStr)
+				numBytes, err := common.ParseBytesAmount(maxBlobLengthStr)
 				if err != nil {
 					return fmt.Errorf("failed to parse max blob length flag: %w", err)
 				}
