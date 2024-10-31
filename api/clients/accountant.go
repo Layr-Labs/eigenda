@@ -17,10 +17,10 @@ type IAccountant interface {
 	AccountBlob(ctx context.Context, data []byte, quorums []uint8) (uint32, uint64, error)
 }
 
-type Accountant struct {
+type accountant struct {
 	// on-chain states
-	reservation       core.ActiveReservation
-	onDemand          core.OnDemandPayment
+	reservation       *core.ActiveReservation
+	onDemand          *core.OnDemandPayment
 	reservationWindow uint32
 	pricePerSymbol    uint32
 	minNumSymbols     uint32
@@ -39,11 +39,11 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) *Accountant {
+func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner) *accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
-	a := Accountant{
+	a := accountant{
 		reservation:       reservation,
 		onDemand:          onDemand,
 		reservationWindow: reservationWindow,
@@ -62,7 +62,7 @@ func NewAccountant(reservation core.ActiveReservation, onDemand core.OnDemandPay
 // then on-demand if the reservation is not available. The returned values are
 // bin index for reservation payments and cumulative payment for on-demand payments,
 // and both fields are used to create the payment header and signature
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
+func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
 
@@ -105,7 +105,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 }
 
 // accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
+func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
 	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, nil, err
@@ -129,13 +129,13 @@ func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(numSymbols uint) uint64 {
+func (a *accountant) PaymentCharged(numSymbols uint) uint64 {
 	return uint64(a.SymbolsCharged(numSymbols)) * uint64(a.pricePerSymbol)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(numSymbols uint) uint32 {
+func (a *accountant) SymbolsCharged(numSymbols uint) uint32 {
 	if numSymbols <= uint(a.minNumSymbols) {
 		return a.minNumSymbols
 	}
@@ -143,7 +143,7 @@ func (a *Accountant) SymbolsCharged(numSymbols uint) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(a.minNumSymbols))) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativeBinRecord(index uint32) *BinRecord {
+func (a *accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 	relativeIndex := index % 3
 	if a.binRecords[relativeIndex].Index != uint32(index) {
 		a.binRecords[relativeIndex] = BinRecord{
