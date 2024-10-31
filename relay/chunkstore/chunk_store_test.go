@@ -168,7 +168,7 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	chunkSize := rand.Intn(1024) + 100 // ignored since we aren't writing coefficients
+	chunkSize := uint64(rand.Intn(1024) + 100) // ignored since we aren't writing coefficients
 
 	writer := NewChunkWriter(logger, client, bucket, chunkSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
@@ -218,7 +218,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	chunkSize := rand.Intn(1024) + 100
+	chunkSize := uint64(rand.Intn(1024) + 100)
 
 	writer := NewChunkWriter(logger, client, bucket, chunkSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
@@ -243,7 +243,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
-		coefficients, err := reader.GetChunkCoefficients(context.Background(), key, nil)
+		coefficients, err := reader.GetChunkCoefficients(context.Background(), key)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedCoefficients, coefficients)
 	}

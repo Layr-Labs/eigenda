@@ -15,9 +15,9 @@ import (
 // Required for reading chunk coefficients using ChunkReader.GetChunkCoefficients().
 type ChunkCoefficientMetadata struct {
 	// The total size of file containing all chunk coefficients for the blob.
-	DataSize int
+	DataSize uint64
 	// The maximum fragment size used to store the chunk coefficients.
-	FragmentSize int
+	FragmentSize uint64
 }
 
 // ChunkWriter writes chunks that can be read by ChunkReader.
@@ -37,7 +37,7 @@ type chunkWriter struct {
 	logger       logging.Logger
 	s3Client     s3.Client
 	bucketName   string
-	fragmentSize int
+	fragmentSize uint64
 }
 
 // NewChunkWriter creates a new ChunkWriter.
@@ -45,7 +45,7 @@ func NewChunkWriter(
 	logger logging.Logger,
 	s3Client s3.Client,
 	bucketName string,
-	fragmentSize int) ChunkWriter {
+	fragmentSize uint64) ChunkWriter {
 
 	return &chunkWriter{
 		logger:       logger,
@@ -97,7 +97,7 @@ func (c *chunkWriter) PutChunkCoefficients(
 	}
 
 	return &ChunkCoefficientMetadata{
-		DataSize:     len(bytes),
+		DataSize:     uint64(len(bytes)),
 		FragmentSize: c.fragmentSize,
 	}, nil
 }
