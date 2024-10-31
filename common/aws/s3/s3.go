@@ -21,28 +21,28 @@ type Client interface {
 	// CreateBucket creates a bucket in S3.
 	CreateBucket(ctx context.Context, bucket string) error
 
-	//// FragmentedUploadObject uploads a file to S3. The fragmentSize parameter specifies the maximum size of each
-	//// file uploaded to S3. If the file is larger than fragmentSize then it will be broken into
-	//// smaller parts and uploaded in parallel. The file will be reassembled on download.
-	////
-	//// Note: if a file is uploaded with this method, only the FragmentedDownloadObject method should be used to
-	//// download the file. It is not advised to use DeleteObject on files uploaded with this method (if such
-	//// functionality is required, a new method to do so should be added to this interface).
-	//FragmentedUploadObject(
-	//	ctx context.Context,
-	//	bucket string,
-	//	key string,
-	//	data []byte,
-	//	fragmentSize int) error
+	// FragmentedUploadObject uploads a file to S3. The fragmentSize parameter specifies the maximum size of each
+	// file uploaded to S3. If the file is larger than fragmentSize then it will be broken into
+	// smaller parts and uploaded in parallel. The file will be reassembled on download.
 	//
-	//// FragmentedDownloadObject downloads a file from S3, as written by Upload. The fileSize (in bytes) and fragmentSize
-	//// must be the same as the values used in the FragmentedUploadObject call.
-	////
-	//// Note: this method can only be used to download files that were uploaded with the FragmentedUploadObject method.
-	//FragmentedDownloadObject(
-	//	ctx context.Context,
-	//	bucket string,
-	//	key string,
-	//	fileSize int,
-	//	fragmentSize int) ([]byte, error)
+	// Note: if a file is uploaded with this method, only the FragmentedDownloadObject method should be used to
+	// download the file. It is not advised to use DeleteObject on files uploaded with this method (if such
+	// functionality is required, a new method to do so should be added to this interface).
+	FragmentedUploadObject(
+		ctx context.Context,
+		bucket string,
+		key string,
+		data []byte,
+		fragmentSize int) error
+
+	// FragmentedDownloadObject downloads a file from S3, as written by Upload. The fileSize (in bytes) and fragmentSize
+	// must be the same as the values used in the FragmentedUploadObject call.
+	//
+	// Note: this method can only be used to download files that were uploaded with the FragmentedUploadObject method.
+	FragmentedDownloadObject(
+		ctx context.Context,
+		bucket string,
+		key string,
+		fileSize int,
+		fragmentSize int) ([]byte, error)
 }

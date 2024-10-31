@@ -116,15 +116,15 @@ func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {
 
 func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 	return ClientConfig{
-		Region:          ctx.GlobalString(common.PrefixFlag(flagPrefix, RegionFlagName)),
-		AccessKey:       ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
-		SecretAccessKey: ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
-		EndpointURL:     ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
-		//FragmentPrefixChars:         ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentPrefixCharsFlagName)),
-		//FragmentParallelismFactor:   ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName)),
-		//FragmentParallelismConstant: ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName)),
-		//FragmentReadTimeout:         ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName)),
-		//FragmentWriteTimeout:        ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentWriteTimeoutFlagName)),
+		Region:                      ctx.GlobalString(common.PrefixFlag(flagPrefix, RegionFlagName)),
+		AccessKey:                   ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
+		SecretAccessKey:             ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
+		EndpointURL:                 ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
+		FragmentPrefixChars:         ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentPrefixCharsFlagName)),
+		FragmentParallelismFactor:   ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName)),
+		FragmentParallelismConstant: ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName)),
+		FragmentReadTimeout:         ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName)),
+		FragmentWriteTimeout:        ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentWriteTimeoutFlagName)),
 	}
 }
 
