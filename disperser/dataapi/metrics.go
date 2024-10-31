@@ -119,6 +119,7 @@ func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics
 	for semver, metrics := range semverData {
 		g.Semvers.WithLabelValues(semver).Set(float64(metrics.Operators))
 		for quorum, stakePct := range metrics.QuorumStakePercentage {
+			g.logger.Debug("Logging semver quorum stake percentage", "semver", semver, "quorum", quorum, "stake", stakePct)
 			switch quorum {
 			case 0:
 				g.SemversStakePctQuorum0.WithLabelValues(semver).Set(stakePct)
