@@ -291,8 +291,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	meterer := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, meterer, ratelimiter, rateConfig, testMaxBlobSize)
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, mt, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,

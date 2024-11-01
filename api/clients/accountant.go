@@ -49,13 +49,17 @@ func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandP
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
+	binRecords := make([]BinRecord, numBins)
+	for i := range binRecords {
+		binRecords[i] = BinRecord{Index: uint32(i), Usage: 0}
+	}
 	a := accountant{
 		reservation:       reservation,
 		onDemand:          onDemand,
 		reservationWindow: reservationWindow,
 		pricePerSymbol:    pricePerSymbol,
 		minNumSymbols:     minNumSymbols,
-		binRecords:        []BinRecord{{Index: 0, Usage: 0}, {Index: 1, Usage: 0}, {Index: 2, Usage: 0}},
+		binRecords:        binRecords,
 		cumulativePayment: big.NewInt(0),
 		paymentSigner:     paymentSigner,
 		numBins:           max(numBins, minNumBins),

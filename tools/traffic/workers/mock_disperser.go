@@ -33,15 +33,6 @@ func (m *MockDisperserClient) DisperseBlobAuthenticated(
 	return args.Get(0).(*disperser.BlobStatus), args.Get(1).([]byte), args.Error(2)
 }
 
-func (m *MockDisperserClient) DispersePaidBlob(
-	ctx context.Context,
-	data []byte,
-	customQuorums []uint8) (*disperser.BlobStatus, []byte, error) {
-
-	args := m.mock.Called(data, customQuorums)
-	return args.Get(0).(*disperser.BlobStatus), args.Get(1).([]byte), args.Error(2)
-}
-
 func (m *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
 	args := m.mock.Called(key)
 	return args.Get(0).(*disperser_rpc.BlobStatusReply), args.Error(1)

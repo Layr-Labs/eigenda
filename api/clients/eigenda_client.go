@@ -110,21 +110,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
-	var paymentSigner core.PaymentSigner
-	if len(config.PaymentSignerPrivateKeyHex) == 64 {
-		paymentSigner, err = auth.NewPaymentSigner(config.PaymentSignerPrivateKeyHex)
-		if err != nil {
-			return nil, fmt.Errorf("new payment signer: %w", err)
-		}
-	} else if len(config.PaymentSignerPrivateKeyHex) == 0 {
-		paymentSigner = auth.NewNoopPaymentSigner()
-	} else {
-		return nil, fmt.Errorf("invalid length for signer private key")
-	}
-
-	// a subsequent PR contains updates to fill in payment state
-	accountant := NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 0, 0, 0, paymentSigner, config.PaymentNumBins)
-	disperserClient, err := NewDisperserClient(disperserConfig, signer, accountant)
+	disperserClient, err := NewDisperserClient(disperserConfig, signer, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
@@ -253,13 +239,8 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
-	var requestID []byte
 	// clients with a payment signer setting can disperse paid blobs
-	if len(m.Config.PaymentSignerPrivateKeyHex) > 0 {
-		_, requestID, err = m.Client.DispersePaidBlob(ctxFinality, data, customQuorumNumbers)
-	} else {
-		_, requestID, err = m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
-	}
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.

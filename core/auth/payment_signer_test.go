@@ -22,7 +22,7 @@ func TestPaymentSigner(t *testing.T) {
 
 	t.Run("SignBlobPayment", func(t *testing.T) {
 		header := &core.PaymentMetadata{
-			AccountID:         "",
+			AccountID:         signer.GetAccountID(),
 			BinIndex:          1,
 			CumulativePayment: big.NewInt(1),
 		}
@@ -40,7 +40,7 @@ func TestPaymentSigner(t *testing.T) {
 		header := &core.PaymentMetadata{
 			BinIndex:          1,
 			CumulativePayment: big.NewInt(1),
-			AccountID:         "",
+			AccountID:         signer.GetAccountID(),
 		}
 
 		// Create an invalid signature
@@ -53,7 +53,7 @@ func TestPaymentSigner(t *testing.T) {
 		header := &core.PaymentMetadata{
 			BinIndex:          1,
 			CumulativePayment: big.NewInt(1),
-			AccountID:         "",
+			AccountID:         signer.GetAccountID(),
 		}
 
 		signature, err := signer.SignBlobPayment(header)

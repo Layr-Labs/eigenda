@@ -749,7 +749,10 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create offchain store")
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
-	mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background(), nil)
+	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background(), nil)
+	if err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
 	rateConfig := apiserver.RateConfig{
