@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/gammazero/workerpool"
+	"golang.org/x/sync/errgroup"
 	"runtime"
 	"sync"
 
@@ -31,7 +31,7 @@ type Object struct {
 type client struct {
 	cfg      *commonaws.ClientConfig
 	s3Client *s3.Client
-	pool     *workerpool.WorkerPool
+	pool     *errgroup.Group
 	logger   logging.Logger
 }
 
@@ -87,7 +87,9 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 		if workers == 0 {
 			workers = 1
 		}
-		pool := workerpool.New(workers)
+
+		pool, _ := errgroup.WithContext(ctx)
+		pool.SetLimit(workers)
 
 		ref = &client{
 			cfg:      &cfg,
@@ -205,8 +207,9 @@ func (s *client) FragmentedUploadObject(
 
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
-		s.pool.Submit(func() {
+		s.pool.Go(func() error {
 			s.fragmentedWriteTask(ctx, resultChannel, fragmentCapture, bucket)
+			return nil
 		})
 	}
 
@@ -260,8 +263,9 @@ func (s *client) FragmentedDownloadObject(
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey
 		boundI := i
-		s.pool.Submit(func() {
+		s.pool.Go(func() error {
 			s.readTask(ctx, resultChannel, bucket, boundFragmentKey, boundI)
+			return nil
 		})
 	}
 

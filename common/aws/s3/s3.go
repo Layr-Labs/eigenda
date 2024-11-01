@@ -28,6 +28,10 @@ type Client interface {
 	// Note: if a file is uploaded with this method, only the FragmentedDownloadObject method should be used to
 	// download the file. It is not advised to use DeleteObject on files uploaded with this method (if such
 	// functionality is required, a new method to do so should be added to this interface).
+	//
+	// Note: if this operation fails partway through, some file fragments may have made it to S3 and others may not.
+	// In order to prevent long term accumulation of fragments, it is suggested to use this method in conjunction with
+	// a bucket configured to have a TTL.
 	FragmentedUploadObject(
 		ctx context.Context,
 		bucket string,
