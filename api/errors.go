@@ -77,6 +77,13 @@ func NewErrorDeadlineExceeded(msg string) error {
 //  1. Failed to put the blob in the disperser's queue (disperser is down)
 //  2. Timed out before getting confirmed onchain (batcher is down)
 //  3. Insufficient signatures (eigenda network is down)
+//
+// One can check if an error is an ErrorFailover by using errors.Is:
+//
+//	failoverErr := NewErrorFailover(someOtherErr)
+//	if !errors.Is(wrappedFailoverErr, &ErrorFailover{}) {
+//	  // do something...
+//	}
 type ErrorFailover struct {
 	Err error
 }
@@ -90,9 +97,28 @@ func NewErrorFailover(err error) *ErrorFailover {
 }
 
 func (e *ErrorFailover) Error() string {
+	if e.Err == nil {
+		return "Failover"
+	}
 	return fmt.Sprintf("Failover: %s", e.Err.Error())
 }
 
 func (e *ErrorFailover) Unwrap() error {
 	return e.Err
+}
+
+// Is only checks the type of the error, not the underlying error.
+// This is because we want to be able to check that an error is an ErrorFailover,
+// even when wrapped. This can now be done with errors.Is.
+//
+//	baseErr := fmt.Errorf("some error")
+//	failoverErr := NewErrorFailover(baseErr)
+//	wrappedFailoverErr := fmt.Errorf("some extra context: %w", failoverErr)
+//
+//	if !errors.Is(wrappedFailoverErr, &ErrorFailover{}) {
+//	  // do something...
+//	}
+func (e *ErrorFailover) Is(target error) bool {
+	_, ok := target.(*ErrorFailover)
+	return ok
 }
