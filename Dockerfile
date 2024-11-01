@@ -1,4 +1,12 @@
 # syntax=docker/dockerfile:1
+
+# Declare build arguments
+# NOTE: to use these args, they must be *consumed* in the child scope (see node-builder)
+# https://docs.docker.com/build/building/variables/#scoping
+ARG SEMVER=""
+ARG GITCOMMIT=""
+ARG GITDATE=""
+
 FROM golang:1.21.1-alpine3.18 AS base-builder
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
@@ -63,9 +71,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Node build stage
 FROM common-builder AS node-builder
-ARG SEMVER=""
-ARG GITCOMMIT=""
-ARG GITDATE=""
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 COPY node /app/node
 COPY operators ./operators
 WORKDIR /app/node
