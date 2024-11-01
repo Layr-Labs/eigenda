@@ -15,7 +15,9 @@ type EncoderGRPCServer struct {
 
 func NewEncoderGRPCServer(config Config, _logger logging.Logger) (*EncoderGRPCServer, error) {
 	logger := _logger.With("component", "EncoderGRPCServer")
-	p, err := prover.NewProver(&config.EncoderConfig, true)
+
+	// TODO: If encoder is v1, we need to load g2 points, otherwise we don't
+	p, err := prover.NewProver(&config.EncoderConfig, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %w", err)
 	}

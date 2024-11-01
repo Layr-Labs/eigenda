@@ -38,7 +38,6 @@ func main() {
 }
 
 func RunEncoderServer(ctx *cli.Context) error {
-
 	config, err := NewConfig(ctx)
 	if err != nil {
 		return err

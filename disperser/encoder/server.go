@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	pb2 "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
@@ -19,7 +20,8 @@ import (
 
 // TODO: Add EncodeMetrics
 type Server struct {
-	pb.UnimplementedEncoderServer
+	encoder    pb.UnimplementedEncoderServer
+	encoder_v2 pb2.UnimplementedEncoderServer
 
 	config  ServerConfig
 	logger  logging.Logger
@@ -41,6 +43,43 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan struct{}, config.RequestPoolSize),
 	}
+}
+
+func (s *Server) Start() error {
+	// Serve grpc requests
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("Could not start tcp listener: %v", err)
+	}
+
+	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	gs := grpc.NewServer(opt)
+	reflection.Register(gs)
+	pb.RegisterEncoderServer(gs, s.encoder)
+	pb2.RegisterEncoderServer(gs, s.encoder_v2)
+
+	// Register Server for Health Checks
+	name := pb.Encoder_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
+
+	s.close = func() {
+		err := listener.Close()
+		if err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+		gs.GracefulStop()
+	}
+
+	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	return gs.Serve(listener)
+}
+
+func (s *Server) Close() {
+	if s.close == nil {
+		return
+	}
+	s.close()
 }
 
 func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
@@ -83,7 +122,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 
 	if len(req.Data) == 0 {
 		return nil, errors.New("handleEncoding: missing data")
-
 	}
 
 	if req.EncodingParams == nil {
@@ -157,39 +195,69 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	}, nil
 }
 
-func (s *Server) Start() error {
+func (s *Server) EncodeBlobToChunkStore(ctx context.Context, req *pb2.EncodeBlobRequest) (*pb2.EncodeBlobToChunkStoreReply, error) {
+	startTime := time.Now()
+	select {
+	case s.requestPool <- struct{}{}:
+	default:
+		s.metrics.IncrementRateLimitedBlobRequestNum(len(req.GetData()))
+		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		return nil, errors.New("too many requests")
+	}
+	s.runningRequests <- struct{}{}
+	defer s.popRequest()
 
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
+	if ctx.Err() != nil {
+		s.metrics.IncrementCanceledBlobRequestNum(len(req.GetData()))
+		return nil, ctx.Err()
+	}
+
+	s.metrics.ObserveLatency("queuing", time.Since(startTime))
+	reply, err := s.handleEncodingToChunkStore(ctx, req)
 	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
+		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
+	} else {
+		s.metrics.IncrementSuccessfulBlobRequestNum(len(req.GetData()))
 	}
+	s.metrics.ObserveLatency("total", time.Since(startTime))
 
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-	reflection.Register(gs)
-	pb.RegisterEncoderServer(gs, s)
-
-	// Register Server for Health Checks
-	name := pb.Encoder_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
-
-	s.close = func() {
-		err := listener.Close()
-		if err != nil {
-			log.Printf("failed to close listener: %v", err)
-		}
-		gs.GracefulStop()
-	}
-
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	return gs.Serve(listener)
+	return reply, err
 }
 
-func (s *Server) Close() {
-	if s.close == nil {
-		return
+func (s *Server) handleEncodingToChunkStore(ctx context.Context, req *pb2.EncodeBlobRequest) (*pb2.EncodeBlobToChunkStoreReply, error) {
+	begin := time.Now()
+
+	if len(req.Data) == 0 {
+		return nil, errors.New("handleEncoding: missing data")
 	}
-	s.close()
+
+	if req.EncodingParams == nil {
+		return nil, errors.New("handleEncoding: missing encoding parameters")
+	}
+
+	// Convert to core EncodingParams
+	var encodingParams = encoding.EncodingParams{
+		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
+		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
+	}
+
+	// RS Encode the data
+
+	// Get the multiproofs for the data
+	_, err := s.prover.GetMultiFrameProofs(req.GetData(), encodingParams)
+	if err != nil {
+		return nil, err
+	}
+
+	s.metrics.ObserveLatency("encoding", time.Since(begin))
+	begin = time.Now()
+
+	s.metrics.ObserveLatency("serialization", time.Since(begin))
+
+	return &pb2.EncodeBlobToChunkStoreReply{
+		FragmentInfo: &pb2.FragmentInfo{
+			TotalChunkSizeBytes: int32(1),
+			NumFragments:        int32(1),
+		},
+	}, nil
 }

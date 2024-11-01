@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2";
+package encoder.v2;
+
+service Encoder {
+  rpc EncodeBlobToChunkStore(EncodeBlobRequest) returns (EncodeBlobToChunkStoreReply) {}
+}
+
+// EncodeBlobRequest contains data and pre-computed encoding params provided to Encoder
+message EncodeBlobRequest {
+  bytes data = 1;
+  EncodingParams encoding_params = 2;
+}
+
+// Parameters needed by Encoder for encoding
+message EncodingParams {
+  uint32 chunk_length = 1;
+  uint32 num_chunks = 2;
+}
+
+// FragmentInfo contains metadata about the encoded fragments
+message FragmentInfo {
+    int32 total_chunk_size_bytes = 1;
+    int32 num_fragments = 2;
+}
+
+// EncodeBlobToChunkStoreReply returns the fragment info returned after the encoded chunks 
+// are written to S3.
+message EncodeBlobToChunkStoreReply {
+  FragmentInfo fragment_info = 1;
+}
