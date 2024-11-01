@@ -138,6 +138,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
 		Required: false,
 	}
+	OnchainStateRefreshInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
+	MaxNumSymbolsPerBlob = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),
+		Usage:    "max number of symbols per blob. This flag is only relevant in v2",
+		Value:    65_536,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_SYMBOLS_PER_BLOB"),
+		Required: false,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -161,6 +175,8 @@ var optionalFlags = []cli.Flag{
 	ReservationsTableName,
 	OnDemandTableName,
 	GlobalRateTableName,
+	OnchainStateRefreshInterval,
+	MaxNumSymbolsPerBlob,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -14,12 +14,13 @@ import (
 
 func TestPutBlobNoopSigner(t *testing.T) {
 	config := clients.NewConfig("nohost", "noport", time.Second, false)
-	disperserClient := clients.NewDisperserClient(config, auth.NewLocalNoopSigner())
+	disperserClient, err := clients.NewDisperserClient(config, auth.NewLocalNoopSigner())
+	assert.NoError(t, err)
 
 	test := []byte("test")
 	test[0] = 0x00 // make sure the first byte of the requst is always 0
 	quorums := []uint8{0}
-	_, _, err := disperserClient.DisperseBlobAuthenticated(context.Background(), test, quorums)
+	_, _, err = disperserClient.DisperseBlobAuthenticated(context.Background(), test, quorums)
 	st, isGRPCError := status.FromError(err)
 	assert.True(t, isGRPCError)
 	assert.Equal(t, codes.InvalidArgument.String(), st.Code().String())

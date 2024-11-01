@@ -11,10 +11,12 @@ import (
 )
 
 type Config struct {
-	LoggerConfig     common.LoggerConfig
-	Workers          int
-	OperatorId       string
-	Timeout          time.Duration
+	LoggerConfig       common.LoggerConfig
+	Workers            int
+	OperatorId         string
+	Timeout            time.Duration
+	UseRetrievalClient bool
+
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
 
@@ -27,6 +29,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
 		Workers:                       ctx.Int(flags.WorkersFlag.Name),
 		OperatorId:                    ctx.String(flags.OperatorIdFlag.Name),
+		UseRetrievalClient:            ctx.Bool(flags.UseRetrievalClientFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),

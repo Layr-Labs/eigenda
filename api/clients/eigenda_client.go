@@ -33,6 +33,8 @@ type IEigenDAClient interface {
 }
 
 // See the NewEigenDAClient constructor's documentation for details and usage examples.
+// TODO: Refactor this struct and interface above to use same naming convention as disperser client.
+//       Also need to make the fields private and use the constructor in the tests.
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
@@ -83,16 +85,16 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	var edasmCaller *edasm.ContractEigenDAServiceManagerCaller
 	ethClient, err = ethclient.Dial(config.EthRpcUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial ETH RPC node: %w", err)
+		return nil, fmt.Errorf("dial ETH RPC node: %w", err)
 	}
 	edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(common.HexToAddress(config.SvcManagerAddr), ethClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create EigenDAServiceManagerCaller: %w", err)
+		return nil, fmt.Errorf("new EigenDAServiceManagerCaller: %w", err)
 	}
 
 	host, port, err := net.SplitHostPort(config.RPC)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse EigenDA RPC: %w", err)
+		return nil, fmt.Errorf("parse EigenDA RPC: %w", err)
 	}
 
 	var signer core.BlobRequestSigner
@@ -106,11 +108,14 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
-	disperserClient := NewDisperserClient(disperserConfig, signer)
+	disperserClient, err := NewDisperserClient(disperserConfig, signer)
+	if err != nil {
+		return nil, fmt.Errorf("new disperser-client: %w", err)
+	}
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
-		return nil, fmt.Errorf("error initializing EigenDA client: %w", err)
+		return nil, fmt.Errorf("create low level codec: %w", err)
 	}
 
 	var codec codecs.BlobCodec
