@@ -1,11 +1,4 @@
 # syntax=docker/dockerfile:1
-
-# Declare build arguments
-# TODO: this is only used for node image right now, should we also use it for nodeplugin?
-ARG SEMVER=""
-ARG GITCOMMIT=""
-ARG GITDATE=""
-
 FROM golang:1.21.1-alpine3.18 AS base-builder
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
@@ -70,6 +63,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Node build stage
 FROM common-builder AS node-builder
+ARG SEMVER=""
+ARG GITCOMMIT=""
+ARG GITDATE=""
 COPY node /app/node
 COPY operators ./operators
 WORKDIR /app/node
