@@ -9,10 +9,6 @@ import (
 func TestErrorFailoverErrorsIs(t *testing.T) {
 	baseErr := fmt.Errorf("some error")
 	failoverErr := NewErrorFailover(baseErr)
-	wrappedFailoverErr := fmt.Errorf("some extra context: %w", failoverErr)
-	if !errors.Is(wrappedFailoverErr, &ErrorFailover{}) {
-		// do something...
-	}
 
 	// error comparison only checks the type of the error
 	if !errors.Is(failoverErr, &ErrorFailover{}) {
