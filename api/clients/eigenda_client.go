@@ -34,7 +34,8 @@ type IEigenDAClient interface {
 
 // See the NewEigenDAClient constructor's documentation for details and usage examples.
 // TODO: Refactor this struct and interface above to use same naming convention as disperser client.
-//       Also need to make the fields private and use the constructor in the tests.
+//
+//	Also need to make the fields private and use the constructor in the tests.
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
@@ -108,6 +109,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
+
 	disperserClient, err := NewDisperserClient(disperserConfig, signer)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
@@ -237,6 +239,7 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 	}
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
+	// clients with a payment signer setting can disperse paid blobs
 	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,

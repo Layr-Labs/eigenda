@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -32,9 +31,7 @@ func NewPaymentSigner(privateKeyHex string) (*paymentSigner, error) {
 }
 
 // SignBlobPayment signs the payment header and returns the signature
-func (s *paymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
-	header.AccountId = s.GetAccountID()
-	pm := core.ConvertPaymentHeader(header)
+func (s *paymentSigner) SignBlobPayment(pm *core.PaymentMetadata) ([]byte, error) {
 	hash, err := pm.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash payment header: %w", err)
@@ -54,7 +51,7 @@ func NewNoopPaymentSigner() *NoopPaymentSigner {
 	return &NoopPaymentSigner{}
 }
 
-func (s *NoopPaymentSigner) SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error) {
+func (s *NoopPaymentSigner) SignBlobPayment(header *core.PaymentMetadata) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob payment header")
 }
 
@@ -63,9 +60,8 @@ func (s *NoopPaymentSigner) GetAccountID() string {
 }
 
 // VerifyPaymentSignature verifies the signature against the payment metadata
-func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignature []byte) error {
-	pm := core.ConvertPaymentHeader(paymentHeader)
-	hash, err := pm.Hash()
+func VerifyPaymentSignature(paymentHeader *core.PaymentMetadata, paymentSignature []byte) error {
+	hash, err := paymentHeader.Hash()
 	if err != nil {
 		return fmt.Errorf("failed to hash payment header: %w", err)
 	}
@@ -76,7 +72,7 @@ func VerifyPaymentSignature(paymentHeader *commonpb.PaymentHeader, paymentSignat
 	}
 
 	recoveredAddress := crypto.PubkeyToAddress(*recoveredPubKey)
-	accountId := common.HexToAddress(paymentHeader.AccountId)
+	accountId := common.HexToAddress(paymentHeader.AccountID)
 	if recoveredAddress != accountId {
 		return fmt.Errorf("signature address %s does not match account id %s", recoveredAddress.Hex(), accountId.Hex())
 	}
