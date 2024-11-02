@@ -115,7 +115,7 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
-// accountant provides and records payment information
+// AccountBlob accountant provides and records payment information
 func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
 	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {

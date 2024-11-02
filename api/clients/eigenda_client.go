@@ -110,7 +110,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
-	disperserClient, err := NewDisperserClient(disperserConfig, signer, nil)
+	disperserClient, err := NewDisperserClient(disperserConfig, signer)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}

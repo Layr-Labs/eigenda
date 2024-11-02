@@ -14,7 +14,7 @@ import (
 
 func TestPutBlobNoopSigner(t *testing.T) {
 	config := clients.NewConfig("nohost", "noport", time.Second, false)
-	disperserClient, err := clients.NewDisperserClient(config, auth.NewLocalNoopSigner(), nil)
+	disperserClient, err := clients.NewDisperserClient(config, auth.NewLocalNoopSigner())
 	assert.NoError(t, err)
 
 	test := []byte("test")

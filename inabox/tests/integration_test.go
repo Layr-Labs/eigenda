@@ -40,7 +40,7 @@ var _ = Describe("Inabox Integration", func() {
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, nil)
+		}, signer)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 

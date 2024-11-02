@@ -111,7 +111,7 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 		Hostname: "localhost",
 		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
 		Timeout:  10 * time.Second,
-	}, nil, nil)
+	}, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, disp)
 
