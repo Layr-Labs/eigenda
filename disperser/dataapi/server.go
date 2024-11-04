@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -181,7 +182,7 @@ type (
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
 	SemverReportResponse struct {
-		Semver map[string]int `json:"semver"`
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
 	}
 
 	ErrorResponse struct {

@@ -17,10 +17,6 @@ func NewS3Client() *S3Client {
 	return &S3Client{bucket: make(map[string][]byte)}
 }
 
-func (s *S3Client) CreateBucket(ctx context.Context, bucket string) error {
-	return nil
-}
-
 func (s *S3Client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
 	data, ok := s.bucket[key]
 	if !ok {
@@ -47,4 +43,31 @@ func (s *S3Client) ListObjects(ctx context.Context, bucket string, prefix string
 		}
 	}
 	return objects, nil
+}
+
+func (s *S3Client) CreateBucket(ctx context.Context, bucket string) error {
+	return nil
+}
+
+func (s *S3Client) FragmentedUploadObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	data []byte,
+	fragmentSize int) error {
+	s.bucket[key] = data
+	return nil
+}
+
+func (s *S3Client) FragmentedDownloadObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	fileSize int,
+	fragmentSize int) ([]byte, error) {
+	data, ok := s.bucket[key]
+	if !ok {
+		return []byte{}, s3.ErrObjectNotFound
+	}
+	return data, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -53,7 +54,6 @@ type DisperserClient interface {
 	// DisperseBlobAuthenticated disperses a blob with an authenticated request.
 	// The BlobStatus returned will always be PROCESSSING if error is nil.
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
-	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 }
@@ -181,11 +181,6 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	}
 
 	return blobStatus, reply.GetRequestId(), nil
-}
-
-// TODO: implemented in subsequent PR
-func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	return nil, nil, api.NewErrorInternal("not implemented")
 }
 
 func (c *disperserClient) DisperseBlobAuthenticated(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {

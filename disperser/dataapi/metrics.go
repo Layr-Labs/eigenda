@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,8 +26,12 @@ type Metrics struct {
 
 	NumRequests    *prometheus.CounterVec
 	Latency        *prometheus.SummaryVec
-	Semvers        *prometheus.GaugeVec
 	OperatorsStake *prometheus.GaugeVec
+
+	Semvers                *prometheus.GaugeVec
+	SemversStakePctQuorum0 *prometheus.GaugeVec
+	SemversStakePctQuorum1 *prometheus.GaugeVec
+	SemversStakePctQuorum2 *prometheus.GaugeVec
 
 	httpPort string
 	logger   logging.Logger
@@ -62,6 +67,27 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 				Help: "Node semver install base",
 			},
 			[]string{"semver"},
+		),
+		SemversStakePctQuorum0: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_0",
+				Help: "Node semver stake percentage in quorum 0",
+			},
+			[]string{"semver_stake_pct_quorum_0"},
+		),
+		SemversStakePctQuorum1: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_1",
+				Help: "Node semver stake percentage in quorum 1",
+			},
+			[]string{"semver_stake_pct_quorum_1"},
+		),
+		SemversStakePctQuorum2: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_2",
+				Help: "Node semver stake percentage in quorum 2",
+			},
+			[]string{"semver_stake_pct_quorum_2"},
 		),
 		OperatorsStake: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -110,9 +136,21 @@ func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 }
 
 // UpdateSemverMetrics updates the semver metrics
-func (g *Metrics) UpdateSemverCounts(semverData map[string]int) {
-	for semver, count := range semverData {
-		g.Semvers.WithLabelValues(semver).Set(float64(count))
+func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics) {
+	for semver, metrics := range semverData {
+		g.Semvers.WithLabelValues(semver).Set(float64(metrics.Operators))
+		for quorum, stakePct := range metrics.QuorumStakePercentage {
+			switch quorum {
+			case 0:
+				g.SemversStakePctQuorum0.WithLabelValues(semver).Set(stakePct)
+			case 1:
+				g.SemversStakePctQuorum1.WithLabelValues(semver).Set(stakePct)
+			case 2:
+				g.SemversStakePctQuorum2.WithLabelValues(semver).Set(stakePct)
+			default:
+				g.logger.Error("Unable to log semver quorum stake percentage for quorum", "semver", semver, "quorum", quorum, "stake", stakePct)
+			}
+		}
 	}
 }
 

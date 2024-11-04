@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	geth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -51,6 +50,6 @@ func VerifySignature(message []byte, accountAddr geth.Address, sig []byte) error
 }
 
 type PaymentSigner interface {
-	SignBlobPayment(header *commonpb.PaymentHeader) ([]byte, error)
+	SignBlobPayment(header *PaymentMetadata) ([]byte, error)
 	GetAccountID() string
 }

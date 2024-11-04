@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -185,17 +184,17 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, fmt.Errorf("reservation not found"))
 
 	// test invalid quorom ID
-	blob, header := createMetererInput(1, 0, 1000, []uint8{0, 1, 2}, accountID1)
-	err := mt.MeterRequest(ctx, *blob, *header)
+	header := createPaymentHeader(1, 0, accountID1)
+	err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
 	// overwhelming bin overflow for empty bins
-	blob, header = createMetererInput(binIndex-1, 0, 10, quoromNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex-1, 0, accountID2)
+	err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
 	// overwhelming bin overflow for empty bins
-	blob, header = createMetererInput(binIndex-1, 0, 1000, quoromNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex-1, 0, accountID2)
+	err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
 	// test non-existent account
@@ -203,22 +202,22 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	blob, header = createMetererInput(1, 0, 1000, []uint8{0, 1, 2}, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
+	header = createPaymentHeader(1, 0, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
 	assert.NoError(t, err)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
 	// test invalid bin index
-	blob, header = createMetererInput(binIndex, 0, 2000, quoromNumbers, accountID1)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, 0, accountID1)
+	err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
 	assert.ErrorContains(t, err, "invalid bin index for reservation")
 
 	// test bin usage metering
-	dataLength := uint(20)
+	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
-		blob, header = createMetererInput(binIndex, 0, dataLength, quoromNumbers, accountID2)
-		err = mt.MeterRequest(ctx, *blob, *header)
+		header = createPaymentHeader(binIndex, 0, accountID2)
+		err = mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID": &types.AttributeValueMemberS{Value: accountID2},
@@ -231,9 +230,9 @@ func TestMetererReservations(t *testing.T) {
 
 	}
 	// first over flow is allowed
-	blob, header = createMetererInput(binIndex, 0, 25, quoromNumbers, accountID2)
+	header = createPaymentHeader(binIndex, 0, accountID2)
 	assert.NoError(t, err)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	err = mt.MeterRequest(ctx, *header, 25, quoromNumbers)
 	assert.NoError(t, err)
 	overflowedBinIndex := binIndex + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -247,9 +246,9 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	blob, header = createMetererInput(binIndex, 0, 1, quoromNumbers, accountID2)
+	header = createPaymentHeader(binIndex, 0, accountID2)
 	assert.NoError(t, err)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	err = mt.MeterRequest(ctx, *header, 1, quoromNumbers)
 	assert.ErrorContains(t, err, "bin has already been filled")
 }
 
@@ -274,19 +273,19 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	blob, header := createMetererInput(binIndex, 2, 1000, quorumNumbers, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
+	header := createPaymentHeader(binIndex, 2, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
 	assert.NoError(t, err)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	blob, header = createMetererInput(binIndex, 1, 1000, []uint8{0, 1, 2}, accountID1)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, 1, accountID1)
+	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	blob, header = createMetererInput(binIndex, 1, 2000, quorumNumbers, accountID1)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, 1, accountID1)
+	err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	// No rollback after meter request
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -297,40 +296,40 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
-	dataLength := uint(100)
-	priceCharged := mt.PaymentCharged(dataLength)
+	symbolLength := uint(100)
+	priceCharged := mt.PaymentCharged(symbolLength)
 	assert.Equal(t, uint64(102*mt.ChainPaymentState.GetPricePerSymbol()), priceCharged)
-	blob, header = createMetererInput(binIndex, priceCharged, dataLength, quorumNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, priceCharged, accountID2)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.NoError(t, err)
-	blob, header = createMetererInput(binIndex, priceCharged, dataLength, quorumNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, priceCharged, accountID2)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
-		blob, header = createMetererInput(binIndex, uint64(priceCharged)*uint64(i+1), dataLength, quorumNumbers, accountID2)
-		err = mt.MeterRequest(ctx, *blob, *header)
+		header = createPaymentHeader(binIndex, uint64(priceCharged)*uint64(i+1), accountID2)
+		err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 		assert.NoError(t, err)
 	}
 
 	// test cumulative payment on-chain constraint
-	blob, header = createMetererInput(binIndex, 2023, 1, quorumNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, 2023, accountID2)
+	err = mt.MeterRequest(ctx, *header, 1, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := uint64(priceCharged) * uint64(9)
-	dataLength = uint(2)
-	priceCharged = mt.PaymentCharged(dataLength)
-	blob, header = createMetererInput(binIndex, previousCumulativePayment+priceCharged-1, dataLength, quorumNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	symbolLength = uint(2)
+	priceCharged = mt.PaymentCharged(symbolLength)
+	header = createPaymentHeader(binIndex, previousCumulativePayment+priceCharged-1, accountID2)
+	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
 	previousCumulativePayment = previousCumulativePayment + priceCharged
 
 	// test cannot insert cumulative payment in out of order
-	blob, header = createMetererInput(binIndex, mt.PaymentCharged(50), 50, quorumNumbers, accountID2)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, mt.PaymentCharged(50), accountID2)
+	err = mt.MeterRequest(ctx, *header, 50, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
 	numPrevRecords := 12
@@ -341,9 +340,8 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numPrevRecords, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	fmt.Println("need ", previousCumulativePayment+mt.PaymentCharged(1010))
-	blob, header = createMetererInput(binIndex, previousCumulativePayment+mt.PaymentCharged(1010), 1010, quorumNumbers, accountID1)
-	err = mt.MeterRequest(ctx, *blob, *header)
+	header = createPaymentHeader(binIndex, previousCumulativePayment+mt.PaymentCharged(1010), accountID1)
+	err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -357,42 +355,42 @@ func TestMetererOnDemand(t *testing.T) {
 func TestMeterer_paymentCharged(t *testing.T) {
 	tests := []struct {
 		name           string
-		dataLength     uint
+		symbolLength   uint
 		pricePerSymbol uint32
 		minNumSymbols  uint32
 		expected       uint64
 	}{
 		{
 			name:           "Data length equal to min chargeable size",
-			dataLength:     1024,
+			symbolLength:   1024,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1024,
 		},
 		{
 			name:           "Data length less than min chargeable size",
-			dataLength:     512,
+			symbolLength:   512,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1024,
 		},
 		{
 			name:           "Data length greater than min chargeable size",
-			dataLength:     2048,
+			symbolLength:   2048,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       2048,
 		},
 		{
 			name:           "Large data length",
-			dataLength:     1 << 20, // 1 MB
+			symbolLength:   1 << 20, // 1 MB
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       1 << 20,
 		},
 		{
 			name:           "Price not evenly divisible by min chargeable size",
-			dataLength:     1536,
+			symbolLength:   1536,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
 			expected:       2048,
@@ -407,7 +405,7 @@ func TestMeterer_paymentCharged(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
 			}
-			result := m.PaymentCharged(tt.dataLength)
+			result := m.PaymentCharged(tt.symbolLength)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -416,37 +414,37 @@ func TestMeterer_paymentCharged(t *testing.T) {
 func TestMeterer_symbolsCharged(t *testing.T) {
 	tests := []struct {
 		name          string
-		dataLength    uint
+		symbolLength  uint
 		minNumSymbols uint32
 		expected      uint32
 	}{
 		{
 			name:          "Data length equal to min number of symobols",
-			dataLength:    1024,
+			symbolLength:  1024,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
 		{
 			name:          "Data length less than min number of symbols",
-			dataLength:    512,
+			symbolLength:  512,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
 		{
 			name:          "Data length greater than min number of symbols",
-			dataLength:    2048,
+			symbolLength:  2048,
 			minNumSymbols: 1024,
 			expected:      2048,
 		},
 		{
 			name:          "Large data length",
-			dataLength:    1 << 20, // 1 MB
+			symbolLength:  1 << 20, // 1 MB
 			minNumSymbols: 1024,
 			expected:      1 << 20,
 		},
 		{
 			name:          "Very small data length",
-			dataLength:    16,
+			symbolLength:  16,
 			minNumSymbols: 1024,
 			expected:      1024,
 		},
@@ -459,34 +457,16 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
 			}
-			result := m.SymbolsCharged(tt.dataLength)
+			result := m.SymbolsCharged(tt.symbolLength)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func createMetererInput(binIndex uint32, cumulativePayment uint64, dataLength uint, quorumNumbers []uint8, accountID string) (blob *core.Blob, header *core.PaymentMetadata) {
-	sp := make([]*core.SecurityParam, len(quorumNumbers))
-	for i, quorumID := range quorumNumbers {
-		sp[i] = &core.SecurityParam{
-			QuorumID: quorumID,
-		}
-	}
-	blob = &core.Blob{
-		RequestHeader: core.BlobRequestHeader{
-			BlobAuthHeader: core.BlobAuthHeader{
-				AccountID: accountID2,
-				BlobCommitments: encoding.BlobCommitments{
-					Length: dataLength,
-				},
-			},
-			SecurityParams: sp,
-		},
-	}
-	header = &core.PaymentMetadata{
+func createPaymentHeader(binIndex uint32, cumulativePayment uint64, accountID string) *core.PaymentMetadata {
+	return &core.PaymentMetadata{
 		AccountID:         accountID,
 		BinIndex:          binIndex,
 		CumulativePayment: big.NewInt(int64(cumulativePayment)),
 	}
-	return blob, header
 }

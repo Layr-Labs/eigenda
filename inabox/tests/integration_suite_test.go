@@ -91,7 +91,7 @@ var _ = BeforeSuite(func() {
 			dockertestPool = pool
 			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName)
+			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, "")
 			Expect(err).To(BeNil())
 
 		} else {
