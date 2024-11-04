@@ -10,11 +10,13 @@ import (
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -27,6 +29,16 @@ const (
 	blobKeyPrefix  = "BlobKey#"
 	blobMetadataSK = "BlobMetadata"
 	blobCertSK     = "BlobCertificate"
+)
+
+var (
+	statusUpdatePrecondition = map[v2.BlobStatus][]v2.BlobStatus{
+		v2.Queued:    {},
+		v2.Encoded:   {v2.Queued},
+		v2.Certified: {v2.Encoded},
+		v2.Failed:    {v2.Queued, v2.Encoded},
+	}
+	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -53,7 +65,50 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return disperser.ErrAlreadyExists
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey core.BlobKey, status v2.BlobStatus) error {
+	validStatuses := statusUpdatePrecondition[status]
+	if len(validStatuses) == 0 {
+		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
+	}
+
+	expValues := make([]expression.OperandBuilder, len(validStatuses))
+	for i, validStatus := range validStatuses {
+		expValues[i] = expression.Value(int(validStatus))
+	}
+	condition := expression.Name("BlobStatus").In(expValues[0], expValues[1:]...)
+	_, err := s.dynamoDBClient.UpdateItemWithCondition(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: blobMetadataSK,
+		},
+	}, map[string]types.AttributeValue{
+		"BlobStatus": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(int(status)),
+		},
+		"UpdatedAt": &types.AttributeValueMemberN{
+			Value: strconv.FormatInt(time.Now().UnixNano(), 10),
+		},
+	}, condition)
+
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		blob, err := s.GetBlobMetadata(ctx, blobKey)
+		if err != nil {
+			s.logger.Errorf("failed to get blob metadata for key %s: %v", blobKey.Hex(), err)
+		}
+
+		if blob.BlobStatus == status {
+			return fmt.Errorf("%w: blob already in status %s", common.ErrAlreadyExists, status.String())
+		}
+
+		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
 	}
 
 	return err
@@ -70,7 +125,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.Bl
 	})
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: metadata not found for key %s", disperser.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: metadata not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	if err != nil {
@@ -85,7 +140,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.Bl
 	return metadata, nil
 }
 
-// GetBlobMetadataByStatus returns all the metadata with the given status
+// GetBlobMetadataByStatus returns all the metadata with the given status that were updated after lastUpdatedAt
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
 	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
@@ -125,21 +180,21 @@ func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 	return count, nil
 }
 
-func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *core.BlobCertificate) error {
-	item, err := MarshalBlobCertificate(blobCert)
+func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *core.BlobCertificate, fragmentInfo *encoding.FragmentInfo) error {
+	item, err := MarshalBlobCertificate(blobCert, fragmentInfo)
 	if err != nil {
 		return err
 	}
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return disperser.ErrAlreadyExists
+		return common.ErrAlreadyExists
 	}
 
 	return err
 }
 
-func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core.BlobKey) (*core.BlobCertificate, error) {
+func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core.BlobKey) (*core.BlobCertificate, *encoding.FragmentInfo, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -150,19 +205,19 @@ func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: certificate not found for key %s", disperser.ErrMetadataNotFound, blobKey.Hex())
+		return nil, nil, fmt.Errorf("%w: certificate not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
-	cert, err := UnmarshalBlobCertificate(item)
+	cert, fragmentInfo, err := UnmarshalBlobCertificate(item)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return cert, nil
+	return cert, fragmentInfo, nil
 }
 
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
@@ -320,10 +375,19 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*v2.BlobMetadata, error) {
 	return &metadata, nil
 }
 
-func MarshalBlobCertificate(blobCert *core.BlobCertificate) (commondynamodb.Item, error) {
+func MarshalBlobCertificate(blobCert *core.BlobCertificate, fragmentInfo *encoding.FragmentInfo) (commondynamodb.Item, error) {
 	fields, err := attributevalue.MarshalMap(blobCert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal blob certificate: %w", err)
+	}
+
+	// merge fragment info
+	fragmentInfoFields, err := attributevalue.MarshalMap(fragmentInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal fragment info: %w", err)
+	}
+	for k, v := range fragmentInfoFields {
+		fields[k] = v
 	}
 
 	// Add PK and SK fields
@@ -337,11 +401,16 @@ func MarshalBlobCertificate(blobCert *core.BlobCertificate) (commondynamodb.Item
 	return fields, nil
 }
 
-func UnmarshalBlobCertificate(item commondynamodb.Item) (*core.BlobCertificate, error) {
+func UnmarshalBlobCertificate(item commondynamodb.Item) (*core.BlobCertificate, *encoding.FragmentInfo, error) {
 	cert := core.BlobCertificate{}
 	err := attributevalue.UnmarshalMap(item, &cert)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to unmarshal blob certificate: %w", err)
 	}
-	return &cert, nil
+	fragmentInfo := encoding.FragmentInfo{}
+	err = attributevalue.UnmarshalMap(item, &fragmentInfo)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal fragment info: %w", err)
+	}
+	return &cert, &fragmentInfo, nil
 }

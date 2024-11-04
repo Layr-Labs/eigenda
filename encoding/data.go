@@ -87,3 +87,8 @@ type SubBatch struct {
 }
 
 type ChunkNumber = uint
+
+type FragmentInfo struct {
+	TotalChunkSizeBytes uint32
+	NumFragments        uint32
+}
