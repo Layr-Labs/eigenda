@@ -245,7 +245,10 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	for key, expectedCoefficients := range expectedValues {
 		coefficients, err := reader.GetChunkCoefficients(context.Background(), key)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedCoefficients, coefficients)
+		assert.Equal(t, len(expectedCoefficients), len(coefficients))
+		for i := 0; i < len(expectedCoefficients); i++ {
+			assert.Equal(t, *expectedCoefficients[i], *coefficients[i])
+		}
 	}
 }
 

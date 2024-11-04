@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
-
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -38,8 +38,8 @@ func Decode(b []byte) (Frame, error) {
 	return f, nil
 }
 
-// EncodeFrames serializes a slice of frames into a byte slice.
-func EncodeFrames(frames []*Frame) ([]byte, error) {
+// GnarkEncodeFrames serializes a slice of frames into a byte slice.
+func GnarkEncodeFrames(frames []*Frame) ([]byte, error) {
 
 	// Serialization format:
 	// [number of frames: 4 byte uint32]
@@ -48,50 +48,95 @@ func EncodeFrames(frames []*Frame) ([]byte, error) {
 	// ...
 	// [size of frame n: 4 byte uint32][frame n]
 
-	encodedSize := 4
-	encodedFrames := make([][]byte, len(frames))
-
-	for i, frame := range frames {
-		encodedSize += 4
-		encodedFrame, err := frame.Encode()
-		if err != nil {
-			return nil, err
-		}
-		encodedFrames[i] = encodedFrame
-		encodedSize += len(encodedFrame)
+	// Count the number of bytes.
+	encodedSize := uint32(4) // stores the number of frames
+	for _, frame := range frames {
+		encodedSize += 4                     // stores the size of the frame
+		encodedSize += GnarkFrameSize(frame) // size of the frame
 	}
 
 	serializedBytes := make([]byte, encodedSize)
 	binary.BigEndian.PutUint32(serializedBytes, uint32(len(frames)))
-	index := 4
+	index := uint32(4)
 
-	for _, frameBytes := range encodedFrames {
-		binary.BigEndian.PutUint32(serializedBytes[index:], uint32(len(frameBytes)))
-		index += 4
-		copy(serializedBytes[index:], frameBytes)
-		index += len(frameBytes)
+	for _, frame := range frames {
+		index += GnarkEncodeFrame(frame, serializedBytes[index:])
+	}
+
+	if index != encodedSize {
+		// Sanity check, this should never happen.
+		return nil, fmt.Errorf("encoded size mismatch: expected %d, got %d", encodedSize, index)
 	}
 
 	return serializedBytes, nil
 }
 
-// DecodeFrames deserializes a byte slice into a slice of frames.
-func DecodeFrames(serializedFrames []byte) ([]*Frame, error) {
+// GnarkEncodeFrame serializes a frame into a target byte slice. Returns the number of bytes written.
+func GnarkEncodeFrame(frame *Frame, target []byte) uint32 {
+	binary.BigEndian.PutUint32(target, uint32(len(frame.Coeffs)))
+	index := uint32(4)
+
+	for _, coeff := range frame.Coeffs {
+		serializedCoeff := coeff.Marshal()
+		copy(target[index:], serializedCoeff)
+		index += uint32(len(serializedCoeff))
+	}
+
+	return index
+}
+
+// GnarkFrameSize returns the size of a frame in bytes.
+func GnarkFrameSize(frame *Frame) uint32 {
+	return uint32(encoding.BYTES_PER_SYMBOL * len(frame.Coeffs))
+}
+
+// GnarkDecodeFrames deserializes a byte slice into a slice of frames.
+func GnarkDecodeFrames(serializedFrames []byte) ([]*Frame, error) {
 	frameCount := binary.BigEndian.Uint32(serializedFrames)
-	index := 4
+	index := uint32(4)
 
 	frames := make([]*Frame, frameCount)
 
 	for i := 0; i < int(frameCount); i++ {
-		frameSize := binary.BigEndian.Uint32(serializedFrames[index:])
-		index += 4
-		frame, err := Decode(serializedFrames[index : index+int(frameSize)])
+		frame, bytesRead, err := GnarkDecodeFrame(serializedFrames[index:])
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode frame %d: %w", i, err)
 		}
-		frames[i] = &frame
-		index += int(frameSize)
+
+		frames[i] = frame
+		index += bytesRead
+	}
+
+	if index != uint32(len(serializedFrames)) {
+		return nil, fmt.Errorf("decoded size mismatch: expected %d, got %d", len(serializedFrames), index)
 	}
 
 	return frames, nil
+}
+
+// GnarkDecodeFrame deserializes a byte slice into a frame. Returns the frame and the number of bytes read.
+func GnarkDecodeFrame(serializedFrame []byte) (*Frame, uint32, error) {
+	if len(serializedFrame) < 4 {
+		return nil, 0, fmt.Errorf("invalid frame size: %d", len(serializedFrame))
+	}
+
+	frameCount := binary.BigEndian.Uint32(serializedFrame)
+	index := uint32(4)
+
+	if len(serializedFrame) < int(index+frameCount*encoding.BYTES_PER_SYMBOL) {
+		return nil, 0, fmt.Errorf("invalid frame size: %d", len(serializedFrame))
+	}
+
+	coeffs := make([]encoding.Symbol, frameCount)
+	for i := 0; i < int(frameCount); i++ {
+		coeff := fr.Element{}
+		coeff.Unmarshal(serializedFrame[index : index+encoding.BYTES_PER_SYMBOL])
+		coeffs[i] = coeff
+		index += uint32(encoding.BYTES_PER_SYMBOL)
+	}
+
+	frame := &Frame{Coeffs: coeffs}
+
+	return frame, index, nil
 }

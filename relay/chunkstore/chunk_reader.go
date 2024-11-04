@@ -100,7 +100,7 @@ func (r *chunkReader) GetChunkCoefficients(
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
 	}
 
-	frames, err := rs.DecodeFrames(bytes)
+	frames, err := rs.GnarkDecodeFrames(bytes)
 	if err != nil {
 		r.logger.Error("Failed to decode frames: %v", err)
 		return nil, fmt.Errorf("failed to decode frames: %w", err)

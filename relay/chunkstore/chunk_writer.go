@@ -81,7 +81,7 @@ func (c *chunkWriter) PutChunkCoefficients(
 
 	s3Key := blobKey.String()
 
-	bytes, err := rs.EncodeFrames(frames)
+	bytes, err := rs.GnarkEncodeFrames(frames)
 	if err != nil {
 		c.logger.Error("Failed to encode frames: %v", err)
 		return nil, fmt.Errorf("failed to encode frames: %w", err)
