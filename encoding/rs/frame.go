@@ -39,14 +39,16 @@ func Decode(b []byte) (Frame, error) {
 }
 
 // GnarkEncodeFrames serializes a slice of frames into a byte slice.
+//
+// Serialization format:
+// [number of frames: 4 byte uint32]
+// [size of frame 1: 4 byte uint32][frame 1]
+// [size of frame 2: 4 byte uint32][frame 2]
+// ...
+// [size of frame n: 4 byte uint32][frame n]
+//
+// Where relevant, big endian encoding is used.
 func GnarkEncodeFrames(frames []*Frame) ([]byte, error) {
-
-	// Serialization format:
-	// [number of frames: 4 byte uint32]
-	// [size of frame 1: 4 byte uint32][frame 1]
-	// [size of frame 2: 4 byte uint32][frame 2]
-	// ...
-	// [size of frame n: 4 byte uint32][frame n]
 
 	// Count the number of bytes.
 	encodedSize := uint32(4) // stores the number of frames
@@ -128,7 +130,7 @@ func GnarkDecodeFrame(serializedFrame []byte) (*Frame, uint32, error) {
 		return nil, 0, fmt.Errorf("invalid frame size: %d", len(serializedFrame))
 	}
 
-	coeffs := make([]encoding.Symbol, frameCount)
+	coeffs := make([]fr.Element, frameCount)
 	for i := 0; i < int(frameCount); i++ {
 		coeff := fr.Element{}
 		coeff.Unmarshal(serializedFrame[index : index+encoding.BYTES_PER_SYMBOL])
