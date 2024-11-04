@@ -9,11 +9,15 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"math"
 	"math/rand"
 	"os"
 	"testing"
@@ -116,31 +120,6 @@ func teardownLocalstack() {
 	}
 }
 
-func randomCoefficients(count int) []*rs.Frame {
-	frames := make([]*rs.Frame, count)
-
-	for i := 0; i < count; i++ {
-
-		symbolCount := rand.Intn(10) + 1
-		coeffs := make([]encoding.Symbol, symbolCount)
-		for j := 0; j < symbolCount; j++ {
-			symbol := [4]uint64{}
-			for k := 0; k < 4; k++ {
-				symbol[k] = rand.Uint64()
-			}
-			coeffs[j] = symbol
-		}
-
-		frame := &rs.Frame{
-			Coeffs: coeffs,
-		}
-
-		frames[i] = frame
-	}
-
-	return frames
-}
-
 func getProofs(t *testing.T, count int) []*encoding.Proof {
 	proofs := make([]*encoding.Proof, count)
 
@@ -148,9 +127,9 @@ func getProofs(t *testing.T, count int) []*encoding.Proof {
 	// Using random data breaks since the deserialization logic rejects invalid proofs.
 	var x, y fp.Element
 	_, err := x.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	_, err = y.SetString("9207254729396071334325696286939045899948985698134704137261649190717970615186")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	for i := 0; i < count; i++ {
 		proof := encoding.Proof{
@@ -166,7 +145,7 @@ func getProofs(t *testing.T, count int) []*encoding.Proof {
 
 func RandomProofsTest(t *testing.T, client s3.Client) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	chunkSize := uint64(rand.Intn(1024) + 100) // ignored since we aren't writing coefficients
 
@@ -188,14 +167,14 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 		expectedValues[key] = proofs
 
 		err := writer.PutChunkProofs(context.Background(), key, proofs)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	// Read data
 	for key, expectedProofs := range expectedValues {
 		proofs, err := reader.GetChunkProofs(context.Background(), key)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedProofs, proofs)
+		require.NoError(t, err)
+		require.Equal(t, expectedProofs, proofs)
 	}
 }
 
@@ -203,22 +182,51 @@ func TestRandomProofs(t *testing.T) {
 	tu.InitializeRandom()
 	for _, builder := range clientBuilders {
 		err := builder.start()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client, err := builder.build()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		RandomProofsTest(t, client)
 
 		err = builder.finish()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
+}
+
+func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int) []*rs.Frame {
+	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)))
+	result := make([]*rs.Frame, len(frames))
+	require.NoError(t, err)
+
+	for i := 0; i < len(frames); i++ {
+		result[i] = &frames[i]
+	}
+
+	return result
 }
 
 func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
+
+	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
+	encoder, _ := rs.NewEncoder(params, true)
+
+	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
+	if encoder.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
+	}
+	fs := fft.NewFFTSettings(n)
+
+	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
+		Fs:             fs,
+		EncodingParams: params,
+	}
+
+	encoder.Computer = RsComputeDevice
+	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, chunkSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
@@ -234,20 +242,20 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 			MetadataHash: metadataHash,
 		}
 
-		coefficients := randomCoefficients(rand.Intn(100) + 100)
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
 		expectedValues[key] = coefficients
 
 		_, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
 		coefficients, err := reader.GetChunkCoefficients(context.Background(), key)
-		assert.NoError(t, err)
-		assert.Equal(t, len(expectedCoefficients), len(coefficients))
+		require.NoError(t, err)
+		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {
-			assert.Equal(t, *expectedCoefficients[i], *coefficients[i])
+			require.Equal(t, *expectedCoefficients[i], *coefficients[i])
 		}
 	}
 }
@@ -256,13 +264,13 @@ func TestRandomCoefficients(t *testing.T) {
 	tu.InitializeRandom()
 	for _, builder := range clientBuilders {
 		err := builder.start()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		client, err := builder.build()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		RandomCoefficientsTest(t, client)
 
 		err = builder.finish()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
