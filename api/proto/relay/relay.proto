@@ -18,9 +18,8 @@ service Relay {
 
 // A request to fetch one or more blobs.
 message GetBlobsRequest {
-  // The hashes of the blobs to retrieve. The order of these requested headers will
-  // be equal to the order of the blobs in the reply.
-  repeated bytes blob_hashes = 1;
+  // The blob keys to fetch.
+  repeated bytes blob_keys = 1;
 
   // If this is an authenticated request, this should hold the ID of the requester. If this
   // is an unauthenticated request, this field should be empty.
