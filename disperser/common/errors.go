@@ -1,4 +1,4 @@
-package disperser
+package common
 
 import "errors"
 

@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser"
+	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -597,7 +598,7 @@ func (s *DispersalServer) GetBlobStatus(ctx context.Context, req *pb.BlobStatusR
 	s.logger.Debug("metadataKey", "metadataKey", metadataKey.String())
 	metadata, err := s.blobStore.GetBlobMetadata(ctx, metadataKey)
 	if err != nil {
-		if errors.Is(err, disperser.ErrMetadataNotFound) {
+		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("GetBlobStatus")
 			s.metrics.HandleNotFoundRequest("GetBlobStatus")
 			return nil, api.NewErrorNotFound("no metadata found for the requestID")
@@ -740,7 +741,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob metadata", "err", err)
-		if errors.Is(err, disperser.ErrMetadataNotFound) {
+		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 			s.metrics.HandleNotFoundRequest("RetrieveBlob")
 			return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
