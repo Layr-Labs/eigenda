@@ -590,6 +590,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		},
 	}, nil)
 
+	cst.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	operatorState, err := cst.GetOperatorState(ctx, 0, []core.QuorumID{0})
 	assert.NoError(t, err)
 

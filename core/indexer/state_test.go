@@ -137,7 +137,7 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	chainState, err := indexedstate.NewIndexedChainState(cs, indexer)
+	chainState, err := indexedstate.NewIndexedChainState(cs, indexer, 0)
 	if err != nil {
 		panic(err)
 	}

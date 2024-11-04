@@ -2,16 +2,20 @@ package indexer
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/indexer"
+	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 type IndexedChainState struct {
 	core.ChainState
 
 	Indexer indexer.Indexer
+
+	operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
 }
 
 var _ core.IndexedChainState = (*IndexedChainState)(nil)
@@ -19,11 +23,21 @@ var _ core.IndexedChainState = (*IndexedChainState)(nil)
 func NewIndexedChainState(
 	chainState core.ChainState,
 	indexer indexer.Indexer,
+	cacheSize int,
 ) (*IndexedChainState, error) {
-
+	operatorStateCache := (*lru.Cache[string, *core.IndexedOperatorState])(nil)
+	var err error
+	if cacheSize > 0 {
+		operatorStateCache, err = lru.New[string, *core.IndexedOperatorState](cacheSize)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &IndexedChainState{
 		ChainState: chainState,
 		Indexer:    indexer,
+
+		operatorStateCache: operatorStateCache,
 	}, nil
 }
 
@@ -32,6 +46,12 @@ func (ics *IndexedChainState) Start(ctx context.Context) error {
 }
 
 func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
+	cacheKey := computeCacheKey(blockNumber, quorums)
+	if ics.operatorStateCache != nil {
+		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
+			return val, nil
+		}
+	}
 
 	pubkeys, sockets, err := ics.getObjects(blockNumber)
 	if err != nil {
@@ -71,6 +91,10 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		OperatorState:    operatorState,
 		IndexedOperators: ops,
 		AggKeys:          aggKeys,
+	}
+
+	if ics.operatorStateCache != nil {
+		ics.operatorStateCache.Add(cacheKey, state)
 	}
 
 	return state, nil
@@ -137,4 +161,11 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 
 	return pubkeys, sockets, nil
 
+}
+
+func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
+	bytes := make([]byte, 8+len(quorumIDs))
+	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))
+	copy(bytes[8:], quorumIDs)
+	return string(bytes)
 }

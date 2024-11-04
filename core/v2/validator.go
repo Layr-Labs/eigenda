@@ -83,6 +83,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Chunks), len(blob.BlobHeader.QuorumNumbers))
 		}
 
+		// TODO(ian-shim): cache the operator state
 		state, err := v.chainState.GetOperatorState(ctx, uint(blob.ReferenceBlockNumber), blob.BlobHeader.QuorumNumbers)
 		if err != nil {
 			return err

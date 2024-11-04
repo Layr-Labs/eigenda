@@ -225,6 +225,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 }
 
 func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
+	_ = d.Called(ctx, blockNumber, quorums)
 	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil

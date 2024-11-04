@@ -189,7 +189,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	ics, err := coreindexer.NewIndexedChainState(cs, indexer)
+	ics, err := coreindexer.NewIndexedChainState(cs, indexer, 0)
 	if err != nil {
 		return err
 	}

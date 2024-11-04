@@ -99,7 +99,7 @@ func setup(t *testing.T) {
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 
-	ics, err := coreindexer.NewIndexedChainState(chainState, indexer)
+	ics, err := coreindexer.NewIndexedChainState(chainState, indexer, 0)
 	if err != nil {
 		panic("failed to create a new indexed chain state")
 	}
