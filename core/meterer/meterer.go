@@ -12,17 +12,12 @@ import (
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
 type Config struct {
-	// GlobalSymbolsPerSecond rate limit in symbols per second for on-demand payments
-	GlobalSymbolsPerSecond uint64
-	// MinNumSymbols is the minimum number of symbols charged, round up for all smaller requests (must be in power of 2)
-	MinNumSymbols uint32
-	// PricePerSymbol is the price per symbol in gwei, used for on-demand payments
-	PricePerSymbol uint32
-	// ReservationWindow is the duration of all reservations in seconds, used to calculate bin indices
-	ReservationWindow uint32
 
 	// ChainReadTimeout is the timeout for reading payment state from chain
 	ChainReadTimeout time.Duration
+
+	// UpdateInterval is the interval for refreshing the on-chain state
+	UpdateInterval time.Duration
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
@@ -30,8 +25,8 @@ type Config struct {
 // payments information is valid.
 type Meterer struct {
 	Config
-	// ChainState reads on-chain payment state periodically and cache it in memory
-	ChainState OnchainPayment
+	// ChainPaymentState reads on-chain payment state periodically and cache it in memory
+	ChainPaymentState OnchainPayment
 	// OffchainStore uses DynamoDB to track metering and used to validate requests
 	OffchainStore OffchainStore
 
@@ -47,8 +42,8 @@ func NewMeterer(
 	return &Meterer{
 		Config: config,
 
-		ChainState:    paymentChainState,
-		OffchainStore: offchainStore,
+		ChainPaymentState: paymentChainState,
+		OffchainStore:     offchainStore,
 
 		logger: logger.With("component", "Meterer"),
 	}
@@ -57,13 +52,13 @@ func NewMeterer(
 // Start starts to periodically refreshing the on-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
+		ticker := time.NewTicker(m.UpdateInterval)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
 			case <-ctx.Done():
@@ -75,23 +70,22 @@ func (m *Meterer) Start(ctx context.Context) {
 
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
-func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.PaymentMetadata) error {
-	headerQuorums := blob.GetQuorumNumbers()
+func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainState.GetActiveReservationByAccount(ctx, header.AccountID)
+		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, &reservation, blob.RequestHeader.BlobAuthHeader.Length, headerQuorums); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, &reservation, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
-		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, blob.RequestHeader.BlobAuthHeader.Length, headerQuorums); err != nil {
+		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}
@@ -100,7 +94,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, blob core.Blob, header core.
 }
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, blobLength uint, quorumNumbers []uint8) error {
+func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint, quorumNumbers []uint8) error {
 	if err := m.ValidateQuorum(quorumNumbers, reservation.QuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
@@ -109,7 +103,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	}
 
 	// Update bin usage atomically and check against reservation's data rate as the bin limit
-	if err := m.IncrementBinUsage(ctx, header, reservation, blobLength); err != nil {
+	if err := m.IncrementBinUsage(ctx, header, reservation, numSymbols); err != nil {
 		return fmt.Errorf("bin overflows: %w", err)
 	}
 
@@ -138,18 +132,19 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 // ValidateBinIndex checks if the provided bin index is valid
 func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *core.ActiveReservation) bool {
 	now := uint64(time.Now().Unix())
-	currentBinIndex := GetBinIndex(now, m.ReservationWindow)
+	reservationWindow := m.ChainPaymentState.GetReservationWindow()
+	currentBinIndex := GetBinIndex(now, reservationWindow)
 	// Valid bin indexes are either the current bin or the previous bin
-	if (header.BinIndex != currentBinIndex && header.BinIndex != (currentBinIndex-1)) || (GetBinIndex(reservation.StartTimestamp, m.ReservationWindow) > header.BinIndex || header.BinIndex > GetBinIndex(reservation.EndTimestamp, m.ReservationWindow)) {
+	if (header.BinIndex != currentBinIndex && header.BinIndex != (currentBinIndex-1)) || (GetBinIndex(reservation.StartTimestamp, reservationWindow) > header.BinIndex || header.BinIndex > GetBinIndex(reservation.EndTimestamp, reservationWindow)) {
 		return false
 	}
 	return true
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, blobLength uint) error {
-	numSymbols := m.SymbolsCharged(blobLength)
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), uint64(numSymbols))
+func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
+	symbolsCharged := m.SymbolsCharged(numSymbols)
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), uint64(symbolsCharged))
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -162,7 +157,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
-	if newUsage <= 2*usageLimit && header.BinIndex+2 <= GetBinIndex(reservation.EndTimestamp, m.ReservationWindow) {
+	if newUsage <= 2*usageLimit && header.BinIndex+2 <= GetBinIndex(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
 		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex+2), newUsage-usageLimit)
 		if err != nil {
 			return err
@@ -181,8 +176,8 @@ func GetBinIndex(timestamp uint64, binInterval uint32) uint32 {
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
-func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, blobLength uint, headerQuorums []uint8) error {
-	quorumNumbers, err := m.ChainState.GetOnDemandQuorumNumbers(ctx)
+func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, numSymbols uint, headerQuorums []uint8) error {
+	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
 	}
@@ -191,13 +186,13 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 	// update blob header to use the miniumum chargeable size
-	symbolsCharged := m.SymbolsCharged(blobLength)
+	symbolsCharged := m.SymbolsCharged(numSymbols)
 	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 	// Validate payments attached
-	err = m.ValidatePayment(ctx, header, onDemandPayment, blobLength)
+	err = m.ValidatePayment(ctx, header, onDemandPayment, numSymbols)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
@@ -219,25 +214,25 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// nextPmtDataLength is the dataLength of corresponding to nextPmt if exists
-// prevPmt + PaymentMetadata.DataLength * m.FixedFeePerByte
+// nextPmtnumSymbols is the numSymbols of corresponding to nextPmt if exists
+// prevPmt + PaymentMetadata.numSymbols * m.FixedFeePerByte
 // <= PaymentMetadata.CumulativePayment
-// <= nextPmt - nextPmtDataLength * m.FixedFeePerByte > nextPmt
-func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, blobLength uint) error {
+// <= nextPmt - nextPmtnumSymbols * m.FixedFeePerByte > nextPmt
+func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, numSymbols uint) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	prevPmt, nextPmt, nextPmtDataLength, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
+	prevPmt, nextPmt, nextPmtnumSymbols, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+m.PaymentCharged(blobLength) > header.CumulativePayment.Uint64() {
+	if prevPmt+m.PaymentCharged(numSymbols) > header.CumulativePayment.Uint64() {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && header.CumulativePayment.Uint64()+m.PaymentCharged(uint(nextPmtDataLength)) > nextPmt {
+	if nextPmt != 0 && header.CumulativePayment.Uint64()+m.PaymentCharged(uint(nextPmtnumSymbols)) > nextPmt {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
@@ -245,18 +240,18 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 }
 
 // PaymentCharged returns the chargeable price for a given data length
-func (m *Meterer) PaymentCharged(dataLength uint) uint64 {
-	return uint64(m.SymbolsCharged(dataLength)) * uint64(m.PricePerSymbol)
+func (m *Meterer) PaymentCharged(numSymbols uint) uint64 {
+	return uint64(m.SymbolsCharged(numSymbols)) * uint64(m.ChainPaymentState.GetPricePerSymbol())
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (m *Meterer) SymbolsCharged(dataLength uint) uint32 {
-	if dataLength <= uint(m.MinNumSymbols) {
-		return m.MinNumSymbols
+func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
+	if numSymbols <= uint(m.ChainPaymentState.GetMinNumSymbols()) {
+		return m.ChainPaymentState.GetMinNumSymbols()
 	}
 	// Round up to the nearest multiple of MinNumSymbols
-	return uint32(core.RoundUpDivide(uint(dataLength), uint(m.MinNumSymbols))) * m.MinNumSymbols
+	return uint32(core.RoundUpDivide(uint(numSymbols), uint(m.ChainPaymentState.GetMinNumSymbols()))) * m.ChainPaymentState.GetMinNumSymbols()
 }
 
 // ValidateBinIndex checks if the provided bin index is valid
@@ -278,7 +273,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.GlobalSymbolsPerSecond {
+	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond() {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil
@@ -286,5 +281,5 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
-	return reservation.SymbolsPerSec * uint64(m.ReservationWindow)
+	return reservation.SymbolsPerSec * uint64(m.ChainPaymentState.GetReservationWindow())
 }

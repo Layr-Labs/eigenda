@@ -102,10 +102,10 @@ message SignedCertificate {
 
 message Attestation {
   repeated uint32 nonSignerQuorumBitmapIndices = 1;
-  repeated common.G1Commitment nonSignerPubkeys = 2;
-  repeated common.G1Commitment quorumApks = 3;
-  common.G2Commitment apkG2 = 4;
-  common.G1Commitment sigma = 5;
+  repeated bytes nonSignerPubkeys = 2;
+  repeated bytes quorumApks = 3;
+  bytes apkG2 = 4;
+  bytes sigma = 5;
   repeated uint32 quorumApkIndices = 6;
   repeated uint32 totalStakeIndices = 7;
   repeated NonSignerStakeIndicesForQuorum nonSignerStakeIndices = 8;

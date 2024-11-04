@@ -55,3 +55,23 @@ func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) 
 	}
 	return value, args.Error(1)
 }
+
+func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetMinNumSymbols() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}
+
+func (m *MockOnchainPaymentState) GetPricePerSymbol() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}
+
+func (m *MockOnchainPaymentState) GetReservationWindow() uint32 {
+	args := m.Called()
+	return args.Get(0).(uint32)
+}

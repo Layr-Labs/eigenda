@@ -19,6 +19,7 @@ import (
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -44,6 +45,7 @@ type DispersalServer struct {
 	tx           core.Reader
 	quorumConfig QuorumConfig
 
+	meterer       *meterer.Meterer
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
@@ -69,6 +71,7 @@ func NewDispersalServer(
 	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
+	meterer *meterer.Meterer,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
 	maxBlobSize int,
@@ -90,6 +93,7 @@ func NewDispersalServer(
 		tx:            tx,
 		metrics:       metrics,
 		logger:        logger,
+		meterer:       meterer,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
@@ -209,7 +213,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated")
+	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated", nil)
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -241,7 +245,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob")
+	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob", nil)
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -251,15 +255,11 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 	return reply, err
 }
 
-func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
-	return nil, api.NewErrorInternal("not implemented")
-}
-
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string, paymentHeader *core.PaymentMetadata) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("DisperseBlob", f*1000) // make milliseconds
+		s.metrics.ObserveLatency(apiMethodName, f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
@@ -282,7 +282,14 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	if s.ratelimiter != nil {
+	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
+	if paymentHeader != nil {
+		blobLength := encoding.GetBlobLength(uint(blobSize))
+		err := s.meterer.MeterRequest(ctx, *paymentHeader, blobLength, blob.GetQuorumNumbers())
+		if err != nil {
+			return nil, api.NewErrorResourceExhausted(err.Error())
+		}
+	} else if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {
 			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.
@@ -949,7 +956,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > 256 {
-		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
+		return nil, fmt.Errorf("number of custom_quorum_numbers must not exceed 256")
 	}
 
 	// validate every 32 bytes is a valid field element
@@ -965,7 +972,7 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	if len(req.GetCustomQuorumNumbers()) > int(quorumConfig.QuorumCount) {
-		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
+		return nil, fmt.Errorf("number of custom_quorum_numbers must not exceed number of quorums")
 	}
 
 	seenQuorums := make(map[uint8]struct{})

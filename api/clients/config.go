@@ -17,6 +17,15 @@ type EigenDAClientConfig struct {
 	ResponseTimeout time.Duration
 
 	// The total amount of time that the client will spend waiting for EigenDA
+	// to "confirm" (include onchain) a blob after it has been dispersed. Note that
+	// we stick to "confirm" here but this really means InclusionTimeout,
+	// not confirmation in the sense of confirmation depth.
+	//
+	// If ConfirmationTimeout time passes and the blob is not yet confirmed,
+	// the client will return an api.ErrorFailover to let the caller failover to EthDA.
+	ConfirmationTimeout time.Duration
+
+	// The total amount of time that the client will spend waiting for EigenDA
 	// to confirm a blob after it has been dispersed
 	// Note that reasonable values for this field will depend on the value of WaitForFinalization.
 	StatusQueryTimeout time.Duration
@@ -81,15 +90,25 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 		return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set. Needed to verify blob confirmed on-chain.")
 	}
 
+	if c.ResponseTimeout == 0 {
+		c.ResponseTimeout = 30 * time.Second
+	}
+	if c.ConfirmationTimeout == 0 {
+		// batching interval on mainnet is 10 minutes,
+		// so we set the confirmation timeout to 15 minutes to give some buffer
+		c.ConfirmationTimeout = 15 * time.Minute
+	}
 	if c.StatusQueryRetryInterval == 0 {
 		c.StatusQueryRetryInterval = 5 * time.Second
 	}
 	if c.StatusQueryTimeout == 0 {
 		c.StatusQueryTimeout = 25 * time.Minute
 	}
-	if c.ResponseTimeout == 0 {
-		c.ResponseTimeout = 30 * time.Second
+	if c.ConfirmationTimeout > c.StatusQueryTimeout {
+		// doesn't make sense... confirmation is about onchain inclusion, whereas status query is about reaching finality (after inclusion)
+		return fmt.Errorf("EigenDAClientConfig.ConfirmationTimeout (%v) > EigenDAClientConfig.StatusQueryTimeout (%v)", c.ConfirmationTimeout, c.StatusQueryTimeout)
 	}
+
 	if len(c.SignerPrivateKeyHex) > 0 && len(c.SignerPrivateKeyHex) != 64 {
 		return fmt.Errorf("a valid length SignerPrivateKeyHex needs to have 64 bytes")
 	}

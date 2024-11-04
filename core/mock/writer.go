@@ -20,12 +20,14 @@ var _ core.Writer = (*MockWriter)(nil)
 
 func (t *MockWriter) GetBlockStaleMeasure(ctx context.Context) (uint32, error) {
 	args := t.Called()
-	return *new(uint32), args.Error(0)
+	result := args.Get(0)
+	return result.(uint32), args.Error(1)
 }
 
 func (t *MockWriter) GetStoreDurationBlocks(ctx context.Context) (uint32, error) {
 	args := t.Called()
-	return *new(uint32), args.Error(0)
+	result := args.Get(0)
+	return result.(uint32), args.Error(1)
 }
 
 func (t *MockWriter) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator core.OperatorID) ([]core.QuorumID, error) {

@@ -2,12 +2,15 @@ package v2
 
 import (
 	"encoding/hex"
+	"errors"
 	"math"
 	"math/big"
 	"strings"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"golang.org/x/crypto/sha3"
 )
@@ -67,6 +70,60 @@ type BlobHeader struct {
 
 	// Signature is the signature of the blob header by the account ID
 	Signature []byte
+}
+
+func NewBlobHeader(proto *pb.BlobHeader) (*BlobHeader, error) {
+	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
+	if err != nil {
+		return nil, err
+	}
+	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(proto.GetCommitment().GetLengthCommitment())
+	if err != nil {
+		return nil, err
+	}
+	lengthProof, err := new(encoding.LengthProof).Deserialize(proto.GetCommitment().GetLengthProof())
+	if err != nil {
+		return nil, err
+	}
+
+	if !(*bn254.G1Affine)(commitment).IsInSubGroup() {
+		return nil, errors.New("commitment is not in the subgroup")
+	}
+
+	if !(*bn254.G2Affine)(lengthCommitment).IsInSubGroup() {
+		return nil, errors.New("lengthCommitment is not in the subgroup")
+	}
+
+	if !(*bn254.G2Affine)(lengthProof).IsInSubGroup() {
+		return nil, errors.New("lengthProof is not in the subgroup")
+	}
+
+	quorumNumbers := make([]core.QuorumID, len(proto.QuorumNumbers))
+	for i, q := range proto.GetQuorumNumbers() {
+		if q > MaxQuorumID {
+			return nil, errors.New("quorum number exceeds maximum allowed")
+		}
+		quorumNumbers[i] = core.QuorumID(q)
+	}
+
+	paymentMetadata := core.PaymentMetadata{
+		AccountID:         proto.GetPaymentHeader().GetAccountId(),
+		BinIndex:          proto.GetPaymentHeader().GetBinIndex(),
+		CumulativePayment: new(big.Int).SetBytes(proto.GetPaymentHeader().GetCumulativePayment()),
+	}
+
+	return &BlobHeader{
+		BlobVersion: BlobVersion(proto.GetVersion()),
+		BlobCommitments: encoding.BlobCommitments{
+			Commitment:       commitment,
+			LengthCommitment: lengthCommitment,
+			LengthProof:      lengthProof,
+			Length:           uint(proto.GetCommitment().GetLength()),
+		},
+		QuorumNumbers:   quorumNumbers,
+		PaymentMetadata: paymentMetadata,
+		Signature:       proto.GetSignature(),
+	}, nil
 }
 
 func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
@@ -230,14 +287,16 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	return headerHash, nil
 }
 
+type RelayKey uint16
+
 type BlobCertificate struct {
-	BlobHeader
+	BlobHeader *BlobHeader
 
 	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
 	ReferenceBlockNumber uint64
 
 	// RelayKeys
-	RelayKeys []uint16
+	RelayKeys []RelayKey
 }
 
 type BlobVersionParameters struct {

@@ -599,3 +599,23 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber ui
 	// contract is not implemented yet
 	return core.OnDemandPayment{}, nil
 }
+
+func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}
+
+func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
+	// contract is not implemented yet
+	return 0, nil
+}

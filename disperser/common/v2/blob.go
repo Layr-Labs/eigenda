@@ -1,6 +1,7 @@
 package v2
 
 import (
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 )
 
@@ -11,7 +12,42 @@ const (
 	Encoded
 	Certified
 	Failed
+	InsufficientSignatures
 )
+
+func (s BlobStatus) String() string {
+	switch s {
+	case Queued:
+		return "Queued"
+	case Encoded:
+		return "Encoded"
+	case Certified:
+		return "Certified"
+	case Failed:
+		return "Failed"
+	case InsufficientSignatures:
+		return "InsufficientSignatures"
+	default:
+		return "Unknown"
+	}
+}
+
+func (s BlobStatus) ToProfobuf() pb.BlobStatus {
+	switch s {
+	case Queued:
+		return pb.BlobStatus_QUEUED
+	case Encoded:
+		return pb.BlobStatus_ENCODED
+	case Certified:
+		return pb.BlobStatus_CERTIFIED
+	case Failed:
+		return pb.BlobStatus_FAILED
+	case InsufficientSignatures:
+		return pb.BlobStatus_INSUFFICIENT_SIGNATURES
+	default:
+		return pb.BlobStatus_UNKNOWN
+	}
+}
 
 // BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {

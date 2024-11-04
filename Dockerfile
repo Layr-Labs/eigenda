@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # Declare build arguments
-# TODO: this is only used for node image right now, should we also use it for nodeplugin?
+# NOTE: to use these args, they must be *consumed* in the child scope (see node-builder)
+# https://docs.docker.com/build/building/variables/#scoping
 ARG SEMVER=""
 ARG GITCOMMIT=""
 ARG GITDATE=""
@@ -70,6 +71,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Node build stage
 FROM common-builder AS node-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 COPY node /app/node
 COPY operators ./operators
 WORKDIR /app/node
