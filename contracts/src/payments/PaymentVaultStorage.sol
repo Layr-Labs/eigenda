@@ -15,6 +15,8 @@ abstract contract PaymentVaultStorage is IPaymentVault {
     uint256 public globalSymbolsPerSecond;  
     /// @notice reservation bin duration 
     uint256 public reservationBinInterval;  
+    /// @notice global rate bin size
+    uint256 public globalRateBinInterval;
 
     /// @notice timestamp of the last price update
     uint256 public lastPriceUpdateTime; 

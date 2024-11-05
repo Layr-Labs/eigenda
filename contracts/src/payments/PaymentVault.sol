@@ -29,15 +29,17 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         uint256 _globalSymbolsPerSecond,
         uint256 _pricePerSymbol,
         uint256 _reservationBinInterval,
-        uint256 _priceUpdateCooldown
+        uint256 _priceUpdateCooldown,
+        uint256 _globalRateBinInterval
     ) public initializer {
-        transferOwnership(_initialOwner);
+        _transferOwnership(_initialOwner);
         
         minChargeableSize = _minChargeableSize;
         globalSymbolsPerSecond = _globalSymbolsPerSecond;
         pricePerSymbol = _pricePerSymbol;
         reservationBinInterval = _reservationBinInterval;
         priceUpdateCooldown = _priceUpdateCooldown;
+        globalRateBinInterval = _globalRateBinInterval;
 
         lastPriceUpdateTime = block.timestamp;
     }
@@ -52,6 +54,7 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         Reservation memory _reservation
     ) external onlyOwner { 
 		_checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
+        require(_reservation.endTimestamp > _reservation.startTimestamp, "end timestamp must be greater than start timestamp");
         reservations[_account] = _reservation;
         emit ReservationUpdated(_account, _reservation);
     }
@@ -89,6 +92,11 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     function setReservationBinInterval(uint256 _reservationBinInterval) external onlyOwner {
         emit ReservationBinIntervalUpdated(reservationBinInterval, _reservationBinInterval);
         reservationBinInterval = _reservationBinInterval;
+    }
+
+    function setGlobalRateBinInterval(uint256 _globalRateBinInterval) external onlyOwner {
+        emit GlobalRateBinIntervalUpdated(globalRateBinInterval, _globalRateBinInterval);
+        globalRateBinInterval = _globalRateBinInterval;
     }
 
     function withdraw(uint256 _amount) external onlyOwner {

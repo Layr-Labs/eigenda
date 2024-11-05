@@ -19,6 +19,8 @@ interface IPaymentVault {
     event GlobalSymbolsPerSecondUpdated(uint256 previousValue, uint256 newValue);
     /// @notice Emitted when reservationBinInterval is updated
     event ReservationBinIntervalUpdated(uint256 previousValue, uint256 newValue);
+    /// @notice Emitted when globalRateBinInterval is updated
+    event GlobalRateBinIntervalUpdated(uint256 previousValue, uint256 newValue);
     /// @notice Emitted when priceParams are updated
     event PriceParamsUpdated(
         uint256 previousMinChargeableSize, 
