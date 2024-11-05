@@ -39,10 +39,13 @@ type cachedAccessor[K comparable, V any] struct {
 	// is written into the channel when it is eventually fetched. If a key is requested more than once while a
 	// lookup in progress, the second (and following) requests will wait for the result of the first lookup
 	// to be written into the channel.
-	lookupsInProgress sync.Map
+	lookupsInProgress map[K]*accessResult[V]
 
 	// cache is the LRU cache used to store values fetched by the accessor.
 	cache *lru.Cache[K, *V]
+
+	// lock is used to protect the cache and lookupsInProgress map.
+	cacheLock sync.Mutex
 
 	// accessor is the function used to fetch values that are not in the cache.
 	accessor Accessor[K, *V]
@@ -56,9 +59,12 @@ func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, 
 		return nil, err
 	}
 
+	lookupsInProgress := make(map[K]*accessResult[V])
+
 	return &cachedAccessor[K, V]{
-		cache:    cache,
-		accessor: accessor,
+		cache:             cache,
+		accessor:          accessor,
+		lookupsInProgress: lookupsInProgress,
 	}, nil
 }
 
@@ -71,16 +77,24 @@ func newAccessResult[V any]() *accessResult[V] {
 }
 
 func (c *cachedAccessor[K, V]) Get(key K) (*V, error) {
+
+	c.cacheLock.Lock()
+
 	// first, attempt to get the value from the cache
 	v, ok := c.cache.Get(key)
 	if ok {
+		c.cacheLock.Unlock()
 		return v, nil
 	}
 
 	// if that fails, check if a lookup is already in progress. If not, start a new one.
-	result := newAccessResult[V]()
-	actual, alreadyLoading := c.lookupsInProgress.LoadOrStore(key, result)
-	result = actual.(*accessResult[V]) // sync.Map was written prior to generics in golang ;(
+	result, alreadyLoading := c.lookupsInProgress[key]
+	if !alreadyLoading {
+		result = newAccessResult[V]()
+		c.lookupsInProgress[key] = result
+	}
+
+	c.cacheLock.Unlock()
 
 	if alreadyLoading {
 		// The result is being fetched on another goroutine. Wait for it to finish.
@@ -89,6 +103,8 @@ func (c *cachedAccessor[K, V]) Get(key K) (*V, error) {
 	} else {
 		// We are the first goroutine to request this key.
 		value, err := c.accessor(key)
+
+		c.cacheLock.Lock()
 
 		// Update the cache if the fetch was successful.
 		if err == nil {
@@ -101,7 +117,9 @@ func (c *cachedAccessor[K, V]) Get(key K) (*V, error) {
 		result.wg.Done()
 
 		// Clean up the lookupInProgress map.
-		c.lookupsInProgress.Delete(key)
+		delete(c.lookupsInProgress, key)
+
+		c.cacheLock.Unlock()
 
 		return value, err
 	}
