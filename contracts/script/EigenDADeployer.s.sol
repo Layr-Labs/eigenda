@@ -16,6 +16,7 @@ import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.
 import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
+import {ISocketRegistry, SocketRegistry} from "eigenlayer-middleware/SocketRegistry.sol";
 
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
@@ -36,6 +37,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
+    ISocketRegistry public socketRegistry;
     OperatorStateRetriever public operatorStateRetriever;
 
     BLSApkRegistry public apkRegistryImplementation;
@@ -43,6 +45,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IRegistryCoordinator public registryCoordinatorImplementation;
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
+    ISocketRegistry public socketRegistryImplementation;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -110,6 +113,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         apkRegistry = BLSApkRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        socketRegistry = ISocketRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
 
         indexRegistryImplementation = new IndexRegistry(
             registryCoordinator
@@ -139,11 +145,19 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(apkRegistryImplementation)
         );
 
+        socketRegistryImplementation = new SocketRegistry(registryCoordinator);
+
+        eigenDAProxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(socketRegistry))),
+            address(socketRegistryImplementation)
+        );
+
         registryCoordinatorImplementation = new RegistryCoordinator(
                 IServiceManager(address(eigenDAServiceManager)),
                 stakeRegistry,
                 apkRegistry,
-                indexRegistry
+                indexRegistry,
+                socketRegistry
             );
 
         {
