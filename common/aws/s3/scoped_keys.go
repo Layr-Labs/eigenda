@@ -12,13 +12,13 @@ const (
 	// to change it that we have not yet implemented.
 	prefixLength = 3
 
-	// blobNamespace is the postfix for a blob key.
+	// blobNamespace is the namespace for a blob key.
 	blobNamespace = "blob"
 
-	// chunkNamespace is the postfix for a chunk key.
+	// chunkNamespace is the namespace for a chunk key.
 	chunkNamespace = "chunk"
 
-	// proofNamespace is the postfix for a proof key.
+	// proofNamespace is the namespace for a proof key.
 	proofNamespace = "proof"
 )
 
