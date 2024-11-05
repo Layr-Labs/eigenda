@@ -2,6 +2,7 @@ package flags
 
 import (
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
@@ -20,6 +21,25 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GRPC_PORT"),
 	}
 	/* Optional Flags*/
+	EncoderVersionFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-version"),
+		Usage:    "Encoder version. Options are 1 and 2.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODER_VERSION"),
+	}
+	BlobStoreS3BucketNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-store-s3-bucket-name"),
+		Usage:    "Name of the bucket to retrieve blobs from",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_STORE_S3_BUCKET_NAME"),
+	}
+	ChunkStoreS3BucketNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chunk-store-s3-bucket-name"),
+		Usage:    "Name of the bucket to store chunks in",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_STORE_S3_BUCKET_NAME"),
+	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -65,6 +85,9 @@ var optionalFlags = []cli.Flag{
 	MaxConcurrentRequestsFlag,
 	RequestPoolSizeFlag,
 	EnableGnarkChunkEncodingFlag,
+	EncoderVersionFlag,
+	BlobStoreS3BucketNameFlag,
+	ChunkStoreS3BucketNameFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
@@ -72,6 +95,7 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
+	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, kzg.CLIFlags(envVarPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 }

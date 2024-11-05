@@ -2,6 +2,11 @@ package chunkstore
 
 import (
 	"context"
+	"math"
+	"math/rand"
+	"os"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -17,10 +22,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
-	"math"
-	"math/rand"
-	"os"
-	"testing"
 )
 
 var (
