@@ -119,7 +119,7 @@ func TestHandleBatch(t *testing.T) {
 	c := newTestComponents(t)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
-		NumFragments:        5,
+		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
 	err = c.EncodingManager.HandleBatch(ctx)
@@ -139,7 +139,7 @@ func TestHandleBatch(t *testing.T) {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
 	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	assert.Equal(t, fetchedFragmentInfo.NumFragments, uint32(5))
+	assert.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
 }
 
 func TestHandleBatchNoBlobs(t *testing.T) {
@@ -178,7 +178,7 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
-		NumFragments:        5,
+		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
 	err = c.EncodingManager.HandleBatch(ctx)
@@ -198,7 +198,7 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
 	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	assert.Equal(t, fetchedFragmentInfo.NumFragments, uint32(5))
+	assert.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 }
 

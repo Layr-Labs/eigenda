@@ -20,7 +20,8 @@ type ChunkReader interface {
 	// should match the metadata returned by PutChunkCoefficients.
 	GetChunkCoefficients(
 		ctx context.Context,
-		blobKey disperser.BlobKey) ([]*rs.Frame, error)
+		blobKey disperser.BlobKey,
+		fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
@@ -88,13 +89,18 @@ func (r *chunkReader) GetChunkProofs(
 
 func (r *chunkReader) GetChunkCoefficients(
 	ctx context.Context,
-	blobKey disperser.BlobKey) ([]*rs.Frame, error) {
+	blobKey disperser.BlobKey,
+	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
 
 	s3Key := blobKey.String()
 
-	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
-	// TODO: Implement fragmented download
-	//bytes, err := r.client.FragmentedDownloadObject(ctx, r.bucket, s3Key, metadata.DataSize, metadata.FragmentSize)
+	bytes, err := r.client.FragmentedDownloadObject(
+		ctx,
+		r.bucket,
+		s3Key,
+		int(fragmentInfo.TotalChunkSizeBytes),
+		int(fragmentInfo.FragmentSizeBytes))
+
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
