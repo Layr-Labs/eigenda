@@ -58,9 +58,7 @@ func (r *chunkReader) GetChunkProofs(
 	ctx context.Context,
 	blobKey v2.BlobKey) ([]*encoding.Proof, error) {
 
-	s3Key := blobKey.Hex()
-
-	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
+	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
@@ -92,12 +90,10 @@ func (r *chunkReader) GetChunkCoefficients(
 	blobKey v2.BlobKey,
 	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
 
-	s3Key := blobKey.Hex()
-
 	bytes, err := r.client.FragmentedDownloadObject(
 		ctx,
 		r.bucket,
-		s3Key,
+		s3.ScopedChunkKey(blobKey),
 		int(fragmentInfo.TotalChunkSizeBytes),
 		int(fragmentInfo.FragmentSizeBytes))
 

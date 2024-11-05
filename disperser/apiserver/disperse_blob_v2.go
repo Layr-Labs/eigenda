@@ -50,7 +50,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 		return v2.BlobKey{}, err
 	}
 
-	if err := s.blobStore.StoreBlob(ctx, blobKey.Hex(), data); err != nil {
+	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
 		return v2.BlobKey{}, err
 	}
 
