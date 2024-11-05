@@ -84,7 +84,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Equal(t, blobKey[:], reply.BlobKey)
 
 	// Check if the blob is stored
-	storedData, err := c.BlobStore.GetBlob(ctx, blobKey.Hex())
+	storedData, err := c.BlobStore.GetBlob(ctx, blobKey)
 	assert.NoError(t, err)
 	assert.Equal(t, data, storedData)
 

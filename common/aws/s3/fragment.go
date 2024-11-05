@@ -19,19 +19,12 @@ func getFragmentCount(fileSize int, fragmentSize int) int {
 
 // getFragmentKey returns the key for the fragment at the given index.
 //
-// Fragment keys take the form of "prefix/body-index[f]". The prefix is the first prefixLength characters
-// of the file key. The body is the file key. The index is the index of the fragment. The character "f" is appended
-// to the key of the last fragment in the series.
+// Fragment keys take the form of "body-index[f]". The index is the index of the fragment. The character "f" is
+// appended to the key of the last fragment in the series.
 //
-// Example: fileKey="abc123", prefixLength=2, fragmentCount=3
-// The keys will be "ab/abc123-0", "ab/abc123-1", "ab/abc123-2f"
-func getFragmentKey(fileKey string, prefixLength int, fragmentCount int, index int) (string, error) {
-	var prefix string
-	if prefixLength > len(fileKey) {
-		prefix = fileKey
-	} else {
-		prefix = fileKey[:prefixLength]
-	}
+// Example: fileKey="abc123", fragmentCount=3
+// The keys will be "abc123-0", "abc123-1", "abc123-2f"
+func getFragmentKey(fileKey string, fragmentCount int, index int) (string, error) {
 
 	postfix := ""
 	if fragmentCount-1 == index {
@@ -42,7 +35,7 @@ func getFragmentKey(fileKey string, prefixLength int, fragmentCount int, index i
 		return "", fmt.Errorf("index %d is too high for fragment count %d", index, fragmentCount)
 	}
 
-	return fmt.Sprintf("%s/%s-%d%s", prefix, fileKey, index, postfix), nil
+	return fmt.Sprintf("%s-%d%s", fileKey, index, postfix), nil
 }
 
 // Fragment is a subset of a file.
@@ -53,7 +46,7 @@ type Fragment struct {
 }
 
 // breakIntoFragments breaks a file into fragments of the given size.
-func breakIntoFragments(fileKey string, data []byte, prefixLength int, fragmentSize int) ([]*Fragment, error) {
+func breakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
 	fragmentCount := getFragmentCount(len(data), fragmentSize)
 	fragments := make([]*Fragment, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
@@ -63,7 +56,7 @@ func breakIntoFragments(fileKey string, data []byte, prefixLength int, fragmentS
 			end = len(data)
 		}
 
-		fragmentKey, err := getFragmentKey(fileKey, prefixLength, fragmentCount, i)
+		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)
 		if err != nil {
 			return nil, err
 		}
@@ -77,10 +70,10 @@ func breakIntoFragments(fileKey string, data []byte, prefixLength int, fragmentS
 }
 
 // getFragmentKeys returns the keys for all fragments of a file.
-func getFragmentKeys(fileKey string, prefixLength int, fragmentCount int) ([]string, error) {
+func getFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 	keys := make([]string, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
-		fragmentKey, err := getFragmentKey(fileKey, prefixLength, fragmentCount, i)
+		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)
 		if err != nil {
 			return nil, err
 		}

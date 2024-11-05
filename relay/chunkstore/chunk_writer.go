@@ -47,15 +47,13 @@ func NewChunkWriter(
 }
 
 func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, proofs []*encoding.Proof) error {
-	s3Key := blobKey.Hex()
-
 	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
 	for _, proof := range proofs {
 		proofBytes := proof.Bytes()
 		bytes = append(bytes, proofBytes[:]...)
 	}
 
-	err := c.s3Client.UploadObject(ctx, c.bucketName, s3Key, bytes)
+	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
 
 	if err != nil {
 		c.logger.Error("Failed to upload chunks to S3: %v", err)
@@ -70,15 +68,13 @@ func (c *chunkWriter) PutChunkCoefficients(
 	blobKey v2.BlobKey,
 	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
 
-	s3Key := blobKey.Hex()
-
 	bytes, err := rs.GnarkEncodeFrames(frames)
 	if err != nil {
 		c.logger.Error("Failed to encode frames: %v", err)
 		return nil, fmt.Errorf("failed to encode frames: %w", err)
 	}
 
-	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3Key, bytes, c.fragmentSize)
+	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
 	if err != nil {
 		c.logger.Error("Failed to upload chunks to S3: %v", err)
 		return nil, fmt.Errorf("failed to upload chunks to S3: %w", err)

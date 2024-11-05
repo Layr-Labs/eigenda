@@ -52,31 +52,6 @@ func TestGetFragmentCount(t *testing.T) {
 	assert.Equal(t, expectedFragmentCount, fragmentCount)
 }
 
-// Fragment keys take the form of "prefix/body-index[f]". Verify the prefix part of the key.
-func TestPrefix(t *testing.T) {
-	tu.InitializeRandom()
-
-	keyLength := rand.Intn(10) + 10
-	key := tu.RandomString(keyLength)
-
-	for i := 0; i < keyLength*2; i++ {
-		fragmentCount := rand.Intn(10) + 10
-		fragmentIndex := rand.Intn(fragmentCount)
-		fragmentKey, err := getFragmentKey(key, i, fragmentCount, fragmentIndex)
-		assert.NoError(t, err)
-
-		parts := strings.Split(fragmentKey, "/")
-		assert.Equal(t, 2, len(parts))
-		prefix := parts[0]
-
-		if i >= keyLength {
-			assert.Equal(t, key, prefix)
-		} else {
-			assert.Equal(t, key[:i], prefix)
-		}
-	}
-}
-
 // Fragment keys take the form of "prefix/body-index[f]". Verify the body part of the key.
 func TestKeyBody(t *testing.T) {
 	tu.InitializeRandom()
@@ -86,12 +61,10 @@ func TestKeyBody(t *testing.T) {
 		key := tu.RandomString(keyLength)
 		fragmentCount := rand.Intn(10) + 10
 		fragmentIndex := rand.Intn(fragmentCount)
-		fragmentKey, err := getFragmentKey(key, rand.Intn(10), fragmentCount, fragmentIndex)
+		fragmentKey, err := getFragmentKey(key, fragmentCount, fragmentIndex)
 		assert.NoError(t, err)
 
-		parts := strings.Split(fragmentKey, "/")
-		assert.Equal(t, 2, len(parts))
-		parts = strings.Split(parts[1], "-")
+		parts := strings.Split(fragmentKey, "-")
 		assert.Equal(t, 2, len(parts))
 		body := parts[0]
 
@@ -106,12 +79,10 @@ func TestKeyIndex(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		fragmentCount := rand.Intn(10) + 10
 		index := rand.Intn(fragmentCount)
-		fragmentKey, err := getFragmentKey(tu.RandomString(10), rand.Intn(10), fragmentCount, index)
+		fragmentKey, err := getFragmentKey(tu.RandomString(10), fragmentCount, index)
 		assert.NoError(t, err)
 
-		parts := strings.Split(fragmentKey, "/")
-		assert.Equal(t, 2, len(parts))
-		parts = strings.Split(parts[1], "-")
+		parts := strings.Split(fragmentKey, "-")
 		assert.Equal(t, 2, len(parts))
 		indexStr := parts[1]
 		assert.True(t, strings.HasPrefix(indexStr, fmt.Sprintf("%d", index)))
@@ -126,7 +97,7 @@ func TestKeyPostfix(t *testing.T) {
 	segmentCount := rand.Intn(10) + 10
 
 	for i := 0; i < segmentCount; i++ {
-		fragmentKey, err := getFragmentKey(tu.RandomString(10), rand.Intn(10), segmentCount, i)
+		fragmentKey, err := getFragmentKey(tu.RandomString(10), segmentCount, i)
 		assert.NoError(t, err)
 
 		if i == segmentCount-1 {
@@ -139,41 +110,35 @@ func TestKeyPostfix(t *testing.T) {
 
 // TestExampleInGodoc tests the example provided in the documentation for getFragmentKey().
 //
-// Example: fileKey="abc123", prefixLength=2, fragmentCount=3
-// The keys will be "ab/abc123-0", "ab/abc123-1", "ab/abc123-2f"
+// Example: fileKey="abc123", fragmentCount=3
+// The keys will be "abc123-0", "abc123-1", "abc123-2f"
 func TestExampleInGodoc(t *testing.T) {
 	fileKey := "abc123"
-	prefixLength := 2
 	fragmentCount := 3
-	fragmentKeys, err := getFragmentKeys(fileKey, prefixLength, fragmentCount)
+	fragmentKeys, err := getFragmentKeys(fileKey, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(fragmentKeys))
-	assert.Equal(t, "ab/abc123-0", fragmentKeys[0])
-	assert.Equal(t, "ab/abc123-1", fragmentKeys[1])
-	assert.Equal(t, "ab/abc123-2f", fragmentKeys[2])
+	assert.Equal(t, "abc123-0", fragmentKeys[0])
+	assert.Equal(t, "abc123-1", fragmentKeys[1])
+	assert.Equal(t, "abc123-2f", fragmentKeys[2])
 }
 
 func TestGetFragmentKeys(t *testing.T) {
 	tu.InitializeRandom()
 
 	fileKey := tu.RandomString(10)
-	prefixLength := rand.Intn(3) + 1
 	fragmentCount := rand.Intn(10) + 10
 
-	fragmentKeys, err := getFragmentKeys(fileKey, prefixLength, fragmentCount)
+	fragmentKeys, err := getFragmentKeys(fileKey, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentCount, len(fragmentKeys))
 
 	for i := 0; i < fragmentCount; i++ {
-		expectedKey, err := getFragmentKey(fileKey, prefixLength, fragmentCount, i)
+		expectedKey, err := getFragmentKey(fileKey, fragmentCount, i)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedKey, fragmentKeys[i])
 
-		parts := strings.Split(fragmentKeys[i], "/")
-		assert.Equal(t, 2, len(parts))
-		parsedPrefix := parts[0]
-		assert.Equal(t, fileKey[:prefixLength], parsedPrefix)
-		parts = strings.Split(parts[1], "-")
+		parts := strings.Split(fragmentKeys[i], "-")
 		assert.Equal(t, 2, len(parts))
 		parsedKey := parts[0]
 		assert.Equal(t, fileKey, parsedKey)
@@ -192,17 +157,16 @@ func TestGetFragments(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(1000)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, getFragmentCount(len(data), fragmentSize), len(fragments))
 
 	totalSize := 0
 
 	for i, fragment := range fragments {
-		fragmentKey, err := getFragmentKey(fileKey, prefixLength, len(fragments), i)
+		fragmentKey, err := getFragmentKey(fileKey, len(fragments), i)
 		assert.NoError(t, err)
 		assert.Equal(t, fragmentKey, fragment.FragmentKey)
 
@@ -224,14 +188,13 @@ func TestGetFragmentsSmallFile(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(10)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := getFragmentKey(fileKey, prefixLength, 1, 0)
+	fragmentKey, err := getFragmentKey(fileKey, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -244,13 +207,12 @@ func TestGetFragmentsExactlyOnePerfectlySizedFile(t *testing.T) {
 	fileKey := tu.RandomString(10)
 	fragmentSize := rand.Intn(100) + 100
 	data := tu.RandomBytes(fragmentSize)
-	prefixLength := rand.Intn(3) + 1
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
-	fragmentKey, err := getFragmentKey(fileKey, prefixLength, 1, 0)
+	fragmentKey, err := getFragmentKey(fileKey, 1, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentKey, fragments[0].FragmentKey)
 	assert.Equal(t, data, fragments[0].Data)
@@ -262,10 +224,9 @@ func TestRecombineFragments(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(1000)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	recombinedData, err := recombineFragments(fragments)
 	assert.NoError(t, err)
@@ -287,10 +248,9 @@ func TestRecombineFragmentsSmallFile(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(10)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 	recombinedData, err := recombineFragments(fragments)
@@ -303,10 +263,9 @@ func TestMissingFragment(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(1000)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 
 	fragmentIndexToSkip := rand.Intn(len(fragments))
@@ -321,10 +280,9 @@ func TestMissingFinalFragment(t *testing.T) {
 
 	fileKey := tu.RandomString(10)
 	data := tu.RandomBytes(1000)
-	prefixLength := rand.Intn(3) + 1
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, prefixLength, fragmentSize)
+	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	fragments = fragments[:len(fragments)-1]
 

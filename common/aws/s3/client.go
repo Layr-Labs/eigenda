@@ -37,7 +37,7 @@ type client struct {
 
 var _ Client = (*client)(nil)
 
-func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.Logger) (*client, error) {
+func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.Logger) (Client, error) {
 	var err error
 	once.Do(func() {
 		customResolver := aws.EndpointResolverWithOptionsFunc(
@@ -196,7 +196,7 @@ func (s *client) FragmentedUploadObject(
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := breakIntoFragments(key, data, s.cfg.FragmentPrefixChars, fragmentSize)
+	fragments, err := breakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func (s *client) FragmentedDownloadObject(
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := getFragmentKeys(key, s.cfg.FragmentPrefixChars, getFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := getFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, err
 	}
