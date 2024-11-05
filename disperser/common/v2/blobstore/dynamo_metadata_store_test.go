@@ -119,7 +119,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	}
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
-		NumFragments:        10,
+		FragmentSizeBytes:   1024 * 1024 * 4,
 	}
 	err := blobMetadataStore.PutBlobCertificate(ctx, blobCert, fragmentInfo)
 	assert.NoError(t, err)
