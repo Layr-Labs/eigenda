@@ -26,9 +26,9 @@ type Server struct {
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 type blobMetadata struct {
 	// the size of the file containing the encoded chunks
-	encodedChunksFileSize uint32
+	totalChunkSizeBytes uint32
 	// the fragment size used for uploading the encoded chunks
-	encodedChunksFragmentSize uint32
+	fragmentSizeBytes uint32
 }
 
 // NewServer creates a new relay Server.
