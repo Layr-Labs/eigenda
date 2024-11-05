@@ -12,7 +12,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-var _ kvstore.Store = &levelDBStore{}
+var _ kvstore.Store[[]byte] = &levelDBStore{}
 
 // levelDBStore implements kvstore.Store interfaces with levelDB as the backend engine.
 type levelDBStore struct {
@@ -25,7 +25,7 @@ type levelDBStore struct {
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
-func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
+func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
@@ -41,6 +41,9 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store, error) {
 
 // Put stores a data in the store.
 func (store *levelDBStore) Put(key []byte, value []byte) error {
+	if value == nil {
+		value = []byte{}
+	}
 	return store.db.Put(key, value, nil)
 }
 
@@ -82,6 +85,39 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 		batch.Put(key, values[i])
 	}
 	return store.db.Write(batch, nil)
+}
+
+// NewBatch creates a new batch for the store.
+func (store *levelDBStore) NewBatch() kvstore.Batch[[]byte] {
+	return &levelDBBatch{
+		store: store,
+		batch: new(leveldb.Batch),
+	}
+}
+
+type levelDBBatch struct {
+	store *levelDBStore
+	batch *leveldb.Batch
+}
+
+func (m *levelDBBatch) Put(key []byte, value []byte) {
+	if value == nil {
+		value = []byte{}
+	}
+	m.batch.Put(key, value)
+}
+
+func (m *levelDBBatch) Delete(key []byte) {
+	m.batch.Delete(key)
+}
+
+func (m *levelDBBatch) Apply() error {
+	return m.store.db.Write(m.batch, nil)
+}
+
+// Size returns the number of operations in the batch.
+func (m *levelDBBatch) Size() uint32 {
+	return uint32(m.batch.Len())
 }
 
 // Shutdown shuts down the store.

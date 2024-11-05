@@ -2,6 +2,7 @@ package batcher
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,11 +14,14 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/wealdtech/go-merkletree/v2"
 	grpc_metadata "google.golang.org/grpc/metadata"
 )
 
 const encodingInterval = 2 * time.Second
+
+const operatorStateCacheSize = 32
 
 var errNoEncodedResults = errors.New("no encoded results")
 
@@ -77,6 +81,8 @@ type EncodingStreamer struct {
 
 	// Used to keep track of the last evaluated key for fetching metadatas
 	exclusiveStartKey *disperser.BlobStoreExclusiveStartKey
+
+	operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
 }
 
 type batch struct {
@@ -110,6 +116,10 @@ func NewEncodingStreamer(
 	if config.EncodingQueueLimit <= 0 {
 		return nil, errors.New("EncodingQueueLimit should be greater than 0")
 	}
+	operatorStateCache, err := lru.New[string, *core.IndexedOperatorState](operatorStateCacheSize)
+	if err != nil {
+		return nil, err
+	}
 	return &EncodingStreamer{
 		StreamerConfig:         config,
 		EncodedBlobstore:       newEncodedBlobStore(logger),
@@ -125,6 +135,7 @@ func NewEncodingStreamer(
 		batcherMetrics:         batcherMetrics,
 		logger:                 logger.With("component", "EncodingStreamer"),
 		exclusiveStartKey:      nil,
+		operatorStateCache:     operatorStateCache,
 	}, nil
 }
 
@@ -342,7 +353,7 @@ func (e *EncodingStreamer) RequestEncodingForBlob(ctx context.Context, metadata 
 
 		params := encoding.ParamsFromMins(chunkLength, info.TotalChunks)
 
-		err = encoding.ValidateEncodingParams(params, int(blobLength), e.SRSOrder)
+		err = encoding.ValidateEncodingParamsAndBlobLength(params, uint64(blobLength), uint64(e.SRSOrder))
 		if err != nil {
 			e.logger.Error("invalid encoding params", "err", err)
 			// Cancel the blob
@@ -464,143 +475,6 @@ func (e *EncodingStreamer) UpdateReferenceBlock(currentBlockNumber uint) error {
 	}
 	e.ReferenceBlockNumber = blockNumber
 	return nil
-}
-
-func (e *EncodingStreamer) CreateMinibatch(ctx context.Context) (*batch, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	// Cancel outstanding encoding requests
-	// Assumption: `CreateMinibatch` will be called at an interval longer than time it takes to encode a single blob
-	if len(e.encodingCtxCancelFuncs) > 0 {
-		e.logger.Info("canceling outstanding encoding requests", "count", len(e.encodingCtxCancelFuncs))
-		for _, cancel := range e.encodingCtxCancelFuncs {
-			cancel()
-		}
-		e.encodingCtxCancelFuncs = make([]context.CancelFunc, 0)
-	}
-
-	// Pop the latest encoded blobs and delete any stale results that are not from the current batching iteration (i.e. that has different reference block number)
-	// If any pending encoded results are discarded here, it will be re-requested in the next iteration
-	encodedResults := e.EncodedBlobstore.PopLatestEncodingResults(e.ReferenceBlockNumber)
-
-	e.logger.Info("creating a batch...", "numBlobs", len(encodedResults), "refblockNumber", e.ReferenceBlockNumber)
-	if len(encodedResults) == 0 {
-		return nil, errNoEncodedResults
-	}
-
-	encodedBlobByKey := make(map[disperser.BlobKey]core.EncodedBlob)
-	blobQuorums := make(map[disperser.BlobKey][]*core.BlobQuorumInfo)
-	blobHeaderByKey := make(map[disperser.BlobKey]*core.BlobHeader)
-	metadataByKey := make(map[disperser.BlobKey]*disperser.BlobMetadata)
-	for i := range encodedResults {
-		// each result represent an encoded result per (blob, quorum param)
-		// if the same blob has been dispersed multiple time with different security params,
-		// there will be multiple encoded results for that (blob, quorum)
-		result := encodedResults[i]
-		blobKey := result.BlobMetadata.GetBlobKey()
-		if _, ok := encodedBlobByKey[blobKey]; !ok {
-			metadataByKey[blobKey] = result.BlobMetadata
-			blobQuorums[blobKey] = make([]*core.BlobQuorumInfo, 0)
-			blobHeader := &core.BlobHeader{
-				BlobCommitments: *result.Commitment,
-			}
-			blobHeaderByKey[blobKey] = blobHeader
-			encodedBlobByKey[blobKey] = core.EncodedBlob{
-				BlobHeader:               blobHeader,
-				EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
-			}
-		}
-
-		// Populate the assigned bundles
-		for opID, assignment := range result.Assignments {
-			bundles, ok := encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
-			if !ok {
-				encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID] = make(core.EncodedBundles)
-				bundles = encodedBlobByKey[blobKey].EncodedBundlesByOperator[opID]
-			}
-			bundles[result.BlobQuorumInfo.QuorumID] = new(core.ChunksData)
-			bundles[result.BlobQuorumInfo.QuorumID].Format = result.ChunksData.Format
-			bundles[result.BlobQuorumInfo.QuorumID].Chunks = append(bundles[result.BlobQuorumInfo.QuorumID].Chunks, result.ChunksData.Chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
-			bundles[result.BlobQuorumInfo.QuorumID].ChunkLen = result.ChunksData.ChunkLen
-		}
-
-		blobQuorums[blobKey] = append(blobQuorums[blobKey], result.BlobQuorumInfo)
-	}
-
-	// Populate the blob quorum infos
-	for blobKey, encodedBlob := range encodedBlobByKey {
-		encodedBlob.BlobHeader.QuorumInfos = blobQuorums[blobKey]
-	}
-
-	for blobKey, metadata := range metadataByKey {
-		quorumPresent := make(map[core.QuorumID]bool)
-		for _, quorum := range blobQuorums[blobKey] {
-			quorumPresent[quorum.QuorumID] = true
-		}
-		// Check if the blob has valid quorums. If any of the quorums are not valid, delete the blobKey
-		for _, quorum := range metadata.RequestMetadata.SecurityParams {
-			_, ok := quorumPresent[quorum.QuorumID]
-			if !ok {
-				// Delete the blobKey. These encoded blobs will be automatically removed by the next run of
-				// RequestEncoding
-				delete(metadataByKey, blobKey)
-				break
-			}
-		}
-	}
-
-	if len(metadataByKey) == 0 {
-		return nil, errNoEncodedResults
-	}
-
-	// Transform maps to slices so orders in different slices match
-	encodedBlobs := make([]core.EncodedBlob, len(metadataByKey))
-	blobHeaders := make([]*core.BlobHeader, len(metadataByKey))
-	metadatas := make([]*disperser.BlobMetadata, len(metadataByKey))
-	i := 0
-	for key := range metadataByKey {
-		err := e.transitionBlobToDispersing(ctx, metadataByKey[key])
-		if err != nil {
-			continue
-		}
-		encodedBlobs[i] = encodedBlobByKey[key]
-		blobHeaders[i] = blobHeaderByKey[key]
-		metadatas[i] = metadataByKey[key]
-		i++
-	}
-
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), e.ChainStateTimeout)
-	defer cancel()
-
-	state, err := e.getOperatorState(timeoutCtx, metadatas, e.ReferenceBlockNumber)
-	if err != nil {
-		for _, metadata := range metadatas {
-			_ = e.handleFailedMetadata(ctx, metadata)
-		}
-		return nil, err
-	}
-
-	// Populate the batch header
-	batchHeader := &core.BatchHeader{
-		ReferenceBlockNumber: e.ReferenceBlockNumber,
-		BatchRoot:            [32]byte{},
-	}
-
-	_, err = batchHeader.SetBatchRoot(blobHeaders)
-	if err != nil {
-		for _, metadata := range metadatas {
-			_ = e.handleFailedMetadata(ctx, metadata)
-		}
-		return nil, err
-	}
-
-	return &batch{
-		EncodedBlobs: encodedBlobs,
-		BatchHeader:  batchHeader,
-		BlobHeaders:  blobHeaders,
-		BlobMetadata: metadatas,
-		State:        state,
-	}, nil
 }
 
 // CreateBatch makes a batch from all blobs in the encoded blob store.
@@ -806,11 +680,16 @@ func (e *EncodingStreamer) getOperatorState(ctx context.Context, metadatas []*di
 		i++
 	}
 
+	cacheKey := computeCacheKey(blockNumber, quorumIds)
+	if val, ok := e.operatorStateCache.Get(cacheKey); ok {
+		return val, nil
+	}
 	// GetIndexedOperatorState should return state for valid quorums only
 	state, err := e.chainState.GetIndexedOperatorState(ctx, blockNumber, quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("error getting operator state at block number %d: %w", blockNumber, err)
 	}
+	e.operatorStateCache.Add(cacheKey, state)
 	return state, nil
 }
 
@@ -835,4 +714,11 @@ func (e *EncodingStreamer) validateMetadataQuorums(metadatas []*disperser.BlobMe
 		}
 	}
 	return validMetadata
+}
+
+func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
+	bytes := make([]byte, 8+len(quorumIDs))
+	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))
+	copy(bytes[8:], quorumIDs)
+	return string(bytes)
 }

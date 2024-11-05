@@ -31,24 +31,30 @@ var (
 	/* Optional Flags*/
 	TimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "timeout"),
-		Usage:    "seconds to wait for GPRC response",
+		Usage:    "Seconds to wait for GPRC response",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TIMEOUT"),
 		Value:    3 * time.Second,
 	}
 	WorkersFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "workers"),
-		Usage:    "maximum number of concurrent node info requests",
+		Usage:    "Maximum number of concurrent node info requests",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "WORKERS"),
 		Value:    10,
 	}
 	OperatorIdFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "operator-id"),
-		Usage:    "operator id to scan",
+		Usage:    "Operator ID to scan",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "OPERATOR_ID"),
 		Value:    "",
+	}
+	UseRetrievalClientFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-retrieval-client"),
+		Usage:    "Use retrieval client to get operator info (default: false)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_RETRIEVAL_CLIENT"),
 	}
 )
 
@@ -61,6 +67,7 @@ var optionalFlags = []cli.Flag{
 	TimeoutFlag,
 	WorkersFlag,
 	OperatorIdFlag,
+	UseRetrievalClientFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -106,6 +106,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			EigenDAServiceManager: retrieverConfig.EigenDAServiceManagerAddr,
 			SignerPrivateKey:      ctx.String(SignerPrivateKeyFlag.Name),
 			CustomQuorums:         customQuorumsUint8,
+
+			MetricsBlacklist:      ctx.StringSlice(MetricsBlacklistFlag.Name),
+			MetricsFuzzyBlacklist: ctx.StringSlice(MetricsFuzzyBlacklistFlag.Name),
 		},
 	}
 

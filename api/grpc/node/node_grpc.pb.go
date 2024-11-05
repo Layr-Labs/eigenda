@@ -244,10 +244,9 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Retrieval_RetrieveChunks_FullMethodName    = "/node.Retrieval/RetrieveChunks"
-	Retrieval_GetBlobHeader_FullMethodName     = "/node.Retrieval/GetBlobHeader"
-	Retrieval_NodeInfo_FullMethodName          = "/node.Retrieval/NodeInfo"
-	Retrieval_StreamBlobHeaders_FullMethodName = "/node.Retrieval/StreamBlobHeaders"
+	Retrieval_RetrieveChunks_FullMethodName = "/node.Retrieval/RetrieveChunks"
+	Retrieval_GetBlobHeader_FullMethodName  = "/node.Retrieval/GetBlobHeader"
+	Retrieval_NodeInfo_FullMethodName       = "/node.Retrieval/NodeInfo"
 )
 
 // RetrievalClient is the client API for Retrieval service.
@@ -260,8 +259,6 @@ type RetrievalClient interface {
 	GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
-	// StreamHeaders requests a stream all new headers.
-	StreamBlobHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamBlobHeadersClient, error)
 }
 
 type retrievalClient struct {
@@ -299,37 +296,6 @@ func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 	return out, nil
 }
 
-func (c *retrievalClient) StreamBlobHeaders(ctx context.Context, opts ...grpc.CallOption) (Retrieval_StreamBlobHeadersClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Retrieval_ServiceDesc.Streams[0], Retrieval_StreamBlobHeaders_FullMethodName, opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &retrievalStreamBlobHeadersClient{stream}
-	return x, nil
-}
-
-type Retrieval_StreamBlobHeadersClient interface {
-	Send(*StreamBlobHeadersRequest) error
-	Recv() (*StreamHeadersReply, error)
-	grpc.ClientStream
-}
-
-type retrievalStreamBlobHeadersClient struct {
-	grpc.ClientStream
-}
-
-func (x *retrievalStreamBlobHeadersClient) Send(m *StreamBlobHeadersRequest) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *retrievalStreamBlobHeadersClient) Recv() (*StreamHeadersReply, error) {
-	m := new(StreamHeadersReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // RetrievalServer is the server API for Retrieval service.
 // All implementations must embed UnimplementedRetrievalServer
 // for forward compatibility
@@ -340,8 +306,6 @@ type RetrievalServer interface {
 	GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
-	// StreamHeaders requests a stream all new headers.
-	StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error
 	mustEmbedUnimplementedRetrievalServer()
 }
 
@@ -357,9 +321,6 @@ func (UnimplementedRetrievalServer) GetBlobHeader(context.Context, *GetBlobHeade
 }
 func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
-}
-func (UnimplementedRetrievalServer) StreamBlobHeaders(Retrieval_StreamBlobHeadersServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
 }
 func (UnimplementedRetrievalServer) mustEmbedUnimplementedRetrievalServer() {}
 
@@ -428,32 +389,6 @@ func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_StreamBlobHeaders_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(RetrievalServer).StreamBlobHeaders(&retrievalStreamBlobHeadersServer{stream})
-}
-
-type Retrieval_StreamBlobHeadersServer interface {
-	Send(*StreamHeadersReply) error
-	Recv() (*StreamBlobHeadersRequest, error)
-	grpc.ServerStream
-}
-
-type retrievalStreamBlobHeadersServer struct {
-	grpc.ServerStream
-}
-
-func (x *retrievalStreamBlobHeadersServer) Send(m *StreamHeadersReply) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *retrievalStreamBlobHeadersServer) Recv() (*StreamBlobHeadersRequest, error) {
-	m := new(StreamBlobHeadersRequest)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // Retrieval_ServiceDesc is the grpc.ServiceDesc for Retrieval service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -474,13 +409,6 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Retrieval_NodeInfo_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "StreamBlobHeaders",
-			Handler:       _Retrieval_StreamBlobHeaders_Handler,
-			ServerStreams: true,
-			ClientStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "node/node.proto",
 }

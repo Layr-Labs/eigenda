@@ -19,6 +19,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
+    },
+    "EjectionManager": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
     }
   },
   "anvil": {
@@ -39,6 +43,10 @@
       "startBlock": 0
     },
     "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
+    },
+    "EjectionManager": {
       "address": "0x0000000000000000000000000000000000000000",
       "startBlock": 0
     }
@@ -63,6 +71,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0xe47b025ed3C54D391c4E0738c6EF050D40dd79b5",
       "startBlock": 10470500
+    },
+    "EjectionManager": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
     }
   },
   "preprod-holesky": {
@@ -85,6 +97,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0xAd7f9e558170a149Ca8E90f41Ab2444A5d3bd6aD",
       "startBlock": 1161126
+    },
+    "EjectionManager": {
+      "address": "0xEEed164605833263B7690bB521983b777D128698",
+      "startBlock": 1367682
     }
   },
   "goerli": {
@@ -107,6 +123,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0xb406d8e5F4BA1430D57c8231cc872C2c369E1F5F",
       "startBlock": 10497644
+    },
+    "EjectionManager": {
+      "address": "0x0000000000000000000000000000000000000000",
+      "startBlock": 0
     }
   },
   "holesky": {
@@ -129,6 +149,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0x066cF95c1bf0927124DFB8B02B401bc23A79730D",
       "startBlock": 1168409
+    },
+    "EjectionManager": {
+      "address": "0x6979bF665e54cd15bd7194BD25C853870038558a",
+      "startBlock": 1367721
     }
   },
   "mainnet": {
@@ -151,6 +175,10 @@
     "BLSApkRegistry_QuorumApkUpdates": {
       "address": "0x00A5Fd09F6CeE6AE9C8b0E5e33287F7c82880505",
       "startBlock": 19592322
+    },
+    "EjectionManager": {
+      "address": "0x130d8EA0052B45554e4C99079B84df292149Bd5E",
+      "startBlock": 19839949
     }
   }
 }

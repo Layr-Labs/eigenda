@@ -81,6 +81,62 @@ type NewPubkeyRegistration @entity(immutable: true) {
   transactionHash: Bytes!
 }
 
+## EjectionManager
+
+type EjectorUpdated @entity(immutable: true) {
+  id: Bytes!
+  ejector: Bytes! # address
+  status: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Initialized @entity(immutable: true) {
+  id: Bytes!
+  version: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OperatorEjected @entity(immutable: true) {
+  id: Bytes!
+  operatorId: Bytes! # bytes32
+  quorumNumber: Int! # uint8
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type OwnershipTransferred @entity(immutable: true) {
+  id: Bytes!
+  previousOwner: Bytes! # address
+  newOwner: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type QuorumEjection @entity(immutable: true) {
+  id: Bytes!
+  ejectedOperators: BigInt! # uint32
+  ratelimitHit: Boolean! # bool
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type QuorumEjectionParamsSet @entity(immutable: true) {
+  id: Bytes!
+  quorumNumber: Int! # uint8
+  rateLimitWindow: BigInt! # uint32
+  ejectableStakePercent: Int! # uint16
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
 ## Custom
 
 type Operator @entity {

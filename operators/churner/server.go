@@ -58,7 +58,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
-		return nil, api.NewInvalidArgError(fmt.Sprintf("invalid request: %s", err.Error()))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid request: %s", err.Error()))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -71,26 +71,26 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	// Global rate limiting: check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
-		return nil, api.NewResourceExhaustedError(fmt.Sprintf("previous approval not expired, retry in %d seconds", s.latestExpiry-now.Unix()))
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("previous approval not expired, retry in %d seconds", s.latestExpiry-now.Unix()))
 	}
 
 	request, err := createChurnRequest(req)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
-		return nil, api.NewInvalidArgError(err.Error())
+		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
-		return nil, api.NewInvalidArgError(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
 	}
 
 	// Per-operator rate limiting: check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
-		return nil, api.NewResourceExhaustedError(fmt.Sprintf("rate limiter error: %s", err.Error()))
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limiter error: %s", err.Error()))
 	}
 
 	response, err := s.churner.ProcessChurnRequest(ctx, operatorToRegisterAddress, request)
@@ -99,7 +99,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 			return nil, err
 		}
 		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
-		return nil, api.NewInternalError(fmt.Sprintf("failed to process churn request: %s", err.Error()))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
 	// update the latest expiry

@@ -1,0 +1,23 @@
+syntax = "proto3";
+package common.v2;
+import "common/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common/v2";
+
+
+message BlobHeader {
+	// Blob version
+	uint32 version = 1;
+	repeated uint32 quorum_numbers = 2;
+	common.BlobCommitment commitment = 3;
+	common.PaymentHeader payment_header = 4;
+
+	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
+	bytes signature = 5;
+}
+
+// BlobCertificate is what gets attested by the network
+message BlobCertificate {
+	BlobHeader blob_header = 1;
+	uint32 reference_block_number = 2;
+	repeated uint32 relays = 3;
+}

@@ -78,7 +78,7 @@ type Batcher struct {
 	AssignmentCoordinator core.AssignmentCoordinator
 	Aggregator            core.SignatureAggregator
 	EncodingStreamer      *EncodingStreamer
-	Transactor            core.Transactor
+	Transactor            core.Writer
 	TransactionManager    TxnManager
 	Metrics               *Metrics
 	HeartbeatChan         chan time.Time
@@ -99,7 +99,7 @@ func NewBatcher(
 	aggregator core.SignatureAggregator,
 	ethClient common.EthClient,
 	finalizer Finalizer,
-	transactor core.Transactor,
+	transactor core.Writer,
 	txnManager TxnManager,
 	logger logging.Logger,
 	metrics *Metrics,

@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -26,6 +27,31 @@ type BlobCommitments struct {
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
 	Length           uint          `json:"length"`
+}
+
+// ToProfobuf converts the BlobCommitments to protobuf format
+func (c *BlobCommitments) ToProfobuf() (*pbcommon.BlobCommitment, error) {
+	commitData, err := c.Commitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	lengthCommitData, err := c.LengthCommitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	lengthProofData, err := c.LengthProof.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbcommon.BlobCommitment{
+		Commitment:       commitData,
+		LengthCommitment: lengthCommitData,
+		LengthProof:      lengthProofData,
+		Length:           uint32(c.Length),
+	}, nil
 }
 
 // Frame is a chunk of data with the associated multi-reveal proof
@@ -61,3 +87,8 @@ type SubBatch struct {
 }
 
 type ChunkNumber = uint
+
+type FragmentInfo struct {
+	TotalChunkSizeBytes uint32
+	NumFragments        uint32
+}

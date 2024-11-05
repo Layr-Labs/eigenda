@@ -5,19 +5,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"reflect"
 	"runtime"
 	"sync"
 	"time"
 
-	"net"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
@@ -29,13 +24,9 @@ import (
 
 	_ "go.uber.org/automaxprocs"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
-
-const localhost = "0.0.0.0"
 
 // Server implements the Node proto APIs.
 type Server struct {
@@ -65,83 +56,6 @@ func NewServer(config *node.Config, node *node.Node, logger logging.Logger, rate
 	}
 }
 
-func (s *Server) Start() {
-
-	// TODO: In order to facilitate integration testing with multiple nodes, we need to be able to set the port.
-	// TODO: Properly implement the health check.
-	// go func() {
-	// 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-	// 		w.WriteHeader(http.StatusOK)
-	// 	})
-	// }()
-
-	// TODO: Add monitoring
-	go func() {
-		for {
-			err := s.serveDispersal()
-			s.logger.Error("dispersal server failed; restarting.", "err", err)
-		}
-	}()
-
-	go func() {
-		for {
-			err := s.serveRetrieval()
-			s.logger.Error("retrieval server failed; restarting.", "err", err)
-		}
-	}()
-}
-
-func (s *Server) serveDispersal() error {
-
-	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalDispersalPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
-	gs := grpc.NewServer(opt)
-
-	// Register reflection service on gRPC server
-	// This makes "grpcurl -plaintext localhost:9000 list" command work
-	reflection.Register(gs)
-
-	pb.RegisterDispersalServer(gs, s)
-	healthcheck.RegisterHealthServer("node.Dispersal", gs)
-
-	s.logger.Info("port", s.config.InternalDispersalPort, "address", listener.Addr().String(), "GRPC Listening")
-	if err := gs.Serve(listener); err != nil {
-		return err
-	}
-	return nil
-
-}
-
-func (s *Server) serveRetrieval() error {
-	addr := fmt.Sprintf("%s:%s", localhost, s.config.InternalRetrievalPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		s.logger.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-
-	// Register reflection service on gRPC server
-	// This makes "grpcurl -plaintext localhost:9000 list" command work
-	reflection.Register(gs)
-
-	pb.RegisterRetrievalServer(gs, s)
-	healthcheck.RegisterHealthServer("node.Retrieval", gs)
-
-	s.logger.Info("port", s.config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
-	if err := gs.Serve(listener); err != nil {
-		return err
-	}
-	return nil
-
-}
-
 func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
 		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
@@ -154,10 +68,6 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 	}
 
 	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
-}
-
-func (s *Server) StreamBlobHeaders(pb.Retrieval_StreamBlobHeadersServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamBlobHeaders not implemented")
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
@@ -189,34 +99,34 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 
 func (s *Server) validateStoreChunkRequest(in *pb.StoreChunksRequest) error {
 	if in.GetBatchHeader() == nil {
-		return api.NewInvalidArgError("missing batch_header in request")
+		return api.NewErrorInvalidArg("missing batch_header in request")
 	}
 	if in.GetBatchHeader().GetBatchRoot() == nil {
-		return api.NewInvalidArgError("missing batch_root in request")
+		return api.NewErrorInvalidArg("missing batch_root in request")
 	}
 	if in.GetBatchHeader().GetReferenceBlockNumber() == 0 {
-		return api.NewInvalidArgError("missing reference_block_number in request")
+		return api.NewErrorInvalidArg("missing reference_block_number in request")
 	}
 
 	if len(in.GetBlobs()) == 0 {
-		return api.NewInvalidArgError("missing blobs in request")
+		return api.NewErrorInvalidArg("missing blobs in request")
 	}
 	for _, blob := range in.Blobs {
 		if blob.GetHeader() == nil {
-			return api.NewInvalidArgError("missing blob header in request")
+			return api.NewErrorInvalidArg("missing blob header in request")
 		}
 		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
-			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+			return api.NewErrorInvalidArg("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
-			return api.NewInvalidArgError("missing quorum headers in request")
+			return api.NewErrorInvalidArg("missing quorum headers in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
-			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+			return api.NewErrorInvalidArg("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
 			if q.GetQuorumId() > core.MaxQuorumID {
-				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+				return api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
 			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
 				return err
@@ -262,35 +172,35 @@ func (s *Server) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*p
 
 func (s *Server) validateStoreBlobsRequest(in *pb.StoreBlobsRequest) error {
 	if in.GetReferenceBlockNumber() == 0 {
-		return api.NewInvalidArgError("missing reference_block_number in request")
+		return api.NewErrorInvalidArg("missing reference_block_number in request")
 	}
 
 	if len(in.GetBlobs()) == 0 {
-		return api.NewInvalidArgError("missing blobs in request")
+		return api.NewErrorInvalidArg("missing blobs in request")
 	}
 	for _, blob := range in.Blobs {
 		if blob.GetHeader() == nil {
-			return api.NewInvalidArgError("missing blob header in request")
+			return api.NewErrorInvalidArg("missing blob header in request")
 		}
 		if node.ValidatePointsFromBlobHeader(blob.GetHeader()) != nil {
-			return api.NewInvalidArgError("invalid points contained in the blob header in request")
+			return api.NewErrorInvalidArg("invalid points contained in the blob header in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) == 0 {
-			return api.NewInvalidArgError("missing quorum headers in request")
+			return api.NewErrorInvalidArg("missing quorum headers in request")
 		}
 		if len(blob.GetHeader().GetQuorumHeaders()) != len(blob.GetBundles()) {
-			return api.NewInvalidArgError("the number of quorums must be the same as the number of bundles")
+			return api.NewErrorInvalidArg("the number of quorums must be the same as the number of bundles")
 		}
 		for _, q := range blob.GetHeader().GetQuorumHeaders() {
 			if q.GetQuorumId() > core.MaxQuorumID {
-				return api.NewInvalidArgError(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
+				return api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", core.MaxQuorumID, q.GetQuorumId()))
 			}
 			if err := core.ValidateSecurityParam(q.GetConfirmationThreshold(), q.GetAdversaryThreshold()); err != nil {
 				return err
 			}
 		}
 		if in.GetReferenceBlockNumber() != blob.GetHeader().GetReferenceBlockNumber() {
-			return api.NewInvalidArgError("reference_block_number must be the same for all blobs")
+			return api.NewErrorInvalidArg("reference_block_number must be the same for all blobs")
 		}
 	}
 	return nil
@@ -347,7 +257,7 @@ func (s *Server) AttestBatch(ctx context.Context, in *pb.AttestBatchRequest) (*p
 	blobHeaderHashes := make([][32]byte, len(in.GetBlobHeaderHashes()))
 	for i, hash := range in.GetBlobHeaderHashes() {
 		if len(hash) != 32 {
-			return nil, api.NewInvalidArgError("invalid blob header hash")
+			return nil, api.NewErrorInvalidArg("invalid blob header hash")
 		}
 		var h [32]byte
 		copy(h[:], hash)

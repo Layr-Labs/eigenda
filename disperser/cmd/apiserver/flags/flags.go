@@ -30,13 +30,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMODB_TABLE_NAME"),
 	}
-	ShadowTableNameFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "shadow-table-name"),
-		Usage:    "Name of the dynamodb table to shadow write blob metadata",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SHADOW_TABLE_NAME"),
-		Value:    "",
-	}
 	GrpcPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "grpc-port"),
 		Usage:    "Port at which disperser listens for grpc calls",
@@ -63,6 +56,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
 	/* Optional Flags*/
+	DisperserVersionFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-version"),
+		Usage:    "Disperser version. Options are 1 and 2.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_VERSION"),
+	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -76,10 +76,47 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
 	}
+	EnablePaymentMeterer = cli.BoolFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "enable-payment-meterer"),
+		Usage:  "enable payment meterer",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_PAYMENT_METERER"),
+	}
 	EnableRatelimiter = cli.BoolFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "enable-ratelimiter"),
 		Usage:  "enable rate limiter",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_RATELIMITER"),
+	}
+	ReservationsTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "reservations-table-name"),
+		Usage:  "name of the dynamodb table to store reservation usages",
+		Value:  "reservations",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATIONS_TABLE_NAME"),
+	}
+	OnDemandTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "on-demand-table-name"),
+		Usage:  "name of the dynamodb table to store on-demand payments",
+		Value:  "on_demand",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_TABLE_NAME"),
+	}
+	GlobalRateTableName = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "global-rate-table-name"),
+		Usage:  "name of the dynamodb table to store global rate usage. If not provided, a local store will be used",
+		Value:  "global_rate",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
+	}
+	UpdateInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "update-interval"),
+		Usage:    "update interval for refreshing the on-chain state",
+		Value:    1 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
+		Required: false,
+	}
+	ChainReadTimeout = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
+		Usage:    "timeout for reading from the chain",
+		Value:    10,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_READ_TIMEOUT"),
+		Required: false,
 	}
 	BucketTableName = cli.StringFlag{
 		Name:   common.PrefixFlag(FlagPrefix, "rate-bucket-table-name"),
@@ -101,6 +138,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
 		Required: false,
 	}
+	OnchainStateRefreshInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
+	MaxNumSymbolsPerBlob = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),
+		Usage:    "max number of symbols per blob. This flag is only relevant in v2",
+		Value:    65_536,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_SYMBOLS_PER_BLOB"),
+		Required: false,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -113,13 +164,19 @@ var requiredFlags = []cli.Flag{
 }
 
 var optionalFlags = []cli.Flag{
+	DisperserVersionFlag,
 	MetricsHTTPPort,
 	EnableMetrics,
 	EnableRatelimiter,
+	EnablePaymentMeterer,
 	BucketStoreSize,
 	GrpcTimeoutFlag,
-	ShadowTableNameFlag,
 	MaxBlobSize,
+	ReservationsTableName,
+	OnDemandTableName,
+	GlobalRateTableName,
+	OnchainStateRefreshInterval,
+	MaxNumSymbolsPerBlob,
 }
 
 // Flags contains the list of configuration options available to the binary.

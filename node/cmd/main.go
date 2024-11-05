@@ -17,7 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/flags"
-	"github.com/Layr-Labs/eigenda/node/grpc"
+	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 )
 
 var (
@@ -85,8 +85,9 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	// Creates the GRPC server.
-	server := grpc.NewServer(config, node, logger, ratelimiter)
-	server.Start()
+	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
+	serverV2 := nodegrpc.NewServerV2(config, node, logger, ratelimiter)
+	err = nodegrpc.RunServers(server, serverV2, config, logger)
 
-	return nil
+	return err
 }

@@ -53,7 +53,7 @@ var (
 
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
-	mockTx            = &coremock.MockTransactor{}
+	mockTx            = &coremock.MockWriter{}
 	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")

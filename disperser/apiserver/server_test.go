@@ -5,16 +5,22 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"math"
+	"math/big"
 	"net"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -44,15 +50,18 @@ var (
 	queue           disperser.BlobStore
 	dispersalServer *apiserver.DispersalServer
 
-	dockertestPool          *dockertest.Pool
-	dockertestResource      *dockertest.Resource
-	UUID                    = uuid.New()
-	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	shadowMetadataTableName = fmt.Sprintf("test-BlobMetadata-Shadow-%v", UUID)
-	bucketTableName         = fmt.Sprintf("test-BucketStore-%v", UUID)
+	dockertestPool      *dockertest.Pool
+	dockertestResource  *dockertest.Resource
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	bucketTableName     = fmt.Sprintf("test-BucketStore-%v", UUID)
+	s3BucketName        = "test-eigenda-blobstore"
+	v2MetadataTableName = fmt.Sprintf("test-BlobMetadata-%v-v2", UUID)
+	prover              encoding.Prover
+	privateKeyHex       = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 	deployLocalStack bool
-	localStackPort   = "4568"
+	localStackPort   = "4569"
 	allowlistFile    *os.File
 	testMaxBlobSize  = 2 * 1024 * 1024
 )
@@ -127,7 +136,7 @@ func TestDisperseBlobAuthTimeout(t *testing.T) {
 
 func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 
-	transactor := &mock.MockTransactor{}
+	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 	quorumParams := []core.SecurityParam{
@@ -136,7 +145,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 	}
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 
-	dispersalServer := newTestServer(transactor)
+	dispersalServer := newTestServer(transactor, t.Name())
 
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
@@ -192,6 +201,7 @@ func TestDisperseBlobWithRequiredQuorums(t *testing.T) {
 }
 
 func TestDisperseBlobWithInvalidQuorum(t *testing.T) {
+
 	data := make([]byte, 1024)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
@@ -453,6 +463,13 @@ func TestParseAllowlist(t *testing.T) {
     "quorumID": 1,
     "blobRate": 0.1,
     "byteRate": 4092
+  },
+  {
+    "name": "bar",
+    "account": "0xcb14cFAaC122E52024232583e7354589AedE74Ff",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
   }
 ]
 	`)
@@ -466,7 +483,6 @@ func TestParseAllowlist(t *testing.T) {
 	assert.Contains(t, rateConfig.Allowlist, "5.5.5.5")
 	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(0))
 	assert.Contains(t, rateConfig.Allowlist["0.1.2.3"], uint8(1))
-	assert.Contains(t, rateConfig.Allowlist["5.5.5.5"], uint8(1))
 	assert.NotContains(t, rateConfig.Allowlist["5.5.5.5"], uint8(0))
 	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].Name, "eigenlabs")
 	assert.Equal(t, rateConfig.Allowlist["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
@@ -477,6 +493,13 @@ func TestParseAllowlist(t *testing.T) {
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Name, "foo")
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].BlobRate, uint32(0.1*1e6))
 	assert.Equal(t, rateConfig.Allowlist["5.5.5.5"][1].Throughput, uint32(4092))
+
+	// verify checksummed address is normalized to lowercase
+	assert.Contains(t, rateConfig.Allowlist, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	assert.Contains(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, rateConfig.Allowlist["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func TestLoadAllowlistFromFile(t *testing.T) {
@@ -513,6 +536,7 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	assert.Contains(t, al["0.1.2.3"], uint8(1))
 	assert.Contains(t, al["5.5.5.5"], uint8(1))
 	assert.NotContains(t, al["5.5.5.5"], uint8(0))
+	assert.NotContains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
 	assert.Equal(t, al["0.1.2.3"][0].Name, "eigenlabs")
 	assert.Equal(t, al["0.1.2.3"][0].BlobRate, uint32(0.01*1e6))
 	assert.Equal(t, al["0.1.2.3"][0].Throughput, uint32(1024))
@@ -538,6 +562,13 @@ func TestLoadAllowlistFromFile(t *testing.T) {
     "quorumID": 1,
     "blobRate": 1,
     "byteRate": 1234
+  },
+  {
+    "name": "bar",
+    "account": "0xcb14cFAaC122E52024232583e7354589AedE74Ff",
+    "quorumID": 1,
+    "blobRate": 0.1,
+    "byteRate": 4092
   }
 ]
 	`)
@@ -556,6 +587,13 @@ func TestLoadAllowlistFromFile(t *testing.T) {
 	assert.Equal(t, al["7.7.7.7"][1].Name, "world")
 	assert.Equal(t, al["7.7.7.7"][1].BlobRate, uint32(1*1e6))
 	assert.Equal(t, al["7.7.7.7"][1].Throughput, uint32(1234))
+
+	// verify checksummed address is normalized to lowercase
+	assert.Contains(t, al, "0xcb14cfaac122e52024232583e7354589aede74ff")
+	assert.Contains(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"], uint8(1))
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Name, "bar")
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].BlobRate, uint32(0.1*1e6))
+	assert.Equal(t, al["0xcb14cfaac122e52024232583e7354589aede74ff"][1].Throughput, uint32(4092))
 }
 
 func overwriteFile(t *testing.T, f *os.File, content string) {
@@ -588,13 +626,13 @@ func setup() {
 
 	}
 
-	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, shadowMetadataTableName, bucketTableName)
+	err = deploy.DeployResources(dockertestPool, localStackPort, metadataTableName, bucketTableName, v2MetadataTableName)
 	if err != nil {
 		teardown()
 		panic("failed to deploy AWS resources")
 	}
 
-	transactor := &mock.MockTransactor{}
+	transactor := &mock.MockWriter{}
 	transactor.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	transactor.On("GetQuorumCount").Return(uint8(2), nil)
 	quorumParams := []core.SecurityParam{
@@ -604,7 +642,21 @@ func setup() {
 	transactor.On("GetQuorumSecurityParams", tmock.Anything).Return(quorumParams, nil)
 	transactor.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{}, nil)
 
-	dispersalServer = newTestServer(transactor)
+	config := &kzg.KzgConfig{
+		G1Path:          "./resources/kzg/g1.point.300000",
+		G2Path:          "./resources/kzg/g2.point.300000",
+		CacheDir:        "./resources/kzg/SRSTables",
+		SRSOrder:        8192,
+		SRSNumberToLoad: 8192,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+	prover, err = p.NewProver(config, true)
+	if err != nil {
+		teardown()
+		panic(fmt.Sprintf("failed to initialize KZG prover: %s", err.Error()))
+	}
+
+	dispersalServer = newTestServer(transactor, "setup")
 }
 
 func teardown() {
@@ -616,10 +668,9 @@ func teardown() {
 	}
 }
 
-func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
+func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
 	logger := logging.NewNoopLogger()
 
-	bucketName := "test-eigenda-blobstore"
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",
 		AccessKey:       "localstack",
@@ -634,7 +685,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	if err != nil {
 		panic("failed to create dynamoDB client")
 	}
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, shadowMetadataTableName, time.Hour)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
 
 	globalParams := common.GlobalRateParams{
 		CountFailed: false,
@@ -644,6 +695,63 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 	bucketStore, err := store.NewLocalParamStore[common.RateBucketParams](1000)
 	if err != nil {
 		panic("failed to create bucket store")
+	}
+
+	mockState := &mock.MockOnchainPaymentState{}
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+
+	mockState.On("GetPricePerSymbol").Return(uint32(encoding.BYTES_PER_SYMBOL), nil)
+	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
+	mockState.On("GetGlobalSymbolsPerSecond").Return(uint64(4096), nil)
+	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)
+	mockState.On("GetOnDemandQuorumNumbers").Return([]uint8{0, 1}, nil)
+	mockState.On("GetReservationWindow").Return(uint32(1), nil)
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(core.OnDemandPayment{
+		CumulativePayment: big.NewInt(3000),
+	}, nil)
+	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(core.ActiveReservation{
+		SymbolsPerSec:  2048,
+		StartTimestamp: 0,
+		EndTimestamp:   math.MaxUint32,
+		QuorumNumbers:  []uint8{0, 1},
+		QuorumSplit:    []byte{50, 50},
+	}, nil)
+	// append test name to each table name for an unique store
+	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
+	err = meterer.CreateReservationTable(awsConfig, table_names[0])
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
+	store, err := meterer.NewOffchainStore(
+		awsConfig,
+		table_names[0],
+		table_names[1],
+		table_names[2],
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background(), nil)
+	if err != nil {
+		panic("failed to make initial query to the on-chain state")
 	}
 	ratelimiter := ratelimit.NewRateLimiter(prometheus.NewRegistry(), globalParams, bucketStore, logger)
 
@@ -676,7 +784,7 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 					BlobRate:   5 * 1e6,
 				},
 			},
-			"0x1aa8226f6d354380dDE75eE6B634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
+			"0x1aa8226f6d354380dde75ee6b634875c4203e522": map[uint8]apiserver.PerUserRateInfo{
 				0: {
 					Name:       "eigenlabs",
 					Throughput: 100 * 1024,
@@ -696,12 +804,12 @@ func newTestServer(transactor core.Transactor) *apiserver.DispersalServer {
 		AllowlistRefreshInterval: 10 * time.Minute,
 	}
 
-	queue = blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+	queue = blobstore.NewSharedStorage(s3BucketName, s3Client, blobMetadataStore, logger)
 
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), mt, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

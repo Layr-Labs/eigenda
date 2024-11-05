@@ -83,7 +83,7 @@ func TestIndexerIntegration(t *testing.T) {
 
 	logger := logging.NewNoopLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
-	tx, err := eth.NewTransactor(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)

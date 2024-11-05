@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # Declare build arguments
-# TODO: this is only used for node image right now, should we also use it for nodeplugin?
+# NOTE: to use these args, they must be *consumed* in the child scope (see node-builder)
+# https://docs.docker.com/build/building/variables/#scoping
 ARG SEMVER=""
 ARG GITCOMMIT=""
 ARG GITDATE=""
@@ -45,6 +46,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # DataAPI build stage
 FROM common-builder AS dataapi-builder
+COPY operators ./operators
 WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -61,7 +63,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM common-builder AS retriever-builder
 COPY retriever /app/retriever
 COPY node /app/node
-COPY operators/churner /app/operators/churner
+COPY operators ./operators
 WORKDIR /app/retriever
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -69,8 +71,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Node build stage
 FROM common-builder AS node-builder
+ARG SEMVER
+ARG GITCOMMIT
+ARG GITDATE
 COPY node /app/node
-COPY operators/churner /app/operators/churner
+COPY operators ./operators
 WORKDIR /app/node
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -79,7 +84,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # Nodeplugin build stage
 FROM common-builder AS node-plugin-builder
 COPY ./node /app/node
-COPY operators/churner /app/operators/churner
+COPY operators ./operators
 WORKDIR /app/node
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
