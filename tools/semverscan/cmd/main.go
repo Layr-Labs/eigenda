@@ -85,7 +85,6 @@ func RunScan(ctx *cli.Context) error {
 			if operator.Hex() != operatorId.Hex() {
 				delete(operators, operator)
 			}
-
 		}
 	}
 
@@ -97,7 +96,7 @@ func RunScan(ctx *cli.Context) error {
 			continue
 		}
 		if socket != operatorInfo.Socket {
-			// delete operator from operators?
+			// delete operator from operators if there's a mistmatch?
 			logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
 		}
 	}
