@@ -6,10 +6,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
-	"sync"
-	"sync/atomic"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -18,46 +15,40 @@ var _ pb.RelayServer = &Server{}
 type Server struct {
 	pb.UnimplementedRelayServer
 
-	config        *Config
-	metadataStore *blobstore.BlobMetadataStore
-	blobStore     *blobstore.BlobStore
-	chunkReader   *chunkstore.ChunkReader
+	config      *Config
+	blobStore   *blobstore.BlobStore
+	chunkReader *chunkstore.ChunkReader
 
-	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
-	// assigned to this server will not be in the cache.
-	metadataCache CachedAccessor[core.BlobKey, blobMetadata]
+	// metadataServer encapsulates logic for fetching metadata for blobs.
+	metadataServer *metadataServer
 }
 
-// Metadata about a blob.
+// Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 type blobMetadata struct {
-
-	// TODO only store what is absolutely needed
-
-	certificate  *core.BlobCertificate
-	fragmentInfo *encoding.FragmentInfo
+	// the size of the file containing the encoded chunks
+	encodedChunksFileSize uint32
+	// the fragment size used for uploading the encoded chunks
+	encodedChunksFragmentSize uint32
 }
 
+// NewServer creates a new relay Server.
 func NewServer(
 	config *Config,
 	metadataStore *blobstore.BlobMetadataStore,
 	blobStore *blobstore.BlobStore,
 	chunkReader *chunkstore.ChunkReader) (*Server, error) {
 
-	server := &Server{
-		config:        config,
-		metadataStore: metadataStore,
-		blobStore:     blobStore,
-		chunkReader:   chunkReader,
-	}
-
-	metadataCache, err :=
-		NewCachedAccessor[core.BlobKey, blobMetadata](config.MetadataCacheSize, server.getMetadataForBlob)
+	ms, err := newMetadataServer(context.Background(), metadataStore, config.MetadataCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("error creating metadata cache: %w", err)
+		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
-	server.metadataCache = metadataCache
 
-	return server, nil
+	return &Server{
+		config:         config,
+		metadataServer: ms,
+		blobStore:      blobStore,
+		chunkReader:    chunkReader,
+	}, nil
 }
 
 // GetBlobs retrieves blobs stored by the relay.
@@ -77,7 +68,7 @@ func (s *Server) GetBlobs(ctx context.Context, request *pb.GetBlobsRequest) (*pb
 
 	// Fetch metadata for the blobs. This fails if any of the blobs do not exist, or if any of the blobs
 	// are assigned to a shard that is not managed by this relay.
-	_, err := s.getMetadataForBlobs(blobKeys)
+	_, err := s.metadataServer.getMetadataForBlobs(blobKeys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blobs, check if blobs exist and are assigned to this relay: %w", err)
@@ -97,66 +88,4 @@ func (s *Server) GetChunks(context.Context, *pb.GetChunksRequest) (*pb.GetChunks
 	// TODO: limit parallelism
 
 	return nil, nil // TODO
-}
-
-// getMetadataForBlob retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
-func (s *Server) getMetadataForBlob(key core.BlobKey) (*blobMetadata, error) {
-	// Retrieve the metadata from the store.
-	fullMetadata, err := s.metadataStore.GetBlobMetadata(context.Background(), key)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
-	}
-
-	// TODO check if the blob is in the correct shard, return error as if not found if not in the correct shard
-
-	metadata := &blobMetadata{
-		certificate:  nil, // TODO
-		fragmentInfo: fullMetadata.FragmentInfo,
-	}
-
-	return metadata, nil
-}
-
-// getMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (s *Server) getMetadataForBlobs(keys []core.BlobKey) (map[core.BlobKey]*blobMetadata, error) {
-
-	if len(keys) == 1 {
-		// Special case: no need to spawn a goroutine.
-		metadata, err := s.metadataCache.Get(keys[0])
-		if err != nil {
-			return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", keys[0].Hex(), err)
-		}
-
-		return map[core.BlobKey]*blobMetadata{keys[0]: metadata}, nil
-	}
-
-	metadataMap := make(map[core.BlobKey]*blobMetadata)
-	errors := atomic.Bool{}
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(keys))
-
-	for _, key := range keys {
-		// TODO limits on parallelism
-		boundKey := key
-		go func() {
-			defer wg.Done()
-
-			metadata, err := s.metadataCache.Get(boundKey)
-			if err != nil {
-				// TODO log error
-				errors.Store(true)
-				return
-			}
-			metadataMap[boundKey] = metadata
-		}()
-	}
-
-	wg.Wait()
-
-	if errors.Load() {
-		return nil, fmt.Errorf("error retrieving metadata for one or more blobs")
-	}
-
-	return metadataMap, nil
 }
