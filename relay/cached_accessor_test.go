@@ -163,7 +163,7 @@ func TestParallelAccess(t *testing.T) {
 	// Wait for the goroutines to start. We want to give the goroutines a chance to do naughty things if they want.
 	// Eliminating this sleep will not cause the test to fail, but it may cause the test not to exercise the
 	// desired race condition.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // TODO
 
 	// Unlock the accessor. This will allow the goroutines to proceed.
 	accessorLock.Unlock()

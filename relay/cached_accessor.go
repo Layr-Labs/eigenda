@@ -39,7 +39,7 @@ type cachedAccessor[K comparable, V any] struct {
 	// is written into the channel when it is eventually fetched. If a key is requested more than once while a
 	// lookup in progress, the second (and following) requests will wait for the result of the first lookup
 	// to be written into the channel.
-	lookupsInProgress *sync.Map
+	lookupsInProgress sync.Map
 
 	// cache is the LRU cache used to store values fetched by the accessor.
 	cache *lru.Cache[K, *V]
@@ -57,13 +57,12 @@ func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, 
 	}
 
 	return &cachedAccessor[K, V]{
-		lookupsInProgress: &sync.Map{},
-		cache:             cache,
-		accessor:          accessor,
+		cache:    cache,
+		accessor: accessor,
 	}, nil
 }
 
-func (c *cachedAccessor[K, V]) newAccessResult() *accessResult[V] {
+func newAccessResult[V any]() *accessResult[V] {
 	result := &accessResult[V]{
 		wg: sync.WaitGroup{},
 	}
@@ -79,7 +78,7 @@ func (c *cachedAccessor[K, V]) Get(key K) (*V, error) {
 	}
 
 	// if that fails, check if a lookup is already in progress. If not, start a new one.
-	result := c.newAccessResult()
+	result := newAccessResult[V]()
 	actual, alreadyLoading := c.lookupsInProgress.LoadOrStore(key, result)
 	result = actual.(*accessResult[V]) // sync.Map was written prior to generics in golang ;(
 
