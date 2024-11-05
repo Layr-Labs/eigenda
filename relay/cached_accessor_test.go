@@ -180,8 +180,9 @@ func TestParallelAccess(t *testing.T) {
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
-	// The internal lookupsInProgress map should be empty.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, string]).lookupsInProgress))
+	// The internal lookupsInProgress map should no longer contain the key.
+	_, ok := ca.(*cachedAccessor[int, string]).lookupsInProgress.Load(0)
+	require.False(t, ok)
 }
 
 func TestParallelAccessWithError(t *testing.T) {
@@ -241,6 +242,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	require.Equal(t, errors.New("intentional error"), err)
 	require.Equal(t, count+1, cacheMissCount.Load())
 
-	// The internal lookupsInProgress map should be empty.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, string]).lookupsInProgress))
+	// The internal lookupsInProgress map should no longer contain the key.
+	_, ok := ca.(*cachedAccessor[int, string]).lookupsInProgress.Load(0)
+	require.False(t, ok)
 }
