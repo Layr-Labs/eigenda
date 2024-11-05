@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/disperser"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -14,11 +14,11 @@ import (
 // ChunkWriter writes chunks that can be read by ChunkReader.
 type ChunkWriter interface {
 	// PutChunkProofs writes a slice of proofs to the chunk store.
-	PutChunkProofs(ctx context.Context, blobKey disperser.BlobKey, proofs []*encoding.Proof) error
+	PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, proofs []*encoding.Proof) error
 	// PutChunkCoefficients writes a slice of frames to the chunk store.
 	PutChunkCoefficients(
 		ctx context.Context,
-		blobKey disperser.BlobKey,
+		blobKey v2.BlobKey,
 		frames []*rs.Frame) (*encoding.FragmentInfo, error)
 }
 
@@ -46,8 +46,8 @@ func NewChunkWriter(
 	}
 }
 
-func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey disperser.BlobKey, proofs []*encoding.Proof) error {
-	s3Key := blobKey.String()
+func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, proofs []*encoding.Proof) error {
+	s3Key := blobKey.Hex()
 
 	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
 	for _, proof := range proofs {
@@ -67,10 +67,10 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey disperser.Blob
 
 func (c *chunkWriter) PutChunkCoefficients(
 	ctx context.Context,
-	blobKey disperser.BlobKey,
+	blobKey v2.BlobKey,
 	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
 
-	s3Key := blobKey.String()
+	s3Key := blobKey.Hex()
 
 	bytes, err := rs.GnarkEncodeFrames(frames)
 	if err != nil {

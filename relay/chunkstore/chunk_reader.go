@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/disperser"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -15,12 +15,12 @@ import (
 // ChunkReader reads chunks written by ChunkWriter.
 type ChunkReader interface {
 	// GetChunkProofs reads a slice of proofs from the chunk store.
-	GetChunkProofs(ctx context.Context, blobKey disperser.BlobKey) ([]*encoding.Proof, error)
+	GetChunkProofs(ctx context.Context, blobKey v2.BlobKey) ([]*encoding.Proof, error)
 	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
 	// should match the metadata returned by PutChunkCoefficients.
 	GetChunkCoefficients(
 		ctx context.Context,
-		blobKey disperser.BlobKey,
+		blobKey v2.BlobKey,
 		fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error)
 }
 
@@ -56,9 +56,9 @@ func NewChunkReader(
 
 func (r *chunkReader) GetChunkProofs(
 	ctx context.Context,
-	blobKey disperser.BlobKey) ([]*encoding.Proof, error) {
+	blobKey v2.BlobKey) ([]*encoding.Proof, error) {
 
-	s3Key := blobKey.String()
+	s3Key := blobKey.Hex()
 
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
 	if err != nil {
@@ -89,10 +89,10 @@ func (r *chunkReader) GetChunkProofs(
 
 func (r *chunkReader) GetChunkCoefficients(
 	ctx context.Context,
-	blobKey disperser.BlobKey,
+	blobKey v2.BlobKey,
 	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
 
-	s3Key := blobKey.String()
+	s3Key := blobKey.Hex()
 
 	bytes, err := r.client.FragmentedDownloadObject(
 		ctx,
