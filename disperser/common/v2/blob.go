@@ -3,6 +3,7 @@ package v2
 import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 type BlobStatus uint
@@ -65,4 +66,6 @@ type BlobMetadata struct {
 	RequestedAt uint64
 	// UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_
 	UpdatedAt uint64
+
+	*encoding.FragmentInfo
 }

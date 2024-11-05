@@ -14,6 +14,7 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ory/dockertest/v3"
@@ -217,6 +218,22 @@ func TestBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	// Attempt to update the item with invalid condition
+	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, commondynamodb.Item{
+		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
+	}, expression.Name("Status").In(expression.Value("Dispersing")))
+	assert.Error(t, err)
+
+	// Attempt to update the item with valid condition
+	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, commondynamodb.Item{
+		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
+	}, expression.Name("Status").In(expression.Value("Confirmed")))
+	assert.NoError(t, err)
+
 	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	}, "BlobSize", 1000)
@@ -231,6 +248,7 @@ func TestBasicOperations(t *testing.T) {
 	assert.Equal(t, "0x123", fetchedItem["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, "0", fetchedItem["BlobIndex"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "456", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)

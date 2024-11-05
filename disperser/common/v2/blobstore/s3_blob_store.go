@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/pkg/errors"
 )
 
 type BlobStore struct {
@@ -34,6 +36,11 @@ func (b *BlobStore) StoreBlob(ctx context.Context, blobKey string, data []byte) 
 // GetBlob retrieves a blob from the blob store
 func (b *BlobStore) GetBlob(ctx context.Context, blobKey string) ([]byte, error) {
 	data, err := b.s3Client.DownloadObject(ctx, b.bucketName, blobKey)
+	if errors.Is(err, s3.ErrObjectNotFound) {
+		b.logger.Warnf("blob not found in bucket %s: %s", b.bucketName, blobKey)
+		return nil, common.ErrBlobNotFound
+	}
+
 	if err != nil {
 		b.logger.Errorf("failed to download blob from bucket %s: %v", b.bucketName, err)
 		return nil, err

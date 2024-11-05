@@ -170,6 +170,49 @@ func (c *Client) UpdateItem(ctx context.Context, tableName string, key Key, item
 	return resp.Attributes, err
 }
 
+func (c *Client) UpdateItemWithCondition(
+	ctx context.Context,
+	tableName string,
+	key Key,
+	item Item,
+	condition expression.ConditionBuilder,
+) (Item, error) {
+	update := expression.UpdateBuilder{}
+	for itemKey, itemValue := range item {
+		// Ignore primary key updates
+		if _, ok := key[itemKey]; ok {
+			continue
+		}
+		update = update.Set(expression.Name(itemKey), expression.Value(itemValue))
+	}
+
+	expr, err := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.dynamoClient.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(tableName),
+		Key:                       key,
+		ConditionExpression:       expr.Condition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+
+	var ccfe *types.ConditionalCheckFailedException
+	if errors.As(err, &ccfe) {
+		return nil, ErrConditionFailed
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Attributes, err
+}
+
 // IncrementBy increments the attribute by the value for item that matches with the key
 func (c *Client) IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error) {
 	// ADD numeric values
