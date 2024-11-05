@@ -72,6 +72,9 @@ type Reader interface {
 	// GetOperatorSetParams returns operator set params for the quorum.
 	GetOperatorSetParams(ctx context.Context, quorumID QuorumID) (*OperatorSetParam, error)
 
+	// GetOperatorSocket returns a operator's socket.
+	GetOperatorSocket(ctx context.Context, operatorID OperatorID) (string, error)
+
 	// GetNumberOfRegisteredOperatorForQuorum returns the number of registered operators for the quorum.
 	GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID QuorumID) (uint32, error)
 
