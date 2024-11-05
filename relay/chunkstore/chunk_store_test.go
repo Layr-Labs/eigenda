@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/disperser"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -147,21 +147,16 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
-	chunkSize := uint64(rand.Intn(1024) + 100) // ignored since we aren't writing coefficients
+	fragmentSize := rand.Intn(1024) + 100 // ignored since we aren't writing coefficients
 
-	writer := NewChunkWriter(logger, client, bucket, chunkSize)
+	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
 
-	expectedValues := make(map[disperser.BlobKey][]*encoding.Proof)
+	expectedValues := make(map[v2.BlobKey][]*encoding.Proof)
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		blobHash := tu.RandomString(10)
-		metadataHash := tu.RandomString(10)
-		key := disperser.BlobKey{
-			BlobHash:     blobHash,
-			MetadataHash: metadataHash,
-		}
+		key := v2.BlobKey(tu.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
 		expectedValues[key] = proofs
@@ -210,6 +205,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	require.NoError(t, err)
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
+	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
 	encoder, _ := rs.NewEncoder(params, true)
@@ -228,30 +224,27 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	encoder.Computer = RsComputeDevice
 	require.NotNil(t, encoder)
 
-	writer := NewChunkWriter(logger, client, bucket, chunkSize)
+	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
 
-	expectedValues := make(map[disperser.BlobKey][]*rs.Frame)
+	expectedValues := make(map[v2.BlobKey][]*rs.Frame)
+	metadataMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		blobHash := tu.RandomString(10)
-		metadataHash := tu.RandomString(10)
-		key := disperser.BlobKey{
-			BlobHash:     blobHash,
-			MetadataHash: metadataHash,
-		}
+		key := v2.BlobKey(tu.RandomBytes(32))
 
 		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
 		expectedValues[key] = coefficients
 
-		_, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
+		metadata, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
 		require.NoError(t, err)
+		metadataMap[key] = metadata
 	}
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
-		coefficients, err := reader.GetChunkCoefficients(context.Background(), key)
+		coefficients, err := reader.GetChunkCoefficients(context.Background(), key, metadataMap[key])
 		require.NoError(t, err)
 		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {

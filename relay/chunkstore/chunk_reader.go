@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/disperser"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -15,12 +15,13 @@ import (
 // ChunkReader reads chunks written by ChunkWriter.
 type ChunkReader interface {
 	// GetChunkProofs reads a slice of proofs from the chunk store.
-	GetChunkProofs(ctx context.Context, blobKey disperser.BlobKey) ([]*encoding.Proof, error)
+	GetChunkProofs(ctx context.Context, blobKey v2.BlobKey) ([]*encoding.Proof, error)
 	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
 	// should match the metadata returned by PutChunkCoefficients.
 	GetChunkCoefficients(
 		ctx context.Context,
-		blobKey disperser.BlobKey) ([]*rs.Frame, error)
+		blobKey v2.BlobKey,
+		fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
@@ -55,11 +56,9 @@ func NewChunkReader(
 
 func (r *chunkReader) GetChunkProofs(
 	ctx context.Context,
-	blobKey disperser.BlobKey) ([]*encoding.Proof, error) {
+	blobKey v2.BlobKey) ([]*encoding.Proof, error) {
 
-	s3Key := blobKey.String()
-
-	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
+	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
@@ -88,13 +87,16 @@ func (r *chunkReader) GetChunkProofs(
 
 func (r *chunkReader) GetChunkCoefficients(
 	ctx context.Context,
-	blobKey disperser.BlobKey) ([]*rs.Frame, error) {
+	blobKey v2.BlobKey,
+	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
 
-	s3Key := blobKey.String()
+	bytes, err := r.client.FragmentedDownloadObject(
+		ctx,
+		r.bucket,
+		s3.ScopedChunkKey(blobKey),
+		int(fragmentInfo.TotalChunkSizeBytes),
+		int(fragmentInfo.FragmentSizeBytes))
 
-	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3Key)
-	// TODO: Implement fragmented download
-	//bytes, err := r.client.FragmentedDownloadObject(ctx, r.bucket, s3Key, metadata.DataSize, metadata.FragmentSize)
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)

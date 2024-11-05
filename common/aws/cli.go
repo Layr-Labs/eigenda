@@ -28,9 +28,6 @@ type ClientConfig struct {
 	// EndpointURL of the S3 endpoint to use. If this is not set then the default AWS S3 endpoint will be used.
 	EndpointURL string
 
-	// FragmentPrefixChars is the number of characters of the key to use as the prefix for fragmented files.
-	// A value of "3" for the key "ABCDEFG" will result in the prefix "ABC". Default is 3.
-	FragmentPrefixChars int
 	// FragmentParallelismFactor helps determine the size of the pool of workers to help upload/download files.
 	// A non-zero value for this parameter adds a number of workers equal to the number of cores times this value.
 	// Default is 8. In general, the number of workers here can be a lot larger than the number of cores because the
@@ -120,7 +117,6 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 		AccessKey:                   ctx.GlobalString(common.PrefixFlag(flagPrefix, AccessKeyIdFlagName)),
 		SecretAccessKey:             ctx.GlobalString(common.PrefixFlag(flagPrefix, SecretAccessKeyFlagName)),
 		EndpointURL:                 ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
-		FragmentPrefixChars:         ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentPrefixCharsFlagName)),
 		FragmentParallelismFactor:   ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName)),
 		FragmentParallelismConstant: ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName)),
 		FragmentReadTimeout:         ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName)),
@@ -132,7 +128,6 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 func DefaultClientConfig() *ClientConfig {
 	return &ClientConfig{
 		Region:                      "us-east-2",
-		FragmentPrefixChars:         3,
 		FragmentParallelismFactor:   8,
 		FragmentParallelismConstant: 0,
 		FragmentReadTimeout:         30 * time.Second,
