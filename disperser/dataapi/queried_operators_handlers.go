@@ -303,7 +303,7 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportRespon
 			s.logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
 			continue
 		}
-		if socket.String() != operatorInfo.Socket {
+		if socket != operatorInfo.Socket {
 			s.logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
 		}
 	}

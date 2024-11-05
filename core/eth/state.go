@@ -51,12 +51,12 @@ func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
 	return uint(header.Number.Uint64()), nil
 }
 
-func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (core.OperatorSocket, error) {
+func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
 	socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
 	if err != nil {
 		return "", err
 	}
-	return core.OperatorSocket(socket), nil
+	return socket, nil
 }
 
 func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {

@@ -238,11 +238,11 @@ func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNum
 
 }
 
-func (d *ChainDataMock) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (core.OperatorSocket, error) {
+func (d *ChainDataMock) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
 
 	state := d.GetTotalOperatorState(ctx, blockNumber)
 
-	return core.OperatorSocket(state.IndexedOperatorState.IndexedOperators[operator].Socket), nil
+	return state.IndexedOperatorState.IndexedOperators[operator].Socket, nil
 }
 
 func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
