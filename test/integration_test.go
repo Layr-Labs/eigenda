@@ -376,6 +376,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
 		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
+		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort)
+		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()
@@ -482,17 +484,24 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		dis.encoderServer.Close()
 	})
 	ops := mustMakeOperators(t, cst, logger)
+
 	gethClient, _ := mustMakeRetriever(cst, logger)
 
 	for _, op := range ops {
+		fmt.Println("opeartor: ", op)
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
 		fmt.Println("Operator: ", idStr)
+
+		// cst.On("GetOperatorSocket", mock.Anything, mock.MatchedBy(func(id core.OperatorID) bool {
+		// 	return bytes.Equal(id[:], op.Node.Config.ID[:])
+		// })).Return(string(core.MakeOperatorSocket(op.Node.Config.Hostname, op.Node.Config.DispersalPort, op.Node.Config.RetrievalPort)), nil)
 
 		fmt.Println("Starting node")
 		err = op.Node.Start(ctx)
 		assert.NoError(t, err)
 
 		fmt.Println("Starting server")
+
 		err = grpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
 		assert.NoError(t, err)
 	}
