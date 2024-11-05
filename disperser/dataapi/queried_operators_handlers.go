@@ -295,6 +295,19 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportRespon
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed operator info - %s", err)
 	}
+
+	// check operator socket registration against the indexed state
+	for operatorID, operatorInfo := range operators {
+		socket, err := s.chainState.GetOperatorSocket(context.Background(), currentBlock, operatorID)
+		if err != nil {
+			s.logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
+			continue
+		}
+		if socket.String() != operatorInfo.Socket {
+			s.logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
+		}
+	}
+
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
 	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
 	if err != nil {
