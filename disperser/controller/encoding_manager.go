@@ -109,11 +109,6 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return errNoBlobsToEncode
 	}
 
-	currentBlockNumber, err := e.chainReader.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
-
 	for _, blob := range blobMetadatas {
 		blobKey, err := blob.BlobHeader.BlobKey()
 		if err != nil {
@@ -139,9 +134,8 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					break
 				}
 				cert := &corev2.BlobCertificate{
-					BlobHeader:           blob.BlobHeader,
-					ReferenceBlockNumber: uint64(currentBlockNumber),
-					RelayKeys:            relayKeys,
+					BlobHeader: blob.BlobHeader,
+					RelayKeys:  relayKeys,
 				}
 
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)

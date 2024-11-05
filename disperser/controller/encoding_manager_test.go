@@ -134,7 +134,6 @@ func TestHandleBatch(t *testing.T) {
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
-	assert.Equal(t, uint32(fetchedCert.ReferenceBlockNumber), blockNumber)
 	for _, relayKey := range fetchedCert.RelayKeys {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
@@ -193,7 +192,6 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
 	assert.NoError(t, err)
 	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
-	assert.Equal(t, uint32(fetchedCert.ReferenceBlockNumber), blockNumber)
 	for _, relayKey := range fetchedCert.RelayKeys {
 		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
