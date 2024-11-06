@@ -2,6 +2,7 @@ package blobstore_test
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -211,6 +213,65 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		},
+	})
+}
+
+func TestBlobMetadataStoreDispersals(t *testing.T) {
+	ctx := context.Background()
+	opID := core.OperatorID{0, 1}
+	dispersalRequest := &corev2.DispersalRequest{
+		OperatorID:      opID,
+		OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+		Socket:          "socket",
+		DispersedAt:     uint64(time.Now().UnixNano()),
+
+		BatchHeader: corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, 3},
+			ReferenceBlockNumber: 100,
+		},
+	}
+
+	err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+	assert.NoError(t, err)
+
+	bhh, err := dispersalRequest.BatchHeader.Hash()
+	assert.NoError(t, err)
+
+	fetchedRequest, err := blobMetadataStore.GetDispersalRequest(ctx, bhh, dispersalRequest.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, dispersalRequest, fetchedRequest)
+
+	// attempt to put dispersal request with the same key should fail
+	err = blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	dispersalResponse := &corev2.DispersalResponse{
+		DispersalRequest: dispersalRequest,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        [32]byte{1, 1, 1},
+		Error:            "error",
+	}
+
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+	assert.NoError(t, err)
+
+	fetchedResponse, err := blobMetadataStore.GetDispersalResponse(ctx, bhh, dispersalRequest.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, dispersalResponse, fetchedResponse)
+
+	// attempt to put dispersal response with the same key should fail
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		},
 	})
 }
