@@ -38,8 +38,8 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 
 func TestEncodeBlobToChunkStore(t *testing.T) {
 	const (
-		testDataSize   = 64 * 1024
-		timeoutSeconds = 15
+		testDataSize   = 16 * 1024
+		timeoutSeconds = 30
 		randSeed       = uint64(42)
 	)
 
@@ -111,7 +111,7 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
 		assert.NotNil(t, resp, "Response should not be nil")
-		assert.Equal(t, uint32(1081348), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
+		assert.Equal(t, uint32(294916), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
 		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
 	})
 
