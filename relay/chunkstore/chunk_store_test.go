@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/mock"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -153,11 +153,11 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
 
-	expectedValues := make(map[v2.BlobKey][]*encoding.Proof)
+	expectedValues := make(map[corev2.BlobKey][]*encoding.Proof)
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		key := v2.BlobKey(tu.RandomBytes(32))
+		key := corev2.BlobKey(tu.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
 		expectedValues[key] = proofs
@@ -228,12 +228,12 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
 
-	expectedValues := make(map[v2.BlobKey][]*rs.Frame)
-	metadataMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
+	expectedValues := make(map[corev2.BlobKey][]*rs.Frame)
+	metadataMap := make(map[corev2.BlobKey]*encoding.FragmentInfo)
 
 	// Write data
 	for i := 0; i < 100; i++ {
-		key := v2.BlobKey(tu.RandomBytes(32))
+		key := corev2.BlobKey(tu.RandomBytes(32))
 
 		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
 		expectedValues[key] = coefficients

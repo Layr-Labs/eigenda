@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -18,7 +18,9 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type EncoderServerV2 struct {
@@ -78,7 +80,7 @@ func (s *EncoderServerV2) Start() error {
 	return gs.Serve(listener)
 }
 
-func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.EncodeBlobToChunkStoreRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
 	totalStart := time.Now()
 	defer func() {
 		s.metrics.ObserveLatency("total", time.Since(totalStart))
@@ -113,7 +115,7 @@ func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.En
 	return reply, err
 }
 
-func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobToChunkStoreRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
 	// Validate request first
 	blobKey, encodingParams, err := s.validateAndParseRequest(req)
 	if err != nil {
@@ -150,29 +152,49 @@ func (s *EncoderServerV2) popRequest() {
 	<-s.runningRequests
 }
 
-func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (v2.BlobKey, encoding.EncodingParams, error) {
-	if req.GetBlobKey() == nil {
-		return v2.BlobKey{}, encoding.EncodingParams{}, errors.New("missing blob header hash")
+func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobToChunkStoreRequest) (corev2.BlobKey, encoding.EncodingParams, error) {
+	// Create zero values for return types
+	var (
+		blobKey corev2.BlobKey
+		params  encoding.EncodingParams
+	)
+
+	if req == nil {
+		return blobKey, params, status.Error(codes.InvalidArgument, "request cannot be nil")
 	}
 
-	if req.GetEncodingParams() == nil {
-		return v2.BlobKey{}, encoding.EncodingParams{}, errors.New("missing encoding parameters")
+	if req.BlobKey == nil {
+		return blobKey, params, status.Error(codes.InvalidArgument, "blob key cannot be nil")
 	}
 
-	blobKey, err := bytesToBlobKey(req.GetBlobKey())
+	if req.EncodingParams == nil {
+		return blobKey, params, status.Error(codes.InvalidArgument, "encoding parameters cannot be nil")
+	}
+
+	// Since these are uint32 in the proto, we only need to check for positive values
+	if req.EncodingParams.ChunkLength == 0 {
+		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be greater than zero")
+	}
+
+	if req.EncodingParams.NumChunks == 0 {
+		return blobKey, params, status.Error(codes.InvalidArgument, "number of chunks must be greater than zero")
+	}
+
+	blobKey, err := bytesToBlobKey(req.BlobKey)
 	if err != nil {
-		return v2.BlobKey{}, encoding.EncodingParams{}, fmt.Errorf("invalid blob header hash: %w", err)
+		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid blob key: %v", err)
 	}
 
-	encodingParams := encoding.EncodingParams{
-		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
-		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
+	// Convert proto EncodingParams to our domain type
+	params = encoding.EncodingParams{
+		ChunkLength: req.EncodingParams.ChunkLength,
+		NumChunks:   req.EncodingParams.NumChunks,
 	}
 
-	return blobKey, encodingParams, nil
+	return blobKey, params, nil
 }
 
-func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey v2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey corev2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobToChunkStoreReply, error) {
 	proofs, coeffs := extractProofsAndCoeffs(frames)
 
 	// Store proofs
@@ -199,13 +221,13 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey v2
 }
 
 // Helper function to validate and convert bytes to BlobKey
-func bytesToBlobKey(bytes []byte) (v2.BlobKey, error) {
+func bytesToBlobKey(bytes []byte) (corev2.BlobKey, error) {
 	// Validate length
 	if len(bytes) != 32 {
-		return v2.BlobKey{}, fmt.Errorf("invalid blob hash length: expected 32 bytes, got %d", len(bytes))
+		return corev2.BlobKey{}, fmt.Errorf("invalid blob key length: expected 32 bytes, got %d", len(bytes))
 	}
 
-	var blobKey v2.BlobKey
+	var blobKey corev2.BlobKey
 	copy(blobKey[:], bytes)
 	return blobKey, nil
 }

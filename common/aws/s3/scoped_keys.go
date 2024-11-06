@@ -2,7 +2,8 @@ package s3
 
 import (
 	"fmt"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
 const (
@@ -38,18 +39,18 @@ func ScopedKey(namespace string, baseKey string, prefixLength int) string {
 
 // ScopedBlobKey returns a key scoped to the blob namespace. Used to name files containing blobs in S3.
 // A key scoped for blobs will never collide with a key scoped for chunks or proofs.
-func ScopedBlobKey(blobKey v2.BlobKey) string {
+func ScopedBlobKey(blobKey corev2.BlobKey) string {
 	return ScopedKey(blobNamespace, blobKey.Hex(), prefixLength)
 }
 
 // ScopedChunkKey returns a key scoped to the chunk namespace. Used to name files containing chunks in S3.
 // A key scoped for chunks will never collide with a key scoped for blobs or proofs.
-func ScopedChunkKey(blobKey v2.BlobKey) string {
+func ScopedChunkKey(blobKey corev2.BlobKey) string {
 	return ScopedKey(chunkNamespace, blobKey.Hex(), prefixLength)
 }
 
 // ScopedProofKey returns a key scoped to the proof namespace. Used to name files containing proofs in S3.
 // A key scoped for proofs will never collide with a key scoped for blobs or chunks.
-func ScopedProofKey(blobKey v2.BlobKey) string {
+func ScopedProofKey(blobKey corev2.BlobKey) string {
 	return ScopedKey(proofNamespace, blobKey.Hex(), prefixLength)
 }

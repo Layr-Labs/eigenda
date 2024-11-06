@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/mock"
@@ -19,7 +19,7 @@ func NewMockEncoderClientV2() *MockEncoderClientV2 {
 	return &MockEncoderClientV2{}
 }
 
-func (m *MockEncoderClientV2) EncodeBlob(ctx context.Context, blobKey v2.BlobKey, encodingParams encoding.EncodingParams) (*encoding.FragmentInfo, error) {
+func (m *MockEncoderClientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*encoding.FragmentInfo, error) {
 	args := m.Called()
 	var fragmentInfo *encoding.FragmentInfo
 	if args.Get(0) != nil {

@@ -75,7 +75,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, 4*1024*1024) // TODO(dmanc): make fragment size configurable?
+		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, 4*1024*1024) // Unlikely to change so we choose to hardcode the fragment size at 4Mb
 		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
 
 		server := encoder.NewEncoderServerV2(

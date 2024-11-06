@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -44,8 +44,8 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	)
 
 	var (
-		codingRatio = v2.ParametersMap[0].CodingRate
-		numChunks   = v2.ParametersMap[0].NumChunks
+		codingRatio = corev2.ParametersMap[0].CodingRate
+		numChunks   = corev2.ParametersMap[0].NumChunks
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutSeconds*time.Second)
@@ -68,7 +68,7 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := v2.GetChunkLength(0, uint32(blobLength))
+	chunkLength, err := corev2.GetChunkLength(0, uint32(blobLength))
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}
@@ -99,11 +99,11 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	server := initializeEncoder(t)
 
 	// Create and execute encoding request
-	req := &pb.EncodeBlobRequest{
+	req := &pb.EncodeBlobToChunkStoreRequest{
 		BlobKey: blobKey[:],
 		EncodingParams: &pb.EncodingParams{
-			ChunkLength: uint32(chunkLength),
-			NumChunks:   uint32(numChunks),
+			ChunkLength: uint64(chunkLength),
+			NumChunks:   uint64(numChunks),
 		},
 	}
 
@@ -138,9 +138,9 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 }
 
 // Helper function to create test blob header
-func createTestBlobHeader(t *testing.T) *v2.BlobHeader {
+func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 	t.Helper()
-	return &v2.BlobHeader{
+	return &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,

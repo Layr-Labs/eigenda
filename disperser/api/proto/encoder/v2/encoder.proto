@@ -4,20 +4,20 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2";
 package encoder.v2;
 
 service Encoder {
-  rpc EncodeBlobToChunkStore(EncodeBlobRequest) returns (EncodeBlobToChunkStoreReply) {}
+  rpc EncodeBlobToChunkStore(EncodeBlobToChunkStoreRequest) returns (EncodeBlobToChunkStoreReply) {}
 }
 
-// EncodeBlobRequest contains the blob key of the data to be encoded along with the encoding params 
+// EncodeBlobToChunkStoreRequest contains the blob key of the data to be encoded along with the encoding params 
 // provided to by the control plane.
-message EncodeBlobRequest {
+message EncodeBlobToChunkStoreRequest {
   bytes blob_key = 1;
   EncodingParams encoding_params = 2;
 }
 
 // Parameters needed by Encoder for encoding
 message EncodingParams {
-  uint32 chunk_length = 1;
-  uint32 num_chunks = 2;
+  uint64 chunk_length = 1;
+  uint64 num_chunks = 2;
 }
 
 // FragmentInfo contains metadata about the encoded fragments

@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EncoderClient interface {
-	EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error)
+	EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobToChunkStoreRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error)
 }
 
 type encoderClient struct {
@@ -37,7 +37,7 @@ func NewEncoderClient(cc grpc.ClientConnInterface) EncoderClient {
 	return &encoderClient{cc}
 }
 
-func (c *encoderClient) EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error) {
+func (c *encoderClient) EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobToChunkStoreRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error) {
 	out := new(EncodeBlobToChunkStoreReply)
 	err := c.cc.Invoke(ctx, Encoder_EncodeBlobToChunkStore_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -50,7 +50,7 @@ func (c *encoderClient) EncodeBlobToChunkStore(ctx context.Context, in *EncodeBl
 // All implementations must embed UnimplementedEncoderServer
 // for forward compatibility
 type EncoderServer interface {
-	EncodeBlobToChunkStore(context.Context, *EncodeBlobRequest) (*EncodeBlobToChunkStoreReply, error)
+	EncodeBlobToChunkStore(context.Context, *EncodeBlobToChunkStoreRequest) (*EncodeBlobToChunkStoreReply, error)
 	mustEmbedUnimplementedEncoderServer()
 }
 
@@ -58,7 +58,7 @@ type EncoderServer interface {
 type UnimplementedEncoderServer struct {
 }
 
-func (UnimplementedEncoderServer) EncodeBlobToChunkStore(context.Context, *EncodeBlobRequest) (*EncodeBlobToChunkStoreReply, error) {
+func (UnimplementedEncoderServer) EncodeBlobToChunkStore(context.Context, *EncodeBlobToChunkStoreRequest) (*EncodeBlobToChunkStoreReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EncodeBlobToChunkStore not implemented")
 }
 func (UnimplementedEncoderServer) mustEmbedUnimplementedEncoderServer() {}
@@ -75,7 +75,7 @@ func RegisterEncoderServer(s grpc.ServiceRegistrar, srv EncoderServer) {
 }
 
 func _Encoder_EncodeBlobToChunkStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EncodeBlobRequest)
+	in := new(EncodeBlobToChunkStoreRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func _Encoder_EncodeBlobToChunkStore_Handler(srv interface{}, ctx context.Contex
 		FullMethod: Encoder_EncodeBlobToChunkStore_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EncoderServer).EncodeBlobToChunkStore(ctx, req.(*EncodeBlobRequest))
+		return srv.(EncoderServer).EncodeBlobToChunkStore(ctx, req.(*EncodeBlobToChunkStoreRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

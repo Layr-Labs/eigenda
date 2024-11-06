@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -37,37 +37,37 @@ func TestGetRelayKeys(t *testing.T) {
 	tests := []struct {
 		name            string
 		numRelays       uint16
-		availableRelays []v2.RelayKey
+		availableRelays []corev2.RelayKey
 		err             error
 	}{
 		{
 			name:            "Single relay",
 			numRelays:       1,
-			availableRelays: []v2.RelayKey{0},
+			availableRelays: []corev2.RelayKey{0},
 			err:             nil,
 		},
 		{
 			name:            "Choose more than whats available",
 			numRelays:       2,
-			availableRelays: []v2.RelayKey{0},
+			availableRelays: []corev2.RelayKey{0},
 			err:             nil,
 		},
 		{
 			name:            "Choose 1 from multiple relays",
 			numRelays:       3,
-			availableRelays: []v2.RelayKey{0, 1, 2, 3},
+			availableRelays: []corev2.RelayKey{0, 1, 2, 3},
 			err:             nil,
 		},
 		{
 			name:            "Choose 2 from multiple relays",
 			numRelays:       2,
-			availableRelays: []v2.RelayKey{0, 1, 2, 3},
+			availableRelays: []corev2.RelayKey{0, 1, 2, 3},
 			err:             nil,
 		},
 		{
 			name:            "No relays",
 			numRelays:       0,
-			availableRelays: []v2.RelayKey{},
+			availableRelays: []corev2.RelayKey{},
 			err:             nil,
 		},
 	}
@@ -80,7 +80,7 @@ func TestGetRelayKeys(t *testing.T) {
 			} else {
 				assert.NoError(t, tt.err)
 				assert.Len(t, got, int(tt.numRelays))
-				seen := make(map[v2.RelayKey]struct{})
+				seen := make(map[corev2.RelayKey]struct{})
 				for _, relay := range got {
 					assert.Contains(t, tt.availableRelays, relay)
 					seen[relay] = struct{}{}
@@ -93,7 +93,7 @@ func TestGetRelayKeys(t *testing.T) {
 
 func TestHandleBatch(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &v2.BlobHeader{
+	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
@@ -151,7 +151,7 @@ func TestHandleBatchNoBlobs(t *testing.T) {
 
 func TestHandleBatchRetrySuccess(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &v2.BlobHeader{
+	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
@@ -204,7 +204,7 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 
 func TestHandleBatchRetryFailure(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &v2.BlobHeader{
+	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
@@ -261,7 +261,7 @@ func newTestComponents(t *testing.T) *testComponents {
 		StoreTimeout:           5 * time.Second,
 		NumEncodingRetries:     1,
 		NumRelayAssignment:     2,
-		AvailableRelays:        []v2.RelayKey{0, 1, 2, 3},
+		AvailableRelays:        []corev2.RelayKey{0, 1, 2, 3},
 	}, blobMetadataStore, pool, encodingClient, chainReader, logger)
 	assert.NoError(t, err)
 	return &testComponents{

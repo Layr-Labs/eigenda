@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBlobKey(t *testing.T) {
-	blobKey := v2.BlobKey([32]byte{1, 2, 3})
+	blobKey := corev2.BlobKey([32]byte{1, 2, 3})
 
 	assert.Equal(t, "0102030000000000000000000000000000000000000000000000000000000000", blobKey.Hex())
-	bk, err := v2.HexToBlobKey(blobKey.Hex())
+	bk, err := corev2.HexToBlobKey(blobKey.Hex())
 	assert.NoError(t, err)
 	assert.Equal(t, blobKey, bk)
 }
@@ -39,7 +39,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bh := v2.BlobHeader{
+	bh := corev2.BlobHeader{
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
