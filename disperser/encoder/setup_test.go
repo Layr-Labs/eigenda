@@ -26,7 +26,6 @@ var (
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
 	localStackPort     = "4571"
-	s3Client           s3.Client
 	blobStore          *blobstore.BlobStore
 	chunkStoreWriter   chunkstore.ChunkWriter
 	chunkStoreReader   chunkstore.ChunkReader

@@ -54,7 +54,11 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	createTestData := func(t *testing.T, size int) []byte {
 		t.Helper()
 		data := make([]byte, size)
-		rand.New(rand.NewSource(randSeed)).Read(data)
+		_, err := rand.New(rand.NewSource(randSeed)).Read(data)
+		if !assert.NoError(t, err, "Failed to create test data") {
+			t.FailNow()
+		}
+
 		return core.PadToPowerOf2(codec.ConvertByPaddingEmptyByte(data))
 	}
 
