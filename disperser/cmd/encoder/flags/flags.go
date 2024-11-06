@@ -28,17 +28,11 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODER_VERSION"),
 	}
-	BlobStoreS3BucketNameFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "blob-store-s3-bucket-name"),
-		Usage:    "Name of the bucket to retrieve blobs from",
+	S3BucketNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "s3-bucket-name"),
+		Usage:    "Name of the bucket to retrieve blobs and store encoded chunks",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_STORE_S3_BUCKET_NAME"),
-	}
-	ChunkStoreS3BucketNameFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "chunk-store-s3-bucket-name"),
-		Usage:    "Name of the bucket to store chunks in",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_STORE_S3_BUCKET_NAME"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "S3_BUCKET_NAME"),
 	}
 	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
@@ -86,8 +80,7 @@ var optionalFlags = []cli.Flag{
 	RequestPoolSizeFlag,
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
-	BlobStoreS3BucketNameFlag,
-	ChunkStoreS3BucketNameFlag,
+	S3BucketNameFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

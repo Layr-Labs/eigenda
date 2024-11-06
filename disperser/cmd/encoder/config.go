@@ -45,10 +45,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncoderVersion:  EncoderVersion(version),
 		AwsClientConfig: aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		BlobStoreConfig: blobstore.Config{
-			BucketName: ctx.GlobalString(flags.BlobStoreS3BucketNameFlag.Name),
+			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 		},
 		ChunkStoreConfig: chunkstore.Config{
-			BucketName: ctx.GlobalString(flags.ChunkStoreS3BucketNameFlag.Name),
+			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 		},
 		EncoderConfig: kzg.ReadCLIConfig(ctx),
 		LoggerConfig:  *loggerConfig,

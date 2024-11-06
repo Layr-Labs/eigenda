@@ -55,10 +55,9 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, pr
 	}
 
 	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
-
 	if err != nil {
-		c.logger.Error("Failed to upload chunks to S3: %v", err)
-		return fmt.Errorf("failed to upload chunks to S3: %w", err)
+		c.logger.Error("Failed to upload chunk proofs to S3: %v", err)
+		return fmt.Errorf("failed to upload chunk proofs to S3: %w", err)
 	}
 
 	return nil
@@ -77,8 +76,8 @@ func (c *chunkWriter) PutChunkCoefficients(
 
 	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
 	if err != nil {
-		c.logger.Error("Failed to upload chunks to S3: %v", err)
-		return nil, fmt.Errorf("failed to upload chunks to S3: %w", err)
+		c.logger.Error("Failed to upload chunk coefficients to S3: %v", err)
+		return nil, fmt.Errorf("failed to upload chunk coefficients to S3: %w", err)
 	}
 
 	return &encoding.FragmentInfo{

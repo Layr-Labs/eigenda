@@ -58,8 +58,7 @@ func (s *EncoderServerV2) Start() error {
 		log.Fatalf("Could not start tcp listener: %v", err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer()
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
 
@@ -80,13 +79,16 @@ func (s *EncoderServerV2) Start() error {
 }
 
 func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
-	startTime := time.Now()
+	totalStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("total", time.Since(totalStart))
+	}()
 
 	// Rate limit
 	select {
 	case s.requestPool <- struct{}{}:
 	default:
-		// TODO: Now that we no longer pass the data directly, should we pass in blob size as part of the request
+		// TODO: Now that we no longer pass the data directly, should we pass in blob size as part of the request?
 		s.metrics.IncrementRateLimitedBlobRequestNum(1)
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
@@ -100,106 +102,100 @@ func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.En
 		return nil, ctx.Err()
 	}
 
-	s.metrics.ObserveLatency("queuing", time.Since(startTime))
+	s.metrics.ObserveLatency("queuing", time.Since(totalStart))
 	reply, err := s.handleEncodingToChunkStore(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(1)
 	} else {
 		s.metrics.IncrementSuccessfulBlobRequestNum(1)
 	}
-	s.metrics.ObserveLatency("total", time.Since(startTime))
 
 	return reply, err
 }
 
 func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
-	begin := time.Now()
-	if req.BlobHeaderHash == nil {
-		return nil, errors.New("handleEncoding: missing blob header hash")
-	}
-
-	if req.EncodingParams == nil {
-		return nil, errors.New("handleEncoding: missing encoding parameters")
-	}
-
-	// Convert bytes to BlobKey
-	blobKey, err := bytesToBlobKey(req.GetBlobHeaderHash())
-	if err != nil {
-		return nil, fmt.Errorf("invalid blob header hash: %w", err)
-	}
-
-	// Convert BlobKey to hex string for storage lookup
-	blobKeyHex := blobKey.Hex()
-
-	// Get the data from the blob store
-	data, err := s.blobStore.GetBlob(ctx, blobKeyHex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get blob from blob store: %w", err)
-	}
-
-	if len(data) == 0 {
-		return nil, errors.New("handleEncoding: missing data")
-	}
-
-	// Convert to core EncodingParams
-	var encodingParams = encoding.EncodingParams{
-		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
-		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
-	}
-
-	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
-	s.logger.Info("time to get blob", "duration", time.Since(begin))
-
-	begin = time.Now()
-	// Get the encoding frames for the data
-	frames, err := s.prover.GetFrames(data, encodingParams)
+	// Validate request first
+	blobKey, encodingParams, err := s.validateAndParseRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	s.metrics.ObserveLatency("encoding", time.Since(begin))
-	s.logger.Info("encoding", "duration", time.Since(begin))
+	s.logger.Info("Preparing to encode", "blobKey", blobKey, "encodingParams", encodingParams)
 
-	begin = time.Now()
-	// Get the proofs and coefficients from the encoding frames
-	proofs := make([]*encoding.Proof, 0, len(frames))
-	coeffs := make([]*rs.Frame, 0, len(frames))
-	for _, frame := range frames {
-		proofs = append(proofs, &frame.Proof)
-		frameWithCoeffs := &rs.Frame{
-			Coeffs: frame.Coeffs,
-		}
-		coeffs = append(coeffs, frameWithCoeffs)
-	}
-	s.logger.Info("copying frames", "duration", time.Since(begin))
-
-	begin = time.Now()
-	// Upload the coefficients to the chunk store
-	metadata, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey.Hex()+"_coeffs", coeffs)
+	// Fetch blob data
+	fetchStart := time.Now()
+	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload chunks: %w", err)
+		return nil, fmt.Errorf("failed to get blob from blob store: %w", err)
 	}
-	s.logger.Info("uploading coefficients", "duration", time.Since(begin))
+	if len(data) == 0 {
+		return nil, errors.New("handleEncodingToChunkStore: missing data")
+	}
+	s.logger.Info("fetched blob", "duration", time.Since(fetchStart))
 
-	begin = time.Now()
-	// Upload the proofs
-	err = s.chunkWriter.PutChunkProofs(ctx, blobKey.Hex()+"_proofs", proofs)
+	// Encode the data
+	encodingStart := time.Now()
+	frames, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload proofs: %w", err)
+		return nil, fmt.Errorf("frame encoding failed: %w", err)
 	}
-	s.logger.Info("uploading proofs", "duration", time.Since(begin))
+	s.logger.Info("encoding frames", "duration", time.Since(encodingStart))
 
-	return &pb.EncodeBlobToChunkStoreReply{
-		FragmentInfo: &pb.FragmentInfo{
-			TotalChunkSizeBytes: int32(metadata.FragmentSize),
-			NumFragments:        int32(metadata.DataSize),
-		},
-	}, nil
+	// Process and store results
+	return s.processAndStoreResults(ctx, blobKey, frames)
 }
 
 func (s *EncoderServerV2) popRequest() {
 	<-s.requestPool
 	<-s.runningRequests
+}
+
+func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (v2.BlobKey, encoding.EncodingParams, error) {
+	if req.GetBlobKey() == nil {
+		return v2.BlobKey{}, encoding.EncodingParams{}, errors.New("missing blob header hash")
+	}
+
+	if req.GetEncodingParams() == nil {
+		return v2.BlobKey{}, encoding.EncodingParams{}, errors.New("missing encoding parameters")
+	}
+
+	blobKey, err := bytesToBlobKey(req.GetBlobKey())
+	if err != nil {
+		return v2.BlobKey{}, encoding.EncodingParams{}, fmt.Errorf("invalid blob header hash: %w", err)
+	}
+
+	encodingParams := encoding.EncodingParams{
+		ChunkLength: uint64(req.GetEncodingParams().GetChunkLength()),
+		NumChunks:   uint64(req.GetEncodingParams().GetNumChunks()),
+	}
+
+	return blobKey, encodingParams, nil
+}
+
+func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey v2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobToChunkStoreReply, error) {
+	proofs, coeffs := extractProofsAndCoeffs(frames)
+
+	// Store proofs
+	storeStart := time.Now()
+	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
+		return nil, fmt.Errorf("failed to upload chunk proofs: %w", err)
+	}
+	s.logger.Info("stored proofs", "duration", time.Since(storeStart))
+
+	// Store coefficients
+	coeffStart := time.Now()
+	fragmentInfo, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey, coeffs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload chunk coefficients: %w", err)
+	}
+	s.logger.Info("stored coefficients", "duration", time.Since(coeffStart))
+
+	return &pb.EncodeBlobToChunkStoreReply{
+		FragmentInfo: &pb.FragmentInfo{
+			TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+			FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+		},
+	}, nil
 }
 
 // Helper function to validate and convert bytes to BlobKey
@@ -212,4 +208,15 @@ func bytesToBlobKey(bytes []byte) (v2.BlobKey, error) {
 	var blobKey v2.BlobKey
 	copy(blobKey[:], bytes)
 	return blobKey, nil
+}
+
+func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.Frame) {
+	proofs := make([]*encoding.Proof, len(frames))
+	coeffs := make([]*rs.Frame, len(frames))
+
+	for i, frame := range frames {
+		proofs[i] = &frame.Proof
+		coeffs[i] = &rs.Frame{Coeffs: frame.Coeffs}
+	}
+	return proofs, coeffs
 }

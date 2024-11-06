@@ -24,7 +24,6 @@ var (
 )
 
 func main() {
-
 	app := cli.NewApp()
 	app.Flags = flags.Flags
 	app.Version = fmt.Sprintf("%s-%s-%s", Version, GitCommit, GitDate)
@@ -53,7 +52,6 @@ func RunEncoderServer(ctx *cli.Context) error {
 	}
 
 	metrics := encoder.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
 		metrics.Start(context.Background())
@@ -61,27 +59,24 @@ func RunEncoderServer(ctx *cli.Context) error {
 	}
 
 	if config.EncoderVersion == V2 {
-		// Do not load G2 points for v2
+		// We no longer compute the commitments in the encoder, so we don't need to load the G2 points
 		prover, err := prover.NewProver(&config.EncoderConfig, false)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
 
-		// Create a new s3 client
 		s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 		if err != nil {
 			return err
 		}
 
-		// Create a new blob store
 		blobStoreBucketName := config.BlobStoreConfig.BucketName
-		logger.Info("Blob store", "bucket", blobStoreBucketName)
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
+		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
-		// Create a new chunk store writer
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
+		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, 4*1024*1024) // TODO(dmanc): make fragment size configurable?
 		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, 1) // TODO: make fragment size configurable?
 
 		server := encoder.NewEncoderServerV2(
 			*config.ServerConfig,

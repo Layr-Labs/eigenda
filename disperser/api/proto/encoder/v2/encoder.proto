@@ -7,10 +7,10 @@ service Encoder {
   rpc EncodeBlobToChunkStore(EncodeBlobRequest) returns (EncodeBlobToChunkStoreReply) {}
 }
 
-// EncodeBlobRequest contains the blob header hash of the data to be encoded along with the encoding params 
+// EncodeBlobRequest contains the blob key of the data to be encoded along with the encoding params 
 // provided to by the control plane.
 message EncodeBlobRequest {
-  bytes blob_header_hash = 1;
+  bytes blob_key = 1;
   EncodingParams encoding_params = 2;
 }
 
@@ -22,8 +22,8 @@ message EncodingParams {
 
 // FragmentInfo contains metadata about the encoded fragments
 message FragmentInfo {
-    int32 total_chunk_size_bytes = 1;
-    int32 num_fragments = 2;
+  uint32 total_chunk_size_bytes = 1;
+  uint32 fragment_size_bytes = 2;
 }
 
 // EncodeBlobToChunkStoreReply returns the fragment info returned after the encoded chunks 

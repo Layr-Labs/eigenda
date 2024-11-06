@@ -2,9 +2,9 @@ package blobstore
 
 import (
 	"context"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/pkg/errors"
@@ -26,7 +26,6 @@ func NewBlobStore(s3BucketName string, s3Client s3.Client, logger logging.Logger
 
 // StoreBlob adds a blob to the blob store
 func (b *BlobStore) StoreBlob(ctx context.Context, key v2.BlobKey, data []byte) error {
-
 	err := b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
 	if err != nil {
 		b.logger.Errorf("failed to upload blob in bucket %s: %v", b.bucketName, err)
