@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -9,7 +10,8 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -26,9 +28,12 @@ const (
 	OperatorDispersalIndexName = "OperatorDispersalIndex"
 	OperatorResponseIndexName  = "OperatorResponseIndex"
 
-	blobKeyPrefix  = "BlobKey#"
-	blobMetadataSK = "BlobMetadata"
-	blobCertSK     = "BlobCertificate"
+	blobKeyPrefix             = "BlobKey#"
+	dispersalKeyPrefix        = "Dispersal#"
+	blobMetadataSK            = "BlobMetadata"
+	blobCertSK                = "BlobCertificate"
+	dispersalRequestSKPrefix  = "DispersalRequest#"
+	dispersalResponseSKPrefix = "DispersalResponse#"
 )
 
 var (
@@ -71,7 +76,7 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 	return err
 }
 
-func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey core.BlobKey, status v2.BlobStatus) error {
+func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2.BlobKey, status v2.BlobStatus) error {
 	validStatuses := statusUpdatePrecondition[status]
 	if len(validStatuses) == 0 {
 		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
@@ -114,7 +119,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey core.B
 	return err
 }
 
-func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey core.BlobKey) (*v2.BlobMetadata, error) {
+func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobMetadata, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -180,7 +185,7 @@ func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 	return count, nil
 }
 
-func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *core.BlobCertificate, fragmentInfo *encoding.FragmentInfo) error {
+func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *corev2.BlobCertificate, fragmentInfo *encoding.FragmentInfo) error {
 	item, err := MarshalBlobCertificate(blobCert, fragmentInfo)
 	if err != nil {
 		return err
@@ -194,7 +199,7 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 	return err
 }
 
-func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core.BlobKey) (*core.BlobCertificate, *encoding.FragmentInfo, error) {
+func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) (*corev2.BlobCertificate, *encoding.FragmentInfo, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -218,6 +223,120 @@ func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core
 	}
 
 	return cert, fragmentInfo, nil
+}
+
+// GetBlobCertificates returns the certificates for the given blob keys
+// Note: the returned certificates are NOT necessarily ordered by the order of the input blob keys
+func (s *BlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []corev2.BlobKey) ([]*corev2.BlobCertificate, []*encoding.FragmentInfo, error) {
+	keys := make([]map[string]types.AttributeValue, len(blobKeys))
+	for i, blobKey := range blobKeys {
+		keys[i] = map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: blobKeyPrefix + blobKey.Hex(),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: blobCertSK,
+			},
+		}
+	}
+
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certs := make([]*corev2.BlobCertificate, len(items))
+	fragmentInfos := make([]*encoding.FragmentInfo, len(items))
+	for i, item := range items {
+		cert, fragmentInfo, err := UnmarshalBlobCertificate(item)
+		if err != nil {
+			return nil, nil, err
+		}
+		certs[i] = cert
+		fragmentInfos[i] = fragmentInfo
+	}
+
+	return certs, fragmentInfos, nil
+}
+
+func (s *BlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2.DispersalRequest) error {
+	item, err := MarshalDispersalRequest(req)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalRequest, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, operatorID.Hex()),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: dispersal request not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+	}
+
+	req, err := UnmarshalDispersalRequest(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev2.DispersalResponse) error {
+	item, err := MarshalDispersalResponse(res)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalResponse, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, operatorID.Hex()),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: dispersal response not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+	}
+
+	res, err := UnmarshalDispersalResponse(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
@@ -351,7 +470,7 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	return fields, nil
 }
 
-func UnmarshalBlobKey(item commondynamodb.Item) (core.BlobKey, error) {
+func UnmarshalBlobKey(item commondynamodb.Item) (corev2.BlobKey, error) {
 	type Blob struct {
 		PK string
 	}
@@ -359,11 +478,11 @@ func UnmarshalBlobKey(item commondynamodb.Item) (core.BlobKey, error) {
 	blob := Blob{}
 	err := attributevalue.UnmarshalMap(item, &blob)
 	if err != nil {
-		return core.BlobKey{}, err
+		return corev2.BlobKey{}, err
 	}
 
 	bk := strings.TrimPrefix(blob.PK, blobKeyPrefix)
-	return core.HexToBlobKey(bk)
+	return corev2.HexToBlobKey(bk)
 }
 
 func UnmarshalBlobMetadata(item commondynamodb.Item) (*v2.BlobMetadata, error) {
@@ -375,7 +494,7 @@ func UnmarshalBlobMetadata(item commondynamodb.Item) (*v2.BlobMetadata, error) {
 	return &metadata, nil
 }
 
-func MarshalBlobCertificate(blobCert *core.BlobCertificate, fragmentInfo *encoding.FragmentInfo) (commondynamodb.Item, error) {
+func MarshalBlobCertificate(blobCert *corev2.BlobCertificate, fragmentInfo *encoding.FragmentInfo) (commondynamodb.Item, error) {
 	fields, err := attributevalue.MarshalMap(blobCert)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal blob certificate: %w", err)
@@ -401,8 +520,8 @@ func MarshalBlobCertificate(blobCert *core.BlobCertificate, fragmentInfo *encodi
 	return fields, nil
 }
 
-func UnmarshalBlobCertificate(item commondynamodb.Item) (*core.BlobCertificate, *encoding.FragmentInfo, error) {
-	cert := core.BlobCertificate{}
+func UnmarshalBlobCertificate(item commondynamodb.Item) (*corev2.BlobCertificate, *encoding.FragmentInfo, error) {
+	cert := corev2.BlobCertificate{}
 	err := attributevalue.UnmarshalMap(item, &cert)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal blob certificate: %w", err)
@@ -413,4 +532,118 @@ func UnmarshalBlobCertificate(item commondynamodb.Item) (*core.BlobCertificate, 
 		return nil, nil, fmt.Errorf("failed to unmarshal fragment info: %w", err)
 	}
 	return &cert, &fragmentInfo, nil
+}
+
+func UnmarshalBatchHeaderHash(item commondynamodb.Item) ([32]byte, error) {
+	type Object struct {
+		PK string
+	}
+
+	obj := Object{}
+	err := attributevalue.UnmarshalMap(item, &obj)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	root := strings.TrimPrefix(obj.PK, dispersalKeyPrefix)
+	return hexToHash(root)
+}
+
+func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
+	type Object struct {
+		OperatorID string
+	}
+
+	obj := Object{}
+	err := attributevalue.UnmarshalMap(item, &obj)
+	if err != nil {
+		return nil, err
+	}
+
+	operatorID, err := core.OperatorIDFromHex(obj.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &operatorID, nil
+}
+
+func MarshalDispersalRequest(req *corev2.DispersalRequest) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal dispersal request: %w", err)
+	}
+
+	batchHeaderHash, err := req.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(batchHeaderHash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, req.OperatorID.Hex())}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: req.OperatorID.Hex()}
+
+	return fields, nil
+}
+
+func UnmarshalDispersalRequest(item commondynamodb.Item) (*corev2.DispersalRequest, error) {
+	req := corev2.DispersalRequest{}
+	err := attributevalue.UnmarshalMap(item, &req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal dispersal request: %w", err)
+	}
+
+	operatorID, err := UnmarshalOperatorID(item)
+	if err != nil {
+		return nil, err
+	}
+	req.OperatorID = *operatorID
+
+	return &req, nil
+}
+
+func MarshalDispersalResponse(res *corev2.DispersalResponse) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal dispersal response: %w", err)
+	}
+
+	batchHeaderHash, err := res.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(batchHeaderHash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, res.OperatorID.Hex())}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: res.OperatorID.Hex()}
+
+	return fields, nil
+}
+
+func UnmarshalDispersalResponse(item commondynamodb.Item) (*corev2.DispersalResponse, error) {
+	res := corev2.DispersalResponse{}
+	err := attributevalue.UnmarshalMap(item, &res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal dispersal response: %w", err)
+	}
+
+	operatorID, err := UnmarshalOperatorID(item)
+	if err != nil {
+		return nil, err
+	}
+	res.OperatorID = *operatorID
+
+	return &res, nil
+}
+
+func hexToHash(h string) ([32]byte, error) {
+	s := strings.TrimPrefix(h, "0x")
+	s = strings.TrimPrefix(s, "0X")
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	return [32]byte(b), nil
 }

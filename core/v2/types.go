@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -343,6 +344,52 @@ type BatchHeader struct {
 	ReferenceBlockNumber uint64
 }
 
+// GetBatchHeaderHash returns the hash of the batch header
+func (h BatchHeader) Hash() ([32]byte, error) {
+	var headerHash [32]byte
+
+	// The order here has to match the field ordering of ReducedBatchHeader defined in IEigenDAServiceManager.sol
+	// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "blobHeadersRoot",
+			Type: "bytes32",
+		},
+		{
+			Name: "referenceBlockNumber",
+			Type: "uint32",
+		},
+	})
+	if err != nil {
+		return headerHash, err
+	}
+
+	arguments := abi.Arguments{
+		{
+			Type: batchHeaderType,
+		},
+	}
+
+	s := struct {
+		BlobHeadersRoot      [32]byte
+		ReferenceBlockNumber uint32
+	}{
+		BlobHeadersRoot:      h.BatchRoot,
+		ReferenceBlockNumber: uint32(h.ReferenceBlockNumber),
+	}
+
+	bytes, err := arguments.Pack(s)
+	if err != nil {
+		return headerHash, err
+	}
+
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(bytes)
+	copy(headerHash[:], hasher.Sum(nil)[:32])
+
+	return headerHash, nil
+}
+
 type Batch struct {
 	BatchHeader      *BatchHeader
 	BlobCertificates []*BlobCertificate
@@ -362,6 +409,27 @@ type BlobVersionParameters struct {
 
 func (p BlobVersionParameters) MaxNumOperators() uint32 {
 	return uint32(math.Floor(float64(p.NumChunks) * (1 - 1/(p.ReconstructionThreshold*float64(p.CodingRate)))))
+}
+
+// DispersalRequest is a request to disperse a batch to a specific operator
+type DispersalRequest struct {
+	core.OperatorID `dynamodbav:"-"`
+	OperatorAddress gethcommon.Address
+	Socket          string
+	DispersedAt     uint64
+
+	BatchHeader
+}
+
+// DispersalResponse is a response to a dispersal request
+type DispersalResponse struct {
+	*DispersalRequest
+
+	RespondedAt uint64
+	// Signature is the signature of the response by the operator
+	Signature [32]byte
+	// Error is the error message if the dispersal failed
+	Error string
 }
 
 const (

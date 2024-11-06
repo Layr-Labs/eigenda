@@ -55,3 +55,17 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	// 0xb19d368345990c79744fe571fe99f427f35787b9383c55089fb5bd6a5c171bbc verified in solidity
 	assert.Equal(t, "b19d368345990c79744fe571fe99f427f35787b9383c55089fb5bd6a5c171bbc", blobKey.Hex())
 }
+
+func TestBatchHeaderHAsh(t *testing.T) {
+	batchRoot := [32]byte{}
+	copy(batchRoot[:], []byte("1"))
+	batchHeader := &v2.BatchHeader{
+		ReferenceBlockNumber: 1,
+		BatchRoot:            batchRoot,
+	}
+
+	hash, err := batchHeader.Hash()
+	assert.NoError(t, err)
+	// 0x891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2 verified in solidity
+	assert.Equal(t, "891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2", hex.EncodeToString(hash[:]))
+}
