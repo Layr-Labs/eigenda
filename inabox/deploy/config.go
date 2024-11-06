@@ -176,7 +176,6 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 		DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE:    "10,10",
 		DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE: "2,2",
 		DISPERSER_SERVER_ENABLE_RATELIMITER:        "true",
-		DISPERSER_SERVER_ALLOWLIST:                 "3.221.120.68/0/1000/10485760,18.214.113.214/0/1000/10485760",
 
 		DISPERSER_SERVER_RETRIEVAL_BLOB_RATE: "4",
 		DISPERSER_SERVER_RETRIEVAL_BYTE_RATE: "10000000",
@@ -187,8 +186,6 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-
-		DISPERSER_SERVER_ENABLE_DUAL_QUORUMS: "true",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -233,6 +230,10 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		DISPERSER_ENCODER_AWS_REGION:              "",
+		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
+		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
+		DISPERSER_ENCODER_AWS_ENDPOINT_URL:        "",
 		DISPERSER_ENCODER_GRPC_PORT:               grpcPort,
 		DISPERSER_ENCODER_ENABLE_METRICS:          "true",
 		DISPERSER_ENCODER_G1_PATH:                 "",
