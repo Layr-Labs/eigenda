@@ -13,12 +13,12 @@ contract PaymentVaultUnit is Test {
 
     event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
     event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
-    event GlobalSymbolsPerSecondUpdated(uint256 previousValue, uint256 newValue);
+    event GlobalSymbolsPerBinUpdated(uint256 previousValue, uint256 newValue);
     event ReservationBinIntervalUpdated(uint256 previousValue, uint256 newValue);
     event GlobalRateBinIntervalUpdated(uint256 previousValue, uint256 newValue);
     event PriceParamsUpdated(
-        uint256 previousMinChargeableSize, 
-        uint256 newMinChargeableSize, 
+        uint256 previousMinNumSymbols, 
+        uint256 newMinNumSymbols, 
         uint256 previousPricePerSymbol, 
         uint256 newPricePerSymbol, 
         uint256 previousPriceUpdateCooldown, 
@@ -34,8 +34,8 @@ contract PaymentVaultUnit is Test {
     address user = address(uint160(uint256(keccak256(abi.encodePacked("user")))));
     address user2 = address(uint160(uint256(keccak256(abi.encodePacked("user2")))));
 
-    uint256 minChargeableSize = 1;
-    uint256 globalSymbolsPerSecond = 2;
+    uint256 minNumSymbols = 1;
+    uint256 globalSymbolsPerBin = 2;
     uint256 pricePerSymbol = 3;
     uint256 reservationBinInterval = 4;
     uint256 globalRateBinInterval = 5;
@@ -57,8 +57,8 @@ contract PaymentVaultUnit is Test {
                         abi.encodeWithSelector(
                             PaymentVault.initialize.selector,
                             initialOwner,
-                            minChargeableSize,
-                            globalSymbolsPerSecond,
+                            minNumSymbols,
+                            globalSymbolsPerBin,
                             pricePerSymbol,
                             reservationBinInterval,
                             priceUpdateCooldown,
@@ -74,8 +74,8 @@ contract PaymentVaultUnit is Test {
 
     function test_initialize() public {
         require(paymentVault.owner() == initialOwner, "Owner is not set");
-        assertEq(paymentVault.minChargeableSize(), minChargeableSize);
-        assertEq(paymentVault.globalSymbolsPerSecond(), globalSymbolsPerSecond);
+        assertEq(paymentVault.minNumSymbols(), minNumSymbols);
+        assertEq(paymentVault.globalSymbolsPerBin(), globalSymbolsPerBin);
         assertEq(paymentVault.pricePerSymbol(), pricePerSymbol);
         assertEq(paymentVault.reservationBinInterval(), reservationBinInterval);
         assertEq(paymentVault.priceUpdateCooldown(), priceUpdateCooldown);
@@ -212,11 +212,11 @@ contract PaymentVaultUnit is Test {
         vm.warp(block.timestamp + priceUpdateCooldown);
 
         vm.expectEmit(address(paymentVault));
-        emit PriceParamsUpdated(minChargeableSize, minChargeableSize + 1, pricePerSymbol, pricePerSymbol + 1, priceUpdateCooldown, priceUpdateCooldown + 1);
+        emit PriceParamsUpdated(minNumSymbols, minNumSymbols + 1, pricePerSymbol, pricePerSymbol + 1, priceUpdateCooldown, priceUpdateCooldown + 1);
         vm.prank(initialOwner);
-        paymentVault.setPriceParams(minChargeableSize + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
+        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
 
-        assertEq(paymentVault.minChargeableSize(), minChargeableSize + 1);
+        assertEq(paymentVault.minNumSymbols(), minNumSymbols + 1);
         assertEq(paymentVault.pricePerSymbol(), pricePerSymbol + 1);
         assertEq(paymentVault.priceUpdateCooldown(), priceUpdateCooldown + 1);
         assertEq(paymentVault.lastPriceUpdateTime(), block.timestamp);
@@ -227,7 +227,7 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert("price update cooldown not surpassed");
         vm.prank(initialOwner);
-        paymentVault.setPriceParams(minChargeableSize + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
+        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
     }
 
     function test_setGlobalRateBinInterval() public {
@@ -238,12 +238,12 @@ contract PaymentVaultUnit is Test {
         assertEq(paymentVault.globalRateBinInterval(), globalRateBinInterval + 1);
     }
 
-    function test_setGlobalSymbolsPerSecond() public {
+    function test_setGlobalSymbolsPerBin() public {
         vm.expectEmit(address(paymentVault));
-        emit GlobalSymbolsPerSecondUpdated(globalSymbolsPerSecond, globalSymbolsPerSecond + 1);
+        emit GlobalSymbolsPerBinUpdated(globalSymbolsPerBin, globalSymbolsPerBin + 1);
         vm.prank(initialOwner);
-        paymentVault.setGlobalSymbolsPerSecond(globalSymbolsPerSecond + 1);
-        assertEq(paymentVault.globalSymbolsPerSecond(), globalSymbolsPerSecond + 1);
+        paymentVault.setGlobalSymbolsPerBin(globalSymbolsPerBin + 1);
+        assertEq(paymentVault.globalSymbolsPerBin(), globalSymbolsPerBin + 1);
     }
 
     function test_setReservationBinInterval() public {
@@ -284,11 +284,11 @@ contract PaymentVaultUnit is Test {
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.withdrawERC20(address(mockToken), 100 ether);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setPriceParams(minChargeableSize + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
+        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.setGlobalRateBinInterval(globalRateBinInterval + 1);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setGlobalSymbolsPerSecond(globalSymbolsPerSecond + 1);
+        paymentVault.setGlobalSymbolsPerBin(globalSymbolsPerBin + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.setReservationBinInterval(reservationBinInterval + 1);
     }

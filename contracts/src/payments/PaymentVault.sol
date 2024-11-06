@@ -25,8 +25,8 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
 
     function initialize(
         address _initialOwner,
-        uint256 _minChargeableSize,
-        uint256 _globalSymbolsPerSecond,
+        uint256 _minNumSymbols,
+        uint256 _globalSymbolsPerBin,
         uint256 _pricePerSymbol,
         uint256 _reservationBinInterval,
         uint256 _priceUpdateCooldown,
@@ -34,8 +34,8 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     ) public initializer {
         _transferOwnership(_initialOwner);
         
-        minChargeableSize = _minChargeableSize;
-        globalSymbolsPerSecond = _globalSymbolsPerSecond;
+        minNumSymbols = _minNumSymbols;
+        globalSymbolsPerBin = _globalSymbolsPerBin;
         pricePerSymbol = _pricePerSymbol;
         reservationBinInterval = _reservationBinInterval;
         priceUpdateCooldown = _priceUpdateCooldown;
@@ -68,25 +68,25 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     }
 
     function setPriceParams(
-        uint256 _minChargeableSize,
+        uint256 _minNumSymbols,
         uint256 _pricePerSymbol,
         uint256 _priceUpdateCooldown
     ) external onlyOwner {
         require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
         emit PriceParamsUpdated(
-            minChargeableSize, _minChargeableSize, 
+            minNumSymbols, _minNumSymbols, 
             pricePerSymbol, _pricePerSymbol, 
             priceUpdateCooldown, _priceUpdateCooldown
         );
         pricePerSymbol = _pricePerSymbol;
-        minChargeableSize = _minChargeableSize;
+        minNumSymbols = _minNumSymbols;
         priceUpdateCooldown = _priceUpdateCooldown;
         lastPriceUpdateTime = block.timestamp;
     }
 
-    function setGlobalSymbolsPerSecond(uint256 _globalSymbolsPerSecond) external onlyOwner {
-        emit GlobalSymbolsPerSecondUpdated(globalSymbolsPerSecond, _globalSymbolsPerSecond);
-        globalSymbolsPerSecond = _globalSymbolsPerSecond;
+    function setGlobalSymbolsPerBin(uint256 _globalSymbolsPerBin) external onlyOwner {
+        emit GlobalSymbolsPerBinUpdated(globalSymbolsPerBin, _globalSymbolsPerBin);
+        globalSymbolsPerBin = _globalSymbolsPerBin;
     }
 
     function setReservationBinInterval(uint256 _reservationBinInterval) external onlyOwner {

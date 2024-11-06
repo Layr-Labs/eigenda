@@ -6,13 +6,13 @@ import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 abstract contract PaymentVaultStorage is IPaymentVault {
 
     /// @notice minimum chargeable size for on-demand payments
-    uint256 public minChargeableSize; 
+    uint256 public minNumSymbols; 
     /// @notice price per symbol in wei
     uint256 public pricePerSymbol; 
     /// @notice cooldown period before the price can be updated again
     uint256 public priceUpdateCooldown;    
     /// @notice maximum number of symbols to disperse per second network-wide for on-demand payments (applied to only ETH and EIGEN)
-    uint256 public globalSymbolsPerSecond;  
+    uint256 public globalSymbolsPerBin;  
     /// @notice reservation bin duration 
     uint256 public reservationBinInterval;  
     /// @notice global rate bin size
