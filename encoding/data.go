@@ -30,7 +30,7 @@ type BlobCommitments struct {
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format
-func (c *BlobCommitments) ToProfobuf() (*pbcommon.BlobCommitment, error) {
+func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
 	commitData, err := c.Commitment.Serialize()
 	if err != nil {
 		return nil, err

@@ -3,11 +3,12 @@ package v2
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -72,7 +73,7 @@ type BlobHeader struct {
 	Signature []byte
 }
 
-func NewBlobHeader(proto *pb.BlobHeader) (*BlobHeader, error) {
+func NewBlobHeader(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, err
@@ -123,6 +124,26 @@ func NewBlobHeader(proto *pb.BlobHeader) (*BlobHeader, error) {
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: paymentMetadata,
 		Signature:       proto.GetSignature(),
+	}, nil
+}
+
+func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
+	quorums := make([]uint32, len(b.QuorumNumbers))
+	for i, q := range b.QuorumNumbers {
+		quorums[i] = uint32(q)
+	}
+
+	commitments, err := b.BlobCommitments.ToProtobuf()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert blob commitments to protobuf: %v", err)
+	}
+
+	return &commonpb.BlobHeader{
+		Version:       uint32(b.BlobVersion),
+		QuorumNumbers: quorums,
+		Commitment:    commitments,
+		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
+		Signature:     b.Signature,
 	}, nil
 }
 
@@ -294,6 +315,27 @@ type BlobCertificate struct {
 
 	// RelayKeys
 	RelayKeys []RelayKey
+}
+
+func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
+	if c.BlobHeader == nil {
+		return nil, fmt.Errorf("blob header is nil")
+	}
+
+	blobHeader, err := c.BlobHeader.ToProtobuf()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert blob header to protobuf: %v", err)
+	}
+
+	relays := make([]uint32, len(c.RelayKeys))
+	for i, r := range c.RelayKeys {
+		relays[i] = uint32(r)
+	}
+
+	return &commonpb.BlobCertificate{
+		BlobHeader: blobHeader,
+		Relays:     relays,
+	}, nil
 }
 
 type BatchHeader struct {
