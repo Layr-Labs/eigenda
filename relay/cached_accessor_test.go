@@ -116,7 +116,7 @@ func TestCacheMisses(t *testing.T) {
 	}
 }
 
-func TestParallelAccess(t *testing.T) {
+func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	tu.InitializeRandom()
 
 	dataSize := 1024
@@ -160,10 +160,12 @@ func TestParallelAccess(t *testing.T) {
 		}()
 	}
 
-	// Wait for the goroutines to start. We want to give the goroutines a chance to do naughty things if they want.
-	// Eliminating this sleep will not cause the test to fail, but it may cause the test not to exercise the
-	// desired race condition.
-	time.Sleep(100 * time.Millisecond)
+	if sleepEnabled {
+		// Wait for the goroutines to start. We want to give the goroutines a chance to do naughty things if they want.
+		// Eliminating this sleep will not cause the test to fail, but it may cause the test not to exercise the
+		// desired race condition.
+		time.Sleep(100 * time.Millisecond)
+	}
 
 	// Unlock the accessor. This will allow the goroutines to proceed.
 	accessorLock.Unlock()
@@ -180,8 +182,16 @@ func TestParallelAccess(t *testing.T) {
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
-	// The internal lookupsInProgress map should be empty.
+	// The internal lookupsInProgress map should no longer contain the key.
 	require.Equal(t, 0, len(ca.(*cachedAccessor[int, string]).lookupsInProgress))
+}
+
+func TestParallelAccess(t *testing.T) {
+	// To show that the sleep is not necessary, we run the test twice: once with the sleep enabled and once without.
+	// The purpose of the sleep is to make a certain type of race condition more likely to occur.
+
+	ParallelAccessTest(t, false)
+	ParallelAccessTest(t, true)
 }
 
 func TestParallelAccessWithError(t *testing.T) {
@@ -241,6 +251,6 @@ func TestParallelAccessWithError(t *testing.T) {
 	require.Equal(t, errors.New("intentional error"), err)
 	require.Equal(t, count+1, cacheMissCount.Load())
 
-	// The internal lookupsInProgress map should be empty.
+	// The internal lookupsInProgress map should no longer contain the key.
 	require.Equal(t, 0, len(ca.(*cachedAccessor[int, string]).lookupsInProgress))
 }
