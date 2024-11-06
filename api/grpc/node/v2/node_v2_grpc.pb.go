@@ -146,9 +146,8 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Retrieval_GetChunks_FullMethodName          = "/node.v2.Retrieval/GetChunks"
-	Retrieval_GetBlobCertificate_FullMethodName = "/node.v2.Retrieval/GetBlobCertificate"
-	Retrieval_NodeInfo_FullMethodName           = "/node.v2.Retrieval/NodeInfo"
+	Retrieval_GetChunks_FullMethodName = "/node.v2.Retrieval/GetChunks"
+	Retrieval_NodeInfo_FullMethodName  = "/node.v2.Retrieval/NodeInfo"
 )
 
 // RetrievalClient is the client API for Retrieval service.
@@ -157,8 +156,6 @@ const (
 type RetrievalClient interface {
 	// GetChunks retrieves the chunks for a blob custodied at the Node.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
-	// GetBlobHeader is similar to GetChunks, this just returns the header of the blob.
-	GetBlobCertificate(ctx context.Context, in *GetBlobCertificateRequest, opts ...grpc.CallOption) (*GetBlobCertificateReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
@@ -180,15 +177,6 @@ func (c *retrievalClient) GetChunks(ctx context.Context, in *GetChunksRequest, o
 	return out, nil
 }
 
-func (c *retrievalClient) GetBlobCertificate(ctx context.Context, in *GetBlobCertificateRequest, opts ...grpc.CallOption) (*GetBlobCertificateReply, error) {
-	out := new(GetBlobCertificateReply)
-	err := c.cc.Invoke(ctx, Retrieval_GetBlobCertificate_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
 	out := new(NodeInfoReply)
 	err := c.cc.Invoke(ctx, Retrieval_NodeInfo_FullMethodName, in, out, opts...)
@@ -204,8 +192,6 @@ func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 type RetrievalServer interface {
 	// GetChunks retrieves the chunks for a blob custodied at the Node.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
-	// GetBlobHeader is similar to GetChunks, this just returns the header of the blob.
-	GetBlobCertificate(context.Context, *GetBlobCertificateRequest) (*GetBlobCertificateReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
@@ -217,9 +203,6 @@ type UnimplementedRetrievalServer struct {
 
 func (UnimplementedRetrievalServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
-}
-func (UnimplementedRetrievalServer) GetBlobCertificate(context.Context, *GetBlobCertificateRequest) (*GetBlobCertificateReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetBlobCertificate not implemented")
 }
 func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
@@ -255,24 +238,6 @@ func _Retrieval_GetChunks_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_GetBlobCertificate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetBlobCertificateRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RetrievalServer).GetBlobCertificate(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Retrieval_GetBlobCertificate_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).GetBlobCertificate(ctx, req.(*GetBlobCertificateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NodeInfoRequest)
 	if err := dec(in); err != nil {
@@ -301,10 +266,6 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChunks",
 			Handler:    _Retrieval_GetChunks_Handler,
-		},
-		{
-			MethodName: "GetBlobCertificate",
-			Handler:    _Retrieval_GetBlobCertificate_Handler,
 		},
 		{
 			MethodName: "NodeInfo",

@@ -292,11 +292,24 @@ type RelayKey uint16
 type BlobCertificate struct {
 	BlobHeader *BlobHeader
 
-	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
-	ReferenceBlockNumber uint64
-
 	// RelayKeys
 	RelayKeys []RelayKey
+}
+
+type BatchHeader struct {
+	BatchRoot            [32]byte
+	ReferenceBlockNumber uint64
+}
+
+type Batch struct {
+	BatchHeader      *BatchHeader
+	BlobCertificates []*BlobCertificate
+}
+
+type BlobVerificationInfo struct {
+	BlobCertificate *BlobCertificate
+	BlobIndex       uint32
+	InclusionProof  []byte
 }
 
 type BlobVersionParameters struct {

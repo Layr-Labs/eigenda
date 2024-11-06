@@ -114,8 +114,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 			},
 			Signature: []byte("signature"),
 		},
-		ReferenceBlockNumber: uint64(100),
-		RelayKeys:            []corev2.RelayKey{0, 2, 4},
+		RelayKeys: []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
@@ -144,8 +143,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 			},
 			Signature: []byte("signature"),
 		},
-		ReferenceBlockNumber: uint64(1234),
-		RelayKeys:            []corev2.RelayKey{0},
+		RelayKeys: []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
