@@ -3,20 +3,30 @@ package relay
 import (
 	"context"
 	"fmt"
+	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"log"
+	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -25,6 +35,7 @@ var (
 	dockertestResource *dockertest.Resource
 	UUID               = uuid.New()
 	metadataTableName  = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	prover             *p.Prover
 )
 
 const (
@@ -32,21 +43,49 @@ const (
 	localstackHost = "http://0.0.0.0:4570"
 )
 
-func setupLocalstack() error {
+func setup(t *testing.T) {
 	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+
+	_, b, _, _ := runtime.Caller(0)
+	rootPath := filepath.Join(filepath.Dir(b), "..")
+	changeDirectory(filepath.Join(rootPath, "inabox"))
 
 	if deployLocalStack {
 		var err error
 		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localstackPort)
-		if err != nil && err.Error() == "container already exists" {
-			teardownLocalstack()
-			return err
-		}
+		require.NoError(t, err)
 	}
-	return nil
+
+	// Only set up the prover once, it's expensive
+	if prover == nil {
+		config := &kzg.KzgConfig{
+			G1Path:          "./resources/kzg/g1.point.300000",
+			G2Path:          "./resources/kzg/g2.point.300000",
+			CacheDir:        "./resources/kzg/SRSTables",
+			SRSOrder:        8192,
+			SRSNumberToLoad: 8192,
+			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		}
+		var err error
+		prover, err = p.NewProver(config, true)
+		require.NoError(t, err)
+	}
 }
 
-func teardownLocalstack() {
+func changeDirectory(path string) {
+	err := os.Chdir(path)
+	if err != nil {
+		log.Panicf("Failed to change directories. Error: %s", err)
+	}
+
+	newDir, err := os.Getwd()
+	if err != nil {
+		log.Panicf("Failed to get working directory. Error: %s", err)
+	}
+	log.Printf("Current Working Directory: %s\n", newDir)
+}
+
+func teardown() {
 	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 
 	if deployLocalStack {
@@ -55,14 +94,10 @@ func teardownLocalstack() {
 }
 
 func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
-	setupLocalstack()
+	setup(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
-
-	config := aws.DefaultClientConfig()
-	config.EndpointURL = localstackHost
-	config.Region = "us-east-1"
 
 	err = os.Setenv("AWS_ACCESS_KEY_ID", "localstack")
 	require.NoError(t, err)
@@ -76,6 +111,13 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 		EndpointURL:     localstackHost,
 	}
 
+	_, err = test_utils.CreateTable(
+		context.Background(),
+		cfg,
+		metadataTableName,
+		blobstore.GenerateTableSchema(metadataTableName, 10, 10))
+	require.NoError(t, err)
+
 	dynamoClient, err := dynamodb.NewClient(cfg, logger)
 	require.NoError(t, err)
 
@@ -85,18 +127,30 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 		metadataTableName)
 }
 
-func randomBlobHeader() *v2.BlobHeader {
+func randomBlobHeader(t *testing.T) *v2.BlobHeader {
 
-	blobCommitments := encoding.BlobCommitments{
-		Commitment: &encoding.G1Commitment{
-			X: fp.Element{rand.Uint64(), rand.Uint64(), rand.Uint64(), rand.Uint64()},
-			Y: fp.Element{rand.Uint64(), rand.Uint64(), rand.Uint64(), rand.Uint64()},
+	data := tu.RandomBytes(128)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+	commitments, err := prover.GetCommitments(data)
+	assert.NoError(t, err)
+	assert.NoError(t, err)
+	commitmentProto, err := commitments.ToProfobuf()
+
+	blobHeaderProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommon.PaymentHeader{
+			AccountId:         tu.RandomString(10),
+			BinIndex:          5,
+			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
+	blobHeader, err := v2.NewBlobHeader(blobHeaderProto)
+	require.NoError(t, err)
 
-	return &v2.BlobHeader{
-		BlobCommitments: blobCommitments,
-	}
+	return blobHeader
 }
 
 func TestFetchingIndividualMetadata(t *testing.T) {
@@ -104,7 +158,7 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 
 	metadataStore := buildMetadataStore(t)
 	defer func() {
-		teardownLocalstack()
+		teardown()
 	}()
 
 	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
@@ -113,7 +167,7 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 	// Write some metadata
 	blobCount := 10
 	for i := 0; i < blobCount; i++ {
-		header := randomBlobHeader()
+		header := randomBlobHeader(t)
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 
@@ -136,5 +190,13 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 	}
 
 	// Read the metadata back
+	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(context.Background(), blobKey)
+		require.NoError(t, err)
+		require.NotNil(t, cert)
+		require.NotNil(t, fragmentInfo)
 
+		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
+		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+	}
 }
