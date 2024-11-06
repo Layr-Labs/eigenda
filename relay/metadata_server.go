@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/core/v2"
-	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/sync/errgroup"
 	"sync"
 	"sync/atomic"
 )
-
-// TODO unit tests
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
 type blobMetadata struct {
@@ -34,11 +32,11 @@ type metadataServer struct {
 
 	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
 	// assigned to this server will not be in the cache.
-	metadataCache CachedAccessor[core.BlobKey, blobMetadata]
+	metadataCache cache.CachedAccessor[v2.BlobKey, blobMetadata]
 
 	// shardSet is the set of shards assigned to this relay. This relay will refuse to serve metadata for blobs
 	// that are not assigned to one of these shards.
-	shardSet map[core.RelayKey]struct{}
+	shardSet map[v2.RelayKey]struct{}
 
 	// pool is a work pool for managing concurrent metadata requests. Used to limit the number of concurrent
 	// requests to the metadata store.
@@ -52,9 +50,9 @@ func NewMetadataServer(
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	workPoolSize int,
-	shards []core.RelayKey) (*metadataServer, error) { // TODO figure out what should be exported
+	shards []v2.RelayKey) (*metadataServer, error) { // TODO figure out what should be exported
 
-	shardSet := make(map[core.RelayKey]struct{}, len(shards))
+	shardSet := make(map[v2.RelayKey]struct{}, len(shards))
 	if shards != nil {
 		for _, shard := range shards {
 			shardSet[shard] = struct{}{}
@@ -72,7 +70,7 @@ func NewMetadataServer(
 		pool:          pool,
 	}
 
-	metadataCache, err := NewCachedAccessor[core.BlobKey, blobMetadata](metadataCacheSize, server.fetchMetadata)
+	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, blobMetadata](metadataCacheSize, server.fetchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata cache: %w", err)
 	}
@@ -83,11 +81,11 @@ func NewMetadataServer(
 }
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (m *metadataServer) GetMetadataForBlobs(keys []core.BlobKey) (*map[core.BlobKey]*blobMetadata, error) {
+func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey]*blobMetadata, error) {
 
 	// TODO figure out how timeouts are going to work here
 
-	metadataMap := make(map[core.BlobKey]*blobMetadata)
+	metadataMap := make(map[v2.BlobKey]*blobMetadata)
 	hadError := atomic.Bool{}
 
 	wg := sync.WaitGroup{}
@@ -124,7 +122,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []core.BlobKey) (*map[core.Blo
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataServer) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	// Retrieve the metadata from the store.
-	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, core.BlobKey(key))
+	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, v2.BlobKey(key))
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}

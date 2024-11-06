@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/sync/errgroup"
 	"sync"
@@ -21,7 +22,7 @@ type blobServer struct {
 	blobStore *blobstore.BlobStore
 
 	// blobCache is an LRU cache of blobs.
-	blobCache CachedAccessor[v2.BlobKey, []byte]
+	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
 
 	// pool is a work pool for managing concurrent worker goroutines.
 	pool *errgroup.Group
@@ -45,7 +46,7 @@ func NewBlobServer(
 		pool:      pool,
 	}
 
-	cache, err := NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
+	cache, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}

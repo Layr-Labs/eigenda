@@ -7,7 +7,7 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	core "github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"

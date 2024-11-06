@@ -1,4 +1,4 @@
-package relay
+package cache
 
 import (
 	lru "github.com/hashicorp/golang-lru/v2"
