@@ -153,8 +153,13 @@ func randomBlobHeader(t *testing.T) *v2.BlobHeader {
 	return blobHeader
 }
 
+// TODO verify blob size once it is added to metadata
+
 func TestFetchingIndividualMetadata(t *testing.T) {
 	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
 
 	metadataStore := buildMetadataStore(t)
 	defer func() {
@@ -189,14 +194,115 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Read the metadata back
+	// Sanity check, make sure the metadata is in the low level store
 	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
 		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(context.Background(), blobKey)
 		require.NoError(t, err)
 		require.NotNil(t, cert)
 		require.NotNil(t, fragmentInfo)
-
 		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
 		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
 	}
+
+	server, err := NewMetadataServer(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
+	require.NoError(t, err)
+
+	// Fetch the metadata from the server.
+	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+		metadataMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(*metadataMap))
+		metadata := (*metadataMap)[blobKey]
+		require.NotNil(t, metadata)
+		require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
+		require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+	}
+
+	// Read it back again. This uses a different code pathway due to the cache.
+	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+		metadataMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(*metadataMap))
+		metadata := (*metadataMap)[blobKey]
+		require.NotNil(t, metadata)
+		require.Equal(t, totalChunkSizeBytes, metadata.totalChunkSizeBytes)
+		require.Equal(t, fragmentSizeMap[blobKey], metadata.fragmentSizeBytes)
+	}
+}
+
+func TestBatchedFetch(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	metadataStore := buildMetadataStore(t)
+	defer func() {
+		teardown()
+	}()
+
+	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
+	fragmentSizeMap := make(map[v2.BlobKey]uint32)
+
+	// Write some metadata
+	blobCount := 10
+	for i := 0; i < blobCount; i++ {
+		header := randomBlobHeader(t)
+		blobKey, err := header.BlobKey()
+		require.NoError(t, err)
+
+		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
+		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
+
+		totalChunkSizeMap[blobKey] = totalChunkSizeBytes
+		fragmentSizeMap[blobKey] = fragmentSizeBytes
+
+		err = metadataStore.PutBlobCertificate(
+			context.Background(),
+			&v2.BlobCertificate{
+				BlobHeader: header,
+			},
+			&encoding.FragmentInfo{
+				TotalChunkSizeBytes: totalChunkSizeBytes,
+				FragmentSizeBytes:   fragmentSizeBytes,
+			})
+		require.NoError(t, err)
+	}
+
+	// Sanity check, make sure the metadata is in the low level store
+	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
+		cert, fragmentInfo, err := metadataStore.GetBlobCertificate(context.Background(), blobKey)
+		require.NoError(t, err)
+		require.NotNil(t, cert)
+		require.NotNil(t, fragmentInfo)
+		require.Equal(t, totalChunkSizeBytes, fragmentInfo.TotalChunkSizeBytes)
+		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
+	}
+
+	server, err := NewMetadataServer(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
+	require.NoError(t, err)
+
+	// Each iteration, choose a random subset of the keys to fetch
+	for i := 0; i < 10; i++ {
+		keyCount := rand.Intn(blobCount) + 1
+		keys := make([]v2.BlobKey, 0, keyCount)
+		for key, _ := range totalChunkSizeMap {
+			keys = append(keys, key)
+			if len(keys) == keyCount {
+				break
+			}
+		}
+
+		metadataMap, err := server.GetMetadataForBlobs(keys)
+		require.NoError(t, err)
+
+		assert.Equal(t, keyCount, len(*metadataMap))
+		for _, key := range keys {
+			metadata := (*metadataMap)[key]
+			require.NotNil(t, metadata)
+			require.Equal(t, totalChunkSizeMap[key], metadata.totalChunkSizeBytes)
+			require.Equal(t, fragmentSizeMap[key], metadata.fragmentSizeBytes)
+		}
+	}
+
 }

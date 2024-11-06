@@ -85,6 +85,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey
 
 	// TODO figure out how timeouts are going to work here
 
+	mapLock := sync.Mutex{} // TODO use concurrent map maybe
 	metadataMap := make(map[v2.BlobKey]*blobMetadata)
 	hadError := atomic.Bool{}
 
@@ -105,7 +106,9 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey
 				hadError.Store(true)
 				return nil
 			}
+			mapLock.Lock()
 			metadataMap[boundKey] = metadata
+			mapLock.Unlock()
 
 			return nil
 		})
@@ -127,20 +130,22 @@ func (m *metadataServer) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
 
-	validShard := false
-	for _, shard := range cert.RelayKeys {
-		if _, ok := m.shardSet[shard]; ok {
-			validShard = true
-			break
+	if m.shardSet != nil && len(m.shardSet) > 0 {
+		validShard := false
+		for _, shard := range cert.RelayKeys {
+			if _, ok := m.shardSet[shard]; ok {
+				validShard = true
+				break
+			}
+		}
+
+		if !validShard {
+			return nil, fmt.Errorf("blob %s is not assigned to this relay", key.Hex())
 		}
 	}
 
-	if !validShard {
-		return nil, fmt.Errorf("blob %s is not assigned to this relay", key.Hex())
-	}
-
 	metadata := &blobMetadata{
-		blobSizeBytes:       0, /* TODO */
+		blobSizeBytes:       0, /* TODO: populate this once it is added to the metadata store */
 		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
 		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 	}
