@@ -136,6 +136,7 @@ func frElementToProtobuf(e *fr.Element) *framepb.Element {
 	}
 }
 
+// fpElementFromProtobuf converts a protobuf element to an fp.Element
 func fpElementFromProtobuf(e *framepb.Element) fp.Element {
 	return fp.Element{
 		e.C0,
@@ -145,6 +146,7 @@ func fpElementFromProtobuf(e *framepb.Element) fp.Element {
 	}
 }
 
+// frElementFromProtobuf converts a protobuf element to an fr.Element
 func frElementFromProtobuf(e *framepb.Element) fr.Element {
 	return fr.Element{
 		e.C0,
@@ -172,6 +174,7 @@ func FrameFromProtobuf(f *framepb.Frame) *Frame {
 	}
 }
 
+// FramesToProtobuf converts a slice of Frames to protobuf format
 func FramesToProtobuf(frames []*Frame) []*framepb.Frame {
 	protobufFrames := make([]*framepb.Frame, len(frames))
 	for i, f := range frames {
@@ -180,6 +183,7 @@ func FramesToProtobuf(frames []*Frame) []*framepb.Frame {
 	return protobufFrames
 }
 
+// FramesFromProtobuf converts a slice of protobuf Frames to Frames.
 func FramesFromProtobuf(frames []*framepb.Frame) []*Frame {
 	protobufFrames := make([]*Frame, len(frames))
 	for i, f := range frames {
