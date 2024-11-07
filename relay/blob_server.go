@@ -8,10 +8,11 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/sync/errgroup"
+	"sync"
 )
 
 // blobServer encapsulates logic for fetching blobs. Utilized by the relay Server.
-// This struct adds caching (and perhaps eventually threading) on top of blobstore.BlobStore.
+// This struct adds caching and threading on top of blobstore.BlobStore.
 type blobServer struct {
 	ctx    context.Context
 	logger logging.Logger
@@ -55,8 +56,27 @@ func NewBlobServer(
 
 // GetBlob retrieves a blob from the blob store.
 func (s *blobServer) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
-	data, err := s.blobCache.Get(blobKey)
+
+	// Even though we don't need extra parallelism here, we still use the work pool to ensure that we don't
+	// permit too many concurrent requests to the blob store.
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	var data *[]byte
+	var err error
+
+	s.pool.Go(func() error {
+		defer wg.Done()
+		data, err = s.blobCache.Get(blobKey)
+		return nil
+	})
+
+	wg.Wait()
+
 	if err != nil {
+		// It should not be possible for external users to force an error here since we won't
+		// even call this method if the blob key is invalid (so it's ok to have a noisy log here).
 		s.logger.Error("Failed to fetch blob: %v", err)
 		return nil, err
 	}
