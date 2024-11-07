@@ -1,6 +1,6 @@
 syntax = "proto3";
 package node;
-import "common/common.proto";
+import "common/v2/frame.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +87,7 @@ message BlobChunks {
 }
 
 message Chunks {
-  repeated common.ChunkData chunks = 1;
+  repeated common.v2.Frame data = 1;
 }
 
 // An error that occurred while trying to fetch a blob or chunks.
