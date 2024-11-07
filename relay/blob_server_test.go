@@ -5,22 +5,17 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestWithoutShards(t *testing.T) {
+func TestReadWrite(t *testing.T) {
 	tu.InitializeRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
 	setup(t)
-	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	blobStore := buildBlobStore(t, logger)
 
@@ -33,14 +28,6 @@ func TestWithoutShards(t *testing.T) {
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
 		expectedData[blobKey] = data
-
-		err = metadataStore.PutBlobCertificate(
-			context.Background(),
-			&v2.BlobCertificate{
-				BlobHeader: header,
-			},
-			&encoding.FragmentInfo{})
-		require.NoError(t, err)
 
 		err = blobStore.StoreBlob(context.Background(), blobKey, data)
 		require.NoError(t, err)
