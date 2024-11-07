@@ -114,16 +114,14 @@ message BlobVerificationInfo {
 }
 
 message Attestation {
-  repeated uint32 nonSignerQuorumBitmapIndices = 1;
-  repeated bytes nonSignerPubkeys = 2;
-  repeated bytes quorumApks = 3;
-  bytes apkG2 = 4;
-  bytes sigma = 5;
-  repeated uint32 quorumApkIndices = 6;
-  repeated uint32 totalStakeIndices = 7;
-  repeated NonSignerStakeIndicesForQuorum nonSignerStakeIndices = 8;
-}
-
-message NonSignerStakeIndicesForQuorum {
-  repeated uint32 indices = 1;
+  // Serialized bytes of non signer public keys (G1 points)
+  repeated bytes non_signer_pubkeys = 1;
+  // Serialized bytes of G2 point that represents aggregate public key of all signers
+  bytes apk_g2 = 2;
+  // Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum
+  repeated bytes quorum_apks = 3;
+  // Serialized bytes of aggregate signature
+  bytes sigma = 4;
+  // Relevant quorum numbers for the attestation
+  repeated uint32 quorum_numbers = 5;
 }

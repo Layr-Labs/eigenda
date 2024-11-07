@@ -276,6 +276,71 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
+	ctx := context.Background()
+	h := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 100,
+	}
+	bhh, err := h.Hash()
+	assert.NoError(t, err)
+
+	err = blobMetadataStore.PutBatchHeader(ctx, h)
+	assert.NoError(t, err)
+
+	fetchedHeader, err := blobMetadataStore.GetBatchHeader(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+
+	// attempt to put batch header with the same key should fail
+	err = blobMetadataStore.PutBatchHeader(ctx, h)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: h,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+	}
+
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	fetchedAttestation, err := blobMetadataStore.GetAttestation(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, attestation, fetchedAttestation)
+
+	// attempt to put attestation with the same key should fail
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+	})
+}
+
 func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)

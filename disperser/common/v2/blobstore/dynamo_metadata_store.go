@@ -30,10 +30,13 @@ const (
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
+	batchHeaderKeyPrefix      = "BatchHeader#"
 	blobMetadataSK            = "BlobMetadata"
 	blobCertSK                = "BlobCertificate"
 	dispersalRequestSKPrefix  = "DispersalRequest#"
 	dispersalResponseSKPrefix = "DispersalResponse#"
+	batchHeaderSK             = "BatchHeader"
+	attestationSK             = "Attestation"
 )
 
 var (
@@ -339,6 +342,86 @@ func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeade
 	return res, nil
 }
 
+func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
+	item, err := MarshalBatchHeader(batchHeader)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchHeaderSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	header, err := UnmarshalBatchHeader(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return header, nil
+}
+
+func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *corev2.Attestation) error {
+	item, err := MarshalAttestation(attestation)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: attestationSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	attestation, err := UnmarshalAttestation(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return attestation, nil
+}
+
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
 	return &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
@@ -636,6 +719,62 @@ func UnmarshalDispersalResponse(item commondynamodb.Item) (*corev2.DispersalResp
 	res.OperatorID = *operatorID
 
 	return &res, nil
+}
+
+func MarshalBatchHeader(batchHeader *corev2.BatchHeader) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(batchHeader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch header: %w", err)
+	}
+
+	hash, err := batchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchHeaderSK}
+
+	return fields, nil
+}
+
+func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error) {
+	header := corev2.BatchHeader{}
+	err := attributevalue.UnmarshalMap(item, &header)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch header: %w", err)
+	}
+
+	return &header, nil
+}
+
+func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(attestation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal attestation: %w", err)
+	}
+
+	hash, err := attestation.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: attestationSK}
+
+	return fields, nil
+}
+
+func UnmarshalAttestation(item commondynamodb.Item) (*corev2.Attestation, error) {
+	attestation := corev2.Attestation{}
+	err := attributevalue.UnmarshalMap(item, &attestation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+	}
+
+	return &attestation, nil
 }
 
 func hexToHash(h string) ([32]byte, error) {

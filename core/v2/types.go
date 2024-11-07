@@ -395,6 +395,23 @@ type Batch struct {
 	BlobCertificates []*BlobCertificate
 }
 
+type Attestation struct {
+	*BatchHeader
+
+	// AttestedAt is the time the attestation was made
+	AttestedAt uint64
+	// NonSignerPubKeys are the public keys of the operators that did not sign the blob
+	NonSignerPubKeys []*core.G1Point
+	// APKG2 is the aggregate public key of all signers
+	APKG2 *core.G2Point
+	// QuorumAPKs is the aggregate public keys of all operators in each quorum
+	QuorumAPKs map[core.QuorumID]*core.G1Point
+	// Sigma is the aggregate signature of all signers
+	Sigma *core.Signature
+	// QuorumNumbers contains the quorums relevant for the attestation
+	QuorumNumbers []core.QuorumID
+}
+
 type BlobVerificationInfo struct {
 	BlobCertificate *BlobCertificate
 	BlobIndex       uint32
