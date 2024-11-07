@@ -134,7 +134,7 @@ library EigenDARollupUtils {
             uint256 confirmedQuorumsBitmap;
 
             // require that the security param in each blob is met
-            for (uint j = 0; i < blobHeaders[i].quorumBlobParams.length; j++) {
+            for (uint j = 0; j < blobHeaders[i].quorumBlobParams.length; j++) {
                 // make sure that the quorumIndex matches the given quorumNumber
                 require(uint8(blobVerificationProofs[i].batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProofs[i].quorumIndices[i])]) == blobHeaders[i].quorumBlobParams[i].quorumNumber, 
                     "EigenDARollupUtils.verifyBlob: quorumNumber does not match"
