@@ -29,6 +29,6 @@ message PaymentHeader {
 /////////////////////////////////////////////////////////////////////////////////////
 
 // A chunk of a blob.
-message ChunkData {
+message ChunkData { // TODO
   bytes data = 1;
 }
