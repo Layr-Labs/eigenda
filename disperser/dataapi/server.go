@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -908,28 +909,18 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
 	parsedFirst, err := strconv.ParseInt(first, 10, 32)
 	if err != nil || parsedFirst < 1 || parsedFirst > 10000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
 		return
 	}
 	firstInt := int32(parsedFirst)
 
-	if firstInt < 1 || firstInt > 10000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
-		return
-	}
-
 	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
 	parsedSkip, err := strconv.ParseInt(skip, 10, 32)
 	if err != nil || parsedSkip < 0 || parsedSkip > 1000000000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter"})
-		return
-	}
-	skipInt := int32(parsedSkip)
-
-	if skipInt < 0 || skipInt > 1000000000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
 		return
 	}
+	skipInt := int32(parsedSkip)
 
 	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
 	if err != nil {
