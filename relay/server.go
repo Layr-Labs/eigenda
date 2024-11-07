@@ -66,55 +66,37 @@ func NewServer(
 	}, nil
 }
 
-// GetBlobs retrieves blobs stored by the relay.
-func (s *Server) GetBlobs(ctx context.Context, request *pb.GetBlobsRequest) (*pb.GetBlobsReply, error) {
+// GetBlob retrieves a blob stored by the relay.
+func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
 	// TODO:
 	//  - global throttle requests / sec
 	//  - per-connection throttle requests / sec
 	//  - timeouts
 
-	if len(request.BlobKeys) > s.config.MaximumBlobKeyLimit {
-		return nil, fmt.Errorf("request touches too many blobs, limit is %d", s.config.MaximumBlobKeyLimit)
-	}
-
-	keys := make([]v2.BlobKey, len(request.BlobKeys))
-	for i, keyBytes := range request.BlobKeys {
-		keys[i] = v2.BlobKey(keyBytes)
-	}
-
+	keys := []v2.BlobKey{v2.BlobKey(request.BlobKey)}
 	metadataMap, err := s.metadataServer.GetMetadataForBlobs(keys)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching metadata for blobs, check if blobs exist and are assigned to this relay: %w", err)
+		return nil, fmt.Errorf(
+			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
+	}
+	metadata := (*metadataMap)[v2.BlobKey(request.BlobKey)]
+	if metadata == nil {
+		return nil, fmt.Errorf("blob not found")
 	}
 
-	// TODO:
-	//  - global bytes / sec throttle
-	//  - per-connection bytes / sec throttle
-	//  - maximum bytes per request limit
+	// TODO
+	//  - global bytes/sec throttle
+	//  - per-connection bytes/sec throttle
 
-	dataMap, err := s.blobServer.GetBlobs(metadataMap)
+	key := v2.BlobKey(request.BlobKey)
+	data, err := s.blobServer.GetBlob(key)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching blobs: %w", err)
+		return nil, fmt.Errorf("error fetching blob: %w", err)
 	}
 
-	requestedBlobs := make([]*pb.RequestedBlob, len(request.BlobKeys))
-	for i, key := range request.BlobKeys {
-
-		// TODO return individual errors per requested blob maybe
-
-		blobKey := v2.BlobKey(key)
-		data := (*dataMap)[blobKey]
-
-		requestedBlobs[i] = &pb.RequestedBlob{
-			Data: &pb.RequestedBlob_Blob{
-				Blob: data,
-			},
-		}
-	}
-
-	reply := &pb.GetBlobsReply{
-		Blobs: requestedBlobs,
+	reply := &pb.GetBlobReply{
+		Blob: data,
 	}
 
 	return reply, nil

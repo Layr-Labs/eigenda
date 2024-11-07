@@ -13,6 +13,7 @@ import (
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
+// This struct adds caching and threading on top of blobstore.BlobMetadataStore.
 type blobMetadata struct {
 	// the size of the blob in bytes
 	blobSizeBytes uint32

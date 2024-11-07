@@ -2,18 +2,16 @@ package relay
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/sync/errgroup"
-	"sync"
-	"sync/atomic"
 )
 
 // blobServer encapsulates logic for fetching blobs. Utilized by the relay Server.
+// This struct adds caching (and perhaps eventually threading) on top of blobstore.BlobStore.
 type blobServer struct {
 	ctx    context.Context
 	logger logging.Logger
@@ -55,39 +53,15 @@ func NewBlobServer(
 	return server, nil
 }
 
-// GetBlobs fetches blobs from the cache or the blob store.
-func (s *blobServer) GetBlobs(
-	metadataMap *map[v2.BlobKey]*blobMetadata) (*map[v2.BlobKey][]byte, error) {
-
-	dataMap := make(map[v2.BlobKey][]byte)
-	hadError := atomic.Bool{}
-
-	wg := sync.WaitGroup{}
-	wg.Add(len(*metadataMap))
-
-	for blobKey := range *metadataMap {
-		boundKey := blobKey
-		s.pool.Go(func() error {
-
-			data, err := s.blobCache.Get(boundKey)
-			if err != nil {
-				s.logger.Error("Failed to fetch blob: %v", err)
-				hadError.Store(true)
-				return err
-			}
-
-			dataMap[boundKey] = *data
-
-			return nil
-		})
+// GetBlob retrieves a blob from the blob store.
+func (s *blobServer) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
+	data, err := s.blobCache.Get(blobKey)
+	if err != nil {
+		s.logger.Error("Failed to fetch blob: %v", err)
+		return nil, err
 	}
 
-	wg.Wait()
-	if hadError.Load() {
-		return nil, errors.New("failed to fetch one or more blobs")
-	}
-
-	return &dataMap, nil
+	return *data, nil
 }
 
 // fetchBlob retrieves a single blob from the blob store.

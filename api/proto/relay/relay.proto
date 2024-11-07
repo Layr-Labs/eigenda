@@ -9,42 +9,23 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 // Relay is a service that provides access to public relay functionality.
 service Relay {
-  // GetBlobs retrieves blobs stored by the relay.
-  rpc GetBlobs(GetBlobsRequest) returns (GetBlobsReply) {}
+  // GetBlob retrieves a blob stored by the relay.
+  rpc GetBlob(GetBlobRequest) returns (GetBlobReply) {}
 
   // GetChunks retrieves chunks from blobs stored by the relay.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 }
 
 // A request to fetch one or more blobs.
-message GetBlobsRequest {
-  // The blob keys to fetch.
-  repeated bytes blob_keys = 1;
-
-  // If this is an authenticated request, this should hold the ID of the requester. If this
-  // is an unauthenticated request, this field should be empty.
-  uint64 requester_id = 2;
-
-  // If this is an authenticated request, this field will hold a signature by the requester
-  // on the blob hashes being requested.
-  bytes requester_signature = 3;
+message GetBlobRequest {
+  // The key of the blob to fetch.
+  bytes blob_key = 1;
 }
 
 // The reply to a GetBlobs request.
-message GetBlobsReply {
-  // The blobs requested. The order of these blobs will be equal to the order of the
-  // requested header hashes.
-  repeated RequestedBlob blobs = 1;
-}
-
-// A blob that was requested or an error explaining why the requested blob could not be fetched.
-message RequestedBlob {
-  oneof data {
-    // The blob requested.
-    bytes blob = 1;
-    // An error (if any) that occurred while trying to fetch the blob.
-    RelayError error = 2;
-  }
+message GetBlobReply {
+  // The blob requested.
+  bytes blob = 1;
 }
 
 // Request chunks from blobs stored by this relay.
