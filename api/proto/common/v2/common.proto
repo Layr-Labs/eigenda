@@ -18,7 +18,7 @@ message BlobHeader {
 // BlobCertificate is what gets attested by the network
 message BlobCertificate {
   BlobHeader blob_header = 1;
-  repeated uint32 relays = 3;
+  repeated uint32 relays = 2;
 }
 
 // BatchHeader is the header of a batch of blobs
