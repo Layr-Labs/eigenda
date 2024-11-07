@@ -53,10 +53,8 @@ func NewMetadataServer(
 	shards []v2.RelayKey) (*metadataServer, error) { // TODO figure out what should be exported
 
 	shardSet := make(map[v2.RelayKey]struct{}, len(shards))
-	if shards != nil {
-		for _, shard := range shards {
-			shardSet[shard] = struct{}{}
-		}
+	for _, shard := range shards {
+		shardSet[shard] = struct{}{}
 	}
 
 	pool, _ := errgroup.WithContext(ctx)
