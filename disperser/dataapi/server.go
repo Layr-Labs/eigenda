@@ -898,18 +898,20 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
 
 	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
-	daysInt, err := strconv.Atoi(days)
-	if err != nil {
+	parsedDays, err := strconv.ParseInt(days, 10, 32)
+	if err != nil || parsedDays < math.MinInt32 || parsedDays > math.MaxInt32 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
 		return
 	}
+	daysInt := int32(parsedDays)
 
 	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
-	firstInt, err := strconv.Atoi(first)
-	if err != nil {
+	parsedFirst, err := strconv.ParseInt(first, 10, 32)
+	if err != nil || parsedFirst < 1 || parsedFirst > 10000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter"})
 		return
 	}
+	firstInt := int32(parsedFirst)
 
 	if firstInt < 1 || firstInt > 10000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
@@ -917,11 +919,12 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 	}
 
 	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
-	skipInt, err := strconv.Atoi(skip)
-	if err != nil {
+	parsedSkip, err := strconv.ParseInt(skip, 10, 32)
+	if err != nil || parsedSkip < 0 || parsedSkip > 1000000000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter"})
 		return
 	}
+	skipInt := int32(parsedSkip)
 
 	if skipInt < 0 || skipInt > 1000000000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
