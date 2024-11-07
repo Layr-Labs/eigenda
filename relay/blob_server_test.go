@@ -16,6 +16,7 @@ func TestReadWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 
 	blobStore := buildBlobStore(t, logger)
 
@@ -50,5 +51,26 @@ func TestReadWrite(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, data, blob)
+	}
+}
+
+func TestNonExistentBlob(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	setup(t)
+	defer teardown()
+
+	blobStore := buildBlobStore(t, logger)
+
+	server, err := NewBlobServer(context.Background(), logger, blobStore, 10, 32)
+	require.NoError(t, err)
+
+	for i := 0; i < 10; i++ {
+		blob, err := server.GetBlob(v2.BlobKey(tu.RandomBytes(32)))
+		require.Error(t, err)
+		require.Nil(t, blob)
 	}
 }

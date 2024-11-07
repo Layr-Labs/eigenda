@@ -21,10 +21,8 @@ func TestGetNonExistentBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	server, err := NewMetadataServer(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
 	require.NoError(t, err)
@@ -43,10 +41,8 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
 	fragmentSizeMap := make(map[v2.BlobKey]uint32)
@@ -119,10 +115,8 @@ func TestBatchedFetch(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
 	fragmentSizeMap := make(map[v2.BlobKey]uint32)
@@ -196,10 +190,8 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
 	fragmentSizeMap := make(map[v2.BlobKey]uint32)
@@ -322,10 +314,8 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 	require.NoError(t, err)
 
 	setup(t)
+	defer teardown()
 	metadataStore := buildMetadataStore(t)
-	defer func() {
-		teardown()
-	}()
 
 	totalChunkSizeMap := make(map[v2.BlobKey]uint32)
 	fragmentSizeMap := make(map[v2.BlobKey]uint32)

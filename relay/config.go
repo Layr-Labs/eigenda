@@ -2,6 +2,8 @@ package relay
 
 import core "github.com/Layr-Labs/eigenda/core/v2"
 
+// TODO make sure each of these is actually used
+
 // Config is the configuration for the relay Server.
 type Config struct {
 
