@@ -16,6 +16,11 @@ import (
 	"github.com/urfave/cli"
 )
 
+const (
+	// DefaultFragmentSizeBytes represents the size of each fragment in bytes (4MB)
+	DefaultFragmentSizeBytes = 4 * 1024 * 1024
+)
+
 var (
 	// Version is the version of the binary.
 	Version   string
@@ -75,7 +80,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
 		chunkStoreBucketName := config.ChunkStoreConfig.BucketName
-		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, 4*1024*1024) // Unlikely to change so we choose to hardcode the fragment size at 4Mb
+		chunkWriter := chunkstore.NewChunkWriter(logger, s3Client, chunkStoreBucketName, DefaultFragmentSizeBytes)
 		logger.Info("Chunk store writer", "bucket", blobStoreBucketName)
 
 		server := encoder.NewEncoderServerV2(

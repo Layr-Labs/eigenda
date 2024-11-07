@@ -19,14 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Encoder_EncodeBlobToChunkStore_FullMethodName = "/encoder.v2.Encoder/EncodeBlobToChunkStore"
+	Encoder_EncodeBlob_FullMethodName = "/encoder.v2.Encoder/EncodeBlob"
 )
 
 // EncoderClient is the client API for Encoder service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type EncoderClient interface {
-	EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobToChunkStoreRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error)
+	// EncodeBlob encodes a blob into chunks using specified encoding parameters.
+	// The blob is retrieved using the provided blob key and the encoded chunks
+	// are persisted for later retrieval.
+	EncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobReply, error)
 }
 
 type encoderClient struct {
@@ -37,9 +40,9 @@ func NewEncoderClient(cc grpc.ClientConnInterface) EncoderClient {
 	return &encoderClient{cc}
 }
 
-func (c *encoderClient) EncodeBlobToChunkStore(ctx context.Context, in *EncodeBlobToChunkStoreRequest, opts ...grpc.CallOption) (*EncodeBlobToChunkStoreReply, error) {
-	out := new(EncodeBlobToChunkStoreReply)
-	err := c.cc.Invoke(ctx, Encoder_EncodeBlobToChunkStore_FullMethodName, in, out, opts...)
+func (c *encoderClient) EncodeBlob(ctx context.Context, in *EncodeBlobRequest, opts ...grpc.CallOption) (*EncodeBlobReply, error) {
+	out := new(EncodeBlobReply)
+	err := c.cc.Invoke(ctx, Encoder_EncodeBlob_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +53,10 @@ func (c *encoderClient) EncodeBlobToChunkStore(ctx context.Context, in *EncodeBl
 // All implementations must embed UnimplementedEncoderServer
 // for forward compatibility
 type EncoderServer interface {
-	EncodeBlobToChunkStore(context.Context, *EncodeBlobToChunkStoreRequest) (*EncodeBlobToChunkStoreReply, error)
+	// EncodeBlob encodes a blob into chunks using specified encoding parameters.
+	// The blob is retrieved using the provided blob key and the encoded chunks
+	// are persisted for later retrieval.
+	EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error)
 	mustEmbedUnimplementedEncoderServer()
 }
 
@@ -58,8 +64,8 @@ type EncoderServer interface {
 type UnimplementedEncoderServer struct {
 }
 
-func (UnimplementedEncoderServer) EncodeBlobToChunkStore(context.Context, *EncodeBlobToChunkStoreRequest) (*EncodeBlobToChunkStoreReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method EncodeBlobToChunkStore not implemented")
+func (UnimplementedEncoderServer) EncodeBlob(context.Context, *EncodeBlobRequest) (*EncodeBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EncodeBlob not implemented")
 }
 func (UnimplementedEncoderServer) mustEmbedUnimplementedEncoderServer() {}
 
@@ -74,20 +80,20 @@ func RegisterEncoderServer(s grpc.ServiceRegistrar, srv EncoderServer) {
 	s.RegisterService(&Encoder_ServiceDesc, srv)
 }
 
-func _Encoder_EncodeBlobToChunkStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(EncodeBlobToChunkStoreRequest)
+func _Encoder_EncodeBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EncodeBlobRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(EncoderServer).EncodeBlobToChunkStore(ctx, in)
+		return srv.(EncoderServer).EncodeBlob(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Encoder_EncodeBlobToChunkStore_FullMethodName,
+		FullMethod: Encoder_EncodeBlob_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EncoderServer).EncodeBlobToChunkStore(ctx, req.(*EncodeBlobToChunkStoreRequest))
+		return srv.(EncoderServer).EncodeBlob(ctx, req.(*EncodeBlobRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -100,8 +106,8 @@ var Encoder_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*EncoderServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "EncodeBlobToChunkStore",
-			Handler:    _Encoder_EncodeBlobToChunkStore_Handler,
+			MethodName: "EncodeBlob",
+			Handler:    _Encoder_EncodeBlob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

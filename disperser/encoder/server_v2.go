@@ -2,7 +2,6 @@ package encoder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -80,7 +79,7 @@ func (s *EncoderServerV2) Start() error {
 	return gs.Serve(listener)
 }
 
-func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.EncodeBlobToChunkStoreRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	totalStart := time.Now()
 	defer func() {
 		s.metrics.ObserveLatency("total", time.Since(totalStart))
@@ -93,7 +92,7 @@ func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.En
 		// TODO: Now that we no longer pass the data directly, should we pass in blob size as part of the request?
 		s.metrics.IncrementRateLimitedBlobRequestNum(1)
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, errors.New("too many requests")
+		return nil, status.Error(codes.ResourceExhausted, "request pool is full")
 	}
 
 	// Limit the number of concurrent requests
@@ -101,7 +100,7 @@ func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.En
 	defer s.popRequest()
 	if ctx.Err() != nil {
 		s.metrics.IncrementCanceledBlobRequestNum(1)
-		return nil, ctx.Err()
+		return nil, status.Error(codes.Canceled, "request was canceled")
 	}
 
 	s.metrics.ObserveLatency("queuing", time.Since(totalStart))
@@ -115,23 +114,23 @@ func (s *EncoderServerV2) EncodeBlobToChunkStore(ctx context.Context, req *pb.En
 	return reply, err
 }
 
-func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobToChunkStoreRequest) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	// Validate request first
 	blobKey, encodingParams, err := s.validateAndParseRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	s.logger.Info("Preparing to encode", "blobKey", blobKey, "encodingParams", encodingParams)
+	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
 	// Fetch blob data
 	fetchStart := time.Now()
 	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get blob from blob store: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to get blob from blob store: %v", err)
 	}
 	if len(data) == 0 {
-		return nil, errors.New("handleEncodingToChunkStore: missing data")
+		return nil, status.Error(codes.NotFound, "blob length is zero")
 	}
 	s.logger.Info("fetched blob", "duration", time.Since(fetchStart))
 
@@ -139,7 +138,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 	encodingStart := time.Now()
 	frames, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
-		return nil, fmt.Errorf("frame encoding failed: %w", err)
+		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
 	}
 	s.logger.Info("encoding frames", "duration", time.Since(encodingStart))
 
@@ -152,7 +151,7 @@ func (s *EncoderServerV2) popRequest() {
 	<-s.runningRequests
 }
 
-func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobToChunkStoreRequest) (corev2.BlobKey, encoding.EncodingParams, error) {
+func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (corev2.BlobKey, encoding.EncodingParams, error) {
 	// Create zero values for return types
 	var (
 		blobKey corev2.BlobKey
@@ -180,7 +179,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobToChunkStore
 		return blobKey, params, status.Error(codes.InvalidArgument, "number of chunks must be greater than zero")
 	}
 
-	blobKey, err := bytesToBlobKey(req.BlobKey)
+	blobKey, err := corev2.BytesToBlobKey(req.BlobKey)
 	if err != nil {
 		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid blob key: %v", err)
 	}
@@ -194,13 +193,13 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobToChunkStore
 	return blobKey, params, nil
 }
 
-func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey corev2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobToChunkStoreReply, error) {
+func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey corev2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobReply, error) {
 	proofs, coeffs := extractProofsAndCoeffs(frames)
 
 	// Store proofs
 	storeStart := time.Now()
 	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
-		return nil, fmt.Errorf("failed to upload chunk proofs: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
 	s.logger.Info("stored proofs", "duration", time.Since(storeStart))
 
@@ -208,28 +207,16 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	coeffStart := time.Now()
 	fragmentInfo, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey, coeffs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload chunk coefficients: %w", err)
+		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
 	s.logger.Info("stored coefficients", "duration", time.Since(coeffStart))
 
-	return &pb.EncodeBlobToChunkStoreReply{
+	return &pb.EncodeBlobReply{
 		FragmentInfo: &pb.FragmentInfo{
 			TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
 			FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 		},
 	}, nil
-}
-
-// Helper function to validate and convert bytes to BlobKey
-func bytesToBlobKey(bytes []byte) (corev2.BlobKey, error) {
-	// Validate length
-	if len(bytes) != 32 {
-		return corev2.BlobKey{}, fmt.Errorf("invalid blob key length: expected 32 bytes, got %d", len(bytes))
-	}
-
-	var blobKey corev2.BlobKey
-	copy(blobKey[:], bytes)
-	return blobKey, nil
 }
 
 func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.Frame) {

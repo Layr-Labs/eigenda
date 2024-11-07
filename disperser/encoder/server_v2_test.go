@@ -36,7 +36,7 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 	return p, err
 }
 
-func TestEncodeBlobToChunkStore(t *testing.T) {
+func TestEncodeBlob(t *testing.T) {
 	const (
 		testDataSize   = 16 * 1024
 		timeoutSeconds = 30
@@ -99,7 +99,7 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 	server := initializeEncoder(t)
 
 	// Create and execute encoding request
-	req := &pb.EncodeBlobToChunkStoreRequest{
+	req := &pb.EncodeBlobRequest{
 		BlobKey: blobKey[:],
 		EncodingParams: &pb.EncodingParams{
 			ChunkLength: uint64(chunkLength),
@@ -107,8 +107,8 @@ func TestEncodeBlobToChunkStore(t *testing.T) {
 		},
 	}
 
-	resp, err := server.EncodeBlobToChunkStore(ctx, req)
-	if !assert.NoError(t, err, "EncodeBlobToChunkStore failed") {
+	resp, err := server.EncodeBlob(ctx, req)
+	if !assert.NoError(t, err, "EncodeBlob failed") {
 		t.FailNow()
 	}
 
