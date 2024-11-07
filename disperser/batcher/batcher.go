@@ -302,7 +302,7 @@ func (b *Batcher) updateConfirmationInfo(
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
 				continue
 			}
-			proof = serializeProof(merkleProof)
+			proof = core.SerializeMerkleProof(merkleProof)
 		}
 
 		confirmationInfo := &disperser.ConfirmationInfo{
@@ -561,14 +561,6 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func serializeProof(proof *merkletree.Proof) []byte {
-	proofBytes := make([]byte, 0)
-	for _, hash := range proof.Hashes {
-		proofBytes = append(proofBytes, hash[:]...)
-	}
-	return proofBytes
 }
 
 func (b *Batcher) parseBatchIDFromReceipt(txReceipt *types.Receipt) (uint32, error) {
