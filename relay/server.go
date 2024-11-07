@@ -36,7 +36,7 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader *chunkstore.ChunkReader) (*Server, error) {
 
-	ms, err := NewMetadataServer(
+	ms, err := newMetadataServer(
 		ctx,
 		logger,
 		metadataStore,
@@ -47,7 +47,7 @@ func NewServer(
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
 
-	bs, err := NewBlobServer(
+	bs, err := newBlobServer(
 		ctx,
 		logger,
 		blobStore,

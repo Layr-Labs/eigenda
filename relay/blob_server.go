@@ -27,8 +27,8 @@ type blobServer struct {
 	pool *errgroup.Group
 }
 
-// NewBlobServer creates a new blobServer.
-func NewBlobServer(
+// newBlobServer creates a new blobServer.
+func newBlobServer(
 	ctx context.Context,
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,

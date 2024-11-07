@@ -44,14 +44,14 @@ type metadataServer struct {
 	pool *errgroup.Group
 }
 
-// NewMetadataServer creates a new metadataServer.
-func NewMetadataServer(
+// newMetadataServer creates a new metadataServer.
+func newMetadataServer(
 	ctx context.Context,
 	logger logging.Logger,
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	workPoolSize int,
-	shards []v2.RelayKey) (*metadataServer, error) { // TODO figure out what should be exported
+	shards []v2.RelayKey) (*metadataServer, error) {
 
 	shardSet := make(map[v2.RelayKey]struct{}, len(shards))
 	for _, shard := range shards {
@@ -84,7 +84,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey
 
 	// TODO figure out how timeouts are going to work here
 
-	mapLock := sync.Mutex{} // TODO use concurrent map maybe
+	mapLock := sync.Mutex{}
 	metadataMap := make(map[v2.BlobKey]*blobMetadata)
 	hadError := atomic.Bool{}
 
