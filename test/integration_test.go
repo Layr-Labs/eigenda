@@ -648,7 +648,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
-			blobHeader, err = core.BlobHeaderFromProto(headerReply.GetBlobHeader())
+			blobHeader, err = core.BlobHeaderFromProtobuf(headerReply.GetBlobHeader())
 			assert.NoError(t, err)
 		}
 

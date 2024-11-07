@@ -63,7 +63,7 @@ func (c client) GetBlobHeader(
 		return nil, nil, err
 	}
 
-	blobHeader, err := core.BlobHeaderFromProto(reply.GetBlobHeader())
+	blobHeader, err := core.BlobHeaderFromProtobuf(reply.GetBlobHeader())
 	if err != nil {
 		return nil, nil, err
 	}
