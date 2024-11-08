@@ -32,6 +32,12 @@ type Config struct {
 
 	// BlobWorkPoolSize is the size of the blob work pool. Default is 32.
 	BlobWorkPoolSize int
+
+	// ChunkCacheSize is the size of the chunk cache. Default is 32.
+	ChunkCacheSize int
+
+	// ChunkWorkPoolSize is the size of the chunk work pool. Default is 32.
+	ChunkWorkPoolSize int
 }
 
 // DefaultConfig returns the default configuration for the relay Server.
@@ -43,5 +49,7 @@ func DefaultConfig() *Config {
 		MetadataWorkPoolSize:     32,
 		BlobCacheSize:            32,
 		BlobWorkPoolSize:         32,
+		ChunkCacheSize:           32,
+		ChunkWorkPoolSize:        32,
 	}
 }

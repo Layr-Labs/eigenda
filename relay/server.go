@@ -17,10 +17,6 @@ var _ pb.RelayServer = &Server{}
 type Server struct {
 	pb.UnimplementedRelayServer
 
-	config      *Config
-	blobStore   *blobstore.BlobStore
-	chunkReader *chunkstore.ChunkReader
-
 	// metadataServer encapsulates logic for fetching metadata for blobs.
 	metadataServer *metadataServer
 
@@ -38,7 +34,7 @@ func NewServer(
 	config *Config,
 	metadataStore *blobstore.BlobMetadataStore,
 	blobStore *blobstore.BlobStore,
-	chunkReader *chunkstore.ChunkReader) (*Server, error) {
+	chunkReader chunkstore.ChunkReader) (*Server, error) {
 
 	ms, err := newMetadataServer(
 		ctx,
@@ -61,12 +57,20 @@ func NewServer(
 		return nil, fmt.Errorf("error creating blob server: %w", err)
 	}
 
+	cs, err := newChunkServer(
+		ctx,
+		logger,
+		chunkReader,
+		config.ChunkCacheSize,
+		config.ChunkWorkPoolSize)
+	if err != nil {
+		return nil, fmt.Errorf("error creating chunk server: %w", err)
+	}
+
 	return &Server{
-		config:         config,
 		metadataServer: ms,
 		blobServer:     bs,
-		blobStore:      blobStore,
-		chunkReader:    chunkReader,
+		chunkServer:    cs,
 	}, nil
 }
 
@@ -96,7 +100,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	key := v2.BlobKey(request.BlobKey)
 	data, err := s.blobServer.GetBlob(key)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching blob: %w", err)
+		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
 
 	reply := &pb.GetBlobReply{
@@ -156,30 +160,38 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 				if index >= len(blobFrames) {
 					return nil, fmt.Errorf(
 						"chunk index %d out of range for key %s, chunk count %d",
-						index, key, len(blobFrames))
+						index, key.Hex(), len(blobFrames))
 				}
 				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
 			}
 
 		} else {
 			key := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
+			startIndex := chunkRequest.GetByRange().StartIndex
+			endIndex := chunkRequest.GetByRange().EndIndex
 
 			blobFrames := (*frames)[key]
-			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, len(chunkRequest.GetByIndex().ChunkIndices)),
-			}
-			protoChunks = append(protoChunks, chunks)
 
-			if chunkRequest.GetByRange().EndIndex >= uint32(len(blobFrames)) {
+			if startIndex > endIndex {
+				return nil, fmt.Errorf(
+					"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
+					startIndex, endIndex, key.Hex())
+			}
+			if endIndex > uint32(len((*frames)[key])) {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invald for key %s, chunk count %d",
 					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))
 			}
-			for index := chunkRequest.GetByRange().StartIndex; index <= chunkRequest.GetByRange().EndIndex; index++ {
+
+			chunks := &pb.Chunks{
+				Data: make([]*v2pb.Frame, 0, endIndex-startIndex),
+			}
+			protoChunks = append(protoChunks, chunks)
+
+			for index := startIndex; index < endIndex; index++ {
 				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
 			}
 		}
-
 	}
 
 	return &pb.GetChunksReply{

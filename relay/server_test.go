@@ -235,3 +235,189 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 }
+
+func TestReadWriteChunks(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	setup(t)
+	defer teardown()
+
+	// These are used to write data to S3/dynamoDB
+	metadataStore := buildMetadataStore(t)
+	chunkReader, chunkWriter := buildChunkStore(t, logger)
+
+	// This is the server used to read it back
+	config := DefaultConfig()
+	server, err := NewServer(
+		context.Background(),
+		logger,
+		config,
+		metadataStore,
+		nil, /* not used in this test*/
+		chunkReader)
+	require.NoError(t, err)
+
+	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
+	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
+
+	blobCount := 10
+	for i := 0; i < blobCount; i++ {
+		header, _, chunks := randomBlobChunks(t)
+
+		blobKey, err := header.BlobKey()
+		require.NoError(t, err)
+		expectedData[blobKey] = chunks
+
+		coeffs, chunkProofs := disassembleFrames(chunks)
+		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		require.NoError(t, err)
+		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		require.NoError(t, err)
+		fragmentInfoMap[blobKey] = fragmentInfo
+
+		err = metadataStore.PutBlobCertificate(
+			context.Background(),
+			&v2.BlobCertificate{
+				BlobHeader: header,
+			},
+			&encoding.FragmentInfo{
+				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			})
+		require.NoError(t, err)
+	}
+
+	// Request the entire blob by range
+	for key, data := range expectedData {
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
+				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
+					StartIndex: 0,
+					EndIndex:   uint32(len(data)),
+				},
+			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
+		}
+
+		response, err := server.GetChunks(context.Background(), request)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(response.Data))
+
+		for i, frame := range response.Data[0].Data {
+			convertedFrame := encoding.FrameFromProtobuf(frame)
+			require.Equal(t, data[i], convertedFrame)
+		}
+	}
+
+	// Request the entire blob by index
+	for key, data := range expectedData {
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+
+		indices := make([]uint32, len(data))
+		for i := range data {
+			indices[i] = uint32(i)
+		}
+
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
+				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
+					ChunkIndices: indices,
+				},
+			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
+		}
+
+		response, err := server.GetChunks(context.Background(), request)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(response.Data))
+
+		for i, frame := range response.Data[0].Data {
+			convertedFrame := encoding.FrameFromProtobuf(frame)
+			require.Equal(t, data[i], convertedFrame)
+		}
+	}
+
+	// Request part of the blob back by range
+	for key, data := range expectedData {
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+
+		startIndex := rand.Intn(len(data))
+		var endIndex int
+		if startIndex == len(data)-1 {
+			endIndex = len(data)
+		} else {
+			endIndex = startIndex + rand.Intn(len(data)-startIndex)
+		}
+
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
+				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
+					StartIndex: uint32(startIndex),
+					EndIndex:   uint32(endIndex),
+				},
+			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
+		}
+
+		response, err := server.GetChunks(context.Background(), request)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(response.Data))
+
+		for i := startIndex; i < endIndex; i++ {
+			convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i-startIndex])
+			require.Equal(t, data[i], convertedFrame)
+		}
+	}
+
+	// Request part of the blob back by index
+	for key, data := range expectedData {
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+
+		indices := make([]uint32, 0)
+		for i := range data {
+			if i%2 == 0 {
+				indices = append(indices, uint32(i))
+			}
+		}
+
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
+				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
+					ChunkIndices: indices,
+				},
+			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
+		}
+
+		response, err := server.GetChunks(context.Background(), request)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(response.Data))
+
+		for i := 0; i < len(indices); i++ {
+			if i%2 == 0 {
+				convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i/2])
+				require.Equal(t, data[indices[i]], convertedFrame)
+			}
+		}
+	}
+}

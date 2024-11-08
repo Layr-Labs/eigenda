@@ -201,7 +201,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) {
 	header, data := randomBlob(t)
 
-	params := encoding.ParamsFromMins(16, 4)
+	params := encoding.ParamsFromMins(16, 16)
 	_, frames, err := prover.EncodeAndProve(data, params)
 	require.NoError(t, err)
 
