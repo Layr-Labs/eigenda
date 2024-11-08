@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -23,7 +23,7 @@ import (
 type OnchainState struct {
 	QuorumCount           uint8
 	RequiredQuorums       []core.QuorumID
-	BlobVersionParameters map[v2.BlobVersion]v2.BlobVersionParameters
+	BlobVersionParameters map[corev2.BlobVersion]corev2.BlobVersionParameters
 	TTL                   time.Duration
 }
 
@@ -37,7 +37,7 @@ type DispersalServerV2 struct {
 
 	chainReader   core.Reader
 	ratelimiter   common.RateLimiter
-	authenticator v2.BlobRequestAuthenticator
+	authenticator corev2.BlobRequestAuthenticator
 	logger        logging.Logger
 
 	// state
@@ -54,7 +54,7 @@ func NewDispersalServerV2(
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	chainReader core.Reader,
 	ratelimiter common.RateLimiter,
-	authenticator v2.BlobRequestAuthenticator,
+	authenticator corev2.BlobRequestAuthenticator,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
@@ -199,7 +199,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 		QuorumCount:     quorumCount,
 		RequiredQuorums: requiredQuorums,
 		// TODO(ian-shim): this should be fetched from chain
-		BlobVersionParameters: v2.ParametersMap,
+		BlobVersionParameters: corev2.ParametersMap,
 		TTL:                   time.Duration((storeDurationBlocks+blockStaleMeasure)*12) * time.Second,
 	}
 	return nil

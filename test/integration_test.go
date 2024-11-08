@@ -139,7 +139,7 @@ func mustMakeTestBlob() core.Blob {
 type TestDisperser struct {
 	batcher       *batcher.Batcher
 	server        *apiserver.DispersalServer
-	encoderServer *encoder.Server
+	encoderServer *encoder.EncoderServer
 	transactor    *coremock.MockWriter
 	txnManager    *batchermock.MockTxnManager
 }
@@ -173,7 +173,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	p0, _ := mustMakeTestComponents()
 	metrics := encoder.NewMetrics("9000", logger)
-	grpcEncoder := encoder.NewServer(encoder.ServerConfig{
+	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
 		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,

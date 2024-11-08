@@ -1,9 +1,10 @@
 package aws
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
-	"time"
 )
 
 var (

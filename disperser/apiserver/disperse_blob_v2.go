@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -25,7 +25,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	data := req.GetData()
-	blobHeader, err := v2.NewBlobHeader(req.GetBlobHeader())
+	blobHeader, err := corev2.NewBlobHeader(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
 	}
@@ -44,14 +44,14 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}, nil
 }
 
-func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *v2.BlobHeader, requestedAt time.Time) (v2.BlobKey, error) {
+func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, requestedAt time.Time) (corev2.BlobKey, error) {
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
-		return v2.BlobKey{}, err
+		return corev2.BlobKey{}, err
 	}
 
 	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
-		return v2.BlobKey{}, err
+		return corev2.BlobKey{}, err
 	}
 
 	blobMetadata := &dispv2.BlobMetadata{
@@ -97,7 +97,7 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("request must contain at least one required quorum: %v does not specify any of %v", blobHeaderProto.GetQuorumNumbers(), s.onchainState.RequiredQuorums))
 	}
 
-	if _, ok := s.onchainState.BlobVersionParameters[v2.BlobVersion(blobHeaderProto.GetVersion())]; !ok {
+	if _, ok := s.onchainState.BlobVersionParameters[corev2.BlobVersion(blobHeaderProto.GetVersion())]; !ok {
 		validVersions := make([]int32, 0, len(s.onchainState.BlobVersionParameters))
 		for version := range s.onchainState.BlobVersionParameters {
 			validVersions = append(validVersions, int32(version))
@@ -105,7 +105,7 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), validVersions))
 	}
 
-	blobHeader, err := v2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := corev2.NewBlobHeader(blobHeaderProto)
 	if err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
 	}

@@ -56,6 +56,17 @@ func HexToBlobKey(h string) (BlobKey, error) {
 	return BlobKey(b), nil
 }
 
+func BytesToBlobKey(bytes []byte) (BlobKey, error) {
+	// Validate length
+	if len(bytes) != 32 {
+		return BlobKey{}, fmt.Errorf("invalid blob key length: expected 32 bytes, got %d", len(bytes))
+	}
+
+	var blobKey BlobKey
+	copy(blobKey[:], bytes)
+	return blobKey, nil
+}
+
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
 type BlobHeader struct {
 	BlobVersion BlobVersion

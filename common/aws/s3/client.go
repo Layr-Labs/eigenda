@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"golang.org/x/sync/errgroup"
 	"runtime"
 	"sync"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"golang.org/x/sync/errgroup"
 )
 
 var (

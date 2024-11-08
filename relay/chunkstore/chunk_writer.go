@@ -3,8 +3,9 @@ package chunkstore
 import (
 	"context"
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -14,11 +15,11 @@ import (
 // ChunkWriter writes chunks that can be read by ChunkReader.
 type ChunkWriter interface {
 	// PutChunkProofs writes a slice of proofs to the chunk store.
-	PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, proofs []*encoding.Proof) error
+	PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error
 	// PutChunkCoefficients writes a slice of frames to the chunk store.
 	PutChunkCoefficients(
 		ctx context.Context,
-		blobKey v2.BlobKey,
+		blobKey corev2.BlobKey,
 		frames []*rs.Frame) (*encoding.FragmentInfo, error)
 }
 
@@ -46,7 +47,7 @@ func NewChunkWriter(
 	}
 }
 
-func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, proofs []*encoding.Proof) error {
+func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
 	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
 	for _, proof := range proofs {
 		proofBytes := proof.Bytes()
@@ -54,10 +55,9 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, pr
 	}
 
 	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
-
 	if err != nil {
-		c.logger.Error("Failed to upload chunks to S3: %v", err)
-		return fmt.Errorf("failed to upload chunks to S3: %w", err)
+		c.logger.Errorf("Failed to upload chunk proofs to S3: %v", err)
+		return fmt.Errorf("failed to upload chunk proofs to S3: %v", err)
 	}
 
 	return nil
@@ -65,19 +65,19 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey v2.BlobKey, pr
 
 func (c *chunkWriter) PutChunkCoefficients(
 	ctx context.Context,
-	blobKey v2.BlobKey,
+	blobKey corev2.BlobKey,
 	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
 
 	bytes, err := rs.GnarkEncodeFrames(frames)
 	if err != nil {
-		c.logger.Error("Failed to encode frames: %v", err)
-		return nil, fmt.Errorf("failed to encode frames: %w", err)
+		c.logger.Errorf("Failed to encode frames: %v", err)
+		return nil, fmt.Errorf("failed to encode frames: %v", err)
 	}
 
 	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
 	if err != nil {
-		c.logger.Error("Failed to upload chunks to S3: %v", err)
-		return nil, fmt.Errorf("failed to upload chunks to S3: %w", err)
+		c.logger.Errorf("Failed to upload chunk coefficients to S3: %v", err)
+		return nil, fmt.Errorf("failed to upload chunk coefficients to S3: %v", err)
 	}
 
 	return &encoding.FragmentInfo{

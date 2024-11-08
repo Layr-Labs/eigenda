@@ -19,7 +19,6 @@ import (
 )
 
 func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
-
 	if err := encoding.ValidateEncodingParams(params, g.SRSOrder); err != nil {
 		return nil, err
 	}

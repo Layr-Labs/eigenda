@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -63,7 +63,7 @@ func TestV2DisperseBlob(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := v2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := corev2.NewBlobHeader(blobHeaderProto)
 	assert.NoError(t, err)
 	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	sig, err := signer.SignBlobRequest(blobHeader)
