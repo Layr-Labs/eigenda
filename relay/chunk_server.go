@@ -96,7 +96,7 @@ func (s *chunkServer) GetFrames(ctx context.Context, mMap *metadataMap) (*frameM
 				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
 				hadError.Store(true)
 			} else {
-				fMap[key.blobKey] = *frames
+				fMap[boundKey.blobKey] = *frames
 			}
 
 			return nil

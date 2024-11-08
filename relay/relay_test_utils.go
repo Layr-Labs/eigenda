@@ -147,10 +147,7 @@ func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
 	return blobstore.NewBlobStore(bucketName, client, logger)
 }
 
-func buildChunkStore(
-	t *testing.T,
-	logger logging.Logger,
-	shards []uint32) (chunkstore.ChunkReader, chunkstore.ChunkWriter) {
+func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReader, chunkstore.ChunkWriter) {
 
 	cfg := aws.ClientConfig{
 		Region:               "us-east-1",
@@ -169,7 +166,7 @@ func buildChunkStore(
 
 	// intentionally use very small fragment size
 	chunkWriter := chunkstore.NewChunkWriter(logger, client, bucketName, 32)
-	chunkReader := chunkstore.NewChunkReader(logger, client, bucketName, shards)
+	chunkReader := chunkstore.NewChunkReader(logger, client, bucketName)
 
 	return chunkReader, chunkWriter
 }
