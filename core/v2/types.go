@@ -12,9 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -162,153 +160,6 @@ func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
 	}, nil
 }
 
-func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{
-			Name: "blobVersion",
-			Type: "uint8",
-		},
-		{
-			Name: "blobCommitments",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "commitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256",
-						},
-						{
-							Name: "Y",
-							Type: "uint256",
-						},
-					},
-				},
-				{
-					Name: "lengthCommitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "lengthProof",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "length",
-					Type: "uint32",
-				},
-			},
-		},
-		{
-			Name: "quorumNumbers",
-			Type: "bytes",
-		},
-		{
-			Name: "paymentMetadataHash",
-			Type: "bytes32",
-		},
-	})
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	arguments := abi.Arguments{
-		{
-			Type: blobHeaderType,
-		},
-	}
-
-	type g1Commit struct {
-		X *big.Int
-		Y *big.Int
-	}
-	type g2Commit struct {
-		X [2]*big.Int
-		Y [2]*big.Int
-	}
-	type blobCommitments struct {
-		Commitment       g1Commit
-		LengthCommitment g2Commit
-		LengthProof      g2Commit
-		Length           uint32
-	}
-
-	paymentHash, err := b.PaymentMetadata.Hash()
-	if err != nil {
-		return [32]byte{}, err
-	}
-	s := struct {
-		BlobVersion         uint8
-		BlobCommitments     blobCommitments
-		QuorumNumbers       []byte
-		PaymentMetadataHash [32]byte
-	}{
-		BlobVersion: uint8(b.BlobVersion),
-		BlobCommitments: blobCommitments{
-			Commitment: g1Commit{
-				X: b.BlobCommitments.Commitment.X.BigInt(new(big.Int)),
-				Y: b.BlobCommitments.Commitment.Y.BigInt(new(big.Int)),
-			},
-			LengthCommitment: g2Commit{
-				X: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
-				},
-				Y: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
-				},
-			},
-			LengthProof: g2Commit{
-				X: [2]*big.Int{
-					b.BlobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
-				},
-				Y: [2]*big.Int{
-					b.BlobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
-				},
-			},
-			Length: uint32(b.BlobCommitments.Length),
-		},
-		QuorumNumbers:       b.QuorumNumbers,
-		PaymentMetadataHash: paymentHash,
-	}
-
-	bytes, err := arguments.Pack(s)
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	var headerHash [32]byte
-	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(bytes)
-	copy(headerHash[:], hasher.Sum(nil)[:32])
-
-	return headerHash, nil
-}
-
 type RelayKey uint16
 
 type BlobCertificate struct {
@@ -344,52 +195,6 @@ type BatchHeader struct {
 	ReferenceBlockNumber uint64
 }
 
-// GetBatchHeaderHash returns the hash of the batch header
-func (h BatchHeader) Hash() ([32]byte, error) {
-	var headerHash [32]byte
-
-	// The order here has to match the field ordering of ReducedBatchHeader defined in IEigenDAServiceManager.sol
-	// ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
-	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{
-			Name: "blobHeadersRoot",
-			Type: "bytes32",
-		},
-		{
-			Name: "referenceBlockNumber",
-			Type: "uint32",
-		},
-	})
-	if err != nil {
-		return headerHash, err
-	}
-
-	arguments := abi.Arguments{
-		{
-			Type: batchHeaderType,
-		},
-	}
-
-	s := struct {
-		BlobHeadersRoot      [32]byte
-		ReferenceBlockNumber uint32
-	}{
-		BlobHeadersRoot:      h.BatchRoot,
-		ReferenceBlockNumber: uint32(h.ReferenceBlockNumber),
-	}
-
-	bytes, err := arguments.Pack(s)
-	if err != nil {
-		return headerHash, err
-	}
-
-	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(bytes)
-	copy(headerHash[:], hasher.Sum(nil)[:32])
-
-	return headerHash, nil
-}
-
 type Batch struct {
 	BatchHeader      *BatchHeader
 	BlobCertificates []*BlobCertificate
@@ -413,9 +218,11 @@ type Attestation struct {
 }
 
 type BlobVerificationInfo struct {
-	BlobCertificate *BlobCertificate
-	BlobIndex       uint32
-	InclusionProof  []byte
+	*BatchHeader
+
+	BlobKey
+	BlobIndex      uint32
+	InclusionProof []byte
 }
 
 type BlobVersionParameters struct {
