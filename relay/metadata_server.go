@@ -79,13 +79,16 @@ func newMetadataServer(
 	return server, nil
 }
 
+// metadataMap is a map of blob keys to metadata.
+type metadataMap map[v2.BlobKey]*blobMetadata
+
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey]*blobMetadata, error) {
+func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
 
 	// TODO figure out how timeouts are going to work here
 
 	mapLock := sync.Mutex{}
-	metadataMap := make(map[v2.BlobKey]*blobMetadata)
+	mMap := make(metadataMap)
 	hadError := atomic.Bool{}
 
 	wg := sync.WaitGroup{}
@@ -106,7 +109,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey
 				return nil
 			}
 			mapLock.Lock()
-			metadataMap[boundKey] = metadata
+			mMap[boundKey] = metadata
 			mapLock.Unlock()
 
 			return nil
@@ -118,7 +121,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*map[v2.BlobKey
 		return nil, fmt.Errorf("error retrieving metadata for one or more blobs")
 	}
 
-	return &metadataMap, nil
+	return &mMap, nil
 }
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
