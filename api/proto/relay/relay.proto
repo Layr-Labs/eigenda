@@ -44,16 +44,16 @@ message GetChunksRequest {
 
 // A request for chunks within a specific blob. Each chunk is requested individually by its index.
 message ChunkRequestByIndex {
-  // The hash of the blob's header.
-  bytes header_hash = 1;
+  // The blob key.
+  bytes blob_key = 1;
   // The index of the chunk within the blob.
   repeated uint32 chunk_indices = 2;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested a range of indices.
 message ChunkRequestByRange {
-  // The hash of the blob's header.
-  bytes header_hash = 1;
+  // The blob key.
+  bytes blob_key = 1;
   // The first index to start fetching chunks from.
   repeated uint32 start_index = 2;
   // One past the last index to fetch chunks from. Similar semantics to golang slices.
