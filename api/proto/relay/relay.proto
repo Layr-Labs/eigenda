@@ -44,20 +44,20 @@ message GetChunksRequest {
 
 // A request for chunks within a specific blob. Each chunk is requested individually by its index.
 message ChunkRequestByIndex {
-  // The hash of the blob's header.
-  bytes header_hash = 1;
+  // The blob key.
+  bytes blob_key = 1;
   // The index of the chunk within the blob.
   repeated uint32 chunk_indices = 2;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested a range of indices.
 message ChunkRequestByRange {
-  // The hash of the blob's header.
-  bytes header_hash = 1;
+  // The blob key.
+  bytes blob_key = 1;
   // The first index to start fetching chunks from.
-  repeated uint32 start_index = 2;
+  uint32 start_index = 2;
   // One past the last index to fetch chunks from. Similar semantics to golang slices.
-  repeated uint32 end_index = 3;
+  uint32 end_index = 3;
 }
 
 // A request for chunks within a specific blob.
@@ -73,19 +73,12 @@ message ChunkRequest {
 // The reply to a GetChunks request.
 message GetChunksReply {
   // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
-  repeated BlobChunks data = 1;
+  repeated Chunks data = 1;
 }
 
-// A grouping of chunks from a specific blob that were requested.
-message BlobChunks {
-  oneof blob {
-    // The chunks requested.
-    Chunks chunks = 1;
-    // An error (if any) that occurred while trying to fetch the chunks.
-    RelayError error = 2;
-  }
-}
-
+// The chunks requested. If this request is in response to a request by index, the order of these chunks will be the
+//  same as the order of the requested indices. If this request is in response to a request by range, the first chunk
+//  will correspond to the first index requested, and so on.
 message Chunks {
   repeated common.v2.Frame data = 1;
 }
