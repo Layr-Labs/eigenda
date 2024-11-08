@@ -59,7 +59,7 @@ func TestEncodeBlob(t *testing.T) {
 			t.FailNow()
 		}
 
-		return core.PadToPowerOf2(codec.ConvertByPaddingEmptyByte(data))
+		return codec.ConvertByPaddingEmptyByte(data)
 	}
 
 	// Setup test data
@@ -68,7 +68,7 @@ func TestEncodeBlob(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := corev2.GetChunkLength(0, uint32(blobLength))
+	chunkLength, err := corev2.GetChunkLength(0, core.NextPowerOf2(uint32(blobLength)))
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}
