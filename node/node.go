@@ -441,7 +441,7 @@ func (n *Node) ValidateBatchContents(ctx context.Context, blobHeaderHashes [][32
 			return errors.New("blob headers have different reference block numbers")
 		}
 
-		blobHeader, err := GetBlobHeaderFromProto(&protoBlobHeader)
+		blobHeader, err := core.BlobHeaderFromProto(&protoBlobHeader)
 		if err != nil {
 			return fmt.Errorf("failed to get blob header from proto: %w", err)
 		}
