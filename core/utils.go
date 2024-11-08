@@ -23,25 +23,3 @@ func NextPowerOf2[T constraints.Integer](d T) T {
 	nextPower := math.Ceil(math.Log2(float64(d)))
 	return T(math.Pow(2.0, nextPower))
 }
-
-// PadToPowerOf2 pads a byte slice to the nearest power of 2 length by appending zeros
-func PadToPowerOf2(data []byte) []byte {
-	length := len(data)
-	if length == 0 {
-		return []byte{0}
-	}
-
-	// If length is already a power of 2, return original
-	if length&(length-1) == 0 {
-		return data
-	}
-
-	// Create a new slice with the power-of-2 length
-	paddedData := make([]byte, NextPowerOf2(uint64(len(data))))
-
-	// Copy original data
-	copy(paddedData, data)
-
-	// The remaining bytes will be zero by default
-	return paddedData
-}
