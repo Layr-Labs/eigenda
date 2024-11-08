@@ -13,10 +13,13 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
@@ -27,6 +30,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 var (
@@ -143,6 +147,33 @@ func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
 	return blobstore.NewBlobStore(bucketName, client, logger)
 }
 
+func buildChunkStore(
+	t *testing.T,
+	logger logging.Logger,
+	shards []uint32) (chunkstore.ChunkReader, chunkstore.ChunkWriter) {
+
+	cfg := aws.ClientConfig{
+		Region:               "us-east-1",
+		AccessKey:            "localstack",
+		SecretAccessKey:      "localstack",
+		EndpointURL:          localstackHost,
+		FragmentWriteTimeout: time.Duration(10) * time.Second,
+		FragmentReadTimeout:  time.Duration(10) * time.Second,
+	}
+
+	client, err := s3.NewClient(context.Background(), cfg, logger)
+	require.NoError(t, err)
+
+	err = client.CreateBucket(context.Background(), bucketName)
+	require.NoError(t, err)
+
+	// intentionally use very small fragment size
+	chunkWriter := chunkstore.NewChunkWriter(logger, client, bucketName, 32)
+	chunkReader := chunkstore.NewChunkReader(logger, client, bucketName, shards)
+
+	return chunkReader, chunkWriter
+}
+
 func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 
 	data := tu.RandomBytes(128)
@@ -168,4 +199,28 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 	require.NoError(t, err)
 
 	return blobHeader, data
+}
+
+func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) {
+	header, data := randomBlob(t)
+
+	params := encoding.ParamsFromMins(16, 4)
+	_, frames, err := prover.EncodeAndProve(data, params)
+	require.NoError(t, err)
+
+	return header, data, frames
+}
+
+func disassembleFrames(frames []*encoding.Frame) ([]*rs.Frame, []*encoding.Proof) {
+	rsFrames := make([]*rs.Frame, len(frames))
+	proofs := make([]*encoding.Proof, len(frames))
+
+	for i, frame := range frames {
+		rsFrames[i] = &rs.Frame{
+			Coeffs: frame.Coeffs,
+		}
+		proofs[i] = &frame.Proof
+	}
+
+	return rsFrames, proofs
 }

@@ -89,6 +89,8 @@ func (s *chunkServer) GetFrames(ctx context.Context, mMap *metadataMap) (*frameM
 		boundKey := key
 		s.pool.Go(func() error {
 
+			defer wg.Done()
+
 			frames, err := s.frameCache.Get(*boundKey)
 			if err != nil {
 				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
@@ -100,6 +102,8 @@ func (s *chunkServer) GetFrames(ctx context.Context, mMap *metadataMap) (*frameM
 			return nil
 		})
 	}
+
+	wg.Wait()
 
 	return &fMap, nil
 }

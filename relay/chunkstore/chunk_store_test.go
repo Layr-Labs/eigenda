@@ -150,7 +150,7 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 	fragmentSize := rand.Intn(1024) + 100 // ignored since we aren't writing coefficients
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
+	reader := NewChunkReader(logger, client, bucket, make([]uint32, 0))
 
 	expectedValues := make(map[v2.BlobKey][]*encoding.Proof)
 
@@ -225,7 +225,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
+	reader := NewChunkReader(logger, client, bucket, make([]uint32, 0))
 
 	expectedValues := make(map[v2.BlobKey][]*rs.Frame)
 	metadataMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
