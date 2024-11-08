@@ -8,6 +8,9 @@ type Client interface {
 	// DownloadObject downloads an object from S3.
 	DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error)
 
+	// HeadObject retrieves the size of an object in S3. Returns error if the object does not exist.
+	HeadObject(ctx context.Context, bucket string, key string) (*int64, error)
+
 	// UploadObject uploads an object to S3.
 	UploadObject(ctx context.Context, bucket string, key string, data []byte) error
 

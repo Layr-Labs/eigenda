@@ -118,14 +118,13 @@ func RandomOperationsTest(t *testing.T, client s3.Client) {
 	expectedData := make(map[string][]byte)
 
 	fragmentSize := rand.Intn(1000) + 1000
-
+	prefix := "test-"
 	for i := 0; i < numberToWrite; i++ {
-		key := tu.RandomString(10)
+		key := prefix + tu.RandomString(10)
 		fragmentMultiple := rand.Float64() * 10
 		dataSize := int(fragmentMultiple*float64(fragmentSize)) + 1
 		data := tu.RandomBytes(dataSize)
 		expectedData[key] = data
-
 		err := client.FragmentedUploadObject(context.Background(), bucket, key, data, fragmentSize)
 		assert.NoError(t, err)
 	}
@@ -136,6 +135,20 @@ func RandomOperationsTest(t *testing.T, client s3.Client) {
 		assert.NoError(t, err)
 		assert.Equal(t, expected, data)
 	}
+
+	// List the objects
+	objects, err := client.ListObjects(context.Background(), bucket, prefix)
+	assert.NoError(t, err)
+	assert.Len(t, objects, numberToWrite)
+	for _, object := range objects {
+		assert.Contains(t, expectedData, object.Key)
+		assert.Equal(t, int64(len(expectedData[object.Key])), object.Size)
+	}
+
+	// Attempt to list non-existent objects
+	objects, err = client.ListObjects(context.Background(), bucket, "nonexistent")
+	assert.NoError(t, err)
+	assert.Len(t, objects, 0)
 }
 
 func TestRandomOperations(t *testing.T) {
@@ -170,6 +183,32 @@ func TestReadNonExistentValue(t *testing.T) {
 		client, err := builder.build()
 		assert.NoError(t, err)
 		ReadNonExistentValueTest(t, client)
+
+		err = builder.finish()
+		assert.NoError(t, err)
+	}
+}
+
+func TestHeadObject(t *testing.T) {
+	tu.InitializeRandom()
+	for _, builder := range clientBuilders {
+		err := builder.start()
+		assert.NoError(t, err)
+
+		client, err := builder.build()
+		assert.NoError(t, err)
+
+		key := tu.RandomString(10)
+		err = client.UploadObject(context.Background(), bucket, key, []byte("test"))
+		assert.NoError(t, err)
+		size, err := client.HeadObject(context.Background(), bucket, key)
+		assert.NoError(t, err)
+		assert.NotNil(t, size)
+		assert.Equal(t, int64(4), *size)
+
+		size, err = client.HeadObject(context.Background(), bucket, "nonexistent")
+		assert.Error(t, err)
+		assert.Nil(t, size)
 
 		err = builder.finish()
 		assert.NoError(t, err)

@@ -25,6 +25,15 @@ func (s *S3Client) DownloadObject(ctx context.Context, bucket string, key string
 	return data, nil
 }
 
+func (s *S3Client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+	data, ok := s.bucket[key]
+	if !ok {
+		return nil, s3.ErrObjectNotFound
+	}
+	size := int64(len(data))
+	return &size, nil
+}
+
 func (s *S3Client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	s.bucket[key] = data
 	return nil

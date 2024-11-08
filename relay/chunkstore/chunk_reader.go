@@ -6,7 +6,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -28,11 +27,10 @@ type ChunkReader interface {
 var _ ChunkReader = (*chunkReader)(nil)
 
 type chunkReader struct {
-	logger        logging.Logger
-	metadataStore *blobstore.BlobMetadataStore
-	client        s3.Client
-	bucket        string
-	shards        []uint32
+	logger logging.Logger
+	client s3.Client
+	bucket string
+	shards []uint32
 }
 
 // NewChunkReader creates a new ChunkReader.
@@ -41,17 +39,15 @@ type chunkReader struct {
 // If empty, it will return data for all shards. (Note: shard feature is not yet implemented.)
 func NewChunkReader(
 	logger logging.Logger,
-	metadataStore *blobstore.BlobMetadataStore,
 	s3Client s3.Client,
 	bucketName string,
 	shards []uint32) ChunkReader {
 
 	return &chunkReader{
-		logger:        logger,
-		metadataStore: metadataStore,
-		client:        s3Client,
-		bucket:        bucketName,
-		shards:        shards,
+		logger: logger,
+		client: s3Client,
+		bucket: bucketName,
+		shards: shards,
 	}
 }
 

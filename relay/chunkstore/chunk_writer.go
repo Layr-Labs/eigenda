@@ -85,3 +85,7 @@ func (c *chunkWriter) PutChunkCoefficients(
 		FragmentSizeBytes:   uint32(c.fragmentSize),
 	}, nil
 }
+
+// func (c *chunkWriter) headObject(ctx context.Context, blobKey corev2.BlobKey) (int, error) {
+// 	return c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
+// }
