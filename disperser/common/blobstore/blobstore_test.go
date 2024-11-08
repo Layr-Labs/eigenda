@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 
-	cmock "github.com/Layr-Labs/eigenda/common/mock"
+	awsmock "github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -34,7 +34,7 @@ var (
 		},
 		Data: []byte("test"),
 	}
-	s3Client   = cmock.NewS3Client()
+	s3Client   = awsmock.NewS3Client()
 	bucketName = "test-eigenda-blobstore"
 	blobHash   = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 	blobSize   = uint(len(blob.Data))
@@ -45,7 +45,7 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4569"
 
-	dynamoClient      *dynamodb.Client
+	dynamoClient      dynamodb.Client
 	blobMetadataStore *blobstore.BlobMetadataStore
 	sharedStorage     *blobstore.SharedBlobStore
 
