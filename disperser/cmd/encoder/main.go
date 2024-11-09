@@ -109,5 +109,4 @@ func RunEncoderServer(ctx *cli.Context) error {
 	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
 	return server.Start()
-
 }

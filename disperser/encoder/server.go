@@ -59,7 +59,13 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
 		queueStats:      make(map[string]int),
+}
+
+func (s *EncoderServer) Close() {
+	if s.close == nil {
+		return
 	}
+	s.close()
 }
 
 func (s *EncoderServer) Start() error {
@@ -102,11 +108,33 @@ func (s *EncoderServer) Start() error {
 	return gs.Serve(listener)
 }
 
-func (s *EncoderServer) Close() {
-	if s.close == nil {
-		return
+func (s *EncoderServer) Start() error {
+	// Serve grpc requests
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("Could not start tcp listener: %v", err)
 	}
-	s.close()
+
+	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	gs := grpc.NewServer(opt)
+	reflection.Register(gs)
+	pb.RegisterEncoderServer(gs, s)
+
+	// Register Server for Health Checks
+	name := pb.Encoder_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
+
+	s.close = func() {
+		err := listener.Close()
+		if err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+		gs.GracefulStop()
+	}
+
+	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	return gs.Serve(listener)
 }
 
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
@@ -135,7 +163,7 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 	}
 
 	s.metrics.ObserveLatency("queuing", time.Since(startTime))
-	reply, err := s.handleEncoding(req)
+	reply, err := s.handleEncoding(ctx, req)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(blobSize)
 	} else {

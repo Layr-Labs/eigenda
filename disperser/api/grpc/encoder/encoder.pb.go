@@ -122,7 +122,7 @@ type RSEncodedFrame struct {
 	unknownFields protoimpl.UnknownFields
 
 	Coeffs           []byte `protobuf:"bytes,1,opt,name=coeffs,proto3" json:"coeffs,omitempty"`                                                // serialized coefficients using your rs.Frame.Serialize()
-	BitReversedIndex uint32 `protobuf:"varint,3,opt,name=bit_reversed_index,json=bitReversedIndex,proto3" json:"bit_reversed_index,omitempty"` // ReverseBits(i)
+	BitReversedIndex uint32 `protobuf:"varint,2,opt,name=bit_reversed_index,json=bitReversedIndex,proto3" json:"bit_reversed_index,omitempty"` // ReverseBits(i)
 }
 
 func (x *RSEncodedFrame) Reset() {
@@ -209,99 +209,6 @@ func (x *RSEncodeBlobReply) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RSEncodeBlobReply.ProtoReflect.Descriptor instead.
 func (*RSEncodeBlobReply) Descriptor() ([]byte, []int) {
 	return file_encoder_encoder_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *RSEncodeBlobReply) GetFrames() []*RSEncodedFrame {
-	if x != nil {
-		return x.Frames
-	}
-	return nil
-}
-
-func (x *RSEncodedFrame) Reset() {
-	*x = RSEncodedFrame{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_encoder_encoder_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RSEncodedFrame) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RSEncodedFrame) ProtoMessage() {}
-
-func (x *RSEncodedFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_encoder_encoder_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RSEncodedFrame.ProtoReflect.Descriptor instead.
-func (*RSEncodedFrame) Descriptor() ([]byte, []int) {
-	return file_encoder_encoder_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *RSEncodedFrame) GetCoeffs() []byte {
-	if x != nil {
-		return x.Coeffs
-	}
-	return nil
-}
-
-func (x *RSEncodedFrame) GetBitReversedIndex() uint32 {
-	if x != nil {
-		return x.BitReversedIndex
-	}
-	return 0
-}
-
-type RSEncodeBlobReply struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Frames []*RSEncodedFrame `protobuf:"bytes,1,rep,name=frames,proto3" json:"frames,omitempty"`
-}
-
-func (x *RSEncodeBlobReply) Reset() {
-	*x = RSEncodeBlobReply{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_encoder_encoder_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *RSEncodeBlobReply) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RSEncodeBlobReply) ProtoMessage() {}
-
-func (x *RSEncodeBlobReply) ProtoReflect() protoreflect.Message {
-	mi := &file_encoder_encoder_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RSEncodeBlobReply.ProtoReflect.Descriptor instead.
-func (*RSEncodeBlobReply) Descriptor() ([]byte, []int) {
-	return file_encoder_encoder_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RSEncodeBlobReply) GetFrames() []*RSEncodedFrame {
@@ -573,7 +480,7 @@ var file_encoder_encoder_proto_rawDesc = []byte{
 	0x53, 0x45, 0x6e, 0x63, 0x6f, 0x64, 0x65, 0x64, 0x46, 0x72, 0x61, 0x6d, 0x65, 0x12, 0x16, 0x0a,
 	0x06, 0x63, 0x6f, 0x65, 0x66, 0x66, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63,
 	0x6f, 0x65, 0x66, 0x66, 0x73, 0x12, 0x2c, 0x0a, 0x12, 0x62, 0x69, 0x74, 0x5f, 0x72, 0x65, 0x76,
-	0x65, 0x72, 0x73, 0x65, 0x64, 0x5f, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x65, 0x72, 0x73, 0x65, 0x64, 0x5f, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x02, 0x20, 0x01, 0x28,
 	0x0d, 0x52, 0x10, 0x62, 0x69, 0x74, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x64, 0x49, 0x6e,
 	0x64, 0x65, 0x78, 0x22, 0x44, 0x0a, 0x11, 0x52, 0x53, 0x45, 0x6e, 0x63, 0x6f, 0x64, 0x65, 0x42,
 	0x6c, 0x6f, 0x62, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x2f, 0x0a, 0x06, 0x66, 0x72, 0x61, 0x6d,

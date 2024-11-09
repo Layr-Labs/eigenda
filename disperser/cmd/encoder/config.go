@@ -28,7 +28,8 @@ type Config struct {
 	EncoderConfig    kzg.KzgConfig
 	LoggerConfig     common.LoggerConfig
 	ServerConfig     *encoder.ServerConfig
-	MetricsConfig    encoder.MetrisConfig
+	MetricsConfig    encoder.MetricsConfig
+	PprofConfig      encoder.PprofConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
