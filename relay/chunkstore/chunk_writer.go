@@ -21,6 +21,10 @@ type ChunkWriter interface {
 		ctx context.Context,
 		blobKey corev2.BlobKey,
 		frames []*rs.Frame) (*encoding.FragmentInfo, error)
+	// ProofExists checks if the proofs for the blob key exist in the chunk store.
+	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
+	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
+	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey, dataSize int64) bool
 }
 
 var _ ChunkWriter = (*chunkWriter)(nil)
@@ -48,6 +52,15 @@ func NewChunkWriter(
 }
 
 func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
+	if len(proofs) == 0 {
+		return fmt.Errorf("no proofs to upload")
+	}
+
+	if c.ProofExists(ctx, blobKey) {
+		c.logger.Infof("Proofs already exist for blob key %s", blobKey)
+		return nil
+	}
+
 	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
 	for _, proof := range proofs {
 		proofBytes := proof.Bytes()
@@ -67,11 +80,21 @@ func (c *chunkWriter) PutChunkCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
-
+	if len(frames) == 0 {
+		return nil, fmt.Errorf("no frames to upload")
+	}
 	bytes, err := rs.GnarkEncodeFrames(frames)
 	if err != nil {
-		c.logger.Errorf("Failed to encode frames: %v", err)
+		c.logger.Error("Failed to encode frames", "err", err)
 		return nil, fmt.Errorf("failed to encode frames: %v", err)
+	}
+
+	if c.CoefficientsExists(ctx, blobKey, int64(len(bytes))) {
+		c.logger.Infof("Coefficients already exist for blob key %s", blobKey)
+		return &encoding.FragmentInfo{
+			TotalChunkSizeBytes: uint32(len(bytes)),
+			FragmentSizeBytes:   uint32(c.fragmentSize),
+		}, nil
 	}
 
 	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
@@ -86,6 +109,26 @@ func (c *chunkWriter) PutChunkCoefficients(
 	}, nil
 }
 
-// func (c *chunkWriter) headObject(ctx context.Context, blobKey corev2.BlobKey) (int, error) {
-// 	return c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
-// }
+func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool {
+	size, err := c.s3Client.HeadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey))
+	if err == nil && size != nil && *size > 0 {
+		return true
+	}
+
+	return false
+}
+
+func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey, dataSize int64) bool {
+	// TODO(ian-shim): check latency
+	objs, err := c.s3Client.ListObjects(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
+	if err != nil {
+		return false
+	}
+
+	totalSize := int64(0)
+	for _, obj := range objs {
+		totalSize += obj.Size
+	}
+
+	return totalSize == dataSize
+}

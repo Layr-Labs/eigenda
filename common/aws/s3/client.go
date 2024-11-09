@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -130,6 +131,10 @@ func (s *client) HeadObject(ctx context.Context, bucket string, key string) (*in
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		var notFound *types.NotFound
+		if ok := errors.As(err, &notFound); ok {
+			return nil, ErrObjectNotFound
+		}
 		return nil, err
 	}
 
@@ -209,7 +214,7 @@ func (s *client) FragmentedUploadObject(
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := breakIntoFragments(key, data, fragmentSize)
+	fragments, err := BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -259,12 +264,15 @@ func (s *client) FragmentedDownloadObject(
 	key string,
 	fileSize int,
 	fragmentSize int) ([]byte, error) {
+	if fileSize <= 0 {
+		return nil, errors.New("fileSize must be greater than 0")
+	}
 
 	if fragmentSize <= 0 {
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := getFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := GetFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, err
 	}

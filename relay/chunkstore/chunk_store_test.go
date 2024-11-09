@@ -19,6 +19,7 @@ import (
 	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
@@ -151,7 +152,7 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 	fragmentSize := rand.Intn(1024) + 100 // ignored since we aren't writing coefficients
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
+	reader := NewChunkReader(logger, client, bucket, make([]uint32, 0))
 
 	expectedValues := make(map[corev2.BlobKey][]*encoding.Proof)
 
@@ -226,7 +227,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	reader := NewChunkReader(logger, nil, client, bucket, make([]uint32, 0))
+	reader := NewChunkReader(logger, client, bucket, make([]uint32, 0))
 
 	expectedValues := make(map[corev2.BlobKey][]*rs.Frame)
 	metadataMap := make(map[corev2.BlobKey]*encoding.FragmentInfo)
@@ -266,5 +267,66 @@ func TestRandomCoefficients(t *testing.T) {
 
 		err = builder.finish()
 		require.NoError(t, err)
+	}
+}
+
+func TestIdempotency(t *testing.T) {
+	tu.InitializeRandom()
+	client := mock.NewS3Client()
+
+	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	// require.NoError(t, err)
+	logger := logging.NewNoopLogger()
+
+	chunkSize := uint64(rand.Intn(1024) + 100)
+	fragmentSize := int(chunkSize / 2)
+
+	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
+	encoder, _ := rs.NewEncoder(params, true)
+
+	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
+	if encoder.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
+	}
+	fs := fft.NewFFTSettings(n)
+
+	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
+		Fs:             fs,
+		EncodingParams: params,
+	}
+
+	encoder.Computer = RsComputeDevice
+	require.NotNil(t, encoder)
+
+	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
+	expectedUploadCalls := 0
+	expectedFragmentedUploadObjectCalls := 0
+	ctx := context.Background()
+	for i := 0; i < 100; i++ {
+		key := corev2.BlobKey(tu.RandomBytes(32))
+
+		proofs := getProofs(t, rand.Intn(100)+100)
+		err := writer.PutChunkProofs(ctx, key, proofs)
+		require.NoError(t, err)
+		expectedUploadCalls++
+		require.Equal(t, expectedUploadCalls, client.Called["UploadObject"])
+
+		// Attempt to upload the same proofs again
+		require.True(t, writer.ProofExists(ctx, key))
+		err = writer.PutChunkProofs(ctx, key, proofs)
+		require.NoError(t, err)
+		require.Equal(t, expectedUploadCalls, client.Called["UploadObject"])
+
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
+		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
+		require.NoError(t, err)
+		expectedFragmentedUploadObjectCalls++
+		require.Equal(t, expectedFragmentedUploadObjectCalls, client.Called["FragmentedUploadObject"])
+
+		// Attempt to upload the same coefficients again
+		newMetadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
+		require.NoError(t, err)
+		require.Equal(t, metadata, newMetadata)
+		require.Equal(t, expectedFragmentedUploadObjectCalls, client.Called["UploadObject"])
 	}
 }

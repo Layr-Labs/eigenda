@@ -81,7 +81,7 @@ func setup() {
 	chunkStoreWriter = chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
 
 	// Initialize chunk store reader
-	chunkStoreReader = chunkstore.NewChunkReader(logger, nil, s3Client, s3BucketName, []uint32{})
+	chunkStoreReader = chunkstore.NewChunkReader(logger, s3Client, s3BucketName, []uint32{})
 
 	var X1, Y1 fp.Element
 	X1 = *X1.SetBigInt(big.NewInt(1))

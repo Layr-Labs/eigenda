@@ -45,8 +45,8 @@ type Fragment struct {
 	Index       int
 }
 
-// breakIntoFragments breaks a file into fragments of the given size.
-func breakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
+// BreakIntoFragments breaks a file into fragments of the given size.
+func BreakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
 	fragmentCount := getFragmentCount(len(data), fragmentSize)
 	fragments := make([]*Fragment, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
@@ -69,8 +69,8 @@ func breakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragm
 	return fragments, nil
 }
 
-// getFragmentKeys returns the keys for all fragments of a file.
-func getFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
+// GetFragmentKeys returns the keys for all fragments of a file.
+func GetFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 	keys := make([]string, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
 		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)

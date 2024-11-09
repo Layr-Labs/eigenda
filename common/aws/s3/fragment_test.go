@@ -2,11 +2,12 @@ package s3
 
 import (
 	"fmt"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"strings"
 	"testing"
+
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetFragmentCount(t *testing.T) {
@@ -115,7 +116,7 @@ func TestKeyPostfix(t *testing.T) {
 func TestExampleInGodoc(t *testing.T) {
 	fileKey := "abc123"
 	fragmentCount := 3
-	fragmentKeys, err := getFragmentKeys(fileKey, fragmentCount)
+	fragmentKeys, err := GetFragmentKeys(fileKey, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(fragmentKeys))
 	assert.Equal(t, "abc123-0", fragmentKeys[0])
@@ -129,7 +130,7 @@ func TestGetFragmentKeys(t *testing.T) {
 	fileKey := tu.RandomString(10)
 	fragmentCount := rand.Intn(10) + 10
 
-	fragmentKeys, err := getFragmentKeys(fileKey, fragmentCount)
+	fragmentKeys, err := GetFragmentKeys(fileKey, fragmentCount)
 	assert.NoError(t, err)
 	assert.Equal(t, fragmentCount, len(fragmentKeys))
 
@@ -159,7 +160,7 @@ func TestGetFragments(t *testing.T) {
 	data := tu.RandomBytes(1000)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, getFragmentCount(len(data), fragmentSize), len(fragments))
 
@@ -190,7 +191,7 @@ func TestGetFragmentsSmallFile(t *testing.T) {
 	data := tu.RandomBytes(10)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
@@ -208,7 +209,7 @@ func TestGetFragmentsExactlyOnePerfectlySizedFile(t *testing.T) {
 	fragmentSize := rand.Intn(100) + 100
 	data := tu.RandomBytes(fragmentSize)
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 
@@ -226,7 +227,7 @@ func TestRecombineFragments(t *testing.T) {
 	data := tu.RandomBytes(1000)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	recombinedData, err := recombineFragments(fragments)
 	assert.NoError(t, err)
@@ -250,7 +251,7 @@ func TestRecombineFragmentsSmallFile(t *testing.T) {
 	data := tu.RandomBytes(10)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fragments))
 	recombinedData, err := recombineFragments(fragments)
@@ -265,7 +266,7 @@ func TestMissingFragment(t *testing.T) {
 	data := tu.RandomBytes(1000)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 
 	fragmentIndexToSkip := rand.Intn(len(fragments))
@@ -282,7 +283,7 @@ func TestMissingFinalFragment(t *testing.T) {
 	data := tu.RandomBytes(1000)
 	fragmentSize := rand.Intn(100) + 100
 
-	fragments, err := breakIntoFragments(fileKey, data, fragmentSize)
+	fragments, err := BreakIntoFragments(fileKey, data, fragmentSize)
 	assert.NoError(t, err)
 	fragments = fragments[:len(fragments)-1]
 
