@@ -305,7 +305,6 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
-		s.logger.Error("failed to store blob", "err", err)
 		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
 	}
 
@@ -740,12 +739,13 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	stageTimer = time.Now()
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
-		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 			s.metrics.HandleNotFoundRequest("RetrieveBlob")
+			s.logger.Warn("failed to retrieve blob metadata", "err", err)
 			return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
 		}
+		s.logger.Error("failed to retrieve blob metadata", "err", err)
 		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewErrorInternal("failed to get blob metadata, please retry")

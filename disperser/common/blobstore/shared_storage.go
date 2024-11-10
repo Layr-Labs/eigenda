@@ -114,7 +114,13 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 	}
 	err = s.blobMetadataStore.QueueNewBlobMetadata(ctx, &metadata)
 	if err != nil {
-		s.logger.Error("error uploading blob metadata", "err", err)
+		if errors.Is(err, context.Canceled) {
+			s.logger.Warn("context canceled while queuing new blob metadata", "err", err)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			s.logger.Warn("context deadline exceeded while queuing new blob metadata", "err", err)
+		} else {
+			s.logger.Error("error uploading blob metadata", "err", err)
+		}
 		return metadataKey, err
 	}
 
