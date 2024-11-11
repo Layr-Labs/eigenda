@@ -421,3 +421,103 @@ func TestReadWriteChunks(t *testing.T) {
 		}
 	}
 }
+
+func TestBatchedReadWriteChunks(t *testing.T) {
+	tu.InitializeRandom()
+
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	setup(t)
+	defer teardown()
+
+	// These are used to write data to S3/dynamoDB
+	metadataStore := buildMetadataStore(t)
+	chunkReader, chunkWriter := buildChunkStore(t, logger)
+
+	// This is the server used to read it back
+	config := DefaultConfig()
+	server, err := NewServer(
+		context.Background(),
+		logger,
+		config,
+		metadataStore,
+		nil, /* not used in this test */
+		chunkReader)
+	require.NoError(t, err)
+
+	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
+	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
+
+	blobCount := 10
+	for i := 0; i < blobCount; i++ {
+		header, _, chunks := randomBlobChunks(t)
+
+		blobKey, err := header.BlobKey()
+		require.NoError(t, err)
+		expectedData[blobKey] = chunks
+
+		coeffs, chunkProofs := disassembleFrames(chunks)
+		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		require.NoError(t, err)
+		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		require.NoError(t, err)
+		fragmentInfoMap[blobKey] = fragmentInfo
+
+		err = metadataStore.PutBlobCertificate(
+			context.Background(),
+			&v2.BlobCertificate{
+				BlobHeader: header,
+			},
+			&encoding.FragmentInfo{
+				TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+				FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+			})
+		require.NoError(t, err)
+	}
+
+	keyCount := 3
+
+	for i := 0; i < 10; i++ {
+		keys := make([]v2.BlobKey, 0, keyCount)
+		for key := range expectedData {
+			keys = append(keys, key)
+			if len(keys) == keyCount {
+				break
+			}
+		}
+
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		for _, key := range keys {
+
+			boundKey := key
+			request := &pb.ChunkRequest{
+				Request: &pb.ChunkRequest_ByRange{
+					ByRange: &pb.ChunkRequestByRange{
+						BlobKey:    boundKey[:],
+						StartIndex: 0,
+						EndIndex:   uint32(len(expectedData[key])),
+					},
+				},
+			}
+
+			requestedChunks = append(requestedChunks, request)
+		}
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
+		}
+
+		response, err := server.GetChunks(context.Background(), request)
+		require.NoError(t, err)
+
+		require.Equal(t, keyCount, len(response.Data))
+
+		for keyIndex, key := range keys {
+			data := expectedData[key]
+			for frameIndex, frame := range response.Data[keyIndex].Data {
+				convertedFrame := encoding.FrameFromProtobuf(frame)
+				require.Equal(t, data[frameIndex], convertedFrame)
+			}
+		}
+	}
+}

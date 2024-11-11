@@ -119,7 +119,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	//  - per-connection throttle requests / sec
 	//  - timeouts
 
-	keys := make([]v2.BlobKey, 0) // TODO
+	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
 		var key v2.BlobKey
