@@ -5,7 +5,8 @@ go 1.22
 toolchain go1.22.0
 
 require (
-	github.com/Layr-Labs/eigenda v0.8.5-0.20241031144746-e2ead56a306d
+	github.com/Layr-Labs/eigenda v0.8.5-rc.0.0.20241101212705-fa8776ae648c
+	github.com/avast/retry-go/v4 v4.6.0
 	github.com/consensys/gnark-crypto v0.12.1
 	github.com/ethereum-optimism/optimism v1.9.4-0.20240927020138-a9c7f349d10b
 	github.com/ethereum/go-ethereum v1.14.11
@@ -20,6 +21,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/redis v0.33.0
 	github.com/urfave/cli/v2 v2.27.4
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
+	google.golang.org/grpc v1.64.1
 )
 
 require (
@@ -283,7 +285,6 @@ require (
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
-	google.golang.org/grpc v1.64.1 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

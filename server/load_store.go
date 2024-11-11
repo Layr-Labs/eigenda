@@ -112,6 +112,7 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metr
 				MaxBlobSizeBytes:     cfg.EigenDAConfig.MemstoreConfig.MaxBlobSizeBytes,
 				EthConfirmationDepth: cfg.EigenDAConfig.VerifierConfig.EthConfirmationDepth,
 				StatusQueryTimeout:   cfg.EigenDAConfig.EdaClientConfig.StatusQueryTimeout,
+				PutRetries:           cfg.EigenDAConfig.PutRetries,
 			},
 		)
 	}

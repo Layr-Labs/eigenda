@@ -10,6 +10,7 @@
   "go.testFlags": [
     "-test.parallel",
     "4",
+    // Comment the following 2 lines to run unit tests.
     "-deploy-config",
     "../.devnet/devnetL1.json"
   ]

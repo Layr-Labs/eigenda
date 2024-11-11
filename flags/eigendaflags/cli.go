@@ -15,10 +15,11 @@ import (
 
 var (
 	DisperserRPCFlagName                 = withFlagPrefix("disperser-rpc")
+	ResponseTimeoutFlagName              = withFlagPrefix("response-timeout")
+	ConfirmationTimeoutFlagName          = withFlagPrefix("confirmation-timeout")
 	StatusQueryRetryIntervalFlagName     = withFlagPrefix("status-query-retry-interval")
 	StatusQueryTimeoutFlagName           = withFlagPrefix("status-query-timeout")
 	DisableTLSFlagName                   = withFlagPrefix("disable-tls")
-	ResponseTimeoutFlagName              = withFlagPrefix("response-timeout")
 	CustomQuorumIDsFlagName              = withFlagPrefix("custom-quorum-ids")
 	SignerPrivateKeyHexFlagName          = withFlagPrefix("signer-private-key-hex")
 	PutBlobEncodingVersionFlagName       = withFlagPrefix("put-blob-encoding-version")
@@ -27,6 +28,8 @@ var (
 	ConfirmationDepthFlagName            = withFlagPrefix("confirmation-depth")
 	EthRPCURLFlagName                    = withFlagPrefix("eth-rpc")
 	SvcManagerAddrFlagName               = withFlagPrefix("svc-manager-addr")
+	// Flags that are proxy specific, and not used by the eigenda-client
+	PutRetriesFlagName = withFlagPrefix("put-retries")
 )
 
 func withFlagPrefix(s string) string {
@@ -44,6 +47,26 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Name:     DisperserRPCFlagName,
 			Usage:    "RPC endpoint of the EigenDA disperser.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "DISPERSER_RPC")},
+			Category: category,
+		},
+		&cli.DurationFlag{
+			Name:     ResponseTimeoutFlagName,
+			Usage:    "Flag used to configure the underlying disperser-client. Total time to wait for the disperseBlob call to return or disperseAuthenticatedBlob stream to finish and close.",
+			Value:    60 * time.Second,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "RESPONSE_TIMEOUT")},
+			Category: category,
+		},
+		&cli.DurationFlag{
+			Name: ConfirmationTimeoutFlagName,
+			Usage: `The total amount of time that the client will spend waiting for EigenDA
+			to "confirm" (include onchain) a blob after it has been dispersed. Note that
+			we stick to "confirm" here but this really means InclusionTimeout,
+			not confirmation in the sense of confirmation depth.
+			
+			If ConfirmationTimeout time passes and the blob is not yet confirmed,
+			the client will return an api.ErrorFailover to let the caller failover to EthDA.`,
+			Value:    15 * time.Minute,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "CONFIRMATION_TIMEOUT")},
 			Category: category,
 		},
 		&cli.DurationFlag{
@@ -65,13 +88,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:    "Disable TLS for gRPC communication with the EigenDA disperser. Default is false.",
 			Value:    false,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "GRPC_DISABLE_TLS")},
-			Category: category,
-		},
-		&cli.DurationFlag{
-			Name:     ResponseTimeoutFlagName,
-			Usage:    "Total time to wait for a response from the EigenDA disperser. Default is 60 seconds.",
-			Value:    60 * time.Second,
-			EnvVars:  []string{withEnvPrefix(envPrefix, "RESPONSE_TIMEOUT")},
 			Category: category,
 		},
 		&cli.UintSliceFlag{
@@ -137,6 +153,15 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: true,
 		},
+		// Flags that are proxy specific, and not used by the eigenda-client
+		// TODO: should we move this to a more specific category, like EIGENDA_STORE?
+		&cli.UintFlag{
+			Name:     PutRetriesFlagName,
+			Usage:    "Number of times to retry blob dispersals.",
+			Value:    3,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETRIES")},
+			Category: category,
+		},
 	}
 }
 
@@ -144,10 +169,11 @@ func ReadConfig(ctx *cli.Context) clients.EigenDAClientConfig {
 	waitForFinalization, confirmationDepth := parseConfirmationFlag(ctx.String(ConfirmationDepthFlagName))
 	return clients.EigenDAClientConfig{
 		RPC:                          ctx.String(DisperserRPCFlagName),
+		ResponseTimeout:              ctx.Duration(ResponseTimeoutFlagName),
+		ConfirmationTimeout:          ctx.Duration(ConfirmationTimeoutFlagName),
 		StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
 		StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
 		DisableTLS:                   ctx.Bool(DisableTLSFlagName),
-		ResponseTimeout:              ctx.Duration(ResponseTimeoutFlagName),
 		CustomQuorumIDs:              ctx.UintSlice(CustomQuorumIDsFlagName),
 		SignerPrivateKeyHex:          ctx.String(SignerPrivateKeyHexFlagName),
 		PutBlobEncodingVersion:       codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),

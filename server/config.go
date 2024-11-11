@@ -19,6 +19,7 @@ type Config struct {
 	MemstoreConfig  memstore.Config
 	StorageConfig   store.Config
 	VerifierConfig  verify.Config
+	PutRetries      uint
 
 	MemstoreEnabled bool
 }
@@ -28,11 +29,11 @@ func ReadConfig(ctx *cli.Context) Config {
 	edaClientConfig := eigendaflags.ReadConfig(ctx)
 	return Config{
 		EdaClientConfig: edaClientConfig,
+		VerifierConfig:  verify.ReadConfig(ctx, edaClientConfig),
+		PutRetries:      ctx.Uint(eigendaflags.PutRetriesFlagName),
+		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
 		MemstoreConfig:  memstore.ReadConfig(ctx),
 		StorageConfig:   store.ReadConfig(ctx),
-		VerifierConfig:  verify.ReadConfig(ctx, edaClientConfig),
-
-		MemstoreEnabled: ctx.Bool(memstore.EnabledFlagName),
 	}
 }
 

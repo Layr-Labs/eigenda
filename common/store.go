@@ -19,8 +19,7 @@ const (
 )
 
 var (
-	ErrProxyOversizedBlob   = fmt.Errorf("encoded blob is larger than max blob size")
-	ErrEigenDAOversizedBlob = fmt.Errorf("blob size cannot exceed")
+	ErrProxyOversizedBlob = fmt.Errorf("encoded blob is larger than max blob size")
 )
 
 func (b BackendType) String() string {
