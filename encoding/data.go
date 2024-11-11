@@ -32,7 +32,7 @@ type BlobCommitments struct {
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format
-func (c *BlobCommitments) ToProfobuf() (*pbcommon.BlobCommitment, error) {
+func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
 	commitData, err := c.Commitment.Serialize()
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (c *BlobCommitments) ToProfobuf() (*pbcommon.BlobCommitment, error) {
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk
 	Proof Proof
-	// Coeffs contains the coefficience of the interpolating polynomial of the chunk
+	// Coeffs contains the coefficients of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 

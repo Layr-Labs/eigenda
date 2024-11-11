@@ -563,6 +563,14 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	return nil
 }
 
+func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+	return &commonpb.PaymentHeader{
+		AccountId:         pm.AccountID,
+		BinIndex:          pm.BinIndex,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
 // ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
 func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
 	return &PaymentMetadata{

@@ -73,7 +73,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	return chunks, &assignment, nil
 }
 
-func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool) error {
+func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, referenceBlockNumber uint64) error {
 	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
@@ -83,7 +83,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Chunks), len(blob.BlobHeader.QuorumNumbers))
 		}
 
-		state, err := v.chainState.GetOperatorState(ctx, uint(blob.ReferenceBlockNumber), blob.BlobHeader.QuorumNumbers)
+		state, err := v.chainState.GetOperatorState(ctx, uint(referenceBlockNumber), blob.BlobHeader.QuorumNumbers)
 		if err != nil {
 			return err
 		}

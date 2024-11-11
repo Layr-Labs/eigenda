@@ -179,7 +179,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 	commitments, err := prover.GetCommitments(data)
 	require.NoError(t, err)
 	require.NoError(t, err)
-	commitmentProto, err := commitments.ToProfobuf()
+	commitmentProto, err := commitments.ToProtobuf()
 	require.NoError(t, err)
 
 	blobHeaderProto := &pbcommonv2.BlobHeader{

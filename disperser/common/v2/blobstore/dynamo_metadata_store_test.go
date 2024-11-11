@@ -2,6 +2,7 @@ package blobstore_test
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -114,8 +116,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 			},
 			Signature: []byte("signature"),
 		},
-		ReferenceBlockNumber: uint64(100),
-		RelayKeys:            []corev2.RelayKey{0, 2, 4},
+		RelayKeys: []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
@@ -144,8 +145,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 			},
 			Signature: []byte("signature"),
 		},
-		ReferenceBlockNumber: uint64(1234),
-		RelayKeys:            []corev2.RelayKey{0},
+		RelayKeys: []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
@@ -213,6 +213,130 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		},
+	})
+}
+
+func TestBlobMetadataStoreDispersals(t *testing.T) {
+	ctx := context.Background()
+	opID := core.OperatorID{0, 1}
+	dispersalRequest := &corev2.DispersalRequest{
+		OperatorID:      opID,
+		OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+		Socket:          "socket",
+		DispersedAt:     uint64(time.Now().UnixNano()),
+
+		BatchHeader: corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, 3},
+			ReferenceBlockNumber: 100,
+		},
+	}
+
+	err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+	assert.NoError(t, err)
+
+	bhh, err := dispersalRequest.BatchHeader.Hash()
+	assert.NoError(t, err)
+
+	fetchedRequest, err := blobMetadataStore.GetDispersalRequest(ctx, bhh, dispersalRequest.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, dispersalRequest, fetchedRequest)
+
+	// attempt to put dispersal request with the same key should fail
+	err = blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	dispersalResponse := &corev2.DispersalResponse{
+		DispersalRequest: dispersalRequest,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        [32]byte{1, 1, 1},
+		Error:            "error",
+	}
+
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+	assert.NoError(t, err)
+
+	fetchedResponse, err := blobMetadataStore.GetDispersalResponse(ctx, bhh, dispersalRequest.OperatorID)
+	assert.NoError(t, err)
+	assert.Equal(t, dispersalResponse, fetchedResponse)
+
+	// attempt to put dispersal response with the same key should fail
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
+		},
+	})
+}
+
+func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
+	ctx := context.Background()
+	h := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 100,
+	}
+	bhh, err := h.Hash()
+	assert.NoError(t, err)
+
+	err = blobMetadataStore.PutBatchHeader(ctx, h)
+	assert.NoError(t, err)
+
+	fetchedHeader, err := blobMetadataStore.GetBatchHeader(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+
+	// attempt to put batch header with the same key should fail
+	err = blobMetadataStore.PutBatchHeader(ctx, h)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: h,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+	}
+
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	fetchedAttestation, err := blobMetadataStore.GetAttestation(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, attestation, fetchedAttestation)
+
+	// attempt to put attestation with the same key should fail
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		},
 	})
 }

@@ -21,6 +21,7 @@ COPY api /app/api
 COPY contracts /app/contracts
 COPY indexer /app/indexer
 COPY encoding /app/encoding
+COPY relay /app/relay
 
 # Churner build stage
 FROM common-builder AS churner-builder

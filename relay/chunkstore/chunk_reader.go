@@ -3,8 +3,9 @@ package chunkstore
 import (
 	"context"
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -14,12 +15,12 @@ import (
 // ChunkReader reads chunks written by ChunkWriter.
 type ChunkReader interface {
 	// GetChunkProofs reads a slice of proofs from the chunk store.
-	GetChunkProofs(ctx context.Context, blobKey v2.BlobKey) ([]*encoding.Proof, error)
+	GetChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([]*encoding.Proof, error)
 	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
 	// should match the metadata returned by PutChunkCoefficients.
 	GetChunkCoefficients(
 		ctx context.Context,
-		blobKey v2.BlobKey,
+		blobKey corev2.BlobKey,
 		fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error)
 }
 
@@ -49,7 +50,7 @@ func NewChunkReader(
 
 func (r *chunkReader) GetChunkProofs(
 	ctx context.Context,
-	blobKey v2.BlobKey) ([]*encoding.Proof, error) {
+	blobKey corev2.BlobKey) ([]*encoding.Proof, error) {
 
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
@@ -80,7 +81,7 @@ func (r *chunkReader) GetChunkProofs(
 
 func (r *chunkReader) GetChunkCoefficients(
 	ctx context.Context,
-	blobKey v2.BlobKey,
+	blobKey corev2.BlobKey,
 	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
 
 	bytes, err := r.client.FragmentedDownloadObject(

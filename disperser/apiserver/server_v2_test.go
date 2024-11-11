@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/mock"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -51,7 +51,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	assert.NoError(t, err)
-	commitmentProto, err := commitments.ToProfobuf()
+	commitmentProto, err := commitments.ToProtobuf()
 	assert.NoError(t, err)
 	blobHeaderProto := &pbcommonv2.BlobHeader{
 		Version:       0,
@@ -63,7 +63,7 @@ func TestV2DisperseBlob(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := v2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := corev2.NewBlobHeader(blobHeaderProto)
 	assert.NoError(t, err)
 	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	sig, err := signer.SignBlobRequest(blobHeader)
@@ -126,7 +126,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: invalidReqProto,
 	})
 	assert.ErrorContains(t, err, "blob header must contain commitments")
-	commitmentProto, err := commitments.ToProfobuf()
+	commitmentProto, err := commitments.ToProtobuf()
 	assert.NoError(t, err)
 
 	// request with too many quorums

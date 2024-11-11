@@ -3,16 +3,16 @@ package v2
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"golang.org/x/crypto/sha3"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -56,6 +56,17 @@ func HexToBlobKey(h string) (BlobKey, error) {
 	return BlobKey(b), nil
 }
 
+func BytesToBlobKey(bytes []byte) (BlobKey, error) {
+	// Validate length
+	if len(bytes) != 32 {
+		return BlobKey{}, fmt.Errorf("invalid blob key length: expected 32 bytes, got %d", len(bytes))
+	}
+
+	var blobKey BlobKey
+	copy(blobKey[:], bytes)
+	return blobKey, nil
+}
+
 // BlobHeader contains all metadata related to a blob including commitments and parameters for encoding
 type BlobHeader struct {
 	BlobVersion BlobVersion
@@ -72,7 +83,7 @@ type BlobHeader struct {
 	Signature []byte
 }
 
-func NewBlobHeader(proto *pb.BlobHeader) (*BlobHeader, error) {
+func NewBlobHeader(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, err
@@ -126,6 +137,26 @@ func NewBlobHeader(proto *pb.BlobHeader) (*BlobHeader, error) {
 	}, nil
 }
 
+func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
+	quorums := make([]uint32, len(b.QuorumNumbers))
+	for i, q := range b.QuorumNumbers {
+		quorums[i] = uint32(q)
+	}
+
+	commitments, err := b.BlobCommitments.ToProtobuf()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert blob commitments to protobuf: %v", err)
+	}
+
+	return &commonpb.BlobHeader{
+		Version:       uint32(b.BlobVersion),
+		QuorumNumbers: quorums,
+		Commitment:    commitments,
+		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
+		Signature:     b.Signature,
+	}, nil
+}
+
 func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
 	params := ParametersMap[b.BlobVersion]
 
@@ -140,163 +171,69 @@ func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
 	}, nil
 }
 
-func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{
-			Name: "blobVersion",
-			Type: "uint8",
-		},
-		{
-			Name: "blobCommitments",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "commitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256",
-						},
-						{
-							Name: "Y",
-							Type: "uint256",
-						},
-					},
-				},
-				{
-					Name: "lengthCommitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "lengthProof",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "length",
-					Type: "uint32",
-				},
-			},
-		},
-		{
-			Name: "quorumNumbers",
-			Type: "bytes",
-		},
-		{
-			Name: "paymentMetadataHash",
-			Type: "bytes32",
-		},
-	})
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	arguments := abi.Arguments{
-		{
-			Type: blobHeaderType,
-		},
-	}
-
-	type g1Commit struct {
-		X *big.Int
-		Y *big.Int
-	}
-	type g2Commit struct {
-		X [2]*big.Int
-		Y [2]*big.Int
-	}
-	type blobCommitments struct {
-		Commitment       g1Commit
-		LengthCommitment g2Commit
-		LengthProof      g2Commit
-		Length           uint32
-	}
-
-	paymentHash, err := b.PaymentMetadata.Hash()
-	if err != nil {
-		return [32]byte{}, err
-	}
-	s := struct {
-		BlobVersion         uint8
-		BlobCommitments     blobCommitments
-		QuorumNumbers       []byte
-		PaymentMetadataHash [32]byte
-	}{
-		BlobVersion: uint8(b.BlobVersion),
-		BlobCommitments: blobCommitments{
-			Commitment: g1Commit{
-				X: b.BlobCommitments.Commitment.X.BigInt(new(big.Int)),
-				Y: b.BlobCommitments.Commitment.Y.BigInt(new(big.Int)),
-			},
-			LengthCommitment: g2Commit{
-				X: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
-				},
-				Y: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
-				},
-			},
-			LengthProof: g2Commit{
-				X: [2]*big.Int{
-					b.BlobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
-				},
-				Y: [2]*big.Int{
-					b.BlobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
-				},
-			},
-			Length: uint32(b.BlobCommitments.Length),
-		},
-		QuorumNumbers:       b.QuorumNumbers,
-		PaymentMetadataHash: paymentHash,
-	}
-
-	bytes, err := arguments.Pack(s)
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	var headerHash [32]byte
-	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(bytes)
-	copy(headerHash[:], hasher.Sum(nil)[:32])
-
-	return headerHash, nil
-}
-
 type RelayKey uint16
 
 type BlobCertificate struct {
 	BlobHeader *BlobHeader
 
-	// ReferenceBlockNumber is the block number of the block at which the operator state will be referenced
-	ReferenceBlockNumber uint64
-
 	// RelayKeys
 	RelayKeys []RelayKey
+}
+
+func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
+	if c.BlobHeader == nil {
+		return nil, fmt.Errorf("blob header is nil")
+	}
+
+	blobHeader, err := c.BlobHeader.ToProtobuf()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert blob header to protobuf: %v", err)
+	}
+
+	relays := make([]uint32, len(c.RelayKeys))
+	for i, r := range c.RelayKeys {
+		relays[i] = uint32(r)
+	}
+
+	return &commonpb.BlobCertificate{
+		BlobHeader: blobHeader,
+		Relays:     relays,
+	}, nil
+}
+
+type BatchHeader struct {
+	BatchRoot            [32]byte
+	ReferenceBlockNumber uint64
+}
+
+type Batch struct {
+	BatchHeader      *BatchHeader
+	BlobCertificates []*BlobCertificate
+}
+
+type Attestation struct {
+	*BatchHeader
+
+	// AttestedAt is the time the attestation was made
+	AttestedAt uint64
+	// NonSignerPubKeys are the public keys of the operators that did not sign the blob
+	NonSignerPubKeys []*core.G1Point
+	// APKG2 is the aggregate public key of all signers
+	APKG2 *core.G2Point
+	// QuorumAPKs is the aggregate public keys of all operators in each quorum
+	QuorumAPKs map[core.QuorumID]*core.G1Point
+	// Sigma is the aggregate signature of all signers
+	Sigma *core.Signature
+	// QuorumNumbers contains the quorums relevant for the attestation
+	QuorumNumbers []core.QuorumID
+}
+
+type BlobVerificationInfo struct {
+	*BatchHeader
+
+	BlobKey
+	BlobIndex      uint32
+	InclusionProof []byte
 }
 
 type BlobVersionParameters struct {
@@ -307,6 +244,27 @@ type BlobVersionParameters struct {
 
 func (p BlobVersionParameters) MaxNumOperators() uint32 {
 	return uint32(math.Floor(float64(p.NumChunks) * (1 - 1/(p.ReconstructionThreshold*float64(p.CodingRate)))))
+}
+
+// DispersalRequest is a request to disperse a batch to a specific operator
+type DispersalRequest struct {
+	core.OperatorID `dynamodbav:"-"`
+	OperatorAddress gethcommon.Address
+	Socket          string
+	DispersedAt     uint64
+
+	BatchHeader
+}
+
+// DispersalResponse is a response to a dispersal request
+type DispersalResponse struct {
+	*DispersalRequest
+
+	RespondedAt uint64
+	// Signature is the signature of the response by the operator
+	Signature [32]byte
+	// Error is the error message if the dispersal failed
+	Error string
 }
 
 const (

@@ -108,9 +108,9 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 	return testBlob, testEncodingParams
 }
 
-func newEncoderTestServer(t *testing.T) *Server {
+func newEncoderTestServer(t *testing.T) *EncoderServer {
 	metrics := NewMetrics("9000", logger)
-	return NewServer(testServerConfig, logger, testProver, metrics)
+	return NewEncoderServer(testServerConfig, logger, testProver, metrics)
 }
 
 func TestEncodeBlob(t *testing.T) {
@@ -202,7 +202,7 @@ func TestThrottling(t *testing.T) {
 		MaxConcurrentRequests: concurrentRequests,
 		RequestPoolSize:       requestPoolSize,
 	}
-	s := NewServer(encoderServerConfig, logger, encoder, metrics)
+	s := NewEncoderServer(encoderServerConfig, logger, encoder, metrics)
 	testBlobData, testEncodingParams := getTestData()
 
 	testEncodingParamsProto := &pb.EncodingParams{
@@ -255,7 +255,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 	// encoder 1 only loads 1500 points
 	prover1, config1 := makeTestProver(1500)
 	metrics := NewMetrics("9000", logger)
-	server1 := NewServer(config1, logger, prover1, metrics)
+	server1 := NewEncoderServer(config1, logger, prover1, metrics)
 
 	testBlobData, testEncodingParams := getTestData()
 
@@ -299,7 +299,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 
 	// encoder 2 only loads 2900 points
 	encoder2, config2 := makeTestProver(2900)
-	server2 := NewServer(config2, logger, encoder2, metrics)
+	server2 := NewEncoderServer(config2, logger, encoder2, metrics)
 
 	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)

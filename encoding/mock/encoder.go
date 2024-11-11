@@ -35,6 +35,12 @@ func (e *MockEncoder) GetFrames(data []byte, params encoding.EncodingParams) ([]
 	return args.Get(0).([]*encoding.Frame), args.Error(1)
 }
 
+func (e *MockEncoder) GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error) {
+	args := e.Called(data, params)
+	time.Sleep(e.Delay)
+	return args.Get(0).([]encoding.Proof), args.Error(1)
+}
+
 func (e *MockEncoder) VerifyFrames(chunks []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
 	args := e.Called(chunks, indices, commitments, params)
 	time.Sleep(e.Delay)
