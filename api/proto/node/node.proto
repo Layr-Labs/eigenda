@@ -18,9 +18,11 @@ service Dispersal {
 	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	// DEPRECATED: StoreBlobs method is not used
 	rpc StoreBlobs(StoreBlobsRequest) returns (StoreBlobsReply) {}
 	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 	// It will return a signature at the end to attest to the aggregated batch.
+	// DEPRECATED: AttestBatch method is not used
 	rpc AttestBatch(AttestBatchRequest) returns (AttestBatchReply) {}
 	// Retrieve node info metadata
 	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
