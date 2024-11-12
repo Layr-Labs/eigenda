@@ -18,13 +18,13 @@ type Server struct {
 	pb.UnimplementedRelayServer
 
 	// metadataServer encapsulates logic for fetching metadata for blobs.
-	metadataServer *metadataServer
+	metadataServer *metadataManager
 
 	// blobServer encapsulates logic for fetching blobs.
-	blobServer *blobServer
+	blobServer *blobManager
 
 	// chunkServer encapsulates logic for fetching chunks.
-	chunkServer *chunkServer
+	chunkServer *chunkManager
 }
 
 // NewServer creates a new relay Server.
@@ -36,7 +36,7 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader) (*Server, error) {
 
-	ms, err := newMetadataServer(
+	ms, err := newMetadataManager(
 		ctx,
 		logger,
 		metadataStore,
@@ -47,7 +47,7 @@ func NewServer(
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
 
-	bs, err := newBlobServer(
+	bs, err := newBlobManager(
 		ctx,
 		logger,
 		blobStore,
@@ -57,7 +57,7 @@ func NewServer(
 		return nil, fmt.Errorf("error creating blob server: %w", err)
 	}
 
-	cs, err := newChunkServer(
+	cs, err := newChunkManager(
 		ctx,
 		logger,
 		chunkReader,

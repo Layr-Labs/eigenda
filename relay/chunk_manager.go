@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 )
 
-type chunkServer struct {
+type chunkManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -41,18 +41,18 @@ func (m *blobKeyWithMetadata) Compare(other *blobKeyWithMetadata) int {
 	return bytes.Compare(m.blobKey[:], other.blobKey[:])
 }
 
-// newChunkServer creates a new chunkServer.
-func newChunkServer(
+// newChunkManager creates a new chunkManager.
+func newChunkManager(
 	ctx context.Context,
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
 	cacheSize int,
-	workPoolSize int) (*chunkServer, error) {
+	workPoolSize int) (*chunkManager, error) {
 
 	pool := &errgroup.Group{}
 	pool.SetLimit(workPoolSize)
 
-	server := &chunkServer{
+	server := &chunkManager{
 		ctx:         ctx,
 		logger:      logger,
 		chunkReader: chunkReader,
@@ -72,7 +72,7 @@ func newChunkServer(
 type frameMap map[v2.BlobKey][]*encoding.Frame
 
 // GetFrames retrieves the frames for a blob.
-func (s *chunkServer) GetFrames(ctx context.Context, mMap *metadataMap) (*frameMap, error) {
+func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frameMap, error) {
 
 	keys := make([]*blobKeyWithMetadata, 0, len(*mMap))
 	for k, v := range *mMap {
@@ -109,7 +109,7 @@ func (s *chunkServer) GetFrames(ctx context.Context, mMap *metadataMap) (*frameM
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkServer) fetchFrames(key blobKeyWithMetadata) (*[]*encoding.Frame, error) {
+func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) (*[]*encoding.Frame, error) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

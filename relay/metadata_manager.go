@@ -23,8 +23,8 @@ type blobMetadata struct {
 	fragmentSizeBytes uint32
 }
 
-// metadataServer encapsulates logic for fetching metadata for blobs. Utilized by the relay Server.
-type metadataServer struct {
+// metadataManager encapsulates logic for fetching metadata for blobs. Utilized by the relay Server.
+type metadataManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -44,14 +44,14 @@ type metadataServer struct {
 	pool *errgroup.Group
 }
 
-// newMetadataServer creates a new metadataServer.
-func newMetadataServer(
+// newMetadataManager creates a new metadataManager.
+func newMetadataManager(
 	ctx context.Context,
 	logger logging.Logger,
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	workPoolSize int,
-	shards []v2.RelayKey) (*metadataServer, error) {
+	shards []v2.RelayKey) (*metadataManager, error) {
 
 	shardSet := make(map[v2.RelayKey]struct{}, len(shards))
 	for _, shard := range shards {
@@ -61,7 +61,7 @@ func newMetadataServer(
 	pool, _ := errgroup.WithContext(ctx)
 	pool.SetLimit(workPoolSize)
 
-	server := &metadataServer{
+	server := &metadataManager{
 		ctx:           ctx,
 		logger:        logger,
 		metadataStore: metadataStore,
@@ -83,7 +83,7 @@ func newMetadataServer(
 type metadataMap map[v2.BlobKey]*blobMetadata
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
+func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
 
 	mapLock := sync.Mutex{}
 	mMap := make(metadataMap)
@@ -123,7 +123,7 @@ func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, e
 }
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
-func (m *metadataServer) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
+func (m *metadataManager) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	// Retrieve the metadata from the store.
 	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, v2.BlobKey(key))
 	if err != nil {

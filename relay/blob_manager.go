@@ -11,9 +11,9 @@ import (
 	"sync"
 )
 
-// blobServer encapsulates logic for fetching blobs. Utilized by the relay Server.
+// blobManager encapsulates logic for fetching blobs. Utilized by the relay Server.
 // This struct adds caching and threading on top of blobstore.BlobStore.
-type blobServer struct {
+type blobManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -27,18 +27,18 @@ type blobServer struct {
 	pool *errgroup.Group
 }
 
-// newBlobServer creates a new blobServer.
-func newBlobServer(
+// newBlobManager creates a new blobManager.
+func newBlobManager(
 	ctx context.Context,
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
 	blobCacheSize int,
-	workPoolSize int) (*blobServer, error) {
+	workPoolSize int) (*blobManager, error) {
 
 	pool, _ := errgroup.WithContext(ctx)
 	pool.SetLimit(workPoolSize)
 
-	server := &blobServer{
+	server := &blobManager{
 		ctx:       ctx,
 		logger:    logger,
 		blobStore: blobStore,
@@ -55,7 +55,7 @@ func newBlobServer(
 }
 
 // GetBlob retrieves a blob from the blob store.
-func (s *blobServer) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
+func (s *blobManager) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 
 	// Even though we don't need extra parallelism here, we still use the work pool to ensure that we don't
 	// permit too many concurrent requests to the blob store.
@@ -85,7 +85,7 @@ func (s *blobServer) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 }
 
 // fetchBlob retrieves a single blob from the blob store.
-func (s *blobServer) fetchBlob(blobKey v2.BlobKey) (*[]byte, error) {
+func (s *blobManager) fetchBlob(blobKey v2.BlobKey) (*[]byte, error) {
 	data, err := s.blobStore.GetBlob(s.ctx, blobKey)
 	if err != nil {
 		s.logger.Error("Failed to fetch blob: %v", err)
