@@ -42,7 +42,7 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataWorkPoolSize,
-		config.Shards)
+		nil) // TODO
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
