@@ -292,18 +292,18 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// Request the entire blob by range
 	for key, data := range expectedData {
-
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
-
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: 0,
 					EndIndex:   uint32(len(data)),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := server.GetChunks(context.Background(), request)
@@ -319,22 +319,23 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// Request the entire blob by index
 	for key, data := range expectedData {
-
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, len(data))
 		for i := range data {
 			indices[i] = uint32(i)
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := server.GetChunks(context.Background(), request)
@@ -350,8 +351,7 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// Request part of the blob back by range
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		startIndex := rand.Intn(len(data))
 		var endIndex int
@@ -360,14 +360,18 @@ func TestReadWriteChunks(t *testing.T) {
 		} else {
 			endIndex = startIndex + rand.Intn(len(data)-startIndex)
 		}
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: uint32(startIndex),
 					EndIndex:   uint32(endIndex),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := server.GetChunks(context.Background(), request)
@@ -383,8 +387,7 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// Request part of the blob back by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, 0)
 		for i := range data {
@@ -393,13 +396,16 @@ func TestReadWriteChunks(t *testing.T) {
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := server.GetChunks(context.Background(), request)
@@ -474,24 +480,31 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		keys := make([]v2.BlobKey, 0, keyCount)
-		byteKeys := make([][]byte, 0, keyCount)
 		for key := range expectedData {
 			keys = append(keys, key)
-			boundKey := key
-			byteKeys = append(byteKeys, boundKey[:])
 			if len(keys) == keyCount {
 				break
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: byteKeys,
-			Request: &pb.GetChunksRequest_ByRange{
-				ByRange: &pb.ChunkRequestByRange{
-					StartIndex: 0,
-					EndIndex:   uint32(len(expectedData[keys[0]])),
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		for _, key := range keys {
+
+			boundKey := key
+			request := &pb.ChunkRequest{
+				Request: &pb.ChunkRequest_ByRange{
+					ByRange: &pb.ChunkRequestByRange{
+						BlobKey:    boundKey[:],
+						StartIndex: 0,
+						EndIndex:   uint32(len(expectedData[key])),
+					},
 				},
-			},
+			}
+
+			requestedChunks = append(requestedChunks, request)
+		}
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := server.GetChunks(context.Background(), request)
@@ -584,17 +597,18 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request the entire blob by range. 25% of the blobs will be assigned to shards we don't have.
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
-
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: 0,
 					EndIndex:   uint32(len(data)),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -625,21 +639,23 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request the entire blob by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, len(data))
 		for i := range data {
 			indices[i] = uint32(i)
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -670,8 +686,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request part of the blob back by range
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		startIndex := rand.Intn(len(data))
 		var endIndex int
@@ -681,14 +696,17 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			endIndex = startIndex + rand.Intn(len(data)-startIndex)
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: uint32(startIndex),
 					EndIndex:   uint32(endIndex),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -715,8 +733,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request part of the blob back by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, 0)
 		for i := range data {
@@ -725,13 +742,16 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -841,24 +861,31 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	// Read the blobs back. On average, we expect 25% of the blobs to be assigned to shards we don't have.
 	for i := 0; i < 10; i++ {
 		keys := make([]v2.BlobKey, 0, keyCount)
-		byteKeys := make([][]byte, 0, keyCount)
 		for key := range expectedData {
 			keys = append(keys, key)
-			boundKey := key
-			byteKeys = append(byteKeys, boundKey[:])
 			if len(keys) == keyCount {
 				break
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: byteKeys,
-			Request: &pb.GetChunksRequest_ByRange{
-				ByRange: &pb.ChunkRequestByRange{
-					StartIndex: 0,
-					EndIndex:   uint32(len(expectedData[keys[0]])),
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		for _, key := range keys {
+
+			boundKey := key
+			request := &pb.ChunkRequest{
+				Request: &pb.ChunkRequest_ByRange{
+					ByRange: &pb.ChunkRequestByRange{
+						BlobKey:    boundKey[:],
+						StartIndex: 0,
+						EndIndex:   uint32(len(expectedData[key])),
+					},
 				},
-			},
+			}
+
+			requestedChunks = append(requestedChunks, request)
+		}
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		allInCorrectShard := true
