@@ -30,44 +30,39 @@ message GetBlobReply {
 
 // Request chunks from blobs stored by this relay.
 message GetChunksRequest {
-  // The chunk requests. Chunks are returned in the same order as they are requested.
-  repeated ChunkRequest chunk_requests = 1;
+
+  // Request chunks from each blob in this list.
+  repeated bytes blob_keys = 1;
+
+  // A description of which chunks to request from each blob.
+  oneof request {
+    // Request chunks by their individual indices.
+    ChunkRequestByIndex by_index = 2;
+    // Request chunks by a range of indices.
+    ChunkRequestByRange by_range = 3;
+  }
 
   // If this is an authenticated request, this should hold the ID of the requester. If this
   // is an unauthenticated request, this field should be empty.
-  uint64 requester_id = 2;
+  uint64 requester_id = 4;
 
   // If this is an authenticated request, this field will hold a signature by the requester
   // on the chunks being requested.
-  bytes requester_signature = 3;
+  bytes requester_signature = 5;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested individually by its index.
 message ChunkRequestByIndex {
-  // The blob key.
-  bytes blob_key = 1;
   // The index of the chunk within the blob.
-  repeated uint32 chunk_indices = 2;
+  repeated uint32 chunk_indices = 1;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested a range of indices.
 message ChunkRequestByRange {
-  // The blob key.
-  bytes blob_key = 1;
   // The first index to start fetching chunks from.
   uint32 start_index = 2;
   // One past the last index to fetch chunks from. Similar semantics to golang slices.
   uint32 end_index = 3;
-}
-
-// A request for chunks within a specific blob.
-message ChunkRequest {
-  oneof request {
-    // Request chunks by their individual indices.
-    ChunkRequestByIndex by_index = 1;
-    // Request chunks by a range of indices.
-    ChunkRequestByRange by_range = 2;
-  }
 }
 
 // The reply to a GetChunks request.
@@ -81,22 +76,4 @@ message GetChunksReply {
 //  will correspond to the first index requested, and so on.
 message Chunks {
   repeated common.v2.Frame data = 1;
-}
-
-// An error that occurred while trying to fetch a blob or chunks.
-message RelayError {
-  // The error code that occurred while trying to fetch a blob or chunks.
-  RelayErrorCode error_code = 1;
-  // A message explaining the error that occurred.
-  string message = 2;
-}
-
-// The error codes that can occur while trying to fetch a blob or chunks.
-enum RelayErrorCode {
-  // This relay does not know about the requested blob or the requested blob is assigned to a different relay.
-  UNKNOWN_BLOB = 0;
-  // The relay is too busy to handle the request.
-  BUSY = 1;
-  // An internal relay error occurred while trying to fetch the blob.
-  INTERNAL_ERROR = 2;
 }

@@ -77,7 +77,7 @@ func NewServer(
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
-	// Future work	:
+	// Future work:
 	//  - global throttle
 	//  - per-connection throttle
 	//  - timeouts
@@ -115,16 +115,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	//  - per-connection throttle
 	//  - timeouts
 
-	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
+	keys := make([]v2.BlobKey, 0, len(request.GetBlobKeys()))
 
-	for _, chunkRequest := range request.ChunkRequests {
-		var key v2.BlobKey
-		if chunkRequest.GetByIndex() != nil {
-			key = v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
-		} else {
-			key = v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
-		}
-		keys = append(keys, key)
+	for _, keyBytes := range request.GetBlobKeys() {
+		keys = append(keys, v2.BlobKey(keyBytes))
 	}
 
 	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
@@ -141,16 +135,16 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	protoChunks := make([]*pb.Chunks, 0, len(*frames))
 
 	// return data in the order that it was requested
-	for _, chunkRequest := range request.ChunkRequests {
-		if chunkRequest.GetByIndex() != nil {
-			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
+	for _, keyBytes := range request.GetBlobKeys() {
+		key := v2.BlobKey(keyBytes)
+		if request.GetByIndex() != nil {
 			blobFrames := (*frames)[key]
 			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, len(chunkRequest.GetByIndex().ChunkIndices)),
+				Data: make([]*v2pb.Frame, 0, len(request.GetByIndex().ChunkIndices)),
 			}
 			protoChunks = append(protoChunks, chunks)
 
-			for index := range chunkRequest.GetByIndex().ChunkIndices {
+			for index := range request.GetByIndex().ChunkIndices {
 
 				if index >= len(blobFrames) {
 					return nil, fmt.Errorf(
@@ -161,9 +155,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			}
 
 		} else {
-			key := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
-			startIndex := chunkRequest.GetByRange().StartIndex
-			endIndex := chunkRequest.GetByRange().EndIndex
+			startIndex := request.GetByRange().StartIndex
+			endIndex := request.GetByRange().EndIndex
 
 			blobFrames := (*frames)[key]
 
@@ -175,7 +168,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			if endIndex > uint32(len((*frames)[key])) {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invald for key %s, chunk count %d",
-					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))
+					request.GetByRange().StartIndex, request.GetByRange().EndIndex, key, len(blobFrames))
 			}
 
 			chunks := &pb.Chunks{
