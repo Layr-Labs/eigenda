@@ -132,7 +132,7 @@ func (m *metadataServer) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
 
-	if m.shardSet != nil && len(m.shardSet) > 0 {
+	if len(m.shardSet) > 0 {
 		validShard := false
 		for _, shard := range cert.RelayKeys {
 			if _, ok := m.shardSet[shard]; ok {
