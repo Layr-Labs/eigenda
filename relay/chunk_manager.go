@@ -81,6 +81,7 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 
 	fMap := make(frameMap, len(keys))
 	hadError := atomic.Bool{}
+	lock := sync.Mutex{}
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(keys))
@@ -96,7 +97,9 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
 				hadError.Store(true)
 			} else {
+				lock.Lock()
 				fMap[boundKey.blobKey] = *frames
+				lock.Unlock()
 			}
 
 			return nil

@@ -2,9 +2,7 @@ package encoding
 
 import (
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
-	framepb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
@@ -96,98 +94,4 @@ type FragmentInfo struct {
 	TotalChunkSizeBytes uint32
 	// FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.
 	FragmentSizeBytes uint32
-}
-
-// ToProtobuf converts the FragmentInfo to protobuf format
-func (f *Frame) ToProtobuf() *framepb.Frame {
-	proof := &framepb.Proof{
-		X: fpElementToProtobuf(&f.Proof.X),
-		Y: fpElementToProtobuf(&f.Proof.Y),
-	}
-
-	coeffs := make([]*framepb.Element, len(f.Coeffs))
-	for i, c := range f.Coeffs {
-		coeffs[i] = frElementToProtobuf(&c)
-	}
-
-	return &framepb.Frame{
-		Proof:  proof,
-		Coeffs: coeffs,
-	}
-}
-
-// fpElementToProtobuf converts an fp.Element to protobuf format
-func fpElementToProtobuf(e *fp.Element) *framepb.Element {
-	return &framepb.Element{
-		C0: e[0],
-		C1: e[1],
-		C2: e[2],
-		C3: e[3],
-	}
-}
-
-// frElementToProtobuf converts an fr.Element to protobuf format
-func frElementToProtobuf(e *fr.Element) *framepb.Element {
-	return &framepb.Element{
-		C0: e[0],
-		C1: e[1],
-		C2: e[2],
-		C3: e[3],
-	}
-}
-
-// fpElementFromProtobuf converts a protobuf element to an fp.Element
-func fpElementFromProtobuf(e *framepb.Element) fp.Element {
-	return fp.Element{
-		e.C0,
-		e.C1,
-		e.C2,
-		e.C3,
-	}
-}
-
-// frElementFromProtobuf converts a protobuf element to an fr.Element
-func frElementFromProtobuf(e *framepb.Element) fr.Element {
-	return fr.Element{
-		e.C0,
-		e.C1,
-		e.C2,
-		e.C3,
-	}
-}
-
-// FrameFromProtobuf converts a protobuf frame to a Frame.
-func FrameFromProtobuf(f *framepb.Frame) *Frame {
-	proof := Proof{
-		X: fpElementFromProtobuf(f.Proof.X),
-		Y: fpElementFromProtobuf(f.Proof.Y),
-	}
-
-	coeffs := make([]Symbol, len(f.Coeffs))
-	for i, c := range f.Coeffs {
-		coeffs[i] = frElementFromProtobuf(c)
-	}
-
-	return &Frame{
-		Proof:  proof,
-		Coeffs: coeffs,
-	}
-}
-
-// FramesToProtobuf converts a slice of Frames to protobuf format
-func FramesToProtobuf(frames []*Frame) []*framepb.Frame {
-	protobufFrames := make([]*framepb.Frame, len(frames))
-	for i, f := range frames {
-		protobufFrames[i] = f.ToProtobuf()
-	}
-	return protobufFrames
-}
-
-// FramesFromProtobuf converts a slice of protobuf Frames to Frames.
-func FramesFromProtobuf(frames []*framepb.Frame) []*Frame {
-	protobufFrames := make([]*Frame, len(frames))
-	for i, f := range frames {
-		protobufFrames[i] = FrameFromProtobuf(f)
-	}
-	return protobufFrames
 }

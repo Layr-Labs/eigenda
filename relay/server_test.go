@@ -5,6 +5,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
@@ -311,9 +312,11 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
-		for i, frame := range response.Data[0].Data {
-			convertedFrame := encoding.FrameFromProtobuf(frame)
-			require.Equal(t, data[i], convertedFrame)
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
+		for i, frame := range bundle {
+			require.Equal(t, data[i], frame)
 		}
 	}
 
@@ -343,9 +346,11 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
-		for i, frame := range response.Data[0].Data {
-			convertedFrame := encoding.FrameFromProtobuf(frame)
-			require.Equal(t, data[i], convertedFrame)
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
+		for i, frame := range bundle {
+			require.Equal(t, data[i], frame)
 		}
 	}
 
@@ -353,13 +358,8 @@ func TestReadWriteChunks(t *testing.T) {
 	for key, data := range expectedData {
 		requestedChunks := make([]*pb.ChunkRequest, 0)
 
-		startIndex := rand.Intn(len(data))
-		var endIndex int
-		if startIndex == len(data)-1 {
-			endIndex = len(data)
-		} else {
-			endIndex = startIndex + rand.Intn(len(data)-startIndex)
-		}
+		startIndex := rand.Intn(len(data) - 1)
+		endIndex := startIndex + rand.Intn(len(data)-startIndex-1) + 1
 
 		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
 			Request: &pb.ChunkRequest_ByRange{
@@ -379,9 +379,11 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
 		for i := startIndex; i < endIndex; i++ {
-			convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i-startIndex])
-			require.Equal(t, data[i], convertedFrame)
+			require.Equal(t, data[i], bundle[i-startIndex])
 		}
 	}
 
@@ -413,10 +415,12 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
 		for i := 0; i < len(indices); i++ {
 			if i%2 == 0 {
-				convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i/2])
-				require.Equal(t, data[indices[i]], convertedFrame)
+				require.Equal(t, data[indices[i]], bundle[i/2])
 			}
 		}
 	}
@@ -514,9 +518,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 		for keyIndex, key := range keys {
 			data := expectedData[key]
-			for frameIndex, frame := range response.Data[keyIndex].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[frameIndex], convertedFrame)
+
+			bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+			require.NoError(t, err)
+
+			for frameIndex, frame := range bundle {
+				require.Equal(t, data[frameIndex], frame)
 			}
 		}
 	}
@@ -627,9 +634,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
-			for i, frame := range response.Data[0].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[i], convertedFrame)
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
+			for i, frame := range bundle {
+				require.Equal(t, data[i], frame)
 			}
 		} else {
 			require.Error(t, err)
@@ -673,9 +682,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
-			for i, frame := range response.Data[0].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[i], convertedFrame)
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
+			for i, frame := range bundle {
+				require.Equal(t, data[i], frame)
 			}
 		} else {
 			response, err := server.GetChunks(context.Background(), request)
@@ -688,13 +699,8 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	for key, data := range expectedData {
 		requestedChunks := make([]*pb.ChunkRequest, 0)
 
-		startIndex := rand.Intn(len(data))
-		var endIndex int
-		if startIndex == len(data)-1 {
-			endIndex = len(data)
-		} else {
-			endIndex = startIndex + rand.Intn(len(data)-startIndex)
-		}
+		startIndex := rand.Intn(len(data) - 1)
+		endIndex := startIndex + rand.Intn(len(data)-startIndex-1) + 1
 
 		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
 			Request: &pb.ChunkRequest_ByRange{
@@ -724,9 +730,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
 			for i := startIndex; i < endIndex; i++ {
-				convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i-startIndex])
-				require.Equal(t, data[i], convertedFrame)
+				require.Equal(t, data[i], bundle[i-startIndex])
 			}
 		}
 	}
@@ -769,10 +777,12 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
 			for i := 0; i < len(indices); i++ {
 				if i%2 == 0 {
-					convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i/2])
-					require.Equal(t, data[indices[i]], convertedFrame)
+					require.Equal(t, data[indices[i]], bundle[i/2])
 				}
 			}
 		} else {
@@ -913,9 +923,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 			for keyIndex, key := range keys {
 				data := expectedData[key]
-				for frameIndex, frame := range response.Data[keyIndex].Data {
-					convertedFrame := encoding.FrameFromProtobuf(frame)
-					require.Equal(t, data[frameIndex], convertedFrame)
+
+				bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+				require.NoError(t, err)
+
+				for frameIndex, frame := range bundle {
+					require.Equal(t, data[frameIndex], frame)
 				}
 			}
 		} else {

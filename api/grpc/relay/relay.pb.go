@@ -397,7 +397,8 @@ func (*ChunkRequest_ByIndex) isChunkRequest_Request() {}
 func (*ChunkRequest_ByRange) isChunkRequest_Request() {}
 
 // The reply to a GetChunks request.
-// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request will fail.
+// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request
+// will fail.
 type GetChunksReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

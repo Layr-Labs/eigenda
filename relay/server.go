@@ -3,10 +3,11 @@ package relay
 import (
 	"context"
 	"fmt"
-	v2pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -138,17 +139,16 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf("error fetching frames: %w", err)
 	}
 
-	protoChunks := make([]*pb.Chunks, 0, len(*frames))
+	bytesToSend := make([][]byte, 0, len(keys))
 
 	// return data in the order that it was requested
 	for _, chunkRequest := range request.ChunkRequests {
+
+		framesToSend := make([]*encoding.Frame, 0)
+
 		if chunkRequest.GetByIndex() != nil {
 			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
 			blobFrames := (*frames)[key]
-			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, len(chunkRequest.GetByIndex().ChunkIndices)),
-			}
-			protoChunks = append(protoChunks, chunks)
 
 			for index := range chunkRequest.GetByIndex().ChunkIndices {
 
@@ -157,7 +157,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 						"chunk index %d out of range for key %s, chunk count %d",
 						index, key.Hex(), len(blobFrames))
 				}
-				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
+
+				framesToSend = append(framesToSend, blobFrames[index])
 			}
 
 		} else {
@@ -178,18 +179,18 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))
 			}
 
-			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, endIndex-startIndex),
-			}
-			protoChunks = append(protoChunks, chunks)
-
-			for index := startIndex; index < endIndex; index++ {
-				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
-			}
+			framesToSend = append(framesToSend, blobFrames[startIndex:endIndex]...)
 		}
+
+		bundle := core.Bundle(framesToSend)
+		bundleBytes, err := bundle.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("error serializing bundle: %w", err)
+		}
+		bytesToSend = append(bytesToSend, bundleBytes)
 	}
 
 	return &pb.GetChunksReply{
-		Data: protoChunks,
+		Data: bytesToSend,
 	}, nil
 }

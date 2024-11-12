@@ -70,7 +70,8 @@ message ChunkRequest {
 }
 
 // The reply to a GetChunks request.
-// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request will fail.
+// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request
+// will fail.
 message GetChunksReply {
   // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
   // data is the raw data of the bundle (i.e. serialized byte array of the frames)
