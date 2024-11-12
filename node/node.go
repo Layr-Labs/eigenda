@@ -28,6 +28,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
@@ -56,8 +57,10 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
+	StoreV2                 StoreV2
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
+	ValidatorV2             corev2.ShardValidator
 	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
@@ -130,6 +133,7 @@ func NewNode(
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
+	validatorV2 := corev2.NewShardValidator(v, config.ID)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -177,9 +181,11 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
+		StoreV2:                 nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
+		ValidatorV2:             validatorV2,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,

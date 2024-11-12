@@ -7,6 +7,8 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -290,6 +292,24 @@ func DeserializeBatchHeader(data []byte) (*BatchHeader, error) {
 		return nil, err
 	}
 	return &h, nil
+}
+
+func BuildMerkleTree(certs []*BlobCertificate) (*merkletree.MerkleTree, error) {
+	leafs := make([][]byte, len(certs))
+	for i, cert := range certs {
+		leaf, err := cert.Hash()
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute blob header hash: %w", err)
+		}
+		leafs[i] = leaf[:]
+	}
+
+	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
+	if err != nil {
+		return nil, err
+	}
+
+	return tree, nil
 }
 
 func encode(obj any) ([]byte, error) {

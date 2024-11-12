@@ -216,7 +216,7 @@ func checkBatchByUniversalVerifier(
 
 	for id := range state.IndexedOperators {
 
-		val := corev2.NewShardValidator(v, cst, id)
+		val := corev2.NewShardValidator(v, id)
 
 		blobs := packagedBlobs[id]
 

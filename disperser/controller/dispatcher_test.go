@@ -57,7 +57,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	ctx := context.Background()
 
 	// Get batch header hash to mock signatures
-	merkleTree, err := controller.BuildMerkleTree(objs.blobCerts)
+	merkleTree, err := corev2.BuildMerkleTree(objs.blobCerts)
 	require.NoError(t, err)
 	require.NotNil(t, merkleTree)
 	require.NotNil(t, merkleTree.Root())
@@ -200,7 +200,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 			RelayKeys: []corev2.RelayKey{0, 1, 2},
 		},
 	}
-	merkleTree, err := controller.BuildMerkleTree(certs)
+	merkleTree, err := corev2.BuildMerkleTree(certs)
 	require.NoError(t, err)
 	require.NotNil(t, merkleTree)
 	require.NotNil(t, merkleTree.Root())
