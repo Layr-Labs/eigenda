@@ -1,6 +1,5 @@
 syntax = "proto3";
 package node;
-import "common/v2/frame.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 /////////////////////////////////////////////////////////////////////////////////////
@@ -71,32 +70,9 @@ message ChunkRequest {
 }
 
 // The reply to a GetChunks request.
+// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request will fail.
 message GetChunksReply {
   // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
-  repeated Chunks data = 1;
-}
-
-// The chunks requested. If this request is in response to a request by index, the order of these chunks will be the
-//  same as the order of the requested indices. If this request is in response to a request by range, the first chunk
-//  will correspond to the first index requested, and so on.
-message Chunks {
-  repeated common.v2.Frame data = 1;
-}
-
-// An error that occurred while trying to fetch a blob or chunks.
-message RelayError {
-  // The error code that occurred while trying to fetch a blob or chunks.
-  RelayErrorCode error_code = 1;
-  // A message explaining the error that occurred.
-  string message = 2;
-}
-
-// The error codes that can occur while trying to fetch a blob or chunks.
-enum RelayErrorCode {
-  // This relay does not know about the requested blob or the requested blob is assigned to a different relay.
-  UNKNOWN_BLOB = 0;
-  // The relay is too busy to handle the request.
-  BUSY = 1;
-  // An internal relay error occurred while trying to fetch the blob.
-  INTERNAL_ERROR = 2;
+  // data is the raw data of the bundle (i.e. serialized byte array of the frames)
+  repeated bytes data = 1;
 }

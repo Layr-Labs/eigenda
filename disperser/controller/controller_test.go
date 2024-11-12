@@ -31,7 +31,7 @@ var (
 	localStackPort   = "4571"
 
 	s3Client          s3.Client
-	dynamoClient      *dynamodb.Client
+	dynamoClient      dynamodb.Client
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
 

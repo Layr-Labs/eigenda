@@ -30,13 +30,13 @@ const (
 //   - StatusIndex: (Partition Key: Status, Sort Key: RequestedAt) -> Metadata
 //   - BatchIndex: (Partition Key: BatchHeaderHash, Sort Key: BlobIndex) -> Metadata
 type BlobMetadataStore struct {
-	dynamoDBClient *commondynamodb.Client
+	dynamoDBClient commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
 	ttl            time.Duration
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,

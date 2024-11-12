@@ -2,17 +2,18 @@ package test
 
 import (
 	"context"
+	"math/rand"
+	"os"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/mock"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
-	"math/rand"
-	"os"
-	"testing"
 )
 
 var (

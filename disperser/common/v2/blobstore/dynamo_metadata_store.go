@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -51,12 +52,12 @@ var (
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
 type BlobMetadataStore struct {
-	dynamoDBClient *commondynamodb.Client
+	dynamoDBClient commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string) *BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store v2 with table %s", tableName)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
@@ -422,6 +423,107 @@ func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash 
 	return attestation, nil
 }
 
+func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verificationInfo *corev2.BlobVerificationInfo) error {
+	item, err := MarshalBlobVerificationInfo(verificationInfo)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+// PutBlobVerificationInfos puts multiple verification infos into the store
+// It retries failed items up to 2 times
+func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verificationInfos []*corev2.BlobVerificationInfo) error {
+	items := make([]commondynamodb.Item, len(verificationInfos))
+	for i, info := range verificationInfos {
+		item, err := MarshalBlobVerificationInfo(info)
+		if err != nil {
+			return err
+		}
+		items[i] = item
+	}
+
+	numRetries := 3
+	for i := 0; i < numRetries; i++ {
+		failedItems, err := s.dynamoDBClient.PutItems(ctx, s.tableName, items)
+		if err != nil {
+			return err
+		}
+
+		if len(failedItems) > 0 {
+			s.logger.Warnf("failed to put verification infos, retrying: %v", failedItems)
+			items = failedItems
+			time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobVerificationInfo, error) {
+	bhh := hex.EncodeToString(batchHeaderHash[:])
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + bhh,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+	}
+
+	info, err := UnmarshalBlobVerificationInfo(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobVerificationInfo, error) {
+	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
+		":pk": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		":prefix": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+	}
+
+	responses := make([]*corev2.BlobVerificationInfo, len(items))
+	for i, item := range items {
+		responses[i], err = UnmarshalBlobVerificationInfo(item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal verification info: %w", err)
+		}
+	}
+
+	return responses, nil
+}
+
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
 	return &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
@@ -747,6 +849,34 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	}
 
 	return &header, nil
+}
+
+func MarshalBlobVerificationInfo(verificationInfo *corev2.BlobVerificationInfo) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(verificationInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal blob verification info: %w", err)
+	}
+
+	bhh, err := verificationInfo.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(bhh[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + verificationInfo.BlobKey.Hex()}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+
+	return fields, nil
+}
+
+func UnmarshalBlobVerificationInfo(item commondynamodb.Item) (*corev2.BlobVerificationInfo, error) {
+	verificationInfo := corev2.BlobVerificationInfo{}
+	err := attributevalue.UnmarshalMap(item, &verificationInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal blob verification info: %w", err)
+	}
+
+	return &verificationInfo, nil
 }
 
 func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, error) {
