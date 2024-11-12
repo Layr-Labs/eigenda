@@ -126,8 +126,6 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 		}
 	}
 
-	require.NoError(t, err)
-
 	dynamoClient, err := dynamodb.NewClient(cfg, logger)
 	require.NoError(t, err)
 
