@@ -77,9 +77,9 @@ func NewServer(
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
-	// TODO:
-	//  - global throttle requests / sec
-	//  - per-connection throttle requests / sec
+	// Future work	:
+	//  - global throttle
+	//  - per-connection throttle
 	//  - timeouts
 
 	keys := []v2.BlobKey{v2.BlobKey(request.BlobKey)}
@@ -92,10 +92,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	if metadata == nil {
 		return nil, fmt.Errorf("blob not found")
 	}
-
-	// TODO
-	//  - global bytes/sec throttle
-	//  - per-connection bytes/sec throttle
 
 	key := v2.BlobKey(request.BlobKey)
 	data, err := s.blobServer.GetBlob(key)
@@ -113,10 +109,10 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
-	// TODO:
+	// Future work:
 	//  - authentication
-	//  - global throttle requests / sec
-	//  - per-connection throttle requests / sec
+	//  - global throttle
+	//  - per-connection throttle
 	//  - timeouts
 
 	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
@@ -144,7 +140,6 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	protoChunks := make([]*pb.Chunks, 0, len(*frames))
 
-	// TODO encapsulate
 	// return data in the order that it was requested
 	for _, chunkRequest := range request.ChunkRequests {
 		if chunkRequest.GetByIndex() != nil {

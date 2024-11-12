@@ -85,8 +85,6 @@ type metadataMap map[v2.BlobKey]*blobMetadata
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
 func (m *metadataServer) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
 
-	// TODO figure out how timeouts are going to work here
-
 	mapLock := sync.Mutex{}
 	mMap := make(metadataMap)
 	hadError := atomic.Bool{}
@@ -147,7 +145,7 @@ func (m *metadataServer) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	}
 
 	metadata := &blobMetadata{
-		blobSizeBytes:       0, /* TODO: populate this once it is added to the metadata store */
+		blobSizeBytes:       0, /* Future work: populate this once it is added to the metadata store */
 		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
 		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 	}

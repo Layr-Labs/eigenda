@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// TODO verify blob size once it is added to metadata
-
 func TestGetNonExistentBlob(t *testing.T) {
 	tu.InitializeRandom()
 
