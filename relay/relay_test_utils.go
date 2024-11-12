@@ -138,14 +138,13 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 }
 
 func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
-	cfg := aws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     localstackHost,
-	}
+	cfg := aws.DefaultClientConfig()
+	cfg.Region = "us-east-1"
+	cfg.AccessKey = "localstack"
+	cfg.SecretAccessKey = "localstack"
+	cfg.EndpointURL = localstackHost
 
-	client, err := s3.NewClient(context.Background(), cfg, logger)
+	client, err := s3.NewClient(context.Background(), *cfg, logger)
 	require.NoError(t, err)
 
 	err = client.CreateBucket(context.Background(), bucketName)

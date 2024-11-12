@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 )
 
@@ -29,7 +28,6 @@ var (
 	blobStore          *blobstore.BlobStore
 	chunkStoreWriter   chunkstore.ChunkWriter
 	chunkStoreReader   chunkstore.ChunkReader
-	UUID               = uuid.New()
 	s3BucketName       = "test-eigenda"
 	mockCommitment     = encoding.BlobCommitments{}
 )
