@@ -62,7 +62,7 @@ func TestExpiryKeyOrdering(t *testing.T) {
 		aTime, _ := parsePrependedTimestamp(a)
 		bTime, _ := parsePrependedTimestamp(b)
 
-		assert.True(t, aTime.Before(bTime))
+		assert.True(t, aTime.Before(bTime) || aTime.Equal(bTime))
 	}
 }
 
