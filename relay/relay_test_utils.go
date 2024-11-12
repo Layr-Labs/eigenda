@@ -121,7 +121,7 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 		metadataTableName,
 		blobstore.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
-		if !strings.HasPrefix(err.Error(), "ResourceInUseException: Table already exists") {
+		if !strings.Contains(err.Error(), "ResourceInUseException: Table already exists") {
 			require.NoError(t, err)
 		}
 	}
