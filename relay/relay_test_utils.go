@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -119,6 +120,12 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 		cfg,
 		metadataTableName,
 		blobstore.GenerateTableSchema(metadataTableName, 10, 10))
+	if err != nil {
+		if !strings.HasPrefix(err.Error(), "ResourceInUseException: Table already exists") {
+			require.NoError(t, err)
+		}
+	}
+
 	require.NoError(t, err)
 
 	dynamoClient, err := dynamodb.NewClient(cfg, logger)
