@@ -328,10 +328,10 @@ func (n *Node) Start(ctx context.Context) error {
 		registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
 		// Error out if registration on-chain is a requirement
 		if err != nil {
-			n.Logger.Warn("failed to get operator socket: %w", err)
+			n.Logger.Warnf("failed to get operator socket: %w", err)
 		}
 		if registeredSocket != socket {
-			n.Logger.Warn("registered socket %s does not match expected socket %s", registeredSocket, socket)
+			n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
 		}
 
 		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
