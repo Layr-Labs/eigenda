@@ -843,11 +843,6 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 			s.grpcMetrics.UnaryServerInterceptor(),
 		))
 
-	// gs := grpc.NewServer(
-	// 	opt,
-	// 	grpc.UnaryInterceptor(
-	// 		grpc.UnaryServerInterceptor(grpcinterceptorprom.UnaryServerInterceptor(s.grpcMetrics)),
-	// 	))
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 	s.grpcMetrics.InitializeMetrics(gs)
