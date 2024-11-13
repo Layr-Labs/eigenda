@@ -8,9 +8,43 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"math/rand"
 	"testing"
 )
+
+func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	conn, err := grpc.Dial("0.0.0.0:50051", opts...)
+	require.NoError(t, err)
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
+
+	client := pb.NewRelayClient(conn)
+	response, err := client.GetBlob(context.Background(), request)
+	return response, err
+}
+
+func getChunks(t *testing.T, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	conn, err := grpc.Dial("0.0.0.0:50051", opts...)
+	require.NoError(t, err)
+	defer func() {
+		err = conn.Close()
+		require.NoError(t, err)
+	}()
+
+	client := pb.NewRelayClient(conn)
+	response, err := client.GetChunks(context.Background(), request)
+	return response, err
+}
 
 func TestReadWriteBlobs(t *testing.T) {
 	tu.InitializeRandom()
@@ -35,6 +69,12 @@ func TestReadWriteBlobs(t *testing.T) {
 		blobStore,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]byte)
 
@@ -64,7 +104,7 @@ func TestReadWriteBlobs(t *testing.T) {
 			BlobKey: key[:],
 		}
 
-		response, err := server.GetBlob(context.Background(), request)
+		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, data, response.Blob)
@@ -76,7 +116,7 @@ func TestReadWriteBlobs(t *testing.T) {
 			BlobKey: key[:],
 		}
 
-		response, err := server.GetBlob(context.Background(), request)
+		response, err := getBlob(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, data, response.Blob)
@@ -107,12 +147,18 @@ func TestReadNonExistentBlob(t *testing.T) {
 		nil /* not used in this test */)
 	require.NoError(t, err)
 
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
+
 	for i := 0; i < 10; i++ {
 		request := &pb.GetBlobRequest{
 			BlobKey: tu.RandomBytes(32),
 		}
 
-		response, err := server.GetBlob(context.Background(), request)
+		response, err := getBlob(t, request)
 		require.Error(t, err)
 		require.Nil(t, response)
 	}
@@ -152,6 +198,12 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		blobStore,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]byte)
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
@@ -198,7 +250,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 			BlobKey: key[:],
 		}
 
-		response, err := server.GetBlob(context.Background(), request)
+		response, err := getBlob(t, request)
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
@@ -224,7 +276,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 			BlobKey: key[:],
 		}
 
-		response, err := server.GetBlob(context.Background(), request)
+		response, err := getBlob(t, request)
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
@@ -259,6 +311,12 @@ func TestReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -306,7 +364,7 @@ func TestReadWriteChunks(t *testing.T) {
 			},
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -337,7 +395,7 @@ func TestReadWriteChunks(t *testing.T) {
 			},
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -370,7 +428,7 @@ func TestReadWriteChunks(t *testing.T) {
 			},
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -402,7 +460,7 @@ func TestReadWriteChunks(t *testing.T) {
 			},
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -439,6 +497,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -494,7 +558,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 			},
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 		require.NoError(t, err)
 
 		require.Equal(t, keyCount, len(response.Data))
@@ -544,6 +608,12 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -606,7 +676,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
@@ -652,7 +722,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := server.GetChunks(context.Background(), request)
+			response, err := getChunks(t, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -662,7 +732,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 				require.Equal(t, data[i], convertedFrame)
 			}
 		} else {
-			response, err := server.GetChunks(context.Background(), request)
+			response, err := getChunks(t, request)
 			require.Error(t, err)
 			require.Nil(t, response)
 		}
@@ -701,7 +771,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := server.GetChunks(context.Background(), request)
+			response, err := getChunks(t, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -744,7 +814,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := server.GetChunks(context.Background(), request)
+			response, err := getChunks(t, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -756,7 +826,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 				}
 			}
 		} else {
-			response, err := server.GetChunks(context.Background(), request)
+			response, err := getChunks(t, request)
 			require.Error(t, err)
 			require.Nil(t, response)
 		}
@@ -798,6 +868,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader)
 	require.NoError(t, err)
+
+	go func() {
+		err = server.Start()
+		require.NoError(t, err)
+	}()
+	defer server.Stop()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -877,7 +953,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		response, err := server.GetChunks(context.Background(), request)
+		response, err := getChunks(t, request)
 
 		if allInCorrectShard {
 			require.NoError(t, err)

@@ -54,7 +54,4 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("fatal error starting relay server: %s", err))
 	}
-
-	// Block forever.
-	select {}
 }

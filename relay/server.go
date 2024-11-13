@@ -2,13 +2,18 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	v2pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"net"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -16,6 +21,15 @@ var _ pb.RelayServer = &Server{}
 // Server implements the Relay service defined in api/proto/relay/relay.proto
 type Server struct {
 	pb.UnimplementedRelayServer
+
+	// the logger for the server
+	logger logging.Logger
+
+	// grpcPort is the port that the relay server listens on.
+	grpcPort int
+
+	// maxProtoSize is the maximum size of a gRPC message that the server will accept.
+	maxProtoSize int
 
 	// metadataServer encapsulates logic for fetching metadata for blobs.
 	metadataServer *metadataManager
@@ -25,6 +39,9 @@ type Server struct {
 
 	// chunkServer encapsulates logic for fetching chunks.
 	chunkServer *chunkManager
+
+	// grpcServer is the gRPC server.
+	grpcServer *grpc.Server
 }
 
 // NewServer creates a new relay Server.
@@ -42,7 +59,7 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataWorkPoolSize,
-		nil) // TODO
+		config.Shards)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
@@ -68,6 +85,9 @@ func NewServer(
 	}
 
 	return &Server{
+		logger:         logger,
+		grpcPort:       config.GRPCPort,
+		maxProtoSize:   config.MaxGRPCMessageSize,
 		metadataServer: ms,
 		blobServer:     bs,
 		chunkServer:    cs,
@@ -187,8 +207,38 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}, nil
 }
 
-// Start starts the server listening for requests.
+// Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start() error {
-	// TODO
+
+	// Serve grpc requests
+	addr := fmt.Sprintf("0.0.0.0:%d", s.grpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
+	}
+
+	opt := grpc.MaxRecvMsgSize(s.maxProtoSize)
+
+	s.grpcServer = grpc.NewServer(opt)
+	reflection.Register(s.grpcServer)
+	pb.RegisterRelayServer(s.grpcServer, s)
+
+	// Register Server for Health Checks
+	name := pb.Relay_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, s.grpcServer)
+
+	s.logger.Info("GRPC Listening", "port", s.grpcPort, "address", listener.Addr().String())
+
+	if err = s.grpcServer.Serve(listener); err != nil {
+		return errors.New("could not start GRPC server")
+	}
+
 	return nil
+}
+
+// Stop stops the server.
+func (s *Server) Stop() {
+	if s.grpcServer != nil {
+		s.grpcServer.Stop()
+	}
 }

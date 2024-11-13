@@ -43,6 +43,13 @@ type Config struct {
 	// serve data for any shard it can.
 	Shards []core.RelayKey
 
+	// GRPCPort is the port that the relay server listens on. Default is 50051. // TODO what is a good port?
+	GRPCPort int
+
+	// MaxGRPCMessageSize is the maximum size of a gRPC message that the server will accept.
+	// Default is 1024 * 1024 * 300 (300 MiB).
+	MaxGRPCMessageSize int
+
 	// BucketName is the name of the S3 bucket that stores blobs. Default is "relay".
 	BucketName string
 
@@ -73,6 +80,8 @@ func DefaultConfig() *Config {
 	return &Config{
 		Log:                  common.DefaultLoggerConfig(),
 		AWS:                  *aws.DefaultClientConfig(),
+		GRPCPort:             50051,
+		MaxGRPCMessageSize:   1024 * 1024 * 300,
 		BucketName:           "relay",
 		MetadataTableName:    "metadata",
 		MetadataCacheSize:    1024 * 1024,
