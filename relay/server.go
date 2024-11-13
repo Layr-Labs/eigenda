@@ -186,3 +186,9 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		Data: protoChunks,
 	}, nil
 }
+
+// Start starts the server listening for requests.
+func (s *Server) Start() error {
+	// TODO
+	return nil
+}

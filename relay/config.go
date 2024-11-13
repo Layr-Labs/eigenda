@@ -3,6 +3,7 @@ package relay
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/spf13/viper"
 	"os"
@@ -35,9 +36,18 @@ type Config struct {
 	// Log is the configuration for the logger. Default is common.DefaultLoggerConfig().
 	Log common.LoggerConfig
 
+	// Configuration for the AWS client. Default is aws.DefaultClientConfig().
+	AWS aws.ClientConfig
+
 	// Shards contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
 	// serve data for any shard it can.
 	Shards []core.RelayKey
+
+	// BucketName is the name of the S3 bucket that stores blobs. Default is "relay".
+	BucketName string
+
+	// MetadataTableName is the name of the DynamoDB table that stores metadata. Default is "metadata".
+	MetadataTableName string
 
 	// MetadataCacheSize is the size of the metadata cache. Default is 1024 * 1024.
 	MetadataCacheSize int
@@ -62,6 +72,9 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Log:                  common.DefaultLoggerConfig(),
+		AWS:                  *aws.DefaultClientConfig(),
+		BucketName:           "relay",
+		MetadataTableName:    "metadata",
 		MetadataCacheSize:    1024 * 1024,
 		MetadataWorkPoolSize: 32,
 		BlobCacheSize:        32,
