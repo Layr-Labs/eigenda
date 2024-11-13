@@ -83,7 +83,12 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	//  - per-connection throttle
 	//  - timeouts
 
-	keys := []v2.BlobKey{v2.BlobKey(request.BlobKey)}
+	key, err := v2.BytesToBlobKey(request.BlobKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid blob key: %w", err)
+	}
+
+	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -94,7 +99,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf("blob not found")
 	}
 
-	key := v2.BlobKey(request.BlobKey)
 	data, err := s.blobServer.GetBlob(key)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
@@ -116,14 +120,26 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	//  - per-connection throttle
 	//  - timeouts
 
+	if len(request.ChunkRequests) <= 0 {
+		return nil, fmt.Errorf("no chunk requests provided")
+	}
+
 	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
 		var key v2.BlobKey
 		if chunkRequest.GetByIndex() != nil {
-			key = v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
+			var err error
+			key, err = v2.BytesToBlobKey(chunkRequest.GetByIndex().GetBlobKey())
+			if err != nil {
+				return nil, fmt.Errorf("invalid blob key: %w", err)
+			}
 		} else {
-			key = v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
+			var err error
+			key, err = v2.BytesToBlobKey(chunkRequest.GetByRange().GetBlobKey())
+			if err != nil {
+				return nil, fmt.Errorf("invalid blob key: %w", err)
+			}
 		}
 		keys = append(keys, key)
 	}
