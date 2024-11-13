@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -193,6 +194,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		config.RateConfig,
 		config.MaxBlobSize,
 	)
+	reg.MustRegister(grpc_prometheus.DefaultServerMetrics)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
