@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"math/rand"
 	"os"
 	"runtime"
@@ -15,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 type BenchmarkResult struct {
@@ -58,22 +56,6 @@ func main() {
 	fmt.Println("Config output", config.OutputFile)
 
 	fmt.Printf("* Task Starts\n")
-
-	// GPU Setup
-	icicle_runtime.LoadBackendFromEnvOrDefault()
-
-	// trying to choose CUDA if available, or fallback to CPU otherwise (default device)
-	var device icicle_runtime.Device
-	deviceCuda := icicle_runtime.CreateDevice("CUDA", 0) // GPU-0
-	if icicle_runtime.IsDeviceAvailable(&deviceCuda) {
-		device = icicle_runtime.CreateDevice("CUDA", 0) // GPU-0
-		slog.Debug("CUDA device available, setting device")
-		icicle_runtime.SetDevice(&device)
-	} else {
-		slog.Debug("CUDA device not available, falling back to CPU")
-		device = icicle_runtime.CreateDevice("CPU", 0)
-		icicle_runtime.SetDevice(&device)
-	}
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)
@@ -138,7 +120,11 @@ func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, ver
 	}
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
-	encoder, err := rs.NewEncoder()
+	encoder, err := rs.NewEncoder(
+		rs.WithBackend(encoding.BackendIcicle),
+		rs.WithGPU(false),
+		rs.WithVerbose(true),
+	)
 
 	// Create array of bytes
 	inputSize := blobLength * 32

@@ -71,7 +71,13 @@ func main() {
 	fmt.Printf("* Task Starts\n")
 
 	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, false)
+	p, _ := prover.NewProver(
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(false),
+		prover.WithVerbose(true),
+		prover.WithBackend(encoding.BackendIcicle),
+		prover.WithGPU(false),
+	)
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)

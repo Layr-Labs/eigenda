@@ -1,7 +1,4 @@
-//go:build gpu
-// +build gpu
-
-package gpu
+package icicle
 
 import (
 	"sync"
@@ -14,17 +11,13 @@ import (
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-type RsGpuComputeDevice struct {
-	NttCfg  core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
-	GpuLock *sync.Mutex
-	Device  runtime.Device
+type RsIcicleComputeDevice struct {
+	NttCfg core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+	Device runtime.Device
 }
 
 // Encoding Reed Solomon using FFT
-func (g *RsGpuComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	g.GpuLock.Lock()
-	defer g.GpuLock.Unlock()
-
+func (g *RsIcicleComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 

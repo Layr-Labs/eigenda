@@ -70,7 +70,18 @@ func main() {
 	fmt.Printf("* Task Starts\n")
 
 	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, true)
+	rsEncoder, _ := rs.NewEncoder(
+		rs.WithBackend(encoding.BackendIcicle),
+		rs.WithGPU(true),
+	)
+	p, err := prover.NewProver(
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+		prover.WithRSEncoder(rsEncoder),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create prover: %v", err)
+	}
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
@@ -13,15 +14,28 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/gpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 
 	_ "go.uber.org/automaxprocs"
 )
 
+// ProverOption defines a function that configures a Prover
+type ProverOption func(*Prover) error
+
 type Prover struct {
-	*kzg.KzgConfig
+	config    *encoding.Config
+	kzgConfig *kzg.KzgConfig
+	*rs.Encoder
+	encoding.BackendType
 	Srs          *kzg.SRS
 	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
@@ -32,91 +46,203 @@ type Prover struct {
 
 var _ encoding.Prover = &Prover{}
 
-func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
-	if config.SRSNumberToLoad > config.SRSOrder {
-		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
+// Default configuration values
+const (
+	defaultBackend        = encoding.BackendDefault
+	defaultEnableGPU      = false
+	defaultLoadG2Points   = true
+	defaultPreloadEncoder = false
+	defaultNTTSize        = 25 // Used for NTT setup in Icicle backend
+	defaultVerbose        = false
+)
+
+// WithBackend sets the backend type for the prover
+func WithBackend(backend encoding.BackendType) ProverOption {
+	return func(p *Prover) error {
+		p.config.BackendType = backend
+		return nil
+	}
+}
+
+// WithGPU enables or disables GPU usage
+func WithGPU(enable bool) ProverOption {
+	return func(e *Prover) error {
+		e.config.EnableGPU = enable
+		return nil
+	}
+}
+
+// WithKZGConfig sets the KZG configuration
+func WithKZGConfig(config *kzg.KzgConfig) ProverOption {
+	return func(p *Prover) error {
+		if config.SRSNumberToLoad > config.SRSOrder {
+			return errors.New("SRSOrder is less than srsNumberToLoad")
+		}
+		p.kzgConfig = config
+		return nil
+	}
+}
+
+// WithRSEncoder sets a custom RS encoder
+func WithRSEncoder(encoder *rs.Encoder) ProverOption {
+	return func(p *Prover) error {
+		p.Encoder = encoder
+		return nil
+	}
+}
+
+// WithRSEncoderOptions configures the RS encoder with specific options
+func WithRSEncoderOptions(opts ...rs.EncoderOption) ProverOption {
+	return func(p *Prover) error {
+		encoder, err := rs.NewEncoder(opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create RS encoder: %w", err)
+		}
+		p.Encoder = encoder
+		return nil
+	}
+}
+
+// WithLoadG2Points enables or disables G2 points loading
+func WithLoadG2Points(load bool) ProverOption {
+	return func(p *Prover) error {
+		p.LoadG2Points = load
+		return nil
+	}
+}
+
+// WithPreloadEncoder enables or disables encoder preloading
+func WithPreloadEncoder(preload bool) ProverOption {
+	return func(p *Prover) error {
+		if !preload {
+			return nil
+		}
+
+		if p.kzgConfig == nil {
+			return errors.New("KZG config must be set before enabling preload encoder")
+		}
+
+		// Create table dir if not exist
+		err := os.MkdirAll(p.kzgConfig.CacheDir, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("cannot make CacheDir: %w", err)
+		}
+
+		return p.PreloadAllEncoders()
+	}
+}
+
+// WithVerbose enables or disables verbose logging
+func WithVerbose(verbose bool) ProverOption {
+	return func(p *Prover) error {
+		p.config.Verbose = verbose
+		return nil
+	}
+}
+
+func NewProver(opts ...ProverOption) (*Prover, error) {
+	p := &Prover{
+		config: &encoding.Config{
+			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
+			BackendType: defaultBackend,
+			EnableGPU:   defaultEnableGPU,
+			Verbose:     defaultVerbose,
+		},
+
+		LoadG2Points:        defaultLoadG2Points,
+		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
+		mu:                  sync.Mutex{},
 	}
 
-	// Read the whole order, and treat it as entire SRS for low degree proof
-	startTime := time.Now()
-	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
-	if err != nil {
-		log.Println("failed to read G1 points", err)
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(p); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
+		}
+	}
+
+	// Validate required configurations
+	if p.kzgConfig == nil {
+		return nil, errors.New("KZG config is required")
+	}
+
+	if err := p.initializeSRS(); err != nil {
 		return nil, err
+	}
+
+	// Create default RS encoder if none provided
+	if p.Encoder == nil {
+		encoder, err := rs.NewEncoder()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default RS encoder: %w", err)
+		}
+		p.Encoder = encoder
+	}
+
+	return p, nil
+}
+
+func (p *Prover) initializeSRS() error {
+	startTime := time.Now()
+	s1, err := kzg.ReadG1Points(p.kzgConfig.G1Path, p.kzgConfig.SRSNumberToLoad, p.kzgConfig.NumWorker)
+	if err != nil {
+		return fmt.Errorf("failed to read G1 points: %w", err)
 	}
 	slog.Info("ReadG1Points", "time", time.Since(startTime), "numPoints", len(s1))
 
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
 
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if loadG2Points {
-		if len(config.G2Path) == 0 {
-			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
+	if p.LoadG2Points {
+		if err := p.loadG2PointsData(&s2, &g2Trailing); err != nil {
+			return err
 		}
-
-		startTime := time.Now()
-		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
-		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
-		}
-		slog.Info("ReadG2Points", "time", time.Since(startTime), "numPoints", len(s2))
-
-		// Measure time to read G2 points section
-		startTime = time.Now()
-		g2Trailing, err = kzg.ReadG2PointSection(
-			config.G2Path,
-			config.SRSOrder-config.SRSNumberToLoad,
-			config.SRSOrder, // last exclusive
-			config.NumWorker,
-		)
-		if err != nil {
-			return nil, err
-		}
-		slog.Info("ReadG2PointSection", "time", time.Since(startTime), "numPoints", len(g2Trailing))
-	} else {
-		// todo, there are better ways to handle it
-		if len(config.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
-		}
+	} else if len(p.kzgConfig.G2PowerOf2Path) == 0 {
+		return errors.New("G2PowerOf2Path is empty but required when loadG2Points is false")
 	}
 
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
-		log.Println("Could not create srs", err)
-		return nil, err
+		return fmt.Errorf("could not create srs: %w", err)
 	}
 
-	fmt.Println("prover numthread", runtime.GOMAXPROCS(0))
+	p.Srs = srs
+	p.G2Trailing = g2Trailing
 
-	encoderGroup := &Prover{
-		KzgConfig:           config,
-		Srs:                 srs,
-		G2Trailing:          g2Trailing,
-		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
-		LoadG2Points:        loadG2Points,
+	return nil
+}
+
+func (p *Prover) loadG2PointsData(s2 *[]bn254.G2Affine, g2Trailing *[]bn254.G2Affine) error {
+	if len(p.kzgConfig.G2Path) == 0 {
+		return errors.New("G2Path is empty but required when loadG2Points is true")
 	}
 
-	if config.PreloadEncoder {
-		// create table dir if not exist
-		err := os.MkdirAll(config.CacheDir, os.ModePerm)
-		if err != nil {
-			log.Println("Cannot make CacheDir", err)
-			return nil, err
-		}
-
-		err = encoderGroup.PreloadAllEncoders()
-		if err != nil {
-			return nil, err
-		}
+	startTime := time.Now()
+	points, err := kzg.ReadG2Points(p.kzgConfig.G2Path, p.kzgConfig.SRSNumberToLoad, p.kzgConfig.NumWorker)
+	if err != nil {
+		return fmt.Errorf("failed to read G2 points: %w", err)
 	}
+	slog.Info("ReadG2Points", "time", time.Since(startTime), "numPoints", len(points))
+	*s2 = points
 
-	return encoderGroup, nil
+	startTime = time.Now()
+	trailing, err := kzg.ReadG2PointSection(
+		p.kzgConfig.G2Path,
+		p.kzgConfig.SRSOrder-p.kzgConfig.SRSNumberToLoad,
+		p.kzgConfig.SRSOrder,
+		p.kzgConfig.NumWorker,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to read G2 point section: %w", err)
+	}
+	slog.Info("ReadG2PointSection", "time", time.Since(startTime), "numPoints", len(trailing))
+	*g2Trailing = trailing
+
+	return nil
 }
 
 func (g *Prover) PreloadAllEncoders() error {
-	paramsAll, err := GetAllPrecomputedSrsMap(g.CacheDir)
+	paramsAll, err := GetAllPrecomputedSrsMap(g.kzgConfig.CacheDir)
 	if err != nil {
 		return err
 	}
@@ -195,7 +321,6 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 
 	chunks := make([]*encoding.Frame, len(kzgFrames))
 	for ind, frame := range kzgFrames {
-
 		chunks[ind] = &encoding.Frame{
 			Coeffs: frame.Coeffs,
 			Proof:  frame.Proof,
@@ -343,4 +468,202 @@ func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {
 		res[i] = uint64(d)
 	}
 	return res
+}
+
+func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
+	if err := encoding.ValidateEncodingParams(params, p.kzgConfig.SRSOrder); err != nil {
+		return nil, err
+	}
+
+	// Create FFT settings based on params
+	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	if params.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * params.NumChunks)))
+	}
+	fs := fft.NewFFTSettings(n)
+
+	// Create base KZG settings
+	ks, err := kzg.NewKZGSettings(fs, p.Srs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
+	}
+
+	switch p.config.BackendType {
+
+	case encoding.BackendDefault:
+		return p.createDefaultBackendProver(params, fs, ks)
+	case encoding.BackendIcicle:
+		return p.createIcicleBackendProver(params, fs, ks)
+	default:
+		return nil, fmt.Errorf("unsupported backend type: %v", p.config.BackendType)
+	}
+
+}
+
+func (p *Prover) createDefaultBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+	fmt.Println("wtfd")
+	if p.config.EnableGPU {
+		return nil, fmt.Errorf("GPU is not supported in default backend")
+	}
+
+	_, fftPointsT, err := p.setupFFTPoints(params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create subgroup FFT settings
+	t := uint8(math.Log2(float64(2 * params.NumChunks)))
+	sfs := fft.NewFFTSettings(t)
+
+	// Set KZG Prover CPU computer
+	proofComputer := &cpu.KzgCpuProofDevice{
+		Fs:         fs,
+		FFTPointsT: fftPointsT,
+		SFs:        sfs,
+		KzgConfig:  p.kzgConfig,
+	}
+
+	// Set KZG Commitments CPU computer
+	commitmentsComputer := &cpu.KzgCPUCommitmentsDevice{
+		Srs:        p.Srs,
+		G2Trailing: p.G2Trailing,
+		KzgConfig:  p.kzgConfig,
+	}
+
+	return &ParametrizedProver{
+		Encoder:             p.Encoder,
+		EncodingParams:      params,
+		KzgConfig:           p.kzgConfig,
+		Ks:                  ks,
+		ProofComputer:       proofComputer,
+		CommitmentsComputer: commitmentsComputer,
+	}, nil
+}
+
+func (p *Prover) createIcicleBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
+	icicle_runtime.LoadBackendFromEnvOrDefault()
+
+	// Setup device (GPU or CPU)
+	device := p.setupIcicleDevice()
+
+	_, fftPointsT, err := p.setupFFTPoints(params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Setup NTT
+	nttCfg, err := p.setupNTTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Setup MSM
+	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, p.Srs.G1[:p.kzgConfig.SRSNumberToLoad])
+	if icicle_err != icicle_runtime.Success {
+		return nil, fmt.Errorf("could not setup MSM")
+	}
+
+	// Create subgroup FFT settings
+	t := uint8(math.Log2(float64(2 * params.NumChunks)))
+	sfs := fft.NewFFTSettings(t)
+
+	// Set up GPU proof computer
+	proofComputer := &gpu.KzgGpuProofDevice{
+		Fs:             fs,
+		FlatFFTPointsT: flatFftPointsT,
+		SRSIcicle:      srsG1Icicle,
+		SFs:            sfs,
+		Srs:            p.Srs,
+		G2Trailing:     p.G2Trailing,
+		NttCfg:         nttCfg,
+		MsmCfg:         msmCfg,
+		MsmCfgG2:       msmCfgG2,
+		KzgConfig:      p.kzgConfig,
+		Device:         device,
+	}
+
+	// Set up CPU commitments computer (same as default backend)
+	commitmentsComputer := &cpu.KzgCPUCommitmentsDevice{
+		Srs:        p.Srs,
+		G2Trailing: p.G2Trailing,
+		KzgConfig:  p.kzgConfig,
+	}
+
+	return &ParametrizedProver{
+		EncodingParams:      params,
+		Encoder:             p.Encoder,
+		KzgConfig:           p.kzgConfig,
+		Ks:                  ks,
+		ProofComputer:       proofComputer,
+		CommitmentsComputer: commitmentsComputer,
+	}, nil
+}
+
+// Helper methods for setup
+func (p *Prover) setupFFTPoints(params encoding.EncodingParams) ([][]bn254.G1Affine, [][]bn254.G1Affine, error) {
+	subTable, err := NewSRSTable(p.kzgConfig.CacheDir, p.Srs.G1, p.config.NumWorker)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create SRS table: %w", err)
+	}
+
+	fftPoints, err := subTable.GetSubTables(params.NumChunks, params.ChunkLength)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get sub tables: %w", err)
+	}
+
+	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
+	for i := range fftPointsT {
+		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
+		for j := uint64(0); j < params.ChunkLength; j++ {
+			fftPointsT[i][j] = fftPoints[j][i]
+		}
+	}
+
+	return fftPoints, fftPointsT, nil
+}
+
+func (e *Prover) setupIcicleDevice() icicle_runtime.Device {
+	if e.config.EnableGPU {
+		return setupGPUDevice()
+	}
+	return setupCPUDevice()
+}
+
+func setupGPUDevice() icicle_runtime.Device {
+	deviceCuda := icicle_runtime.CreateDevice("CUDA", 0)
+	if icicle_runtime.IsDeviceAvailable(&deviceCuda) {
+		device := icicle_runtime.CreateDevice("CUDA", 0)
+		slog.Info("CUDA device available, setting device")
+		icicle_runtime.SetDevice(&device)
+		return device
+	}
+
+	slog.Info("CUDA device not available, falling back to CPU")
+
+	return setupCPUDevice()
+}
+
+func setupCPUDevice() icicle_runtime.Device {
+	device := icicle_runtime.CreateDevice("CPU", 0)
+	if icicle_runtime.IsDeviceAvailable(&device) {
+		slog.Info("CPU device available, setting device")
+	}
+	icicle_runtime.SetDevice(&device)
+	return device
+}
+
+func (p *Prover) setupMSM(fftPointsT [][]bn254.G1Affine) ([]icicle_bn254.Affine, []icicle_bn254.Affine, core.MSMConfig, core.MSMConfig, error) {
+	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, p.Srs.G1[:p.kzgConfig.SRSNumberToLoad])
+	if icicle_err != icicle_runtime.Success {
+		return nil, nil, core.MSMConfig{}, core.MSMConfig{}, fmt.Errorf("could not setup MSM")
+	}
+	return flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, nil
+}
+
+func (p *Prover) setupNTTConfig() (core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32], error) {
+	nttCfg, icicle_err := gpu_utils.SetupNTT(defaultNTTSize)
+	if icicle_err != icicle_runtime.Success {
+		return nttCfg, fmt.Errorf("could not setup NTT")
+	}
+	return nttCfg, nil
 }

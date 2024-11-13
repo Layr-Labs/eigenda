@@ -22,6 +22,7 @@ import (
 
 type Verifier struct {
 	*kzg.KzgConfig
+	*rs.Encoder
 	Srs          *kzg.SRS
 	G2Trailing   []bn254.G2Affine
 	mu           sync.Mutex
@@ -109,8 +110,6 @@ type ParametrizedVerifier struct {
 	*kzg.KzgConfig
 	Srs *kzg.SRS
 
-	*rs.Encoder
-
 	Fs *fft.FFTSettings
 	Ks *kzg.KZGSettings
 }
@@ -156,16 +155,15 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 		return nil, err
 	}
 
-	encoder, err := rs.NewEncoder()
-	if err != nil {
-		log.Println("Could not create encoder: ", err)
-		return nil, err
-	}
+	// encoder, err := rs.NewEncoder(rs.BackendDefault, false)
+	// if err != nil {
+	// 	log.Println("Could not create encoder: ", err)
+	// 	return nil, err
+	// }
 
 	return &ParametrizedVerifier{
 		KzgConfig: g.KzgConfig,
 		Srs:       g.Srs,
-		Encoder:   encoder,
 		Fs:        fs,
 		Ks:        ks,
 	}, nil
@@ -173,7 +171,6 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 
 func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
 	return v.VerifyCommit((*bn254.G2Affine)(commitments.LengthCommitment), (*bn254.G2Affine)(commitments.LengthProof), uint64(commitments.Length))
-
 }
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
@@ -302,12 +299,12 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 			Coeffs: chunks[i].Coeffs,
 		}
 	}
-	encoder, err := v.GetKzgVerifier(params)
-	if err != nil {
-		return nil, err
-	}
+	// encoder, err := v.GetKzgVerifier(params)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
+	return v.Encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

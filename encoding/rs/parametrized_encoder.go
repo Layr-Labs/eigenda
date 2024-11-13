@@ -10,7 +10,7 @@ import (
 )
 
 type ParametrizedEncoder struct {
-	*Config
+	*encoding.Config
 	encoding.EncodingParams
 	Fs                *fft.FFTSettings
 	RSEncoderComputer EncoderDevice

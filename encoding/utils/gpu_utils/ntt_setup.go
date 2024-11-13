@@ -1,6 +1,3 @@
-//go:build gpu
-// +build gpu
-
 package gpu_utils
 
 import (

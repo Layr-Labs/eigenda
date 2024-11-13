@@ -1,6 +1,3 @@
-//go:build gpu
-// +build gpu
-
 package gpu
 
 import (
@@ -32,10 +29,8 @@ type KzgGpuProofDevice struct {
 	NttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	MsmCfgG2       core.MSMConfig
-	GpuLock        *sync.Mutex // lock whenever gpu is needed,
 	HeadsG2        []icicle_bn254_g2.G2Affine
 	TrailsG2       []icicle_bn254_g2.G2Affine
-	Stream         *runtime.Stream
 	Device         runtime.Device
 }
 
@@ -102,8 +97,6 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	p.GpuLock.Lock()
-	defer p.GpuLock.Unlock()
 	var msmDone, firstECNttDone, secondECNttDone time.Time
 	runtime.RunOnDevice(&p.Device, func(args ...any) {
 		defer wg.Done()
@@ -146,7 +139,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		secondECNttDone = time.Now()
 
 		flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
-		flatProofsBatchHost.CopyFromDeviceAsync(&flatProofsBatch, *p.Stream)
+		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
 		flatProofsBatch.Free()
 		gpuFFTBatch = gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
 	})
