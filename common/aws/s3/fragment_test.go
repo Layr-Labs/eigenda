@@ -8,6 +8,7 @@ import (
 
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetFragmentCount(t *testing.T) {
@@ -289,4 +290,44 @@ func TestMissingFinalFragment(t *testing.T) {
 
 	_, err = recombineFragments(fragments)
 	assert.Error(t, err)
+}
+
+func TestSortAndCheckAllFragmentsExist(t *testing.T) {
+	keys := []string{ // valid keys
+		"abc-2",
+		"abc-3f",
+		"abc-1",
+		"abc-0",
+	}
+	require.True(t, SortAndCheckAllFragmentsExist(keys))
+
+	keys = []string{ // no final fragment
+		"abc-2",
+		"abc-3",
+		"abc-1",
+		"abc-0",
+	}
+	require.False(t, SortAndCheckAllFragmentsExist(keys))
+
+	keys = []string{ // extra fragment after final fragment
+		"abc-2f",
+		"abc-3",
+		"abc-1",
+		"abc-0",
+	}
+	require.False(t, SortAndCheckAllFragmentsExist(keys))
+
+	keys = []string{ // missing fragment
+		"abc-2",
+		"abc-3f",
+		"abc-1",
+	}
+	require.False(t, SortAndCheckAllFragmentsExist(keys))
+
+	keys = []string{ // missing fragment
+		"abc-2",
+		"abc-3f",
+		"abc-0",
+	}
+	require.False(t, SortAndCheckAllFragmentsExist(keys))
 }

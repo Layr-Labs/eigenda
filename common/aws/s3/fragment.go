@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -80,6 +81,23 @@ func GetFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 		keys[i] = fragmentKey
 	}
 	return keys, nil
+}
+
+// AllFragmentsExist returns true if all keys are fragment keys.
+// It checks if all fragment keys starting with 0th fragment and ending with nth fragment (marked by "f" postfix) exist.
+// Warning: this function sorts the input slice in place and therefore mutates the ordering of the input slice.
+func SortAndCheckAllFragmentsExist(keys []string) bool {
+	sort.Strings(keys)
+	for i, key := range keys {
+		if !strings.HasSuffix(key, "-"+strconv.Itoa(i)) {
+			if strings.HasSuffix(key, "-"+strconv.Itoa(i)+"f") {
+				return i == len(keys)-1
+			}
+			return false
+		}
+	}
+
+	return false
 }
 
 // recombineFragments recombines fragments into a single file.

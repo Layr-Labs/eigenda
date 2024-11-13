@@ -270,7 +270,7 @@ func TestRandomCoefficients(t *testing.T) {
 	}
 }
 
-func TestIdempotency(t *testing.T) {
+func TestCheckProofCoefficientsExist(t *testing.T) {
 	tu.InitializeRandom()
 	client := mock.NewS3Client()
 
@@ -299,8 +299,6 @@ func TestIdempotency(t *testing.T) {
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
-	expectedUploadCalls := 0
-	expectedFragmentedUploadObjectCalls := 0
 	ctx := context.Background()
 	for i := 0; i < 100; i++ {
 		key := corev2.BlobKey(tu.RandomBytes(32))
@@ -308,25 +306,13 @@ func TestIdempotency(t *testing.T) {
 		proofs := getProofs(t, rand.Intn(100)+100)
 		err := writer.PutChunkProofs(ctx, key, proofs)
 		require.NoError(t, err)
-		expectedUploadCalls++
-		require.Equal(t, expectedUploadCalls, client.Called["UploadObject"])
-
-		// Attempt to upload the same proofs again
 		require.True(t, writer.ProofExists(ctx, key))
-		err = writer.PutChunkProofs(ctx, key, proofs)
-		require.NoError(t, err)
-		require.Equal(t, expectedUploadCalls, client.Called["UploadObject"])
 
 		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
 		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
-		expectedFragmentedUploadObjectCalls++
-		require.Equal(t, expectedFragmentedUploadObjectCalls, client.Called["FragmentedUploadObject"])
-
-		// Attempt to upload the same coefficients again
-		newMetadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
-		require.NoError(t, err)
-		require.Equal(t, metadata, newMetadata)
-		require.Equal(t, expectedFragmentedUploadObjectCalls, client.Called["UploadObject"])
+		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
+		require.True(t, exist)
+		require.Equal(t, metadata, fragmentInfo)
 	}
 }

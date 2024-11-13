@@ -24,7 +24,8 @@ type ChunkWriter interface {
 	// ProofExists checks if the proofs for the blob key exist in the chunk store.
 	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
 	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
-	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey, dataSize int64) bool
+	// Returns a bool indicating if the coefficients exist and fragment info.
+	CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo)
 }
 
 var _ ChunkWriter = (*chunkWriter)(nil)
@@ -56,11 +57,6 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	if c.ProofExists(ctx, blobKey) {
-		c.logger.Infof("Proofs already exist for blob key %s", blobKey)
-		return nil
-	}
-
 	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
 	for _, proof := range proofs {
 		proofBytes := proof.Bytes()
@@ -89,14 +85,6 @@ func (c *chunkWriter) PutChunkCoefficients(
 		return nil, fmt.Errorf("failed to encode frames: %v", err)
 	}
 
-	if c.CoefficientsExists(ctx, blobKey, int64(len(bytes))) {
-		c.logger.Infof("Coefficients already exist for blob key %s", blobKey)
-		return &encoding.FragmentInfo{
-			TotalChunkSizeBytes: uint32(len(bytes)),
-			FragmentSizeBytes:   uint32(c.fragmentSize),
-		}, nil
-	}
-
 	err = c.s3Client.FragmentedUploadObject(ctx, c.bucketName, s3.ScopedChunkKey(blobKey), bytes, c.fragmentSize)
 	if err != nil {
 		c.logger.Errorf("Failed to upload chunk coefficients to S3: %v", err)
@@ -118,17 +106,22 @@ func (c *chunkWriter) ProofExists(ctx context.Context, blobKey corev2.BlobKey) b
 	return false
 }
 
-func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey, dataSize int64) bool {
+func (c *chunkWriter) CoefficientsExists(ctx context.Context, blobKey corev2.BlobKey) (bool, *encoding.FragmentInfo) {
 	// TODO(ian-shim): check latency
 	objs, err := c.s3Client.ListObjects(ctx, c.bucketName, s3.ScopedChunkKey(blobKey))
 	if err != nil {
-		return false
+		return false, nil
 	}
 
+	keys := make([]string, len(objs))
 	totalSize := int64(0)
-	for _, obj := range objs {
-		totalSize += obj.Size
+	for i, obj := range objs {
+		keys[i] = obj.Key
+		totalSize += int64(obj.Size)
 	}
 
-	return totalSize == dataSize
+	return s3.SortAndCheckAllFragmentsExist(keys), &encoding.FragmentInfo{
+		TotalChunkSizeBytes: uint32(totalSize),
+		FragmentSizeBytes:   uint32(c.fragmentSize),
+	}
 }
