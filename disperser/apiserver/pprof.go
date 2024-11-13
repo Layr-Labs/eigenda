@@ -6,7 +6,6 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -29,10 +28,9 @@ func NewPprofProfiler(httpPort string, logger logging.Logger) *PprofProfiler {
 
 // Start the pprof server
 func (p *PprofProfiler) Start(port string, logger logging.Logger) {
-	pprofAddr := fmt.Sprintf("%s:%s", disperser.Localhost, port)
-	mux := http.NewServeMux()
+	pprofAddr := fmt.Sprintf("%s:%s", "0.0.0.0", port)
 
-	if err := http.ListenAndServe(pprofAddr, mux); err != nil {
+	if err := http.ListenAndServe(pprofAddr, nil); err != nil {
 		p.logger.Error("pprof server failed", "error", err)
 	}
 }
