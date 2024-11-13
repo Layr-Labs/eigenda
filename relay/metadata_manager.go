@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"golang.org/x/sync/errgroup"
 	"sync/atomic"
 )
 
@@ -38,9 +37,8 @@ type metadataManager struct {
 	// that are not assigned to one of these shards.
 	shardSet map[v2.RelayKey]struct{}
 
-	// pool is a work pool for managing concurrent metadata requests. Used to limit the number of concurrent
-	// requests to the metadata store.
-	pool *errgroup.Group
+	// concurrencyLimiter is a channel that limits the number of concurrent operations.
+	concurrencyLimiter chan struct{}
 }
 
 // newMetadataManager creates a new metadataManager.
@@ -57,15 +55,12 @@ func newMetadataManager(
 		shardSet[shard] = struct{}{}
 	}
 
-	pool := &errgroup.Group{}
-	pool.SetLimit(workPoolSize)
-
 	server := &metadataManager{
-		ctx:           ctx,
-		logger:        logger,
-		metadataStore: metadataStore,
-		shardSet:      shardSet,
-		pool:          pool,
+		ctx:                ctx,
+		logger:             logger,
+		metadataStore:      metadataStore,
+		shardSet:           shardSet,
+		concurrencyLimiter: make(chan struct{}, workPoolSize),
 	}
 
 	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, blobMetadata](metadataCacheSize, server.fetchMetadata)
@@ -104,7 +99,12 @@ func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, 
 		}
 
 		boundKey := key
-		m.pool.Go(func() error {
+		m.concurrencyLimiter <- struct{}{}
+		go func() {
+			defer func() {
+				<-m.concurrencyLimiter
+			}()
+
 			metadata, err := m.metadataCache.Get(boundKey)
 			if err != nil {
 				// Intentionally log at debug level. External users can force this condition to trigger
@@ -116,15 +116,13 @@ func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, 
 					key: boundKey,
 					err: err,
 				}
-				return nil
 			}
 
 			completionChannel <- &blobMetadataResult{
 				key:      boundKey,
 				metadata: metadata,
 			}
-			return nil
-		})
+		}()
 	}
 
 	mMap := make(metadataMap)

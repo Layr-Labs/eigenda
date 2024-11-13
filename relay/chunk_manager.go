@@ -10,9 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"golang.org/x/sync/errgroup"
 	"sync"
-	"sync/atomic"
 )
 
 type chunkManager struct {
@@ -26,9 +24,8 @@ type chunkManager struct {
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
 
-	// pool is a work pool for managing concurrent requests. Used to limit the number of concurrent
-	// requests.
-	pool *errgroup.Group
+	// concurrencyLimiter is a channel that limits the number of concurrent operations.
+	concurrencyLimiter chan struct{}
 }
 
 // blobKeyWithMetadata attaches some additional metadata to a blobKey.
@@ -49,14 +46,11 @@ func newChunkManager(
 	cacheSize int,
 	workPoolSize int) (*chunkManager, error) {
 
-	pool := &errgroup.Group{}
-	pool.SetLimit(workPoolSize)
-
 	server := &chunkManager{
-		ctx:         ctx,
-		logger:      logger,
-		chunkReader: chunkReader,
-		pool:        pool,
+		ctx:                ctx,
+		logger:             logger,
+		chunkReader:        chunkReader,
+		concurrencyLimiter: make(chan struct{}, workPoolSize),
 	}
 
 	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](cacheSize, server.fetchFrames)
@@ -88,22 +82,13 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 	// Channel for results.
 	completionChannel := make(chan *framesResult, len(keys))
 
-	// Set when the first error is encountered. Useful for preventing new operations from starting.
-	hadError := atomic.Bool{}
-
 	for _, key := range keys {
 
-		if hadError.Load() {
-			// If we've already encountered an error, don't start any new operations.
-			break
-		}
-
 		boundKey := key
-		s.pool.Go(func() error {
+		go func() {
 			frames, err := s.frameCache.Get(*boundKey)
 			if err != nil {
 				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
-				hadError.Store(true)
 				completionChannel <- &framesResult{
 					key: boundKey.blobKey,
 					err: err,
@@ -115,8 +100,7 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 				}
 			}
 
-			return nil
-		})
+		}()
 	}
 
 	fMap := make(frameMap, len(keys))
@@ -140,12 +124,14 @@ func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) (*[]*encoding.Frame,
 	var proofs []*encoding.Proof
 	var proofsErr error
 
-	s.pool.Go(
-		func() error {
-			defer wg.Done()
-			proofs, proofsErr = s.chunkReader.GetChunkProofs(s.ctx, key.blobKey)
-			return nil
-		})
+	s.concurrencyLimiter <- struct{}{}
+	go func() {
+		defer func() {
+			wg.Done()
+			<-s.concurrencyLimiter
+		}()
+		proofs, proofsErr = s.chunkReader.GetChunkProofs(s.ctx, key.blobKey)
+	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: key.metadata.totalChunkSizeBytes,

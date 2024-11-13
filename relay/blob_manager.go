@@ -7,8 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 // blobManager encapsulates logic for fetching blobs. Utilized by the relay Server.
@@ -23,8 +21,8 @@ type blobManager struct {
 	// blobCache is an LRU cache of blobs.
 	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
 
-	// pool is a work pool for managing concurrent worker goroutines.
-	pool *errgroup.Group
+	// concurrencyLimiter is a channel that limits the number of concurrent operations.
+	concurrencyLimiter chan struct{}
 }
 
 // newBlobManager creates a new blobManager.
@@ -35,14 +33,11 @@ func newBlobManager(
 	blobCacheSize int,
 	workPoolSize int) (*blobManager, error) {
 
-	pool := &errgroup.Group{}
-	pool.SetLimit(workPoolSize)
-
 	server := &blobManager{
-		ctx:       ctx,
-		logger:    logger,
-		blobStore: blobStore,
-		pool:      pool,
+		ctx:                ctx,
+		logger:             logger,
+		blobStore:          blobStore,
+		concurrencyLimiter: make(chan struct{}, workPoolSize),
 	}
 
 	cache, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
@@ -57,22 +52,9 @@ func newBlobManager(
 // GetBlob retrieves a blob from the blob store.
 func (s *blobManager) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 
-	// Even though we don't need extra parallelism here, we still use the work pool to ensure that we don't
-	// permit too many concurrent requests to the blob store.
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	var data *[]byte
-	var err error
-
-	s.pool.Go(func() error {
-		defer wg.Done()
-		data, err = s.blobCache.Get(blobKey)
-		return nil
-	})
-
-	wg.Wait()
+	s.concurrencyLimiter <- struct{}{}
+	data, err := s.blobCache.Get(blobKey)
+	<-s.concurrencyLimiter
 
 	if err != nil {
 		// It should not be possible for external users to force an error here since we won't
