@@ -27,7 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -51,7 +51,8 @@ type DispersalServer struct {
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
-	metrics *disperser.Metrics
+	metrics     *disperser.Metrics
+	grpcMetrics *grpcprom.ServerMetrics
 
 	maxBlobSize int
 
@@ -73,6 +74,7 @@ func NewDispersalServer(
 	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
+	grpcMetrics *grpcprom.ServerMetrics,
 	meterer *meterer.Meterer,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
@@ -96,6 +98,7 @@ func NewDispersalServer(
 		metrics:       metrics,
 		logger:        logger,
 		meterer:       meterer,
+		grpcMetrics:   grpcMetrics,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
@@ -836,11 +839,18 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	gs := grpc.NewServer(
 		opt,
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		))
+
+	// gs := grpc.NewServer(
+	// 	opt,
+	// 	grpc.UnaryInterceptor(
+	// 		grpc.UnaryServerInterceptor(grpcinterceptorprom.UnaryServerInterceptor(s.grpcMetrics)),
+	// 	))
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
-	grpc_prometheus.Register(gs)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
