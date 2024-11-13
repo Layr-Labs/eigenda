@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 
 	_ "go.uber.org/automaxprocs"
@@ -159,9 +159,32 @@ func (e *Encoder) createIcicleBackendEncoder(params encoding.EncodingParams, fs 
 	icicle_runtime.LoadBackendFromEnvOrDefault()
 
 	device := e.setupIcicleDevice()
-	nttCfg, err := e.setupNTTConfig()
-	if err != nil {
-		return nil, err
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	var (
+		nttCfg     core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+		setupErr   error
+		icicle_err icicle_runtime.EIcicleError
+	)
+
+	// Setup NTT on device
+	icicle_runtime.RunOnDevice(&device, func(args ...any) {
+		defer wg.Done()
+
+		// Setup NTT
+		nttCfg, icicle_err = gpu_utils.SetupNTT(defaultNTTSize)
+		if icicle_err != icicle_runtime.Success {
+			setupErr = fmt.Errorf("could not setup NTT")
+			return
+		}
+	})
+
+	wg.Wait()
+
+	if setupErr != nil {
+		return nil, setupErr
 	}
 
 	return &ParametrizedEncoder{
@@ -208,7 +231,7 @@ func (e *Encoder) setupCPUDevice() icicle_runtime.Device {
 	return device
 }
 
-func (e *Encoder) setupNTTConfig() (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], error) {
+func (e *Encoder) setupNTTConfig() (core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32], error) {
 	nttCfg, icicle_err := gpu_utils.SetupNTT(defaultNTTSize)
 	if icicle_err != icicle_runtime.Success {
 		return nttCfg, fmt.Errorf("could not setup NTT")

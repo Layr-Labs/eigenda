@@ -3,11 +3,12 @@ package verifier
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"math/big"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 
@@ -18,10 +19,15 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	_ "go.uber.org/automaxprocs"
 )
 
+// VerifierOption defines a function that configures a Verifier
+type VerifierOption func(*Verifier) error
+
 type Verifier struct {
-	*kzg.KzgConfig
+	config    *encoding.Config
+	kzgConfig *kzg.KzgConfig
 	*rs.Encoder
 	Srs          *kzg.SRS
 	G2Trailing   []bn254.G2Affine
@@ -33,77 +39,143 @@ type Verifier struct {
 
 var _ encoding.Verifier = &Verifier{}
 
-func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
+// Default configuration values
+const (
+	defaultLoadG2Points = true
+	defaultVerbose      = false
+)
 
-	if config.SRSNumberToLoad > config.SRSOrder {
-		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
+// WithKZGConfig sets the KZG configuration
+func WithKZGConfig(config *kzg.KzgConfig) VerifierOption {
+	return func(v *Verifier) error {
+		if config.SRSNumberToLoad > config.SRSOrder {
+			return errors.New("SRSOrder is less than srsNumberToLoad")
+		}
+		v.kzgConfig = config
+		return nil
+	}
+}
+
+// WithRSEncoder sets a custom RS encoder
+func WithRSEncoder(encoder *rs.Encoder) VerifierOption {
+	return func(v *Verifier) error {
+		v.Encoder = encoder
+		return nil
+	}
+}
+
+// WithLoadG2Points enables or disables G2 points loading
+func WithLoadG2Points(load bool) VerifierOption {
+	return func(v *Verifier) error {
+		v.LoadG2Points = load
+		return nil
+	}
+}
+
+// WithVerbose enables or disables verbose logging
+func WithVerbose(verbose bool) VerifierOption {
+	return func(v *Verifier) error {
+		v.config.Verbose = verbose
+		return nil
+	}
+}
+
+func NewVerifier(opts ...VerifierOption) (*Verifier, error) {
+	v := &Verifier{
+		config: &encoding.Config{
+			NumWorker: uint64(runtime.GOMAXPROCS(0)),
+			Verbose:   defaultVerbose,
+		},
+		LoadG2Points:          defaultLoadG2Points,
+		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
+		mu:                    sync.Mutex{},
 	}
 
-	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(v); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
+		}
+	}
+
+	// Validate required configurations
+	if v.kzgConfig == nil {
+		return nil, errors.New("KZG config is required")
+	}
+
+	if err := v.initializeSRS(); err != nil {
+		return nil, err
+	}
+
+	// Create default RS encoder if none provided
+	if v.Encoder == nil {
+		encoder, err := rs.NewEncoder()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default RS encoder: %w", err)
+		}
+		v.Encoder = encoder
+	}
+
+	return v, nil
+}
+
+func (v *Verifier) initializeSRS() error {
+	startTime := time.Now()
+	s1, err := kzg.ReadG1Points(v.kzgConfig.G1Path, v.kzgConfig.SRSNumberToLoad, v.kzgConfig.NumWorker)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
+		return fmt.Errorf("failed to read G1 points: %w", err)
 	}
+	slog.Info("ReadG1Points", "time", time.Since(startTime), "numPoints", len(s1))
 
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
 
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if loadG2Points {
-		if len(config.G2Path) == 0 {
-			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
+	if v.LoadG2Points {
+		if err := v.loadG2PointsData(&s2, &g2Trailing); err != nil {
+			return err
 		}
-
-		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read %d G2 points from %s: %v", config.SRSNumberToLoad, config.G2Path, err)
-		}
-
-		g2Trailing, err = kzg.ReadG2PointSection(
-			config.G2Path,
-			config.SRSOrder-config.SRSNumberToLoad,
-			config.SRSOrder, // last exclusive
-			config.NumWorker,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read trailing G2 points from %s: %v", config.G2Path, err)
-		}
-	} else {
-		if len(config.G2PowerOf2Path) == 0 && len(config.G2Path) == 0 {
-			return nil, errors.New("both G2Path and G2PowerOf2Path are empty. However, object needs to load G2Points")
-		}
-
-		if len(config.G2PowerOf2Path) != 0 {
-			if config.SRSOrder == 0 {
-				return nil, errors.New("SRS order cannot be 0")
-			}
-
-			maxPower := uint64(math.Log2(float64(config.SRSOrder)))
-			_, err := kzg.ReadG2PointSection(config.G2PowerOf2Path, 0, maxPower, 1)
-			if err != nil {
-				return nil, fmt.Errorf("file located at %v is invalid", config.G2PowerOf2Path)
-			}
-		} else {
-			log.Println("verifier requires accesses to entire g2 points. It is a legacy usage. For most operators, it is likely because G2_POWER_OF_2_PATH is improperly configured.")
-		}
+	} else if len(v.kzgConfig.G2PowerOf2Path) == 0 {
+		return errors.New("G2PowerOf2Path is empty but required when loadG2Points is false")
 	}
+
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SRS: %v", err)
+		return fmt.Errorf("could not create srs: %w", err)
 	}
 
-	fmt.Println("numthread", runtime.GOMAXPROCS(0))
+	v.Srs = srs
+	v.G2Trailing = g2Trailing
 
-	encoderGroup := &Verifier{
-		KzgConfig:             config,
-		Srs:                   srs,
-		G2Trailing:            g2Trailing,
-		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
-		LoadG2Points:          loadG2Points,
+	return nil
+}
+
+func (v *Verifier) loadG2PointsData(s2 *[]bn254.G2Affine, g2Trailing *[]bn254.G2Affine) error {
+	if len(v.kzgConfig.G2Path) == 0 {
+		return errors.New("G2Path is empty but required when loadG2Points is true")
 	}
 
-	return encoderGroup, nil
+	startTime := time.Now()
+	points, err := kzg.ReadG2Points(v.kzgConfig.G2Path, v.kzgConfig.SRSNumberToLoad, v.kzgConfig.NumWorker)
+	if err != nil {
+		return fmt.Errorf("failed to read G2 points: %w", err)
+	}
+	slog.Info("ReadG2Points", "time", time.Since(startTime), "numPoints", len(points))
+	*s2 = points
 
+	startTime = time.Now()
+	trailing, err := kzg.ReadG2PointSection(
+		v.kzgConfig.G2Path,
+		v.kzgConfig.SRSOrder-v.kzgConfig.SRSNumberToLoad,
+		v.kzgConfig.SRSOrder,
+		v.kzgConfig.NumWorker,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to read G2 point section: %w", err)
+	}
+	slog.Info("ReadG2PointSection", "time", time.Since(startTime), "numPoints", len(trailing))
+	*g2Trailing = trailing
+
+	return nil
 }
 
 type ParametrizedVerifier struct {
@@ -114,70 +186,67 @@ type ParametrizedVerifier struct {
 	Ks *kzg.KZGSettings
 }
 
-func (g *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
-	if err := params.Validate(); err != nil {
+	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
 		return nil, err
 	}
 
-	ver, ok := g.ParametrizedVerifiers[params]
+	ver, ok := v.ParametrizedVerifiers[params]
 	if ok {
 		return ver, nil
 	}
 
-	ver, err := g.newKzgVerifier(params)
+	ver, err := v.newKzgVerifier(params)
 	if err == nil {
-		g.ParametrizedVerifiers[params] = ver
+		v.ParametrizedVerifiers[params] = ver
 	}
 
 	return ver, err
 }
 
 func (g *Verifier) NewKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	return g.newKzgVerifier(params)
 }
 
-func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-
+func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
 	if err := params.Validate(); err != nil {
 		return nil, err
 	}
 
+	// Create FFT settings based on params
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
-	ks, err := kzg.NewKZGSettings(fs, g.Srs)
 
+	// Create KZG settings
+	ks, err := kzg.NewKZGSettings(fs, v.Srs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
 	}
 
-	// encoder, err := rs.NewEncoder(rs.BackendDefault, false)
-	// if err != nil {
-	// 	log.Println("Could not create encoder: ", err)
-	// 	return nil, err
-	// }
-
 	return &ParametrizedVerifier{
-		KzgConfig: g.KzgConfig,
-		Srs:       g.Srs,
+		KzgConfig: v.kzgConfig,
+		Srs:       v.Srs,
 		Fs:        fs,
 		Ks:        ks,
 	}, nil
 }
 
 func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return v.VerifyCommit((*bn254.G2Affine)(commitments.LengthCommitment), (*bn254.G2Affine)(commitments.LengthProof), uint64(commitments.Length))
+	return v.VerifyCommit(
+		(*bn254.G2Affine)(commitments.LengthCommitment),
+		(*bn254.G2Affine)(commitments.LengthProof),
+		uint64(commitments.Length),
+	)
 }
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
 
-	g1Challenge, err := kzg.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
+	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig)
 	if err != nil {
 		return err
 	}
@@ -299,10 +368,6 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 			Coeffs: chunks[i].Coeffs,
 		}
 	}
-	// encoder, err := v.GetKzgVerifier(params)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return v.Encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
 }

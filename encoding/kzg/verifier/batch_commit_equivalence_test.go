@@ -14,17 +14,29 @@ import (
 )
 
 func TestBatchEquivalence(t *testing.T) {
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	group, err := prover.NewProver(opts...)
+	require.NoError(t, err)
 
-	group, _ := prover.NewProver(kzgConfig, true)
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+	vopts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithLoadG2Points(true),
+	}
+	v, err := verifier.NewVerifier(vopts...)
+	require.NoError(t, err)
+
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
-	require.Nil(t, err)
+	require.NoError(t, err)
+
 	commit, g2commit, _, _, _, err := enc.Encode(inputFr)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	numBlob := 5
 	commitPairs := make([]verifier.CommitmentPair, numBlob)

@@ -71,7 +71,12 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 	if config.EncoderVersion == V2 {
 		// We no longer compute the commitments in the encoder, so we don't need to load the G2 points
-		prover, err := prover.NewProver(&config.EncoderConfig, false)
+		opts := []prover.ProverOption{
+			prover.WithKZGConfig(&config.EncoderConfig),
+			prover.WithLoadG2Points(false),
+		}
+
+		prover, err := prover.NewProver(opts...)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
@@ -105,7 +110,11 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return server.Start()
 	}
 
-	prover, err := prover.NewProver(&config.EncoderConfig, true)
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(&config.EncoderConfig),
+		prover.WithLoadG2Points(true),
+	}
+	prover, err := prover.NewProver(opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}

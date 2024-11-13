@@ -51,7 +51,11 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	p, err := prover.NewProver(kzgConfig, false)
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(false),
+	}
+	p, err := prover.NewProver(opts...)
 
 	return p, err
 }

@@ -14,7 +14,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	icicle_bn254_g2 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/g2"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
@@ -25,12 +24,8 @@ type KzgGpuProofDevice struct {
 	SRSIcicle      []icicle_bn254.Affine
 	SFs            *fft.FFTSettings
 	Srs            *kzg.SRS
-	G2Trailing     []bn254.G2Affine
 	NttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
-	MsmCfgG2       core.MSMConfig
-	HeadsG2        []icicle_bn254_g2.G2Affine
-	TrailsG2       []icicle_bn254_g2.G2Affine
 	Device         runtime.Device
 }
 
@@ -41,8 +36,6 @@ type WorkerResult struct {
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
 func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
-	slog.Debug("Starting ComputeMultiFrameProof")
-
 	begin := time.Now()
 
 	// Robert: Standardizing this to use the same math used in precomputeSRS

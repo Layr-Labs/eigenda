@@ -72,7 +72,14 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, true)
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	p, err := prover.NewProver(opts...)
+	if err != nil {
+		log.Fatalf("Failed to create prover: %v", err)
+	}
 
 	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / numSys}
 	enc, _ := p.GetKzgEncoder(params)
@@ -112,7 +119,11 @@ func TestKzgRs() {
 		}
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
-		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+		rsEncoder, err := enc.GetRsEncoder(params)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		lc := rsEncoder.Fs.ExpandedRootsOfUnity[uint64(j)]
 
 		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		if err != nil {

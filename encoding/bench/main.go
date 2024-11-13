@@ -52,13 +52,15 @@ func parseFlags() Config {
 	return config
 }
 
+var kzgConfig = &kzg.KzgConfig{}
+
 func main() {
 	config := parseFlags()
 
 	fmt.Println("Config output", config.OutputFile)
 
 	// Setup phase
-	kzgConfig := &kzg.KzgConfig{
+	kzgConfig = &kzg.KzgConfig{
 		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
 		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
 		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
@@ -70,15 +72,22 @@ func main() {
 	fmt.Printf("* Task Starts\n")
 
 	// create encoding object
-	rsEncoder, _ := rs.NewEncoder(
+	rs_opts := []rs.EncoderOption{
 		rs.WithBackend(encoding.BackendIcicle),
 		rs.WithGPU(true),
-	)
-	p, err := prover.NewProver(
+	}
+	rsEncoder, _ := rs.NewEncoder(rs_opts...)
+
+	prover_opts := []prover.ProverOption{
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
+		prover.WithVerbose(true),
+		prover.WithBackend(encoding.BackendIcicle),
+		prover.WithGPU(true),
 		prover.WithRSEncoder(rsEncoder),
-	)
+	}
+	p, err := prover.NewProver(prover_opts...)
+
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
 	}
@@ -185,7 +194,7 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 			}
 			lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), p.KzgConfig)
+			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 			if err != nil {
 				log.Fatalf("Load g2 %v failed\n", err)
 			}

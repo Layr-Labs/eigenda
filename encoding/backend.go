@@ -13,9 +13,3 @@ type Config struct {
 	EnableGPU   bool
 	Verbose     bool
 }
-
-func WithIcicleBackend() Config {
-	return Config{
-		BackendType: BackendIcicle,
-	}
-}

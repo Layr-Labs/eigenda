@@ -501,7 +501,6 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 }
 
 func (p *Prover) createDefaultBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
-	fmt.Println("wtfd")
 	if p.config.EnableGPU {
 		return nil, fmt.Errorf("GPU is not supported in default backend")
 	}
@@ -551,16 +550,44 @@ func (p *Prover) createIcicleBackendProver(params encoding.EncodingParams, fs *f
 		return nil, err
 	}
 
-	// Setup NTT
-	nttCfg, err := p.setupNTTConfig()
-	if err != nil {
-		return nil, err
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	// Setup MSM
-	flatFftPointsT, srsG1Icicle, msmCfg, msmCfgG2, icicle_err := gpu_utils.SetupMsm(fftPointsT, p.Srs.G1[:p.kzgConfig.SRSNumberToLoad])
-	if icicle_err != icicle_runtime.Success {
-		return nil, fmt.Errorf("could not setup MSM")
+	var (
+		nttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+		flatFftPointsT []icicle_bn254.Affine
+		srsG1Icicle    []icicle_bn254.Affine
+		msmCfg         core.MSMConfig
+		setupErr       error
+		icicle_err     icicle_runtime.EIcicleError
+	)
+
+	// Setup NTT and MSM on device
+	icicle_runtime.RunOnDevice(&device, func(args ...any) {
+		defer wg.Done()
+
+		// Setup NTT
+		nttCfg, icicle_err = gpu_utils.SetupNTT(defaultNTTSize)
+		if icicle_err != icicle_runtime.Success {
+			setupErr = fmt.Errorf("could not setup NTT")
+			return
+		}
+
+		// Setup MSM
+		flatFftPointsT, srsG1Icicle, msmCfg, _, icicle_err = gpu_utils.SetupMsm(
+			fftPointsT,
+			p.Srs.G1[:p.kzgConfig.SRSNumberToLoad],
+		)
+		if icicle_err != icicle_runtime.Success {
+			setupErr = fmt.Errorf("could not setup MSM")
+			return
+		}
+	})
+
+	wg.Wait()
+
+	if setupErr != nil {
+		return nil, setupErr
 	}
 
 	// Create subgroup FFT settings
@@ -574,10 +601,8 @@ func (p *Prover) createIcicleBackendProver(params encoding.EncodingParams, fs *f
 		SRSIcicle:      srsG1Icicle,
 		SFs:            sfs,
 		Srs:            p.Srs,
-		G2Trailing:     p.G2Trailing,
 		NttCfg:         nttCfg,
 		MsmCfg:         msmCfg,
-		MsmCfgG2:       msmCfgG2,
 		KzgConfig:      p.kzgConfig,
 		Device:         device,
 	}

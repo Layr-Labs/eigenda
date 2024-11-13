@@ -653,7 +653,12 @@ func setup() {
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
-	prover, err = p.NewProver(config, true)
+
+	opts := []p.ProverOption{
+		p.WithKZGConfig(config),
+		p.WithLoadG2Points(true),
+	}
+	prover, err = p.NewProver(opts...)
 	if err != nil {
 		teardown()
 		panic(fmt.Sprintf("failed to initialize KZG prover: %s", err.Error()))

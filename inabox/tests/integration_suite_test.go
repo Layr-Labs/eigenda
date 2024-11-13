@@ -161,16 +161,23 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	v, err := verifier.NewVerifier(&kzg.KzgConfig{
+	kzgConfig := &kzg.KzgConfig{
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
 		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
-		NumWorker:       1,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
+		NumWorker:       1,
 		PreloadEncoder:  false,
-	}, false)
+	}
+
+	opts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithVerbose(true),
+		verifier.WithLoadG2Points(false),
+	}
+	v, err := verifier.NewVerifier(opts...)
 	if err != nil {
 		return err
 	}

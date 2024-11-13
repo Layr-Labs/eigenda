@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -59,9 +60,18 @@ func teardown() {
 
 func TestBenchmarkVerifyChunks(t *testing.T) {
 	t.Skip("This test is meant to be run manually, not as part of the test suite")
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	p, err := prover.NewProver(opts...)
+	require.NoError(t, err)
 
-	p, _ := prover.NewProver(kzgConfig, true)
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+	vopts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithLoadG2Points(true),
+	}
+	v, _ := verifier.NewVerifier(vopts...)
 
 	chunkLengths := []uint64{64, 128, 256, 512, 1024, 2048, 4096, 8192}
 	chunkCounts := []int{4, 8, 16}
@@ -112,9 +122,18 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 }
 
 func BenchmarkVerifyBlob(b *testing.B) {
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	p, err := prover.NewProver(opts...)
+	require.NoError(b, err)
 
-	p, _ := prover.NewProver(kzgConfig, true)
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+	vopts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithLoadG2Points(true),
+	}
+	v, _ := verifier.NewVerifier(vopts...)
 
 	params := encoding.EncodingParams{
 		ChunkLength: 256,

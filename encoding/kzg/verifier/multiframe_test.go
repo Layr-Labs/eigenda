@@ -12,9 +12,19 @@ import (
 )
 
 func TestUniversalVerify(t *testing.T) {
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	group, err := prover.NewProver(opts...)
+	require.Nil(t, err)
 
-	group, _ := prover.NewProver(kzgConfig, true)
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+	vopts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithLoadG2Points(true),
+	}
+	v, err := verifier.NewVerifier(vopts...)
+	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
@@ -54,13 +64,19 @@ func TestUniversalVerify(t *testing.T) {
 }
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
-
 	kzgConfigCopy := *kzgConfig
-	group, err := prover.NewProver(&kzgConfigCopy, true)
-	assert.NoError(t, err)
-	group.KzgConfig.G2Path = ""
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(&kzgConfigCopy),
+		prover.WithLoadG2Points(true),
+	}
+	group, err := prover.NewProver(opts...)
+	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, true)
+	vopts := []verifier.VerifierOption{
+		verifier.WithKZGConfig(kzgConfig),
+		verifier.WithLoadG2Points(true),
+	}
+	v, err := verifier.NewVerifier(vopts...)
 	assert.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

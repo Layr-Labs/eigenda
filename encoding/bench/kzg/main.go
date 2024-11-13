@@ -70,14 +70,15 @@ func main() {
 
 	fmt.Printf("* Task Starts\n")
 
-	// create encoding object
-	p, _ := prover.NewProver(
+	// Create prover object
+	opts := []prover.ProverOption{
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(false),
 		prover.WithVerbose(true),
 		prover.WithBackend(encoding.BackendIcicle),
 		prover.WithGPU(false),
-	)
+	}
+	p, _ := prover.NewProver(opts...)
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)

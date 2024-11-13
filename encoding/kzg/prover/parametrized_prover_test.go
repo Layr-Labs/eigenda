@@ -14,8 +14,12 @@ import (
 )
 
 func TestProveAllCosetThreads(t *testing.T) {
-
-	group, _ := prover.NewProver(kzgConfig, true)
+	opts := []prover.ProverOption{
+		prover.WithKZGConfig(kzgConfig),
+		prover.WithLoadG2Points(true),
+	}
+	group, err := prover.NewProver(opts...)
+	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
