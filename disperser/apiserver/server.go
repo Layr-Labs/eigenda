@@ -300,6 +300,9 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
+	if ctxErr := contextError(err); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		for _, param := range securityParams {
 			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
@@ -1040,4 +1043,16 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	return blob, nil
+}
+
+func contextError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return api.NewErrorDeadlineExceeded(err.Error())
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return api.NewErrorCanceled(err.Error())
+	}
+
+	return nil
 }
