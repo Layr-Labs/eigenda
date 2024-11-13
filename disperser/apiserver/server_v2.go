@@ -144,10 +144,6 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	return nil
 }
 
-func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatusRequest) (*pb.BlobStatusReply, error) {
-	return &pb.BlobStatusReply{}, api.NewErrorUnimplemented()
-}
-
 func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
 	return &pb.BlobCommitmentReply{}, api.NewErrorUnimplemented()
 }

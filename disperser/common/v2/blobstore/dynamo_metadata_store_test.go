@@ -448,6 +448,12 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
+	// attempt to retrieve batch header and attestation at the same time
+	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+	assert.Equal(t, attestation, fetchedAttestation)
+
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
