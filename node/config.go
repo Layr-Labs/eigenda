@@ -78,11 +78,12 @@ type Config struct {
 	UseSecureGrpc                  bool
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
-	BLSRemoteSignerUrl             string
-	BLSPublicKeyHex                string
-	BLSKeyPassword                 string
-	BLSSignerTLSCertFilePath       string
-	UseBLSRemoteSigner             bool
+
+	BLSRemoteSignerEnabled   bool
+	BLSRemoteSignerUrl       string
+	BLSPublicKeyHex          string
+	BLSKeyPassword           string
+	BLSSignerTLSCertFilePath string
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -153,13 +154,16 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	// check if BLS remote signer configuration is provided
-	useBLSRemoteSigner := ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name) != "" && ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name) != ""
+	blsRemoteSignerEnabled := ctx.GlobalBool(flags.BLSRemoteSignerEnabledFlag.Name)
+	if blsRemoteSignerEnabled && (ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name) == "" || ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name) == "") {
+		return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
+	}
 
 	// Decrypt BLS key
 	var privateBls string
 	if !testMode {
 		// If remote signer fields are empty then try to read the BLS key from the file
-		if !useBLSRemoteSigner {
+		if !blsRemoteSignerEnabled {
 			kp, err := bls.ReadPrivateKeyFromFile(ctx.GlobalString(flags.BlsKeyFileFlag.Name), ctx.GlobalString(flags.BlsKeyPasswordFlag.Name))
 			if err != nil {
 				return nil, fmt.Errorf("could not read or decrypt the BLS private key: %v", err)
@@ -224,6 +228,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSPublicKeyHex:                ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name),
 		BLSKeyPassword:                 ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
 		BLSSignerTLSCertFilePath:       ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
-		UseBLSRemoteSigner:             useBLSRemoteSigner,
+		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
 	}, nil
 }
