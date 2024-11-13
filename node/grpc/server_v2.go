@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"runtime"
-	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
@@ -18,23 +17,24 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	node   *node.Node
-	config *node.Config
-	logger logging.Logger
-
+	config      *node.Config
+	node        *node.Node
 	ratelimiter common.RateLimiter
-
-	mu *sync.Mutex
+	logger      logging.Logger
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
-func NewServerV2(config *node.Config, node *node.Node, logger logging.Logger, ratelimiter common.RateLimiter) *ServerV2 {
+func NewServerV2(
+	config *node.Config,
+	node *node.Node,
+	logger logging.Logger,
+	ratelimiter common.RateLimiter,
+) *ServerV2 {
 	return &ServerV2{
 		config:      config,
-		logger:      logger,
 		node:        node,
 		ratelimiter: ratelimiter,
-		mu:          &sync.Mutex{},
+		logger:      logger,
 	}
 }
 

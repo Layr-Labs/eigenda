@@ -182,14 +182,14 @@ func prepareBlobs(
 				}
 				if len(inverseMap[operatorID]) < blobIndex+1 {
 					inverseMap[operatorID] = append(inverseMap[operatorID], &corev2.BlobShard{
-						BlobCertificate: certs[blobIndex],
-						Chunks:          make(map[core.QuorumID][]*encoding.Frame),
+						BlobCertificate: &certs[blobIndex],
+						Bundles:         make(map[core.QuorumID]core.Bundle),
 					})
 				}
 				if len(frames) == 0 {
 					continue
 				}
-				inverseMap[operatorID][blobIndex].Chunks[quorum] = append(inverseMap[operatorID][blobIndex].Chunks[quorum], frames...)
+				inverseMap[operatorID][blobIndex].Bundles[quorum] = append(inverseMap[operatorID][blobIndex].Bundles[quorum], frames...)
 
 			}
 		}

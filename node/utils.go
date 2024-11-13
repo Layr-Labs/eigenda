@@ -25,7 +25,7 @@ func GetBlobMessages(pbBlobs []*pb.Blob, numWorkers int) ([]*core.BlobMessage, e
 		i := i
 		blob := blob
 		pool.Submit(func() {
-			blobHeader, err := core.BlobHeaderFromProto(blob.GetHeader())
+			blobHeader, err := core.BlobHeaderFromProtobuf(blob.GetHeader())
 			if err != nil {
 				resultChan <- err
 				return

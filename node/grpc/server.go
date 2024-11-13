@@ -313,7 +313,7 @@ func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.Merkle
 			return nil, err
 		}
 
-		blobHeader, err := core.BlobHeaderFromProto(&protoBlobHeader)
+		blobHeader, err := core.BlobHeaderFromProtobuf(&protoBlobHeader)
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +355,7 @@ func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, bl
 		return nil, nil, err
 	}
 
-	blobHeader, err := core.BlobHeaderFromProto(&protoBlobHeader)
+	blobHeader, err := core.BlobHeaderFromProtobuf(&protoBlobHeader)
 	if err != nil {
 		return nil, nil, err
 	}

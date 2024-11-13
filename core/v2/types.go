@@ -211,6 +211,77 @@ type Batch struct {
 	BlobCertificates []*BlobCertificate
 }
 
+func (b *Batch) ToProtobuf() (*commonpb.Batch, error) {
+	if b.BatchHeader == nil {
+		return nil, errors.New("batch header is nil")
+	}
+
+	if b.BatchHeader.BatchRoot == [32]byte{} {
+		return nil, errors.New("batch root is empty")
+	}
+
+	if b.BatchHeader.ReferenceBlockNumber == 0 {
+		return nil, errors.New("reference block number is 0")
+	}
+
+	blobCerts := make([]*commonpb.BlobCertificate, len(b.BlobCertificates))
+	for i, cert := range b.BlobCertificates {
+		blobCert, err := cert.ToProtobuf()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert blob certificate to protobuf: %v", err)
+		}
+		blobCerts[i] = blobCert
+	}
+
+	return &commonpb.Batch{
+		Header: &commonpb.BatchHeader{
+			BatchRoot:            b.BatchHeader.BatchRoot[:],
+			ReferenceBlockNumber: b.BatchHeader.ReferenceBlockNumber,
+		},
+		BlobCertificates: blobCerts,
+	}, nil
+}
+
+func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
+	if len(proto.GetBlobCertificates()) == 0 {
+		return nil, errors.New("missing blob certificates in batch")
+	}
+
+	if proto.GetHeader() == nil {
+		return nil, errors.New("missing header in batch")
+	}
+
+	if len(proto.GetHeader().GetBatchRoot()) != 32 {
+		return nil, errors.New("batch root must be 32 bytes")
+	}
+
+	batchHeader := &BatchHeader{
+		BatchRoot:            [32]byte(proto.GetHeader().GetBatchRoot()),
+		ReferenceBlockNumber: proto.GetHeader().GetReferenceBlockNumber(),
+	}
+
+	blobCerts := make([]*BlobCertificate, len(proto.GetBlobCertificates()))
+	for i, cert := range proto.GetBlobCertificates() {
+		blobHeader, err := NewBlobHeader(cert.GetBlobHeader())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create blob header: %v", err)
+		}
+
+		blobCerts[i] = &BlobCertificate{
+			BlobHeader: blobHeader,
+			RelayKeys:  make([]RelayKey, len(cert.GetRelays())),
+		}
+		for j, r := range cert.GetRelays() {
+			blobCerts[i].RelayKeys[j] = RelayKey(r)
+		}
+	}
+
+	return &Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: blobCerts,
+	}, nil
+}
+
 type Attestation struct {
 	*BatchHeader
 

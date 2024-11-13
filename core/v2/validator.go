@@ -16,8 +16,8 @@ var (
 )
 
 type BlobShard struct {
-	BlobCertificate
-	Chunks map[core.QuorumID][]*encoding.Frame
+	*BlobCertificate
+	Bundles core.Bundles
 }
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
@@ -52,18 +52,17 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	if assignment.NumChunks == 0 {
 		return nil, nil, fmt.Errorf("%w: operator %s has no chunks in quorum %d", ErrBlobQuorumSkip, v.operatorID.Hex(), quorum)
 	}
-	if assignment.NumChunks != uint32(len(blob.Chunks[quorum])) {
-		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Chunks[quorum]), assignment.NumChunks, quorum)
+	if assignment.NumChunks != uint32(len(blob.Bundles[quorum])) {
+		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d) for quorum %d", len(blob.Bundles[quorum]), assignment.NumChunks, quorum)
 	}
 
-	// Validate the chunkLength against the confirmation and adversary threshold parameters
+	// Get the chunk length
 	chunkLength, err := GetChunkLength(blob.BlobHeader.BlobVersion, uint32(blob.BlobHeader.BlobCommitments.Length))
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
 
-	// Get the chunk length
-	chunks := blob.Chunks[quorum]
+	chunks := blob.Bundles[quorum]
 	for _, chunk := range chunks {
 		if uint32(chunk.Length()) != chunkLength {
 			return nil, nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d) for quorum %d", ErrChunkLengthMismatch, chunk.Length(), chunkLength, quorum)
@@ -79,8 +78,8 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
-		if len(blob.Chunks) != len(blob.BlobHeader.QuorumNumbers) {
-			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Chunks), len(blob.BlobHeader.QuorumNumbers))
+		if len(blob.Bundles) != len(blob.BlobHeader.QuorumNumbers) {
+			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumNumbers))
 		}
 
 		state, err := v.chainState.GetOperatorState(ctx, uint(referenceBlockNumber), blob.BlobHeader.QuorumNumbers)

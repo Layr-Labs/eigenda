@@ -2,12 +2,12 @@ package node_test
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"runtime"
 	"testing"
 	"time"
 
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -17,12 +17,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-var privateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-var opID = [32]byte{}
+var (
+	privateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	opID       = [32]byte{0}
+)
 
 type components struct {
-	node *node.Node
-	tx   *coremock.MockWriter
+	node        *node.Node
+	tx          *coremock.MockWriter
+	relayClient *clientsmock.MockRelayClient
 }
 
 func newComponents(t *testing.T) *components {
@@ -31,7 +34,6 @@ func newComponents(t *testing.T) *components {
 	if err != nil {
 		panic("failed to create a BLS Key")
 	}
-	copy(opID[:], []byte(fmt.Sprintf("%d", 3)))
 	config := &node.Config{
 		Timeout:                   10 * time.Second,
 		ExpirationPollIntervalSec: 1,
@@ -69,19 +71,21 @@ func newComponents(t *testing.T) *components {
 		panic("failed to create a new levelDB store")
 	}
 	defer os.Remove(dbPath)
-
+	relayClient := clientsmock.NewRelayClient()
 	return &components{
 		node: &node.Node{
-			Config:     config,
-			Logger:     logger,
-			KeyPair:    keyPair,
-			Metrics:    nil,
-			Store:      store,
-			ChainState: chainState,
-			Validator:  mockVal,
-			Transactor: tx,
+			Config:      config,
+			Logger:      logger,
+			KeyPair:     keyPair,
+			Metrics:     nil,
+			Store:       store,
+			ChainState:  chainState,
+			Validator:   mockVal,
+			Transactor:  tx,
+			RelayClient: relayClient,
 		},
-		tx: tx,
+		tx:          tx,
+		relayClient: relayClient,
 	}
 }
 
