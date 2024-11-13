@@ -475,7 +475,7 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.Nil(t, err)
 	err = proto.Unmarshal(blobHeaderBytes0, &protoBlobHeader)
 	assert.Nil(t, err)
-	blobHeader0, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader0, err := core.BlobHeaderFromProto(&protoBlobHeader)
 	assert.Nil(t, err)
 
 	assert.Equal(t, blobHeader0, blobs[0].BlobHeader)
@@ -483,7 +483,7 @@ func TestStoreBatchBlobMapping(t *testing.T) {
 	assert.Nil(t, err)
 	err = proto.Unmarshal(blobHeaderBytes1, &protoBlobHeader)
 	assert.Nil(t, err)
-	blobHeader1, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader1, err := core.BlobHeaderFromProto(&protoBlobHeader)
 	assert.Nil(t, err)
 	assert.Equal(t, blobHeader1, blobs[1].BlobHeader)
 	blobHeaderBytes2, err := s.GetBlobHeader(ctx, batchHeaderHash, 2)

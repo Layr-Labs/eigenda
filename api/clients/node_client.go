@@ -8,7 +8,6 @@ import (
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/node"
 	"github.com/wealdtech/go-merkletree/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -64,7 +63,7 @@ func (c client) GetBlobHeader(
 		return nil, nil, err
 	}
 
-	blobHeader, err := node.GetBlobHeaderFromProto(reply.GetBlobHeader())
+	blobHeader, err := core.BlobHeaderFromProto(reply.GetBlobHeader())
 	if err != nil {
 		return nil, nil, err
 	}
