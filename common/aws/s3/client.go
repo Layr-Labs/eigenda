@@ -88,7 +88,7 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 			workers = 1
 		}
 
-		pool, _ := errgroup.WithContext(ctx)
+		pool := &errgroup.Group{}
 		pool.SetLimit(workers)
 
 		ref = &client{

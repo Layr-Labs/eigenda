@@ -35,7 +35,7 @@ func newBlobManager(
 	blobCacheSize int,
 	workPoolSize int) (*blobManager, error) {
 
-	pool, _ := errgroup.WithContext(ctx)
+	pool := &errgroup.Group{}
 	pool.SetLimit(workPoolSize)
 
 	server := &blobManager{

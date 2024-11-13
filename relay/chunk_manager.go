@@ -79,34 +79,54 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 		keys = append(keys, &blobKeyWithMetadata{blobKey: k, metadata: *v})
 	}
 
-	fMap := make(frameMap, len(keys))
-	hadError := atomic.Bool{}
-	lock := sync.Mutex{}
+	type framesResult struct {
+		key  v2.BlobKey
+		data []*encoding.Frame
+		err  error
+	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(keys))
+	// Channel for results.
+	completionChannel := make(chan *framesResult, len(keys))
+
+	// Set when the first error is encountered. Useful for preventing new operations from starting.
+	hadError := atomic.Bool{}
 
 	for _, key := range keys {
+
+		if hadError.Load() {
+			// If we've already encountered an error, don't start any new operations.
+			break
+		}
+
 		boundKey := key
 		s.pool.Go(func() error {
-
-			defer wg.Done()
-
 			frames, err := s.frameCache.Get(*boundKey)
 			if err != nil {
 				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
 				hadError.Store(true)
+				completionChannel <- &framesResult{
+					key: boundKey.blobKey,
+					err: err,
+				}
 			} else {
-				lock.Lock()
-				fMap[boundKey.blobKey] = *frames
-				lock.Unlock()
+				completionChannel <- &framesResult{
+					key:  boundKey.blobKey,
+					data: *frames,
+				}
 			}
 
 			return nil
 		})
 	}
 
-	wg.Wait()
+	fMap := make(frameMap, len(keys))
+	for len(fMap) < len(keys) {
+		result := <-completionChannel
+		if result.err != nil {
+			return nil, fmt.Errorf("error fetching frames for blob %v: %w", result.key, result.err)
+		}
+		fMap[result.key] = result.data
+	}
 
 	return &fMap, nil
 }

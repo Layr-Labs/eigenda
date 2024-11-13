@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/sync/errgroup"
-	"sync"
 	"sync/atomic"
 )
 
@@ -58,7 +57,7 @@ func newMetadataManager(
 		shardSet[shard] = struct{}{}
 	}
 
-	pool, _ := errgroup.WithContext(ctx)
+	pool := &errgroup.Group{}
 	pool.SetLimit(workPoolSize)
 
 	server := &metadataManager{
@@ -85,18 +84,27 @@ type metadataMap map[v2.BlobKey]*blobMetadata
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
 func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
 
-	mapLock := sync.Mutex{}
-	mMap := make(metadataMap)
+	// blobMetadataResult is the result of a metadata fetch operation.
+	type blobMetadataResult struct {
+		key      v2.BlobKey
+		metadata *blobMetadata
+		err      error
+	}
+
+	// Completed operations will send a result to this channel.
+	completionChannel := make(chan *blobMetadataResult, len(keys))
+
+	// Set when the first error is encountered. Useful for preventing new operations from starting.
 	hadError := atomic.Bool{}
 
-	wg := sync.WaitGroup{}
-	wg.Add(len(keys))
-
 	for _, key := range keys {
+		if hadError.Load() {
+			// Don't bother starting new operations if we've already encountered an error.
+			break
+		}
+
 		boundKey := key
 		m.pool.Go(func() error {
-			defer wg.Done()
-
 			metadata, err := m.metadataCache.Get(boundKey)
 			if err != nil {
 				// Intentionally log at debug level. External users can force this condition to trigger
@@ -104,19 +112,28 @@ func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, 
 				// allowing hooligans to spam the logs in production environments.
 				m.logger.Debug("error retrieving metadata for blob %s: %v", boundKey.Hex(), err)
 				hadError.Store(true)
+				completionChannel <- &blobMetadataResult{
+					key: boundKey,
+					err: err,
+				}
 				return nil
 			}
-			mapLock.Lock()
-			mMap[boundKey] = metadata
-			mapLock.Unlock()
 
+			completionChannel <- &blobMetadataResult{
+				key:      boundKey,
+				metadata: metadata,
+			}
 			return nil
 		})
 	}
-	wg.Wait()
 
-	if hadError.Load() {
-		return nil, fmt.Errorf("error retrieving metadata for one or more blobs")
+	mMap := make(metadataMap)
+	for len(mMap) < len(keys) {
+		result := <-completionChannel
+		if result.err != nil {
+			return nil, fmt.Errorf("error fetching metadata for blob %s: %w", result.key.Hex(), result.err)
+		}
+		mMap[result.key] = result.metadata
 	}
 
 	return &mMap, nil
