@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -833,9 +834,13 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer(
+		opt,
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
+	grpc_prometheus.Register(gs)
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
