@@ -73,6 +73,11 @@ func NewDispatcher(
 }
 
 func (d *Dispatcher) Start(ctx context.Context) error {
+	err := d.chainState.Start(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start chain state: %w", err)
+	}
+
 	go func() {
 		ticker := time.NewTicker(d.PullInterval)
 		defer ticker.Stop()
