@@ -152,7 +152,7 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		cli.BoolFlag{
 			Name:     EnablePprofName,
 			Usage:    "start prrof server",
-			Required: true,
+			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "ENABLE_PPROF"),
 		},
 	}
