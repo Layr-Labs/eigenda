@@ -82,6 +82,10 @@ func RunEncoderServer(ctx *cli.Context) error {
 		}
 
 		blobStoreBucketName := config.BlobStoreConfig.BucketName
+		if blobStoreBucketName == "" {
+			return fmt.Errorf("blob store bucket name is required")
+		}
+
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 

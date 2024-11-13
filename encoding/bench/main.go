@@ -168,7 +168,11 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 				log.Fatal("leading coset inconsistency")
 			}
 
-			lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+			rs, err := enc.GetRsEncoder(enc.EncodingParams)
+			if err != nil {
+				log.Fatalf("%v", err)
+			}
+			lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
 
 			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), p.KzgConfig)
 			if err != nil {

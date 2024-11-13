@@ -34,7 +34,7 @@ func TestVerify(t *testing.T) {
 	fs := fft.NewFFTSettings(n)
 	require.NotNil(t, fs)
 
-	lc := enc.Fs.ExpandedRootsOfUnity[uint64(0)]
+	lc := fs.ExpandedRootsOfUnity[uint64(0)]
 	require.NotNil(t, lc)
 
 	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)

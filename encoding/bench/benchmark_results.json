@@ -3,88 +3,88 @@
     "num_chunks": 8192,
     "chunk_length": 1,
     "blob_length": 1024,
-    "encode_time": 12941206728,
-    "verify_time": 8213394432,
-    "verify_result": true
+    "encode_time": 102059584,
+    "verify_time": 2319457,
+    "verify_result": false
   },
   {
     "num_chunks": 8192,
     "chunk_length": 2,
     "blob_length": 2048,
-    "encode_time": 13049839860,
-    "verify_time": 8224738550,
+    "encode_time": 97900944,
+    "verify_time": 8221218149,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 4,
     "blob_length": 4096,
-    "encode_time": 13129218792,
-    "verify_time": 8386146011,
+    "encode_time": 108926751,
+    "verify_time": 8542191270,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 8,
     "blob_length": 8192,
-    "encode_time": 13342246105,
-    "verify_time": 8813121571,
+    "encode_time": 123954945,
+    "verify_time": 8967509365,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 16,
     "blob_length": 16384,
-    "encode_time": 13528058083,
-    "verify_time": 9178989643,
+    "encode_time": 173905227,
+    "verify_time": 9240825867,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 32,
     "blob_length": 32768,
-    "encode_time": 13888073023,
-    "verify_time": 9626637167,
+    "encode_time": 242604594,
+    "verify_time": 9491153262,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 64,
     "blob_length": 65536,
-    "encode_time": 14649932258,
-    "verify_time": 10123828692,
+    "encode_time": 421520591,
+    "verify_time": 10132030566,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 128,
     "blob_length": 131072,
-    "encode_time": 15977497646,
-    "verify_time": 11020511789,
+    "encode_time": 565742729,
+    "verify_time": 10949238065,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 256,
     "blob_length": 262144,
-    "encode_time": 18268363478,
-    "verify_time": 12296145712,
+    "encode_time": 1178485441,
+    "verify_time": 12338565194,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 512,
     "blob_length": 524288,
-    "encode_time": 23896687675,
-    "verify_time": 15163323458,
+    "encode_time": 1656844718,
+    "verify_time": 14854767670,
     "verify_result": true
   },
   {
     "num_chunks": 8192,
     "chunk_length": 1024,
     "blob_length": 1048576,
-    "encode_time": 30098471798,
-    "verify_time": 18789758950,
+    "encode_time": 4378241616,
+    "verify_time": 18838459873,
     "verify_result": true
   }
 ]

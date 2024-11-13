@@ -13,9 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzg_commitments "github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
 	kzg_prover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/gpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	rs_encoder "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
@@ -24,13 +24,13 @@ import (
 )
 
 func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver, error) {
-
+	fmt.Println("newProver")
 	// Check that the parameters are valid with respect to the SRS.
 	if params.ChunkLength*params.NumChunks >= g.SRSOrder {
 		return nil, fmt.Errorf("the supplied encoding parameters are not valid with respect to the SRS. ChunkLength: %d, NumChunks: %d, SRSOrder: %d", params.ChunkLength, params.NumChunks, g.SRSOrder)
 	}
 
-	encoder, err := rs.NewEncoder(params)
+	encoder, err := rs.NewEncoder()
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
@@ -43,7 +43,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	log.Println("Getting sub tables")
-	fftPoints, err := subTable.GetSubTables(encoder.NumChunks, encoder.ChunkLength)
+	fftPoints, err := subTable.GetSubTables(params.NumChunks, params.ChunkLength)
 	if err != nil {
 		log.Println("could not get sub tables", err)
 		return nil, err
@@ -53,16 +53,16 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	fftPointsT := make([][]bn254.G1Affine, len(fftPoints[0]))
 	for i := range fftPointsT {
 		fftPointsT[i] = make([]bn254.G1Affine, len(fftPoints))
-		for j := uint64(0); j < encoder.ChunkLength; j++ {
+		for j := uint64(0); j < params.ChunkLength; j++ {
 			fftPointsT[i][j] = fftPoints[j][i]
 		}
 	}
 	_ = fftPoints
 
 	log.Println("Creating FFT settings")
-	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
-	if encoder.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
+	n := uint8(math.Log2(float64(params.NumEvaluations())))
+	if params.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * params.NumChunks)))
 	}
 	fs := fft.NewFFTSettings(n)
 
@@ -72,7 +72,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		return nil, err
 	}
 
-	t := uint8(math.Log2(float64(2 * encoder.NumChunks)))
+	t := uint8(math.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
 	// GPU Setup
@@ -83,18 +83,17 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	deviceCuda := runtime.CreateDevice("CUDA", 0) // GPU-0
 	if runtime.IsDeviceAvailable(&deviceCuda) {
 		device = runtime.CreateDevice("CUDA", 0) // GPU-0
-		slog.Debug("CUDA device available, setting device")
+		slog.Info("CUDA device available, setting device")
 		runtime.SetDevice(&device)
 	} else {
-		slog.Debug("CUDA device not available, falling back to CPU")
+		slog.Info("CUDA device not available, falling back to CPU")
 		device = runtime.CreateDevice("CPU", 0)
-		runtime.SetDevice(&device)
 	}
 
 	gpuLock := sync.Mutex{}
 
 	// Setup NTT
-	nttCfg, icicle_err := gpu_utils.SetupNTT(n)
+	nttCfg, icicle_err := gpu_utils.SetupNTT(25)
 	if icicle_err != runtime.Success {
 		return nil, fmt.Errorf("could not setup NTT")
 	}
@@ -111,7 +110,7 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 	}
 
 	// Set KZG Prover GPU computer
-	computer := &kzg_prover.KzgGpuProofDevice{
+	proofComputer := &kzg_prover.KzgGpuProofDevice{
 		Fs:             fs,
 		FlatFFTPointsT: flatFftPointsT,
 		SRSIcicle:      srsG1Icicle,
@@ -127,16 +126,19 @@ func (g *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 		Device:         device,
 	}
 
-	RsComputeDevice := &rs_encoder.RsCpuComputeDevice{
-		Fs: fs,
+	// Set KZG Commitments CPU computer
+	commitmentsComputer := &kzg_commitments.KzgCPUCommitmentsDevice{
+		Srs:        g.Srs,
+		G2Trailing: g.G2Trailing,
+		KzgConfig:  g.KzgConfig,
 	}
 
-	encoder.Computer = RsComputeDevice
-
 	return &ParametrizedProver{
-		Encoder:   encoder,
-		KzgConfig: g.KzgConfig,
-		Ks:        ks,
-		Computer:  computer,
+		EncodingParams:      params,
+		Encoder:             encoder,
+		KzgConfig:           g.KzgConfig,
+		Ks:                  ks,
+		ProofComputer:       proofComputer,
+		CommitmentsComputer: commitmentsComputer,
 	}, nil
 }

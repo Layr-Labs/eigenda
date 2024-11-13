@@ -15,12 +15,14 @@ import (
 )
 
 type ParametrizedProver struct {
+	encoding.EncodingParams
 	*rs.Encoder
 
 	*kzg.KzgConfig
 	Ks *kzg.KZGSettings
 
-	Computer ProofDevice
+	ProofComputer       ProofDevice
+	CommitmentsComputer CommitmentDevice
 }
 
 type rsEncodeResult struct {
@@ -127,7 +129,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 	// compute commit for the full poly
 	go func() {
 		start := time.Now()
-		commit, err := g.Computer.ComputeCommitment(inputFr)
+		commit, err := g.CommitmentsComputer.ComputeCommitment(inputFr)
 		commitmentChan <- commitmentResult{
 			Commitment: commit,
 			Err:        err,
@@ -137,7 +139,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 
 	go func() {
 		start := time.Now()
-		lengthCommitment, err := g.Computer.ComputeLengthCommitment(inputFr)
+		lengthCommitment, err := g.CommitmentsComputer.ComputeLengthCommitment(inputFr)
 		lengthCommitmentChan <- lengthCommitmentResult{
 			LengthCommitment: lengthCommitment,
 			Err:              err,
@@ -147,7 +149,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 
 	go func() {
 		start := time.Now()
-		lengthProof, err := g.Computer.ComputeLengthProofForLength(inputFr, length)
+		lengthProof, err := g.CommitmentsComputer.ComputeLengthProofForLength(inputFr, length)
 		lengthProofChan <- lengthProofResult{
 			LengthProof: lengthProof,
 			Err:         err,
@@ -192,7 +194,8 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	// compute chunks
 	go func() {
 		start := time.Now()
-		frames, indices, err := g.Encoder.Encode(inputFr)
+
+		frames, indices, err := g.Encoder.Encode(inputFr, g.EncodingParams)
 		rsChan <- rsEncodeResult{
 			Frames:   frames,
 			Indices:  indices,
@@ -214,7 +217,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
 		}
 
-		proofs, err := g.Computer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+		proofs, err := g.ProofComputer.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
@@ -266,7 +269,7 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 	copy(paddedCoeffs, inputFr)
 	paddingEnd := time.Since(paddingStart)
 
-	proofs, err := g.Computer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+	proofs, err := g.ProofComputer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
 
 	end := time.Since(start)
 

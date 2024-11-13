@@ -2,13 +2,10 @@ package rs_test
 
 import (
 	"fmt"
-	"math"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,22 +15,9 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder(params)
+	enc, _ := rs.NewEncoder()
 
-	n := uint8(math.Log2(float64(enc.NumEvaluations())))
-	if enc.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * enc.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs: fs,
-	}
-
-	enc.Computer = RsComputeDevice
-	require.NotNil(t, enc)
-
-	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
@@ -53,23 +37,9 @@ func TestGnarkEncodeDecodeFrame_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder(params, true)
+	enc, _ := rs.NewEncoder()
 
-	n := uint8(math.Log2(float64(enc.NumEvaluations())))
-	if enc.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * enc.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
-	}
-
-	enc.Computer = RsComputeDevice
-	require.NotNil(t, enc)
-
-	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	require.Nil(t, err)
 	require.NotNil(t, frames, err)
 
@@ -90,23 +60,9 @@ func TestGnarkEncodeDecodeFrames_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder(params, true)
+	enc, _ := rs.NewEncoder()
 
-	n := uint8(math.Log2(float64(enc.NumEvaluations())))
-	if enc.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * enc.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
-	}
-
-	enc.Computer = RsComputeDevice
-	require.NotNil(t, enc)
-
-	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES)
+	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	assert.NoError(t, err)
 
 	framesPointers := make([]*rs.Frame, len(frames))

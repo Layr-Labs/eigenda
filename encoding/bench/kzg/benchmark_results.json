@@ -3,7 +3,7 @@
     "num_chunks": 8192,
     "chunk_length": 1,
     "blob_length": 1024,
-    "encode_time": 13138350293,
+    "encode_time": 833849985,
     "verify_time": 30,
     "verify_result": false
   },
@@ -11,7 +11,7 @@
     "num_chunks": 8192,
     "chunk_length": 2,
     "blob_length": 2048,
-    "encode_time": 13159256506,
+    "encode_time": 303208635,
     "verify_time": 30,
     "verify_result": false
   },
@@ -19,15 +19,15 @@
     "num_chunks": 8192,
     "chunk_length": 4,
     "blob_length": 4096,
-    "encode_time": 13319900605,
-    "verify_time": 30,
+    "encode_time": 316875022,
+    "verify_time": 40,
     "verify_result": false
   },
   {
     "num_chunks": 8192,
     "chunk_length": 8,
     "blob_length": 8192,
-    "encode_time": 13472965727,
+    "encode_time": 400393189,
     "verify_time": 30,
     "verify_result": false
   },
@@ -35,7 +35,7 @@
     "num_chunks": 8192,
     "chunk_length": 16,
     "blob_length": 16384,
-    "encode_time": 13800565763,
+    "encode_time": 525067438,
     "verify_time": 30,
     "verify_result": false
   },
@@ -43,7 +43,7 @@
     "num_chunks": 8192,
     "chunk_length": 32,
     "blob_length": 32768,
-    "encode_time": 14428307395,
+    "encode_time": 825848048,
     "verify_time": 30,
     "verify_result": false
   },
@@ -51,7 +51,7 @@
     "num_chunks": 8192,
     "chunk_length": 64,
     "blob_length": 65536,
-    "encode_time": 15496717742,
+    "encode_time": 1408274788,
     "verify_time": 30,
     "verify_result": false
   },
@@ -59,15 +59,15 @@
     "num_chunks": 8192,
     "chunk_length": 128,
     "blob_length": 131072,
-    "encode_time": 17634848652,
-    "verify_time": 30,
+    "encode_time": 2545767313,
+    "verify_time": 31,
     "verify_result": false
   },
   {
     "num_chunks": 8192,
     "chunk_length": 256,
     "blob_length": 262144,
-    "encode_time": 21442840519,
+    "encode_time": 4925295453,
     "verify_time": 30,
     "verify_result": false
   },
@@ -75,16 +75,16 @@
     "num_chunks": 8192,
     "chunk_length": 512,
     "blob_length": 524288,
-    "encode_time": 30385737811,
-    "verify_time": 31,
+    "encode_time": 8942939758,
+    "verify_time": 30,
     "verify_result": false
   },
   {
     "num_chunks": 8192,
     "chunk_length": 1024,
     "blob_length": 1048576,
-    "encode_time": 42084931016,
-    "verify_time": 20,
+    "encode_time": 18861217495,
+    "verify_time": 31,
     "verify_result": false
   }
 ]

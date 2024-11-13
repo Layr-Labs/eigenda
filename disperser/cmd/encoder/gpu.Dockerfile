@@ -28,6 +28,7 @@ COPY api /app/api
 COPY indexer /app/indexer
 COPY encoding /app/encoding
 COPY icicle /app/icicle
+COPY relay /app/relay
 
 # Install Icicle
 RUN cp -r /app/icicle/lib/* /usr/lib/ && \
@@ -36,7 +37,7 @@ RUN cp -r /app/icicle/lib/* /usr/lib/ && \
 
 # Build the server with GPU support
 WORKDIR /app/disperser
-RUN go build -tags gpu -o ./bin/server ./cmd/encoder
+RUN go build -tags=gpu -o ./bin/server ./cmd/encoder
 
 # Start a new stage for the base image
 FROM nvidia/cuda:12.2.2-base-ubuntu22.04

@@ -98,6 +98,12 @@ target "encoder" {
   tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
+target "encoder-gpu" {
+  context = "."
+  dockerfile = "./disperser/cmd/encoder/gpu.Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/encoder-gpu:${BUILD_TAG}"]
+}
+
 target "encoder-internal" {
   inherits = ["encoder"]
   tags       = ["${REGISTRY}/eigenda-encoder:${BUILD_TAG}",

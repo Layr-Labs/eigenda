@@ -19,8 +19,6 @@ type KzgCpuProofDevice struct {
 	Fs         *fft.FFTSettings
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
 	SFs        *fft.FFTSettings
-	Srs        *kzg.SRS
-	G2Trailing []bn254.G2Affine
 }
 
 type WorkerResult struct {

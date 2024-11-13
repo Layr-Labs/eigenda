@@ -156,7 +156,7 @@ func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*Parametrized
 		return nil, err
 	}
 
-	encoder, err := rs.NewEncoder(params)
+	encoder, err := rs.NewEncoder()
 	if err != nil {
 		log.Println("Could not create encoder: ", err)
 		return nil, err
@@ -215,6 +215,7 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 			(*bn254.G1Affine)(commitments.Commitment),
 			frames[ind],
 			uint64(indices[ind]),
+			params.NumChunks,
 		)
 
 		if err != nil {
@@ -226,11 +227,11 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 
 }
 
-func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64) error {
+func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64, numChunks uint64) error {
 
 	j, err := rs.GetLeadingCosetIndex(
 		uint64(index),
-		v.NumChunks,
+		numChunks,
 	)
 	if err != nil {
 		return err
@@ -306,7 +307,7 @@ func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumb
 		return nil, err
 	}
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+	return encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

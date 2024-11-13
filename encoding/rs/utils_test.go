@@ -38,8 +38,7 @@ func TestToFrArrayAndToByteArray_AreInverses(t *testing.T) {
 	numEle := rs.GetNumElement(1000, encoding.BYTES_PER_SYMBOL)
 	assert.Equal(t, numEle, uint64(32))
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder(params)
+	enc, _ := rs.NewEncoder()
 	require.NotNil(t, enc)
 
 	dataFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)

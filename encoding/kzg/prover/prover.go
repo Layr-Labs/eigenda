@@ -88,7 +88,7 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 		return nil, err
 	}
 
-	fmt.Println("numthread", runtime.GOMAXPROCS(0))
+	fmt.Println("prover numthread", runtime.GOMAXPROCS(0))
 
 	encoderGroup := &Prover{
 		KzgConfig:           config,
@@ -113,7 +113,6 @@ func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
 	}
 
 	return encoderGroup, nil
-
 }
 
 func (g *Prover) PreloadAllEncoders() error {
@@ -329,6 +328,7 @@ func (p *Prover) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber
 			Coeffs: chunks[i].Coeffs,
 		}
 	}
+
 	encoder, err := p.GetKzgEncoder(params)
 	if err != nil {
 		return nil, err

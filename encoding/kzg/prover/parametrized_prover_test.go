@@ -24,7 +24,10 @@ func TestProveAllCosetThreads(t *testing.T) {
 	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
 	assert.Nil(t, err)
 
-	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
+	frames, fIndices, err := enc.GetFrames(inputFr)
+	require.Nil(t, err)
+
+	commit, _, _, err := enc.GetCommitments(inputFr)
 	require.Nil(t, err)
 
 	for i := 0; i < len(frames); i++ {
@@ -37,7 +40,10 @@ func TestProveAllCosetThreads(t *testing.T) {
 		assert.Equal(t, j, q, "leading coset inconsistency")
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
-		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+		rs, err := enc.GetRsEncoder(params)
+		require.Nil(t, err)
+
+		lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
 
 		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
 		require.Nil(t, err)

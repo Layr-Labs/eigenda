@@ -6,23 +6,15 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"math"
 	"math/rand"
 	"os"
 	"runtime"
 	"runtime/pprof"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
-	rs_gpu "github.com/Layr-Labs/eigenda/encoding/rs/gpu"
-	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
@@ -83,55 +75,6 @@ func main() {
 		icicle_runtime.SetDevice(&device)
 	}
 
-	gpuLock := sync.Mutex{}
-
-	// Setup FFT Settings
-	// time this part
-	fs := fft.NewFFTSettings(uint8(math.Log2(float64(8192 * 1024))))
-
-	for i := 1; i <= 1024; i *= 2 {
-		start := time.Now()
-		_ = fft.NewFFTSettings(uint8(math.Log2(float64(8192 * i))))
-		fmt.Printf("FFT Settings took (%v, %v) : %v\n", 8192, i, time.Since(start))
-	}
-
-	// Setup NTT
-	start := time.Now()
-	fmt.Println("wtf")
-
-	var nttCfg core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
-	var icicle_err icicle_runtime.EIcicleError
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	icicle_runtime.RunOnDevice(&device, func(args ...any) {
-		defer wg.Done()
-		maxSettings := uint8(math.Log2(float64(8192 * 1024)))
-		nttCfg, icicle_err = gpu_utils.SetupNTT(maxSettings)
-		if icicle_err != icicle_runtime.Success {
-			log.Fatal("could not setup NTT")
-		}
-		fmt.Printf("NTT Setup took: %v\n", time.Since(start))
-
-		for i := 1; i <= 1024; i *= 2 {
-			nttCfg, icicle_err = gpu_utils.SetupNTT(uint8(math.Log2(float64(8192 * i))))
-			if icicle_err != icicle_runtime.Success {
-				log.Fatal("could not setup NTT")
-			}
-			fmt.Printf("NTT Setup took (%v, %v): %v\n", 8192, i, time.Since(start))
-		}
-	})
-
-	wg.Wait()
-
-	fmt.Println("Wwww")
-
-	RsComputeDevice := &rs_gpu.RsGpuComputeDevice{
-		NttCfg:  nttCfg,
-		GpuLock: &gpuLock,
-		Device:  device,
-	}
-
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)
 		if err != nil {
@@ -144,7 +87,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	results := runBenchmark(&config, RsComputeDevice, fs)
+	results := runBenchmark(&config)
 	if config.MemProfile != "" {
 		f, err := os.Create(config.MemProfile)
 		if err != nil {
@@ -171,7 +114,7 @@ func main() {
 	fmt.Printf("Benchmark results written to %s\n", config.OutputFile)
 }
 
-func runBenchmark(config *Config, compute rs.RsComputeDevice, fs *fft.FFTSettings) []BenchmarkResult {
+func runBenchmark(config *Config) []BenchmarkResult {
 	var results []BenchmarkResult
 
 	// Fixed coding ratio of 8
@@ -182,32 +125,20 @@ func runBenchmark(config *Config, compute rs.RsComputeDevice, fs *fft.FFTSetting
 		if chunkLen < 1 {
 			continue // Skip invalid configurations
 		}
-		result := benchmarkRSEncode(blobLength, config.NumChunks, chunkLen, config.EnableVerify, compute, fs)
+		result := benchmarkRSEncode(blobLength, config.NumChunks, chunkLen, config.EnableVerify)
 		results = append(results, result)
 	}
 	return results
 }
 
-func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, verifyResults bool, compute rs.RsComputeDevice, fs *fft.FFTSettings) BenchmarkResult {
+func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, verifyResults bool) BenchmarkResult {
 	params := encoding.EncodingParams{
 		NumChunks:   numChunks,
 		ChunkLength: chunkLen,
 	}
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
-	encoder, err := rs.NewEncoderFFT(params, fs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Set RS CPU computer
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs: encoder.Fs,
-	}
-	encoder.Computer = RsComputeDevice
-
-	// Set RS GPU computer
-	encoder.Computer = compute
+	encoder, err := rs.NewEncoder()
 
 	// Create array of bytes
 	inputSize := blobLength * 32
@@ -220,7 +151,7 @@ func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, ver
 	}
 
 	start := time.Now()
-	frames, indices, err := encoder.EncodeBytes(inputData)
+	frames, indices, err := encoder.EncodeBytes(inputData, params)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -238,7 +169,7 @@ func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, ver
 		}
 
 		samples, indices := sampleFrames(frames, uint64((len(frames))))
-		data, err := encoder.Decode(samples, indices, uint64(len(inputData)))
+		data, err := encoder.Decode(samples, indices, uint64(len(inputData)), params)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -61,6 +61,7 @@ func main() {
 	kzgConfig := &kzg.KzgConfig{
 		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
 		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
+		G2PowerOf2Path:  "/home/ubuntu/resources/kzg/g2.powerof2.point",
 		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
 		SRSOrder:        268435456,
 		SRSNumberToLoad: 1048576,
@@ -70,7 +71,7 @@ func main() {
 	fmt.Printf("* Task Starts\n")
 
 	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, true)
+	p, _ := prover.NewProver(kzgConfig, false)
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)
