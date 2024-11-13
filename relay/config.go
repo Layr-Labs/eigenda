@@ -9,19 +9,22 @@ type Config struct {
 	// serve data for any shard it can.
 	Shards []core.RelayKey
 
-	// MetadataCacheSize is the size of the metadata cache. Default is 1024 * 1024.
+	// MetadataCacheSize is the size of the metadata cache. Current cache implementation is unaware of data sizes, and
+	// so this is a total count, not a size in bytes. Default is 1024 * 1024.
 	MetadataCacheSize int
 
 	// MetadataWorkPoolSize is the size of the metadata work pool. Default is 32.
 	MetadataWorkPoolSize int
 
-	// BlobCacheSize is the size of the blob cache. Default is 32.
+	// BlobCacheSize is the size of the blob cache. Current cache implementation is unaware of data sizes, and so
+	// this is a total count, not a size in bytes. Default is 32.
 	BlobCacheSize int
 
 	// BlobWorkPoolSize is the size of the blob work pool. Default is 32.
 	BlobWorkPoolSize int
 
-	// ChunkCacheSize is the size of the chunk cache. Default is 32.
+	// ChunkCacheSize is the size of the chunk cache. Current cache implementation is unaware of data sizes, and so
+	// this is a total count, not a size in bytes. Default is 32.
 	ChunkCacheSize int
 
 	// ChunkWorkPoolSize is the size of the chunk work pool. Default is 32.
