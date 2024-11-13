@@ -485,6 +485,27 @@ func BlobHeaderFromProto(h *pb.BlobHeader) (*BlobHeader, error) {
 	}, nil
 }
 
+func SerializeMerkleProof(proof *merkletree.Proof) []byte {
+	proofBytes := make([]byte, 0)
+	for _, hash := range proof.Hashes {
+		proofBytes = append(proofBytes, hash[:]...)
+	}
+	return proofBytes
+}
+
+func DeserializeMerkleProof(data []byte) (*merkletree.Proof, error) {
+	proof := &merkletree.Proof{}
+	if len(data)%32 != 0 {
+		return nil, fmt.Errorf("invalid proof length")
+	}
+	for i := 0; i < len(data); i += 32 {
+		var hash [32]byte
+		copy(hash[:], data[i:i+32])
+		proof.Hashes = append(proof.Hashes, hash[:])
+	}
+	return proof, nil
+}
+
 func encode(obj any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
