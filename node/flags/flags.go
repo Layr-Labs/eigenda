@@ -273,6 +273,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_NODE_INFO_RESOURCES"),
 	}
 
+	BLSRemoteSignerEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-remote-signer-enabled"),
+		Usage:    "Set to true to enable the BLS remote signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_REMOTE_SIGNER_ENABLED"),
+	}
+
 	BLSRemoteSignerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-remote-signer-url"),
 		Usage:    "The URL of the BLS remote signer",
@@ -335,6 +342,7 @@ var optionalFlags = []cli.Flag{
 	DataApiUrlFlag,
 	DisableNodeInfoResourcesFlag,
 	EnableGnarkBundleEncodingFlag,
+	BLSRemoteSignerEnabledFlag,
 	BLSRemoteSignerUrlFlag,
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,

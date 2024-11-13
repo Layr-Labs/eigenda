@@ -441,7 +441,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
-	signature, err := n.GetSignature(ctx, batchHeaderHash)
+	signature, err := n.SignMessage(ctx, batchHeaderHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign batch: %w", err)
 	}
@@ -453,8 +453,8 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	return signature, nil
 }
 
-func (n *Node) GetSignature(ctx context.Context, data [32]byte) (*core.Signature, error) {
-	if n.Config.UseBLSRemoteSigner {
+func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	if n.Config.BLSRemoteSignerEnabled {
 		sigResp, err := n.BLSSigner.SignGeneric(
 			ctx,
 			&blssignerV1.SignGenericRequest{
