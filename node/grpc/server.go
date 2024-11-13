@@ -72,9 +72,9 @@ func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunk
 	start := time.Now()
 
 	// Get batch header hash
-	batchHeader, err := node.GetBatchHeader(in.GetBatchHeader())
+	batchHeader, err := core.BatchHeaderFromProtobuf(in.GetBatchHeader())
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	blobs, err := node.GetBlobMessages(in.GetBlobs(), s.node.Config.NumBatchDeserializationWorkers)
@@ -313,7 +313,7 @@ func (s *Server) rebuildMerkleTree(batchHeaderHash [32]byte) (*merkletree.Merkle
 			return nil, err
 		}
 
-		blobHeader, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+		blobHeader, err := core.BlobHeaderFromProto(&protoBlobHeader)
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +355,7 @@ func (s *Server) getBlobHeader(ctx context.Context, batchHeaderHash [32]byte, bl
 		return nil, nil, err
 	}
 
-	blobHeader, err := node.GetBlobHeaderFromProto(&protoBlobHeader)
+	blobHeader, err := core.BlobHeaderFromProto(&protoBlobHeader)
 	if err != nil {
 		return nil, nil, err
 	}

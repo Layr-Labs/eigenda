@@ -80,6 +80,11 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queued, 1)
 	assert.Equal(t, metadata1, queued[0])
+	// query to get newer blobs should result in 0 results
+	queued, err = blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Queued, metadata1.UpdatedAt+100)
+	assert.NoError(t, err)
+	assert.Len(t, queued, 0)
+
 	certified, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Certified, 0)
 	assert.NoError(t, err)
 	assert.Len(t, certified, 1)
@@ -152,6 +157,45 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	// get multiple certs
+	numCerts := 100
+	keys := make([]corev2.BlobKey, numCerts)
+	for i := 0; i < numCerts; i++ {
+		blobCert := &corev2.BlobCertificate{
+			BlobHeader: &corev2.BlobHeader{
+				BlobVersion:     0,
+				QuorumNumbers:   []core.QuorumID{0},
+				BlobCommitments: mockCommitment,
+				PaymentMetadata: core.PaymentMetadata{
+					AccountID:         "0x123",
+					BinIndex:          uint32(i),
+					CumulativePayment: big.NewInt(321),
+				},
+				Signature: []byte("signature"),
+			},
+			RelayKeys: []corev2.RelayKey{0},
+		}
+		blobKey, err := blobCert.BlobHeader.BlobKey()
+		assert.NoError(t, err)
+		keys[i] = blobKey
+		err = blobMetadataStore.PutBlobCertificate(ctx, blobCert, fragmentInfo)
+		assert.NoError(t, err)
+	}
+
+	certs, fragmentInfos, err := blobMetadataStore.GetBlobCertificates(ctx, keys)
+	assert.NoError(t, err)
+	assert.Len(t, certs, numCerts)
+	assert.Len(t, fragmentInfos, numCerts)
+	binIndexes := make(map[uint32]struct{})
+	for i := 0; i < numCerts; i++ {
+		assert.Equal(t, fragmentInfos[i], fragmentInfo)
+		binIndexes[certs[i].BlobHeader.PaymentMetadata.BinIndex] = struct{}{}
+	}
+	assert.Len(t, binIndexes, numCerts)
+	for i := 0; i < numCerts; i++ {
+		assert.Contains(t, binIndexes, uint32(i))
+	}
 
 	deleteItems(t, []commondynamodb.Key{
 		{

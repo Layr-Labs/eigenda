@@ -157,7 +157,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 			Value: strconv.Itoa(int(status)),
 		},
 		":updatedAt": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+			Value: strconv.FormatInt(int64(lastUpdatedAt), 10),
 		}})
 	if err != nil {
 		return nil, err
