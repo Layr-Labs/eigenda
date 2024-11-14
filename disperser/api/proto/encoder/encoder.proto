@@ -7,27 +7,6 @@ service Encoder {
   rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
 }
 
-service RSEncoder {
-  rpc RSEncodeBlob(EncodeBlobRequest) returns (RSEncodeBlobReply) {}
-}
-
-service KZGProver {
-  rpc ComputeMultiFrameProof(EncodeBlobRequest) returns (MultiProofReply) {}
-}
-
-message MultiProofReply {
-  repeated bytes proofs = 1;  // serialized G1Affine proofs in bit-reversed order
-}
-
-message RSEncodedFrame {
-  bytes coeffs = 1;                // serialized coefficients using your rs.Frame.Serialize()
-  uint32 bit_reversed_index = 2;   // ReverseBits(i)
-}
-
-message RSEncodeBlobReply {
-  repeated RSEncodedFrame frames = 1;
-}
-
 // BlobCommitments contains the blob's commitment, degree proof, and the actual degree
 // DEPRECATED: use common.BlobCommitment instead
 message BlobCommitment {

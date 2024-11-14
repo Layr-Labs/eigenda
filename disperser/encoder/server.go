@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/disperser/common"
@@ -23,8 +22,6 @@ import (
 
 type EncoderServer struct {
 	pb.UnimplementedEncoderServer
-	pb.UnimplementedRSEncoderServer
-	pb.UnimplementedKZGProverServer
 
 	config      ServerConfig
 	logger      logging.Logger
@@ -59,53 +56,7 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
 		queueStats:      make(map[string]int),
-}
-
-func (s *EncoderServer) Close() {
-	if s.close == nil {
-		return
 	}
-	s.close()
-}
-
-func (s *EncoderServer) Start() error {
-	pprofProfiler := commonpprof.NewPprofProfiler(s.config.PprofHttpPort, s.logger)
-	if s.config.EnablePprof {
-		go pprofProfiler.Start()
-		s.logger.Info("Enabled pprof for encoder server", "port", s.config.PprofHttpPort)
-	}
-
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt,
-		grpc.UnaryInterceptor(
-			s.grpcMetrics.UnaryServerInterceptor(),
-		),
-	)
-	reflection.Register(gs)
-	pb.RegisterEncoderServer(gs, s)
-	s.grpcMetrics.InitializeMetrics(gs)
-
-	// Register Server for Health Checks
-	name := pb.Encoder_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
-
-	s.close = func() {
-		err := listener.Close()
-		if err != nil {
-			log.Printf("failed to close listener: %v", err)
-		}
-		gs.GracefulStop()
-	}
-
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	return gs.Serve(listener)
 }
 
 func (s *EncoderServer) Start() error {
@@ -257,4 +208,11 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 		Chunks:              chunksData,
 		ChunkEncodingFormat: format,
 	}, nil
+}
+
+func (s *EncoderServer) Close() {
+	if s.close == nil {
+		return
+	}
+	s.close()
 }

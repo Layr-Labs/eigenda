@@ -70,13 +70,19 @@ func RunEncoderServer(ctx *cli.Context) error {
 		reg.MustRegister(grpcMetrics)
 	}
 
+	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
+	if err != nil {
+		return err
+	}
+
 	if config.EncoderVersion == V2 {
 		// We no longer compute the commitments in the encoder, so we don't need to load the G2 points
 		opts := []prover.ProverOption{
 			prover.WithKZGConfig(&config.EncoderConfig),
 			prover.WithLoadG2Points(false),
+			prover.WithBackend(backendType),
+			prover.WithGPU(config.ServerConfig.EnableGPU),
 		}
-
 		prover, err := prover.NewProver(opts...)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
@@ -109,11 +115,6 @@ func RunEncoderServer(ctx *cli.Context) error {
 		)
 
 		return server.Start()
-	}
-
-	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
-	if err != nil {
-		return err
 	}
 
 	opts := []prover.ProverOption{
