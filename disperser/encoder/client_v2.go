@@ -3,7 +3,6 @@ package encoder
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -14,14 +13,12 @@ import (
 )
 
 type clientV2 struct {
-	addr    string
-	timeout time.Duration
+	addr string
 }
 
-func NewEncoderClientV2(addr string, timeout time.Duration) (disperser.EncoderClientV2, error) {
+func NewEncoderClientV2(addr string) (disperser.EncoderClientV2, error) {
 	return &clientV2{
-		addr:    addr,
-		timeout: timeout,
+		addr: addr,
 	}, nil
 }
 
@@ -46,13 +43,6 @@ func (c *clientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encod
 			ChunkLength: encodingParams.ChunkLength,
 			NumChunks:   encodingParams.NumChunks,
 		},
-	}
-
-	// Add timeout if specified
-	if c.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
 	}
 
 	// Make the RPC call
