@@ -27,13 +27,25 @@ COPY core /app/core
 COPY api /app/api
 COPY indexer /app/indexer
 COPY encoding /app/encoding
-COPY icicle /app/icicle
 COPY relay /app/relay
 
-# Install Icicle
-RUN cp -r /app/icicle/lib/* /usr/lib/ && \
-    cp -r /app/icicle/include/icicle/ /usr/local/include/ && \
-    cp -r /app/icicle /opt
+# Define Icicle versions and checksums
+ENV ICICLE_VERSION=3.1.0
+ENV ICICLE_BASE_SHA256=2e4e33b8bc3e335b2dd33dcfb10a9aaa18717885509614a24f492f47a2e4f4b1
+ENV ICICLE_CUDA_SHA256=cdba907eac6297445a6c128081ebba5c711d352003f69310145406a8fd781647
+
+# Download Icicle tarballs
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
+
+# Verify checksums and install Icicle
+RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
+    echo "${ICICLE_CUDA_SHA256} /tmp/icicle-cuda.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/icicle.tar.gz && \
+    cp -r ./icicle/lib/* /usr/lib/ && \
+    cp -r ./icicle/include/icicle/ /usr/local/include/ && \
+    tar xzf /tmp/icicle-cuda.tar.gz -C /opt && \
+    rm /tmp/icicle.tar.gz /tmp/icicle-cuda.tar.gz
 
 # Build the server with GPU support
 WORKDIR /app/disperser
