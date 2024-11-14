@@ -1,6 +1,6 @@
 //go:build icicle
 
-package gpu
+package icicle
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ import (
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-type KzgGpuProofDevice struct {
+type KzgMultiProofIcicleBackend struct {
 	*kzg.KzgConfig
 	Fs             *fft.FFTSettings
 	FlatFFTPointsT []icicle_bn254.Affine
@@ -37,7 +37,7 @@ type WorkerResult struct {
 
 // This function supports batching over multiple blobs.
 // All blobs must have same size and concatenated passed as polyFr
-func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
 	// Robert: Standardizing this to use the same math used in precomputeSRS
@@ -86,9 +86,8 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 	flattenCoeffStoreSf := gpu_utils.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[icicle_bn254.ScalarField](flattenCoeffStoreSf)
 
-	// Start using GPU
-	var gpuFFTBatch []bn254.G1Affine
-	var gpuErr error
+	var icicleFFTBatch []bn254.G1Affine
+	var icicleErr error
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -102,7 +101,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 
 		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 		if err != nil {
-			gpuErr = fmt.Errorf("msm error: %w", err)
+			icicleErr = fmt.Errorf("msm error: %w", err)
 		}
 
 		// Free the flatten coeff store
@@ -114,7 +113,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		p.NttCfg.BatchSize = int32(numPoly)
 		sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
 		if err != nil {
-			gpuErr = fmt.Errorf("first ECNtt error: %w", err)
+			icicleErr = fmt.Errorf("first ECNtt error: %w", err)
 		}
 
 		sumVec.Free()
@@ -126,7 +125,7 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		// Compute the second ecntt on the reduced size array
 		flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
 		if err != nil {
-			gpuErr = fmt.Errorf("second ECNtt error: %w", err)
+			icicleErr = fmt.Errorf("second ECNtt error: %w", err)
 		}
 
 		prunedSumVecInv.Free()
@@ -136,13 +135,13 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
 		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
 		flatProofsBatch.Free()
-		gpuFFTBatch = gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
+		icicleFFTBatch = gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
 	})
 
 	wg.Wait()
 
-	if gpuErr != nil {
-		return nil, gpuErr
+	if icicleErr != nil {
+		return nil, icicleErr
 	}
 
 	end := time.Now()
@@ -155,10 +154,10 @@ func (p *KzgGpuProofDevice) ComputeMultiFrameProof(polyFr []fr.Element, numChunk
 		"fft2", secondECNttDone.Sub(firstECNttDone),
 	)
 
-	return gpuFFTBatch, nil
+	return icicleFFTBatch, nil
 }
 
-func (p *KzgGpuProofDevice) proofWorker(
+func (p *KzgMultiProofIcicleBackend) proofWorker(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
@@ -190,7 +189,7 @@ func (p *KzgGpuProofDevice) proofWorker(
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *KzgGpuProofDevice) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *KzgMultiProofIcicleBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l

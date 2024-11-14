@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	_ "go.uber.org/automaxprocs"
@@ -508,28 +507,28 @@ func (p *Prover) createDefaultBackendProver(params encoding.EncodingParams, fs *
 	t := uint8(math.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	// Set KZG Prover CPU computer
-	proofComputer := &cpu.KzgCpuProofDevice{
+	// Set KZG Prover default backend
+	multiproofBackend := &KzgMultiProofDefaultBackend{
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
 		KzgConfig:  p.KzgConfig,
 	}
 
-	// Set KZG Commitments CPU computer
-	commitmentsComputer := &cpu.KzgCPUCommitmentsDevice{
+	// Set KZG Commitments default backend
+	commitmentsBckend := &KzgCommitmentsDefaultBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
 		KzgConfig:  p.KzgConfig,
 	}
 
 	return &ParametrizedProver{
-		Encoder:             p.Encoder,
-		EncodingParams:      params,
-		KzgConfig:           p.KzgConfig,
-		Ks:                  ks,
-		ProofComputer:       proofComputer,
-		CommitmentsComputer: commitmentsComputer,
+		Encoder:               p.Encoder,
+		EncodingParams:        params,
+		KzgConfig:             p.KzgConfig,
+		Ks:                    ks,
+		KzgMultiProofBackend:  multiproofBackend,
+		KzgCommitmentsBackend: commitmentsBckend,
 	}, nil
 }
 

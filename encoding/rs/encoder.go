@@ -8,7 +8,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
-	"github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
 	_ "go.uber.org/automaxprocs"
@@ -34,7 +33,6 @@ const (
 	defaultBackend   = encoding.BackendDefault
 	defaultEnableGPU = false
 	defaultVerbose   = false
-	defaultNTTSize   = 25 // Used for NTT setup in Icicle backend
 )
 
 // Option Definitions
@@ -144,11 +142,10 @@ func (e *Encoder) createDefaultBackendEncoder(params encoding.EncodingParams, fs
 		Config:            e.Config,
 		EncodingParams:    params,
 		Fs:                fs,
-		RSEncoderComputer: &cpu.RsDefaultComputeDevice{Fs: fs},
+		RSEncoderComputer: &RsDefaultComputeDevice{Fs: fs},
 	}, nil
 }
 
 func (e *Encoder) createIcicleBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	fmt.Println("CreateIcicleBackendEncoder", e.Config.EnableGPU)
 	return CreateIcicleBackendEncoder(e, params, fs)
 }

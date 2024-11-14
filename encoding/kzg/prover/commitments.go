@@ -1,4 +1,4 @@
-package cpu
+package prover
 
 import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -7,13 +7,13 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type KzgCPUCommitmentsDevice struct {
+type KzgCommitmentsDefaultBackend struct {
 	*kzg.KzgConfig
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
 }
 
-func (p *KzgCPUCommitmentsDevice) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *KzgCommitmentsDefaultBackend) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	inputLength := uint64(len(coeffs))
 	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-inputLength:]
 	config := ecc.MultiExpConfig{}
@@ -26,7 +26,7 @@ func (p *KzgCPUCommitmentsDevice) ComputeLengthProof(coeffs []fr.Element) (*bn25
 	return &lengthProof, nil
 }
 
-func (p *KzgCPUCommitmentsDevice) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
+func (p *KzgCommitmentsDefaultBackend) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
 	// compute commit for the full poly
 	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
@@ -37,7 +37,7 @@ func (p *KzgCPUCommitmentsDevice) ComputeCommitment(coeffs []fr.Element) (*bn254
 	return &commitment, nil
 }
 
-func (p *KzgCPUCommitmentsDevice) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *KzgCommitmentsDefaultBackend) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	config := ecc.MultiExpConfig{}
 
 	var lengthCommitment bn254.G2Affine

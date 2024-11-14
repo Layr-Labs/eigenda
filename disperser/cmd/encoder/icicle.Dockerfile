@@ -47,7 +47,7 @@ RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \
     tar xzf /tmp/icicle-cuda.tar.gz -C /opt && \
     rm /tmp/icicle.tar.gz /tmp/icicle-cuda.tar.gz
 
-# Build the server with GPU support
+# Build the server with icicle backend
 WORKDIR /app/disperser
 RUN go build -tags=icicle -o ./bin/server ./cmd/encoder
 

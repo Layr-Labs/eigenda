@@ -1,4 +1,4 @@
-package cpu
+package rs
 
 import (
 	"github.com/Layr-Labs/eigenda/encoding/fft"

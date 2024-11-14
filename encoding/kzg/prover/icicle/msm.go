@@ -1,6 +1,6 @@
 //go:build icicle
 
-package gpu
+package icicle
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 
 // MsmBatchOnDevice function supports batch across blobs.
 // totalSize is the number of output points, which equals to numPoly * 2 * dimE , dimE is number of chunks
-func (c *KzgGpuProofDevice) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []icicle_bn254.Affine, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofIcicleBackend) MsmBatchOnDevice(rowsFrIcicleCopy core.DeviceSlice, rowsG1Icicle []icicle_bn254.Affine, totalSize int) (core.DeviceSlice, error) {
 	rowsG1IcicleCopy := core.HostSliceFromElements[icicle_bn254.Affine](rowsG1Icicle)
 
 	var p icicle_bn254.Projective

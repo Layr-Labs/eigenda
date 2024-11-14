@@ -1,6 +1,6 @@
 //go:build icicle
 
-package gpu
+package icicle
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-func (c *KzgGpuProofDevice) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofIcicleBackend) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
 	output, err := c.ECNttOnDevice(batchPoints, isInverse, totalSize)
 	if err != nil {
 		return output, err
@@ -20,7 +20,7 @@ func (c *KzgGpuProofDevice) ECNttToGnarkOnDevice(batchPoints core.DeviceSlice, i
 	return output, nil
 }
 
-func (c *KzgGpuProofDevice) ECNttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
+func (c *KzgMultiProofIcicleBackend) ECNttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
 	var p icicle_bn254.Projective
 	var out core.DeviceSlice
 
