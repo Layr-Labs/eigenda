@@ -312,7 +312,8 @@ func (x *ChunkRequestByRange) GetEndIndex() uint32 {
 	return 0
 }
 
-// A request for chunks within a specific blob.
+// A request for chunks within a specific blob. Requests are fulfilled in all-or-nothing fashion. If any of the
+// requested chunks are not found or are unable to be fetched, the entire request will fail.
 type ChunkRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -397,8 +398,6 @@ func (*ChunkRequest_ByIndex) isChunkRequest_Request() {}
 func (*ChunkRequest_ByRange) isChunkRequest_Request() {}
 
 // The reply to a GetChunks request.
-// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request
-// will fail.
 type GetChunksReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
