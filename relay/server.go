@@ -42,8 +42,8 @@ func NewServer(
 		logger,
 		metadataStore,
 		config.MetadataCacheSize,
-		config.MetadataWorkPoolSize,
-		config.Shards)
+		config.MetadataMaxConcurrency,
+		config.RelayIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
@@ -53,7 +53,7 @@ func NewServer(
 		logger,
 		blobStore,
 		config.BlobCacheSize,
-		config.BlobWorkPoolSize)
+		config.BlobMaxConcurrency)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob server: %w", err)
 	}
@@ -63,7 +63,7 @@ func NewServer(
 		logger,
 		chunkReader,
 		config.ChunkCacheSize,
-		config.ChunkWorkPoolSize)
+		config.ChunkMaxConcurrency)
 	if err != nil {
 		return nil, fmt.Errorf("error creating chunk server: %w", err)
 	}
@@ -94,7 +94,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
-	metadata := (*mMap)[v2.BlobKey(request.BlobKey)]
+	metadata := mMap[v2.BlobKey(request.BlobKey)]
 	if metadata == nil {
 		return nil, fmt.Errorf("blob not found")
 	}
@@ -164,7 +164,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 		if chunkRequest.GetByIndex() != nil {
 			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
-			blobFrames := (*frames)[key]
+			blobFrames := (frames)[key]
 
 			for index := range chunkRequest.GetByIndex().ChunkIndices {
 
@@ -182,14 +182,14 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			startIndex := chunkRequest.GetByRange().StartIndex
 			endIndex := chunkRequest.GetByRange().EndIndex
 
-			blobFrames := (*frames)[key]
+			blobFrames := (frames)[key]
 
 			if startIndex > endIndex {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
 					startIndex, endIndex, key.Hex())
 			}
-			if endIndex > uint32(len((*frames)[key])) {
+			if endIndex > uint32(len((frames)[key])) {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invald for key %s, chunk count %d",
 					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))

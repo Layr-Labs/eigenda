@@ -5,40 +5,40 @@ import core "github.com/Layr-Labs/eigenda/core/v2"
 // Config is the configuration for the relay Server.
 type Config struct {
 
-	// Shards contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
+	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
 	// serve data for any shard it can.
-	Shards []core.RelayKey
+	RelayIDs []core.RelayKey
 
-	// MetadataCacheSize is the size of the metadata cache. Current cache implementation is unaware of data sizes, and
-	// so this is a total count, not a size in bytes. Default is 1024 * 1024.
+	// MetadataCacheSize is the maximum number of items in the metadata cache. Default is 1024 * 1024.
 	MetadataCacheSize int
 
-	// MetadataWorkPoolSize is the size of the metadata work pool. Default is 32.
-	MetadataWorkPoolSize int
+	// MetadataMaxConcurrency puts a limit on the maximum number of concurrent metadata fetches actively running on
+	// goroutines. Default is 32.
+	MetadataMaxConcurrency int
 
-	// BlobCacheSize is the size of the blob cache. Current cache implementation is unaware of data sizes, and so
-	// this is a total count, not a size in bytes. Default is 32.
+	// BlobCacheSize is the maximum number of items in the blob cache. Default is 32.
 	BlobCacheSize int
 
-	// BlobWorkPoolSize is the size of the blob work pool. Default is 32.
-	BlobWorkPoolSize int
+	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
+	// Default is 32.
+	BlobMaxConcurrency int
 
-	// ChunkCacheSize is the size of the chunk cache. Current cache implementation is unaware of data sizes, and so
-	// this is a total count, not a size in bytes. Default is 32.
+	// ChunkCacheSize is the maximum number of items in the chunk cache. Default is 32.
 	ChunkCacheSize int
 
-	// ChunkWorkPoolSize is the size of the chunk work pool. Default is 32.
-	ChunkWorkPoolSize int
+	// ChunkMaxConcurrency is the size of the work pool for fetching chunks. Default is 32. Note that this does not
+	// impact concurrency utilized by the s3 client to upload/download fragmented files.
+	ChunkMaxConcurrency int
 }
 
 // DefaultConfig returns the default configuration for the relay Server.
 func DefaultConfig() *Config {
 	return &Config{
-		MetadataCacheSize:    1024 * 1024,
-		MetadataWorkPoolSize: 32,
-		BlobCacheSize:        32,
-		BlobWorkPoolSize:     32,
-		ChunkCacheSize:       32,
-		ChunkWorkPoolSize:    32,
+		MetadataCacheSize:      1024 * 1024,
+		MetadataMaxConcurrency: 32,
+		BlobCacheSize:          32,
+		BlobMaxConcurrency:     32,
+		ChunkCacheSize:         32,
+		ChunkMaxConcurrency:    32,
 	}
 }

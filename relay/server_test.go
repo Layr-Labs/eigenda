@@ -144,7 +144,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -555,7 +555,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -819,7 +819,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,

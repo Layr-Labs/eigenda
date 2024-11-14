@@ -17,8 +17,8 @@ type chunkManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
-	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
-	// assigned to this server will not be in the cache.
+	// metadataCache is an LRU cache of blob metadata. Each relay is authorized to serve data assigned to one or more
+	// relay IDs. Blobs that do not belong to one of the relay IDs assigned to this server will not be in the cache.
 	frameCache cache.CachedAccessor[blobKeyWithMetadata, []*encoding.Frame]
 
 	// chunkReader is used to read chunks from the chunk store.
@@ -44,13 +44,13 @@ func newChunkManager(
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
 	cacheSize int,
-	workPoolSize int) (*chunkManager, error) {
+	maxIOConcurrency int) (*chunkManager, error) {
 
 	server := &chunkManager{
 		ctx:                ctx,
 		logger:             logger,
 		chunkReader:        chunkReader,
-		concurrencyLimiter: make(chan struct{}, workPoolSize),
+		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
 	}
 
 	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](cacheSize, server.fetchFrames)
@@ -66,10 +66,14 @@ func newChunkManager(
 type frameMap map[v2.BlobKey][]*encoding.Frame
 
 // GetFrames retrieves the frames for a blob.
-func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frameMap, error) {
+func (s *chunkManager) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
 
-	keys := make([]*blobKeyWithMetadata, 0, len(*mMap))
-	for k, v := range *mMap {
+	if len(mMap) == 0 {
+		return nil, fmt.Errorf("no metadata provided")
+	}
+
+	keys := make([]*blobKeyWithMetadata, 0, len(mMap))
+	for k, v := range mMap {
 		keys = append(keys, &blobKeyWithMetadata{blobKey: k, metadata: *v})
 	}
 
@@ -96,7 +100,7 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 			} else {
 				completionChannel <- &framesResult{
 					key:  boundKey.blobKey,
-					data: *frames,
+					data: frames,
 				}
 			}
 
@@ -112,11 +116,11 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap *metadataMap) (*frame
 		fMap[result.key] = result.data
 	}
 
-	return &fMap, nil
+	return fMap, nil
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) (*[]*encoding.Frame, error) {
+func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame, error) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -153,19 +157,19 @@ func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) (*[]*encoding.Frame,
 		return nil, err
 	}
 
-	return &frames, nil
+	return frames, nil
 }
 
 // assembleFrames assembles a slice of frames from its composite proofs and coefficients.
-func assembleFrames(frames []*rs.Frame, proof []*encoding.Proof) ([]*encoding.Frame, error) {
-	if len(frames) != len(proof) {
-		return nil, fmt.Errorf("number of frames and proofs must be equal (%d != %d)", len(frames), len(proof))
+func assembleFrames(frames []*rs.Frame, proofs []*encoding.Proof) ([]*encoding.Frame, error) {
+	if len(frames) != len(proofs) {
+		return nil, fmt.Errorf("number of frames and proofs must be equal (%d != %d)", len(frames), len(proofs))
 	}
 
 	assembledFrames := make([]*encoding.Frame, len(frames))
 	for i := range frames {
 		assembledFrames[i] = &encoding.Frame{
-			Proof:  *proof[i],
+			Proof:  *proofs[i],
 			Coeffs: frames[i].Coeffs,
 		}
 	}

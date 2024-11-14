@@ -10,12 +10,12 @@ import (
 )
 
 // blobManager encapsulates logic for fetching blobs. Utilized by the relay Server.
-// This struct adds caching and threading on top of blobstore.BlobStore.
+// This struct adds caching and concurrency limitation on top of blobstore.BlobStore.
 type blobManager struct {
 	ctx    context.Context
 	logger logging.Logger
 
-	// blobStore can be used to read blobs from S3.
+	// blobStore is used to read blobs from S3.
 	blobStore *blobstore.BlobStore
 
 	// blobCache is an LRU cache of blobs.
@@ -31,20 +31,20 @@ func newBlobManager(
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
 	blobCacheSize int,
-	workPoolSize int) (*blobManager, error) {
+	maxIOConcurrency int) (*blobManager, error) {
 
 	server := &blobManager{
 		ctx:                ctx,
 		logger:             logger,
 		blobStore:          blobStore,
-		concurrencyLimiter: make(chan struct{}, workPoolSize),
+		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
 	}
 
-	cache, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
+	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}
-	server.blobCache = cache
+	server.blobCache = c
 
 	return server, nil
 }
@@ -63,16 +63,16 @@ func (s *blobManager) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 		return nil, err
 	}
 
-	return *data, nil
+	return data, nil
 }
 
 // fetchBlob retrieves a single blob from the blob store.
-func (s *blobManager) fetchBlob(blobKey v2.BlobKey) (*[]byte, error) {
+func (s *blobManager) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 	data, err := s.blobStore.GetBlob(s.ctx, blobKey)
 	if err != nil {
 		s.logger.Error("Failed to fetch blob: %v", err)
 		return nil, err
 	}
 
-	return &data, nil
+	return data, nil
 }

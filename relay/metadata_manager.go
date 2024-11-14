@@ -31,11 +31,11 @@ type metadataManager struct {
 
 	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
 	// assigned to this server will not be in the cache.
-	metadataCache cache.CachedAccessor[v2.BlobKey, blobMetadata]
+	metadataCache cache.CachedAccessor[v2.BlobKey, *blobMetadata]
 
-	// shardSet is the set of shards assigned to this relay. This relay will refuse to serve metadata for blobs
-	// that are not assigned to one of these shards.
-	shardSet map[v2.RelayKey]struct{}
+	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
+	// that are not assigned to one of these IDs.
+	relayIDSet map[v2.RelayKey]struct{}
 
 	// concurrencyLimiter is a channel that limits the number of concurrent operations.
 	concurrencyLimiter chan struct{}
@@ -47,23 +47,23 @@ func newMetadataManager(
 	logger logging.Logger,
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
-	workPoolSize int,
-	shards []v2.RelayKey) (*metadataManager, error) {
+	maxIOConcurrency int,
+	relayIDs []v2.RelayKey) (*metadataManager, error) {
 
-	shardSet := make(map[v2.RelayKey]struct{}, len(shards))
-	for _, shard := range shards {
-		shardSet[shard] = struct{}{}
+	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
+	for _, id := range relayIDs {
+		relayIDSet[id] = struct{}{}
 	}
 
 	server := &metadataManager{
 		ctx:                ctx,
 		logger:             logger,
 		metadataStore:      metadataStore,
-		shardSet:           shardSet,
-		concurrencyLimiter: make(chan struct{}, workPoolSize),
+		relayIDSet:         relayIDSet,
+		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
 	}
 
-	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, blobMetadata](metadataCacheSize, server.fetchMetadata)
+	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](metadataCacheSize, server.fetchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata cache: %w", err)
 	}
@@ -77,7 +77,7 @@ func newMetadataManager(
 type metadataMap map[v2.BlobKey]*blobMetadata
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, error) {
+func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, error) {
 
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
@@ -134,21 +134,21 @@ func (m *metadataManager) GetMetadataForBlobs(keys []v2.BlobKey) (*metadataMap, 
 		mMap[result.key] = result.metadata
 	}
 
-	return &mMap, nil
+	return mMap, nil
 }
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataManager) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	// Retrieve the metadata from the store.
-	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, v2.BlobKey(key))
+	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
 
-	if len(m.shardSet) > 0 {
+	if len(m.relayIDSet) > 0 {
 		validShard := false
 		for _, shard := range cert.RelayKeys {
-			if _, ok := m.shardSet[shard]; ok {
+			if _, ok := m.relayIDSet[shard]; ok {
 				validShard = true
 				break
 			}
