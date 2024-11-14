@@ -20,6 +20,9 @@ import (
 func (e *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
 	// Get encoder
 	g, err := e.GetRsEncoder(params)
+	if err != nil {
+		return nil, err
+	}
 
 	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
 

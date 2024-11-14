@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/Layr-Labs/eigenda/encoding/utils/toeplitz"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -83,7 +83,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		flattenCoeffStoreFr = append(flattenCoeffStoreFr, coeffStore[i]...)
 	}
 
-	flattenCoeffStoreSf := gpu_utils.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
+	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[icicle_bn254.ScalarField](flattenCoeffStoreSf)
 
 	var icicleFFTBatch []bn254.G1Affine
@@ -135,7 +135,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
 		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
 		flatProofsBatch.Free()
-		icicleFFTBatch = gpu_utils.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
+		icicleFFTBatch = icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
 	})
 
 	wg.Wait()

@@ -5,7 +5,7 @@ package icicle
 import (
 	"sync"
 
-	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
+	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
@@ -27,11 +27,11 @@ func (g *RsIcicleComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Elemen
 	g.NttCfg.BatchSize = int32(1)
 	runtime.RunOnDevice(&g.Device, func(args ...any) {
 		defer wg.Done()
-		scalarsSF := gpu_utils.ConvertFrToScalarFieldsBytes(coeffs)
+		scalarsSF := icicle.ConvertFrToScalarFieldsBytes(coeffs)
 		scalars := core.HostSliceFromElements[icicle_bn254.ScalarField](scalarsSF)
 		outputDevice := make(core.HostSlice[icicle_bn254.ScalarField], len(coeffs))
 		ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
-		evals = gpu_utils.ConvertScalarFieldsToFrBytes(outputDevice)
+		evals = icicle.ConvertScalarFieldsToFrBytes(outputDevice)
 	})
 
 	wg.Wait()
