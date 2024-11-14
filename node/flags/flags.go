@@ -178,7 +178,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "expiration-poll-interval"),
 		Usage:    "How often (in second) to poll status and expire outdated blobs",
 		Required: false,
-		Value:    "180",
+		Value:    "1296000",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EXPIRATION_POLL_INTERVAL"),
 	}
 	ReachabilityPollIntervalSecFlag = cli.StringFlag{
