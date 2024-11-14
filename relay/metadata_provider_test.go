@@ -22,7 +22,7 @@ func TestGetNonExistentBlob(t *testing.T) {
 	defer teardown()
 	metadataStore := buildMetadataStore(t)
 
-	server, err := newMetadataManager(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
+	server, err := newMetadataProvider(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
 	require.NoError(t, err)
 
 	// Try to fetch a non-existent blobs
@@ -80,7 +80,7 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
 	}
 
-	server, err := newMetadataManager(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
+	server, err := newMetadataProvider(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
@@ -154,7 +154,7 @@ func TestBatchedFetch(t *testing.T) {
 		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
 	}
 
-	server, err := newMetadataManager(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
+	server, err := newMetadataProvider(context.Background(), logger, metadataStore, 1024*1024, 32, nil)
 	require.NoError(t, err)
 
 	// Each iteration, choose a random subset of the keys to fetch
@@ -247,7 +247,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
 	}
 
-	server, err := newMetadataManager(context.Background(), logger, metadataStore, 1024*1024, 32, shardList)
+	server, err := newMetadataProvider(context.Background(), logger, metadataStore, 1024*1024, 32, shardList)
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
@@ -371,7 +371,7 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 		require.Equal(t, fragmentSizeMap[blobKey], fragmentInfo.FragmentSizeBytes)
 	}
 
-	server, err := newMetadataManager(context.Background(), logger, metadataStore, 1024*1024, 32, shardList)
+	server, err := newMetadataProvider(context.Background(), logger, metadataStore, 1024*1024, 32, shardList)
 	require.NoError(t, err)
 
 	// Each iteration, choose two random keys to fetch. There will be a 25% chance that both blobs map to valid shards.

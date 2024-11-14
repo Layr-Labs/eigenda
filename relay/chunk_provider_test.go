@@ -44,7 +44,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		fragmentInfoMap[blobKey] = fragmentInfo
 	}
 
-	server, err := newChunkManager(context.Background(), logger, chunkReader, 10, 32)
+	server, err := newChunkProvider(context.Background(), logger, chunkReader, 10, 32)
 	require.NoError(t, err)
 
 	// Read it back.
@@ -124,7 +124,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		fragmentInfoMap[blobKey] = fragmentInfo
 	}
 
-	server, err := newChunkManager(context.Background(), logger, chunkReader, 10, 32)
+	server, err := newChunkProvider(context.Background(), logger, chunkReader, 10, 32)
 	require.NoError(t, err)
 
 	// Read it back.

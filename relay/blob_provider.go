@@ -9,9 +9,9 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// blobManager encapsulates logic for fetching blobs. Utilized by the relay Server.
+// blobProvider encapsulates logic for fetching blobs. Utilized by the relay Server.
 // This struct adds caching and concurrency limitation on top of blobstore.BlobStore.
-type blobManager struct {
+type blobProvider struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -25,15 +25,15 @@ type blobManager struct {
 	concurrencyLimiter chan struct{}
 }
 
-// newBlobManager creates a new blobManager.
-func newBlobManager(
+// newBlobProvider creates a new blobProvider.
+func newBlobProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
 	blobCacheSize int,
-	maxIOConcurrency int) (*blobManager, error) {
+	maxIOConcurrency int) (*blobProvider, error) {
 
-	server := &blobManager{
+	server := &blobProvider{
 		ctx:                ctx,
 		logger:             logger,
 		blobStore:          blobStore,
@@ -50,7 +50,7 @@ func newBlobManager(
 }
 
 // GetBlob retrieves a blob from the blob store.
-func (s *blobManager) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
+func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 
 	s.concurrencyLimiter <- struct{}{}
 	data, err := s.blobCache.Get(blobKey)
@@ -67,7 +67,7 @@ func (s *blobManager) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 }
 
 // fetchBlob retrieves a single blob from the blob store.
-func (s *blobManager) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
+func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 	data, err := s.blobStore.GetBlob(s.ctx, blobKey)
 	if err != nil {
 		s.logger.Error("Failed to fetch blob: %v", err)

@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-type chunkManager struct {
+type chunkProvider struct {
 	ctx    context.Context
 	logger logging.Logger
 
@@ -38,15 +38,15 @@ func (m *blobKeyWithMetadata) Compare(other *blobKeyWithMetadata) int {
 	return bytes.Compare(m.blobKey[:], other.blobKey[:])
 }
 
-// newChunkManager creates a new chunkManager.
-func newChunkManager(
+// newChunkProvider creates a new chunkProvider.
+func newChunkProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
 	cacheSize int,
-	maxIOConcurrency int) (*chunkManager, error) {
+	maxIOConcurrency int) (*chunkProvider, error) {
 
-	server := &chunkManager{
+	server := &chunkProvider{
 		ctx:                ctx,
 		logger:             logger,
 		chunkReader:        chunkReader,
@@ -66,7 +66,7 @@ func newChunkManager(
 type frameMap map[v2.BlobKey][]*encoding.Frame
 
 // GetFrames retrieves the frames for a blob.
-func (s *chunkManager) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
+func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
 
 	if len(mMap) == 0 {
 		return nil, fmt.Errorf("no metadata provided")
@@ -120,7 +120,7 @@ func (s *chunkManager) GetFrames(ctx context.Context, mMap metadataMap) (frameMa
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkManager) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame, error) {
+func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame, error) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

@@ -18,14 +18,14 @@ var _ pb.RelayServer = &Server{}
 type Server struct {
 	pb.UnimplementedRelayServer
 
-	// metadataServer encapsulates logic for fetching metadata for blobs.
-	metadataServer *metadataManager
+	// metadataProvider encapsulates logic for fetching metadata for blobs.
+	metadataProvider *metadataProvider
 
-	// blobServer encapsulates logic for fetching blobs.
-	blobServer *blobManager
+	// blobProvider encapsulates logic for fetching blobs.
+	blobProvider *blobProvider
 
-	// chunkServer encapsulates logic for fetching chunks.
-	chunkServer *chunkManager
+	// chunkProvider encapsulates logic for fetching chunks.
+	chunkProvider *chunkProvider
 }
 
 // NewServer creates a new relay Server.
@@ -37,7 +37,7 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader) (*Server, error) {
 
-	ms, err := newMetadataManager(
+	ms, err := newMetadataProvider(
 		ctx,
 		logger,
 		metadataStore,
@@ -48,7 +48,7 @@ func NewServer(
 		return nil, fmt.Errorf("error creating metadata server: %w", err)
 	}
 
-	bs, err := newBlobManager(
+	bs, err := newBlobProvider(
 		ctx,
 		logger,
 		blobStore,
@@ -58,7 +58,7 @@ func NewServer(
 		return nil, fmt.Errorf("error creating blob server: %w", err)
 	}
 
-	cs, err := newChunkManager(
+	cs, err := newChunkProvider(
 		ctx,
 		logger,
 		chunkReader,
@@ -69,9 +69,9 @@ func NewServer(
 	}
 
 	return &Server{
-		metadataServer: ms,
-		blobServer:     bs,
-		chunkServer:    cs,
+		metadataProvider: ms,
+		blobProvider:     bs,
+		chunkProvider:    cs,
 	}, nil
 }
 
@@ -89,7 +89,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 
 	keys := []v2.BlobKey{key}
-	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
@@ -99,7 +99,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf("blob not found")
 	}
 
-	data, err := s.blobServer.GetBlob(key)
+	data, err := s.blobProvider.GetBlob(key)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
@@ -144,13 +144,13 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		keys = append(keys, key)
 	}
 
-	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
 
-	frames, err := s.chunkServer.GetFrames(ctx, mMap)
+	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching frames: %w", err)
 	}
