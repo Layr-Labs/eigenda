@@ -31,7 +31,7 @@ type EncoderDevice interface {
 // Default configuration values
 const (
 	defaultBackend   = encoding.BackendDefault
-	defaultEnableGPU = false
+	defaultGPUEnable = false
 	defaultVerbose   = false
 )
 
@@ -44,7 +44,7 @@ func WithBackend(backend encoding.BackendType) EncoderOption {
 
 func WithGPU(enable bool) EncoderOption {
 	return func(e *Encoder) {
-		e.Config.EnableGPU = enable
+		e.Config.GPUEnable = enable
 	}
 }
 
@@ -66,7 +66,7 @@ func NewEncoder(opts ...EncoderOption) (*Encoder, error) {
 		Config: &encoding.Config{
 			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 			BackendType: defaultBackend,
-			EnableGPU:   defaultEnableGPU,
+			GPUEnable:   defaultGPUEnable,
 			Verbose:     defaultVerbose,
 		},
 
@@ -134,7 +134,7 @@ func (e *Encoder) CreateFFTSettings(params encoding.EncodingParams) *fft.FFTSett
 }
 
 func (e *Encoder) createDefaultBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	if e.Config.EnableGPU {
+	if e.Config.GPUEnable {
 		return nil, fmt.Errorf("GPU is not supported in default backend")
 	}
 

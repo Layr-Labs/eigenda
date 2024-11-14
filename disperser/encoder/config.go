@@ -11,7 +11,7 @@ type ServerConfig struct {
 	EnableGnarkChunkEncoding bool
 	PreventReencoding        bool
 	Backend                  string
-	EnableGPU                bool
+	GPUEnable                bool
 	PprofHttpPort            string
 	EnablePprof              bool
 }

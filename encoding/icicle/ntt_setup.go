@@ -12,7 +12,8 @@ import (
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
-// batchSize is number of batches
+// SetupNTT initializes the NTT domain with the domain size of maxScale.
+// It returns the NTT configuration and an error if the initialization fails.
 func SetupNTT(maxScale uint8) (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
 	cfg := core.GetDefaultNTTInitDomainConfig()
 

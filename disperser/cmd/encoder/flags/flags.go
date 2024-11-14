@@ -68,11 +68,11 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_CHUNK_ENCODING"),
 	}
-	EnableGPUFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-gpu"),
+	GPUEnableFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "gpu-enable"),
 		Usage:    "Enable GPU",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GPU"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GPU_ENABLE"),
 	}
 	BackendFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "backend"),
@@ -114,7 +114,7 @@ var optionalFlags = []cli.Flag{
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
 	S3BucketNameFlag,
-	EnableGPUFlag,
+	GPUEnableFlag,
 	BackendFlag,
 	PreventReencodingFlag,
 	PprofHttpPort,

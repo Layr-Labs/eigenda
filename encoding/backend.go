@@ -12,7 +12,7 @@ const (
 type Config struct {
 	NumWorker   uint64
 	BackendType BackendType
-	EnableGPU   bool
+	GPUEnable   bool
 	Verbose     bool
 }
 

@@ -19,7 +19,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
-		EnableGPU:  p.Config.EnableGPU,
+		GPUEnable:  p.Config.GPUEnable,
 		NTTSize:    defaultNTTSize,
 		FFTPointsT: fftPointsT,
 		SRSG1:      p.Srs.G1[:p.KzgConfig.SRSNumberToLoad],

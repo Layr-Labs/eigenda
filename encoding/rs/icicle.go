@@ -15,7 +15,7 @@ const (
 
 func CreateIcicleBackendEncoder(e *Encoder, params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
-		EnableGPU: e.Config.EnableGPU,
+		GPUEnable: e.Config.GPUEnable,
 		NTTSize:   defaultNTTSize,
 		// No MSM setup needed for encoder
 	})

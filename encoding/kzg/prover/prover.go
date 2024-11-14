@@ -42,7 +42,7 @@ var _ encoding.Prover = &Prover{}
 // Default configuration values
 const (
 	defaultBackend        = encoding.BackendDefault
-	defaultEnableGPU      = false
+	defaultGPUEnable      = false
 	defaultLoadG2Points   = true
 	defaultPreloadEncoder = false
 	defaultNTTSize        = 25 // Used for NTT setup in Icicle backend
@@ -60,7 +60,7 @@ func WithBackend(backend encoding.BackendType) ProverOption {
 // WithGPU enables or disables GPU usage
 func WithGPU(enable bool) ProverOption {
 	return func(e *Prover) error {
-		e.Config.EnableGPU = enable
+		e.Config.GPUEnable = enable
 		return nil
 	}
 }
@@ -138,7 +138,7 @@ func NewProver(opts ...ProverOption) (*Prover, error) {
 		Config: &encoding.Config{
 			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 			BackendType: defaultBackend,
-			EnableGPU:   defaultEnableGPU,
+			GPUEnable:   defaultGPUEnable,
 			Verbose:     defaultVerbose,
 		},
 
@@ -494,7 +494,7 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 }
 
 func (p *Prover) createDefaultBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
-	if p.Config.EnableGPU {
+	if p.Config.GPUEnable {
 		return nil, fmt.Errorf("GPU is not supported in default backend")
 	}
 

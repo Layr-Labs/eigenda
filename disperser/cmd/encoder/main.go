@@ -80,7 +80,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		// Create the encoder
 		opts := []rs.EncoderOption{
 			rs.WithBackend(backendType),
-			rs.WithGPU(config.ServerConfig.EnableGPU),
+			rs.WithGPU(config.ServerConfig.GPUEnable),
 		}
 		rsEncoder, err := rs.NewEncoder(opts...)
 		if err != nil {
@@ -92,7 +92,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 			prover.WithKZGConfig(&config.EncoderConfig),
 			prover.WithLoadG2Points(false),
 			prover.WithBackend(backendType),
-			prover.WithGPU(config.ServerConfig.EnableGPU),
+			prover.WithGPU(config.ServerConfig.GPUEnable),
 			prover.WithRSEncoder(rsEncoder),
 		}
 		prover, err := prover.NewProver(popts...)
@@ -133,7 +133,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		prover.WithKZGConfig(&config.EncoderConfig),
 		prover.WithLoadG2Points(true),
 		prover.WithBackend(backendType),
-		prover.WithGPU(config.ServerConfig.EnableGPU),
+		prover.WithGPU(config.ServerConfig.GPUEnable),
 	}
 	prover, err := prover.NewProver(opts...)
 	if err != nil {

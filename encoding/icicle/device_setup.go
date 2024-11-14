@@ -22,10 +22,16 @@ type IcicleDevice struct {
 	SRSG1Icicle    []icicle_bn254.Affine
 }
 
-// IcicleDeviceConfig holds configuration options for device setup
+// IcicleDeviceConfig holds configuration options for a single device.
+//   - The GPUEnable parameter is used to enable GPU acceleration.
+//   - The NTTSize parameter is used to set the maximum domain size for NTT configuration.
+//   - The FFTPointsT and SRSG1 parameters are used to set up the MSM configuration.
+//   - MSM setup is optional and can be skipped by not providing these parameters.
+//     The reason for this is that not all applications require an MSM setup.
 type IcicleDeviceConfig struct {
-	EnableGPU bool
+	GPUEnable bool
 	NTTSize   uint8
+
 	// MSM setup parameters (optional)
 	FFTPointsT [][]bn254.G1Affine
 	SRSG1      []bn254.G1Affine
@@ -35,7 +41,7 @@ type IcicleDeviceConfig struct {
 func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 	icicle_runtime.LoadBackendFromEnvOrDefault()
 
-	device := setupDevice(config.EnableGPU)
+	device := setupDevice(config.GPUEnable)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -55,18 +61,18 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 		// Setup NTT
 		nttCfg, icicleErr = SetupNTT(config.NTTSize)
 		if icicleErr != icicle_runtime.Success {
-			setupErr = fmt.Errorf("could not setup NTT")
+			setupErr = fmt.Errorf("could not setup NTT: %v", icicleErr.AsString())
 			return
 		}
 
 		// Setup MSM if parameters are provided
 		if config.FFTPointsT != nil && config.SRSG1 != nil {
-			flatFftPointsT, srsG1Icicle, msmCfg, _, icicleErr = SetupMsm(
+			flatFftPointsT, srsG1Icicle, msmCfg, icicleErr = SetupMsmG1(
 				config.FFTPointsT,
 				config.SRSG1,
 			)
 			if icicleErr != icicle_runtime.Success {
-				setupErr = fmt.Errorf("could not setup MSM")
+				setupErr = fmt.Errorf("could not setup MSM: %v", icicleErr.AsString())
 				return
 			}
 		}
@@ -88,8 +94,8 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 }
 
 // setupDevice initializes either a GPU or CPU device
-func setupDevice(enableGPU bool) icicle_runtime.Device {
-	if enableGPU {
+func setupDevice(gpuEnable bool) icicle_runtime.Device {
+	if gpuEnable {
 		return setupGPUDevice()
 	}
 
