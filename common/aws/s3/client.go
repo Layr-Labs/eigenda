@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -124,6 +125,22 @@ func (s *client) DownloadObject(ctx context.Context, bucket string, key string) 
 	return buffer.Bytes(), nil
 }
 
+func (s *client) HeadObject(ctx context.Context, bucket string, key string) (*int64, error) {
+	output, err := s.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var notFound *types.NotFound
+		if ok := errors.As(err, &notFound); ok {
+			return nil, ErrObjectNotFound
+		}
+		return nil, err
+	}
+
+	return output.ContentLength, nil
+}
+
 func (s *client) UploadObject(ctx context.Context, bucket string, key string, data []byte) error {
 	var partMiBs int64 = 10
 	uploader := manager.NewUploader(s.s3Client, func(u *manager.Uploader) {
@@ -155,6 +172,7 @@ func (s *client) DeleteObject(ctx context.Context, bucket string, key string) er
 	return err
 }
 
+// ListObjects lists all items metadata in a bucket with the given prefix up to 1000 items.
 func (s *client) ListObjects(ctx context.Context, bucket string, prefix string) ([]Object, error) {
 	output, err := s.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
@@ -196,7 +214,7 @@ func (s *client) FragmentedUploadObject(
 	data []byte,
 	fragmentSize int) error {
 
-	fragments, err := breakIntoFragments(key, data, fragmentSize)
+	fragments, err := BreakIntoFragments(key, data, fragmentSize)
 	if err != nil {
 		return err
 	}
@@ -246,12 +264,15 @@ func (s *client) FragmentedDownloadObject(
 	key string,
 	fileSize int,
 	fragmentSize int) ([]byte, error) {
+	if fileSize <= 0 {
+		return nil, errors.New("fileSize must be greater than 0")
+	}
 
 	if fragmentSize <= 0 {
 		return nil, errors.New("fragmentSize must be greater than 0")
 	}
 
-	fragmentKeys, err := getFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
+	fragmentKeys, err := GetFragmentKeys(key, getFragmentCount(fileSize, fragmentSize))
 	if err != nil {
 		return nil, err
 	}
