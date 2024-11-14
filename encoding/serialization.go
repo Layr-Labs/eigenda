@@ -10,25 +10,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
-func SerializeProof(p *Proof) ([]byte, error) {
-	coded := make([]byte, 0, bn254.SizeOfG1AffineCompressed)
-	proofBytes := p.Bytes()
-	coded = append(coded, proofBytes[:]...)
-
-	return coded, nil
-}
-
-func DeserializeProofGnark(data []byte) (*Proof, error) {
-	var p Proof
-	buf := data
-	err := p.Unmarshal(buf[:bn254.SizeOfG1AffineCompressed])
-	if err != nil {
-		return nil, err
-	}
-
-	return &p, nil
-}
-
 func (c *Frame) Serialize() ([]byte, error) {
 	return encode(c)
 }

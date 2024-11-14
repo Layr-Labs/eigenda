@@ -30,7 +30,6 @@ type EncoderServer struct {
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
 
-	// General encoding request pool
 	runningRequests chan struct{}
 	requestPool     chan blobRequest
 
