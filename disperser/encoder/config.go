@@ -10,6 +10,8 @@ type ServerConfig struct {
 	RequestPoolSize          int
 	EnableGnarkChunkEncoding bool
 	PreventReencoding        bool
+	Backend                  string
+	EnableGPU                bool
 	PprofHttpPort            string
 	EnablePprof              bool
 }

@@ -45,7 +45,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 		return nil, nil, err
 	}
 
-	if g.config.Verbose {
+	if g.Config.Verbose {
 		log.Printf("    Padding takes  %v\n", time.Since(intermediate))
 	}
 
@@ -54,7 +54,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 		return nil, nil, err
 	}
 
-	if g.config.Verbose {
+	if g.Config.Verbose {
 		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
 	}
 

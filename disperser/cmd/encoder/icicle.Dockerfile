@@ -37,7 +37,7 @@ RUN cp -r /app/icicle/lib/* /usr/lib/ && \
 
 # Build the server with GPU support
 WORKDIR /app/disperser
-RUN go build -tags=gpu -o ./bin/server ./cmd/encoder
+RUN go build -tags=icicle -o ./bin/server ./cmd/encoder
 
 # Start a new stage for the base image
 FROM nvidia/cuda:12.2.2-base-ubuntu22.04

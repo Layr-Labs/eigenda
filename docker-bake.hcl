@@ -98,10 +98,10 @@ target "encoder" {
   tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
-target "encoder-gpu" {
+target "encoder-icicle" {
   context = "."
-  dockerfile = "./disperser/cmd/encoder/gpu.Dockerfile"
-  tags       = ["${REGISTRY}/${REPO}/encoder-gpu:${BUILD_TAG}"]
+  dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
 }
 
 target "encoder-internal" {

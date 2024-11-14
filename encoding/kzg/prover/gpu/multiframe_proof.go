@@ -1,3 +1,5 @@
+//go:build icicle
+
 package gpu
 
 import (

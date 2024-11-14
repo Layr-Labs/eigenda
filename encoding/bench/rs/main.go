@@ -122,7 +122,7 @@ func benchmarkRSEncode(blobLength uint64, numChunks uint64, chunkLen uint64, ver
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 	encoder, err := rs.NewEncoder(
 		rs.WithBackend(encoding.BackendIcicle),
-		rs.WithGPU(false),
+		rs.WithGPU(true),
 		rs.WithVerbose(true),
 	)
 

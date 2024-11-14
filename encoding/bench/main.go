@@ -156,7 +156,10 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, _ := p.GetKzgEncoder(params)
+	enc, err := p.GetKzgEncoder(params)
+	if err != nil {
+		log.Fatalf("Failed to get KZG encoder: %v", err)
+	}
 
 	// Create polynomial
 	inputSize := blobLength

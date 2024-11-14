@@ -12,6 +12,7 @@ import (
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -110,9 +111,16 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return server.Start()
 	}
 
+	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
+	if err != nil {
+		return err
+	}
+
 	opts := []prover.ProverOption{
 		prover.WithKZGConfig(&config.EncoderConfig),
 		prover.WithLoadG2Points(true),
+		prover.WithBackend(backendType),
+		prover.WithGPU(config.ServerConfig.EnableGPU),
 	}
 	prover, err := prover.NewProver(opts...)
 	if err != nil {

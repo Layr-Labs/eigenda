@@ -2,7 +2,6 @@ package rs
 
 import (
 	"fmt"
-	"log/slog"
 	"math"
 	"runtime"
 	"sync"
@@ -10,12 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs/cpu"
-	rs_icicle "github.com/Layr-Labs/eigenda/encoding/rs/icicle"
-	"github.com/Layr-Labs/eigenda/encoding/utils/gpu_utils"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 
 	_ "go.uber.org/automaxprocs"
 )
@@ -24,7 +18,7 @@ import (
 type EncoderOption func(*Encoder)
 
 type Encoder struct {
-	config *encoding.Config
+	Config *encoding.Config
 
 	mu                  sync.Mutex
 	ParametrizedEncoder map[encoding.EncodingParams]*ParametrizedEncoder
@@ -46,32 +40,32 @@ const (
 // Option Definitions
 func WithBackend(backend encoding.BackendType) EncoderOption {
 	return func(e *Encoder) {
-		e.config.BackendType = backend
+		e.Config.BackendType = backend
 	}
 }
 
 func WithGPU(enable bool) EncoderOption {
 	return func(e *Encoder) {
-		e.config.EnableGPU = enable
+		e.Config.EnableGPU = enable
 	}
 }
 
 func WithNumWorkers(workers uint64) EncoderOption {
 	return func(e *Encoder) {
-		e.config.NumWorker = workers
+		e.Config.NumWorker = workers
 	}
 }
 
 func WithVerbose(verbose bool) EncoderOption {
 	return func(e *Encoder) {
-		e.config.Verbose = verbose
+		e.Config.Verbose = verbose
 	}
 }
 
 // NewEncoder creates a new encoder with the given options
 func NewEncoder(opts ...EncoderOption) (*Encoder, error) {
 	e := &Encoder{
-		config: &encoding.Config{
+		Config: &encoding.Config{
 			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 			BackendType: defaultBackend,
 			EnableGPU:   defaultEnableGPU,
@@ -121,20 +115,19 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 		return nil, err
 	}
 
-	fs := e.createFFTSettings(params)
+	fs := e.CreateFFTSettings(params)
 
-	switch e.config.BackendType {
-
+	switch e.Config.BackendType {
 	case encoding.BackendDefault:
 		return e.createDefaultBackendEncoder(params, fs)
 	case encoding.BackendIcicle:
 		return e.createIcicleBackendEncoder(params, fs)
 	default:
-		return nil, fmt.Errorf("unsupported backend type: %v", e.config.BackendType)
+		return nil, fmt.Errorf("unsupported backend type: %v", e.Config.BackendType)
 	}
 }
 
-func (e *Encoder) createFFTSettings(params encoding.EncodingParams) *fft.FFTSettings {
+func (e *Encoder) CreateFFTSettings(params encoding.EncodingParams) *fft.FFTSettings {
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	if params.ChunkLength == 1 {
 		n = uint8(math.Log2(float64(2 * params.NumChunks)))
@@ -143,12 +136,12 @@ func (e *Encoder) createFFTSettings(params encoding.EncodingParams) *fft.FFTSett
 }
 
 func (e *Encoder) createDefaultBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	if e.config.EnableGPU {
+	if e.Config.EnableGPU {
 		return nil, fmt.Errorf("GPU is not supported in default backend")
 	}
 
 	return &ParametrizedEncoder{
-		Config:            e.config,
+		Config:            e.Config,
 		EncodingParams:    params,
 		Fs:                fs,
 		RSEncoderComputer: &cpu.RsDefaultComputeDevice{Fs: fs},
@@ -156,85 +149,6 @@ func (e *Encoder) createDefaultBackendEncoder(params encoding.EncodingParams, fs
 }
 
 func (e *Encoder) createIcicleBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
-	icicle_runtime.LoadBackendFromEnvOrDefault()
-
-	device := e.setupIcicleDevice()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	var (
-		nttCfg     core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
-		setupErr   error
-		icicle_err icicle_runtime.EIcicleError
-	)
-
-	// Setup NTT on device
-	icicle_runtime.RunOnDevice(&device, func(args ...any) {
-		defer wg.Done()
-
-		// Setup NTT
-		nttCfg, icicle_err = gpu_utils.SetupNTT(defaultNTTSize)
-		if icicle_err != icicle_runtime.Success {
-			setupErr = fmt.Errorf("could not setup NTT")
-			return
-		}
-	})
-
-	wg.Wait()
-
-	if setupErr != nil {
-		return nil, setupErr
-	}
-
-	return &ParametrizedEncoder{
-		Config:         e.config,
-		EncodingParams: params,
-		Fs:             fs,
-		RSEncoderComputer: &rs_icicle.RsIcicleComputeDevice{
-			NttCfg: nttCfg,
-			Device: device,
-		},
-	}, nil
-}
-
-func (e *Encoder) setupIcicleDevice() icicle_runtime.Device {
-	if e.config.EnableGPU {
-		return e.setupGPUDevice()
-	}
-	return e.setupCPUDevice()
-}
-
-func (e *Encoder) setupGPUDevice() icicle_runtime.Device {
-	deviceCuda := icicle_runtime.CreateDevice("CUDA", 0)
-	if icicle_runtime.IsDeviceAvailable(&deviceCuda) {
-		device := icicle_runtime.CreateDevice("CUDA", 0)
-		if e.config.Verbose {
-			slog.Info("CUDA device available, setting device")
-		}
-		icicle_runtime.SetDevice(&device)
-		return device
-	}
-
-	if e.config.Verbose {
-		slog.Info("CUDA device not available, falling back to CPU")
-	}
-	return e.setupCPUDevice()
-}
-
-func (e *Encoder) setupCPUDevice() icicle_runtime.Device {
-	device := icicle_runtime.CreateDevice("CPU", 0)
-	if e.config.Verbose && icicle_runtime.IsDeviceAvailable(&device) {
-		slog.Info("CPU device available, setting device")
-	}
-	icicle_runtime.SetDevice(&device)
-	return device
-}
-
-func (e *Encoder) setupNTTConfig() (core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32], error) {
-	nttCfg, icicle_err := gpu_utils.SetupNTT(defaultNTTSize)
-	if icicle_err != icicle_runtime.Success {
-		return nttCfg, fmt.Errorf("could not setup NTT")
-	}
-	return nttCfg, nil
+	fmt.Println("CreateIcicleBackendEncoder", e.Config.EnableGPU)
+	return CreateIcicleBackendEncoder(e, params, fs)
 }
