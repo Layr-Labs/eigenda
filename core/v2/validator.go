@@ -43,7 +43,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Get the assignments for the quorum
-	assignment, err := GetAssignment(operatorState, blob.Version, quorum, v.operatorID)
+	assignment, err := GetAssignment(operatorState, blob.BlobHeader.BlobVersion, quorum, v.operatorID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -57,7 +57,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Validate the chunkLength against the confirmation and adversary threshold parameters
-	chunkLength, err := GetChunkLength(blob.Version, uint32(blob.BlobHeader.Length))
+	chunkLength, err := GetChunkLength(blob.BlobHeader.BlobVersion, uint32(blob.BlobHeader.BlobCommitments.Length))
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
@@ -73,7 +73,7 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	return chunks, &assignment, nil
 }
 
-func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool) error {
+func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, referenceBlockNumber uint64) error {
 	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
@@ -83,7 +83,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Chunks), len(blob.BlobHeader.QuorumNumbers))
 		}
 
-		state, err := v.chainState.GetOperatorState(ctx, uint(blob.ReferenceBlockNumber), blob.BlobHeader.QuorumNumbers)
+		state, err := v.chainState.GetOperatorState(ctx, uint(referenceBlockNumber), blob.BlobHeader.QuorumNumbers)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 				return err
 			}
 			// TODO: Define params for the blob
-			params, err := blob.GetEncodingParams()
+			params, err := blob.BlobHeader.GetEncodingParams()
 			if err != nil {
 				return err
 			}

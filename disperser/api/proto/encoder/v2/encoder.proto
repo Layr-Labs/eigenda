@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2";
+package encoder.v2;
+
+service Encoder {
+  // EncodeBlob encodes a blob into chunks using specified encoding parameters.
+  // The blob is retrieved using the provided blob key and the encoded chunks
+  // are persisted for later retrieval.
+  rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
+}
+
+// EncodeBlobRequest contains the reference to the blob to be encoded and the encoding parameters
+// determined by the control plane.
+message EncodeBlobRequest {
+  bytes blob_key = 1;
+  EncodingParams encoding_params = 2;
+}
+
+// EncodingParams specifies how the blob should be encoded into chunks
+message EncodingParams {
+  uint64 chunk_length = 1;
+  uint64 num_chunks = 2;
+}
+
+// FragmentInfo contains metadata about the encoded fragments
+message FragmentInfo {
+  uint32 total_chunk_size_bytes = 1;
+  uint32 fragment_size_bytes = 2;
+}
+
+// EncodeBlobReply contains metadata about the encoded chunks
+message EncodeBlobReply {
+  FragmentInfo fragment_info = 1;
+}

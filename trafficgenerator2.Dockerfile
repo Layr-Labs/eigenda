@@ -16,5 +16,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM alpine:3.18 as generator2
 
 COPY --from=builder /app/tools/traffic/bin/generator /usr/local/bin
+COPY --from=builder /app/inabox/resources /resources
 
 ENTRYPOINT ["generator"]

@@ -6,9 +6,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
@@ -29,7 +30,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     kvstore.Store
+	db     kvstore.Store[[]byte]
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
@@ -473,154 +474,6 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	log.Debug("StoreBatch succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "num blobs", len(blobs), "num of key-value pair entries", len(keys), "write batch duration", time.Since(start), "write throughput (MB/s)", throughput/1000_000, "total store batch duration", time.Since(storeBatchStart), "total bytes", size)
 
 	return &keys, nil
-}
-
-func (s *Store) StoreBlobs(ctx context.Context, blobs []*core.BlobMessage, blobsProto []*node.Blob) (*[][]byte, error) {
-	storeBlobsStart := time.Now()
-	keys := make([][]byte, 0)
-	batch := s.db.NewBatch()
-
-	expirationTime := s.expirationTime()
-
-	// Generate key/value pairs for all blob headers and blob chunks .
-	size := int64(0)
-	var serializationDuration, encodingDuration time.Duration
-	for idx, blob := range blobs {
-		rawBlob := blobsProto[idx]
-		if len(rawBlob.GetBundles()) != len(blob.Bundles) {
-			return nil, fmt.Errorf("internal error: the number of bundles in parsed blob (%d) must be the same as in raw blob (%d)", len(rawBlob.GetBundles()), len(blob.Bundles))
-		}
-
-		blobHeaderHash, err := blob.BlobHeader.GetBlobHeaderHash()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get blob header hash: %w", err)
-		}
-
-		// expiration key
-		expirationKey := EncodeBlobExpirationKey(expirationTime, blobHeaderHash)
-		keys = append(keys, expirationKey)
-		batch.Put(expirationKey, blobHeaderHash[:])
-
-		// blob header
-		blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
-		if s.HasKey(ctx, blobHeaderKey) {
-			s.logger.Warn("Blob already exists", "blobHeaderHash", hexutil.Encode(blobHeaderHash[:]))
-			continue
-		}
-
-		blobHeaderBytes, err := proto.Marshal(blobsProto[idx].GetHeader())
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize the blob header proto: %w", err)
-		}
-		keys = append(keys, blobHeaderKey)
-		batch.Put(blobHeaderKey, blobHeaderBytes)
-
-		// Get raw chunks
-		start := time.Now()
-		format := GetBundleEncodingFormat(rawBlob)
-		rawBundles := make(map[core.QuorumID][]byte)
-		rawChunks := make(map[core.QuorumID][][]byte)
-		for i, bundle := range rawBlob.GetBundles() {
-			quorumID := uint8(rawBlob.GetHeader().GetQuorumHeaders()[i].GetQuorumId())
-			if format == core.GnarkBundleEncodingFormat {
-				if len(bundle.GetChunks()) > 0 && len(bundle.GetChunks()[0]) > 0 {
-					return nil, errors.New("chunks of a bundle are encoded together already")
-				}
-				rawBundles[quorumID] = bundle.GetBundle()
-			} else {
-				rawChunks[quorumID] = make([][]byte, len(bundle.GetChunks()))
-				for j, chunk := range bundle.GetChunks() {
-					rawChunks[quorumID][j] = chunk
-				}
-			}
-		}
-		serializationDuration += time.Since(start)
-		start = time.Now()
-		// blob chunks
-		for quorumID, bundle := range blob.Bundles {
-			key, err := EncodeBlobKeyByHash(blobHeaderHash, quorumID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate the key for storing blob: %w", err)
-			}
-
-			if format == core.GnarkBundleEncodingFormat {
-				rawBundle, ok := rawBundles[quorumID]
-				if ok {
-					size += int64(len(rawBundle))
-					keys = append(keys, key)
-					batch.Put(key, rawBundle)
-				}
-			} else if format == core.GobBundleEncodingFormat {
-				if len(rawChunks[quorumID]) != len(bundle) {
-					return nil, errors.New("internal error: the number of chunks in parsed blob bundle must be the same as in raw blob bundle")
-				}
-				chunksBytes, ok := rawChunks[quorumID]
-				if ok {
-
-					bundleRaw := make([][]byte, len(bundle))
-					for i := 0; i < len(bundle); i++ {
-						bundleRaw[i] = chunksBytes[i]
-					}
-					chunkBytes, err := EncodeChunks(bundleRaw)
-					if err != nil {
-						return nil, err
-					}
-					size += int64(len(chunkBytes))
-					keys = append(keys, key)
-					batch.Put(key, chunkBytes)
-				}
-			} else {
-				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
-			}
-		}
-		encodingDuration += time.Since(start)
-	}
-
-	start := time.Now()
-	// Write all the key/value pairs to the local database atomically.
-	err := batch.Apply()
-	if err != nil {
-		return nil, fmt.Errorf("failed to write the batch into local database: %w", err)
-	}
-	throughput := float64(size) / time.Since(start).Seconds()
-	s.metrics.DBWriteThroughput.Set(throughput)
-	s.logger.Debug("StoreBlobs succeeded", "chunk serialization duration", serializationDuration, "bytes encoding duration", encodingDuration, "num blobs", len(blobs), "num of key-value pair entries", len(keys), "write batch duration", time.Since(start), "write throughput (MB/s)", throughput/1000_000, "total store batch duration", time.Since(storeBlobsStart), "total bytes", size)
-
-	return &keys, nil
-}
-
-func (s *Store) StoreBatchBlobMapping(ctx context.Context, batchHeader *core.BatchHeader, blobHeaderHashes [][32]byte) error {
-	start := time.Now()
-	batch := s.db.NewBatch()
-
-	batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
-	if err != nil {
-		return fmt.Errorf("failed to get the batch header hash: %w", err)
-	}
-
-	expirationTime := s.expirationTime()
-	expirationKey := EncodeBatchMappingExpirationKey(expirationTime, batchHeaderHash)
-	batch.Put(expirationKey, batchHeaderHash[:])
-
-	for blobIndex, blobHeaderHash := range blobHeaderHashes {
-		blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
-		batch.Put(blobIndexKey, blobHeaderHash[:])
-	}
-
-	// Generate the key/value pair for batch header.
-	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
-	batchHeaderBytes, err := batchHeader.Serialize()
-	if err != nil {
-		return fmt.Errorf("failed to serialize the batch header: %w", err)
-	}
-	batch.Put(batchHeaderKey, batchHeaderBytes)
-
-	err = batch.Apply()
-	if err != nil {
-		return fmt.Errorf("failed to write the blob index mappings into local database: %w", err)
-	}
-	s.logger.Debug("StoreBatchBlobMapping succeeded", "duration", time.Since(start))
-	return nil
 }
 
 func (s *Store) expirationTime() int64 {

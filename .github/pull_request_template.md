@@ -4,7 +4,6 @@
 
 ## Checks
 
-- [ ] I've made sure the lint is passing in this PR.
 - [ ] I've made sure the tests are passing. Note that there might be a few flaky tests, in that case, please comment that they are not relevant.
 - [ ] I've checked the new test coverage and the coverage percentage didn't drop.
 - Testing Strategy

@@ -13,20 +13,49 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// BlobStatus represents the status of a blob.
+// The status of a blob is updated as the blob is processed by the disperser.
+// The status of a blob can be queried by the client using the GetBlobStatus API.
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// - PROCESSING
+// - DISPERSING
+// - CONFIRMED
+// Terminal states are states that will not be updated to a different state:
+// - FAILED
+// - FINALIZED
+// - INSUFFICIENT_SIGNATURES
+//
+// Note: this docstring and the enum ones below are copied from the disperser.proto,
+// which is the source of truth for BlobStatus.
 type BlobStatus uint
 
 // WARNING: THESE VALUES BECOME PART OF PERSISTENT SYSTEM STATE;
 // ALWAYS INSERT NEW ENUM VALUES AS THE LAST ELEMENT TO MAINTAIN COMPATIBILITY
 const (
+	// PROCESSING means that the blob is currently being processed by the disperser
 	Processing BlobStatus = iota
+	// CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed
+	// batch containing the blob has been confirmed onchain
 	Confirmed
+	// FAILED means that the blob has failed permanently (for reasons other than insufficient
+	// signatures, which is a separate state). This status is somewhat of a catch-all category,
+	// containg (but not necessarily exclusively as errors can be added in the future):
+	//  - blob has expired
+	//  - internal logic error while requesting encoding
+	//  - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
+	//  Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
 	Failed
+	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
 	Finalized
+	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+	// for at least one quorum.
 	InsufficientSignatures
+	// The DISPERSING state is comprised of two separate phases:
+	//  - Dispersing to DA nodes and collecting signature
+	//  - Submitting the transaction on chain and waiting for tx receipt
 	Dispersing
 )
 
@@ -189,9 +218,6 @@ type BlobStore interface {
 
 type Dispatcher interface {
 	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SigningMessage
-	SendBlobsToOperator(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error)
-	AttestBatch(ctx context.Context, state *core.IndexedOperatorState, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader) (chan core.SigningMessage, error)
-	SendAttestBatchRequest(ctx context.Context, nodeDispersalClient node.DispersalClient, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error)
 }
 
 // GenerateReverseIndexKey returns the key used to store the blob key in the reverse index

@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	mt "github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
@@ -60,11 +63,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	if config.DisperserVersion == V2 {
-		server := apiserver.NewDispersalServerV2(config.ServerConfig, logger)
-		return server.Start(context.Background())
-	}
-
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -94,12 +92,42 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	bucketName := config.BlobstoreConfig.BucketName
-	logger.Info("Creating blob store", "bucket", bucketName)
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
-
 	reg := prometheus.NewRegistry()
+
+	var meterer *mt.Meterer
+	if config.EnablePaymentMeterer {
+		mtConfig := mt.Config{
+			ChainReadTimeout: time.Duration(config.ChainReadTimeout) * time.Second,
+			UpdateInterval:   time.Duration(config.UpdateInterval) * time.Second,
+		}
+
+		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
+
+		offchainStore, err := mt.NewOffchainStore(
+			config.AwsClientConfig,
+			config.ReservationsTableName,
+			config.OnDemandTableName,
+			config.GlobalRateTableName,
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		// add some default sensible configs
+		meterer = mt.NewMeterer(
+			mtConfig,
+			&paymentChainState,
+			offchainStore,
+			logger,
+			// metrics.NewNoopMetrics(),
+		)
+	}
 
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
@@ -129,6 +157,30 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
 	}
 
+	bucketName := config.BlobstoreConfig.BucketName
+	logger.Info("Blob store", "bucket", bucketName)
+	if config.DisperserVersion == V2 {
+		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
+
+		server := apiserver.NewDispersalServerV2(
+			config.ServerConfig,
+			config.RateConfig,
+			blobStore,
+			blobMetadataStore,
+			transactor,
+			ratelimiter,
+			authv2.NewAuthenticator(),
+			uint64(config.MaxNumSymbolsPerBlob),
+			config.OnchainStateRefreshInterval,
+			logger,
+		)
+		return server.Start(context.Background())
+	}
+
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
@@ -136,6 +188,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		meterer,
 		ratelimiter,
 		config.RateConfig,
 		config.MaxBlobSize,

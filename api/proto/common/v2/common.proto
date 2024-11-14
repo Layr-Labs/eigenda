@@ -5,19 +5,34 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common/v2";
 
 
 message BlobHeader {
-	// Blob version
-	uint32 version = 1;
-	repeated uint32 quorum_numbers = 2;
-	common.BlobCommitment commitment = 3;
-	common.PaymentHeader payment_header = 4;
+  // Blob version
+  uint32 version = 1;
+  repeated uint32 quorum_numbers = 2;
+  common.BlobCommitment commitment = 3;
+  common.PaymentHeader payment_header = 4;
 
-	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-	bytes signature = 5;
+  // signature over keccak hash of the blob_header that can be verified by blob_header.account_id
+  bytes signature = 5;
 }
 
 // BlobCertificate is what gets attested by the network
 message BlobCertificate {
-	BlobHeader blob_header = 1;
-	uint32 reference_block_number = 2;
-	repeated uint32 relays = 3;
+  BlobHeader blob_header = 1;
+  repeated uint32 relays = 2;
+}
+
+// BatchHeader is the header of a batch of blobs
+message BatchHeader {
+  // batch_root is the root of the merkle tree of the hashes of blob certificates in the batch
+  bytes batch_root = 1;
+  // reference_block_number is the block number that the state of the batch is based on for attestation
+  uint64 reference_block_number = 2;
+}
+
+// Batch is a batch of blob certificates
+message Batch {
+  // header contains metadata about the batch
+  BatchHeader header = 1;
+  // blob_certificates is the list of blob certificates in the batch
+  repeated BlobCertificate blob_certificates = 2;
 }

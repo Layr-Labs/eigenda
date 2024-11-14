@@ -18,7 +18,7 @@ import (
 )
 
 type OffchainStore struct {
-	dynamoClient         *commondynamodb.Client
+	dynamoClient         commondynamodb.Client
 	reservationTableName string
 	onDemandTableName    string
 	globalBinTableName   string

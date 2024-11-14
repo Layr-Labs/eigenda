@@ -104,7 +104,7 @@ func TestV2NodeInfoRequest(t *testing.T) {
 func TestV2StoreChunks(t *testing.T) {
 	server := newTestServerV2(t, true)
 	_, err := server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{
-		BlobCertificates: []*commonpb.BlobCertificate{},
+		Batch: &commonpb.Batch{},
 	})
 	assert.ErrorContains(t, err, "not implemented")
 }
@@ -113,15 +113,6 @@ func TestV2GetChunks(t *testing.T) {
 	server := newTestServerV2(t, true)
 
 	_, err := server.GetChunks(context.Background(), &pbv2.GetChunksRequest{
-		BlobKey: []byte{0},
-	})
-	assert.ErrorContains(t, err, "not implemented")
-}
-
-func GetV2BlobCertificate(t *testing.T) {
-	server := newTestServerV2(t, true)
-
-	_, err := server.GetBlobCertificate(context.Background(), &pbv2.GetBlobCertificateRequest{
 		BlobKey: []byte{0},
 	})
 	assert.ErrorContains(t, err, "not implemented")

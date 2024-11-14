@@ -8,6 +8,7 @@ import (
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -29,13 +30,13 @@ const (
 //   - StatusIndex: (Partition Key: Status, Sort Key: RequestedAt) -> Metadata
 //   - BatchIndex: (Partition Key: BatchHeaderHash, Sort Key: BlobIndex) -> Metadata
 type BlobMetadataStore struct {
-	dynamoDBClient *commondynamodb.Client
+	dynamoDBClient commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
 	ttl            time.Duration
 }
 
-func NewBlobMetadataStore(dynamoDBClient *commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
+func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
 	logger.Debugf("creating blob metadata store with table %s with TTL: %s", tableName, ttl)
 	return &BlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
@@ -65,7 +66,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey dispers
 	})
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: metadata not found for key %s", disperser.ErrMetadataNotFound, blobKey)
+		return nil, fmt.Errorf("%w: metadata not found for key %s", common.ErrMetadataNotFound, blobKey)
 	}
 
 	if err != nil {
@@ -312,7 +313,7 @@ func (s *BlobMetadataStore) GetBlobMetadataInBatch(ctx context.Context, batchHea
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: there is no metadata for batch %s and blob index %d", disperser.ErrMetadataNotFound, hexutil.Encode(batchHeaderHash[:]), blobIndex)
+		return nil, fmt.Errorf("%w: there is no metadata for batch %s and blob index %d", common.ErrMetadataNotFound, hexutil.Encode(batchHeaderHash[:]), blobIndex)
 	}
 
 	if len(items) > 1 {

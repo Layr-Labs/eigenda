@@ -8,58 +8,59 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
 // Disperser defines the public APIs for dispersing blobs.
 service Disperser {
-	// DisperseBlob accepts blob to disperse from clients.
-	// This executes the dispersal asynchronously, i.e. it returns once the request
-	// is accepted. The client could use GetBlobStatus() API to poll the the
-	// processing status of the blob.
-	rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
+  // DisperseBlob accepts blob to disperse from clients.
+  // This executes the dispersal asynchronously, i.e. it returns once the request
+  // is accepted. The client could use GetBlobStatus() API to poll the the
+  // processing status of the blob.
+  rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
 
-	// GetBlobStatus is meant to be polled for the blob status.
-	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
-	
-	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
-	rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
+  // GetBlobStatus is meant to be polled for the blob status.
+  rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
+  
+  // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+  rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 }
 
 // Requests and Replys
 
 message DisperseBlobRequest {
-	// The data to be dispersed.
-	// The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-	// as a field element on the bn254 curve. The valid range is
-	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
-	bytes data = 1;
-	common.v2.BlobHeader blob_header = 2;
+  // The data to be dispersed.
+  // The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
+  // where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
+  // as a field element on the bn254 curve. The valid range is
+  // 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+  // If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
+  bytes data = 1;
+  common.v2.BlobHeader blob_header = 2;
 }
 
 message DisperseBlobReply {
-	// The status of the blob associated with the blob key.
-	BlobStatus result = 1;
-	bytes blob_key = 2;
+  // The status of the blob associated with the blob key.
+  BlobStatus result = 1;
+  bytes blob_key = 2;
 }
 
 // BlobStatusRequest is used to query the status of a blob.
 message BlobStatusRequest {
-	bytes blob_key = 1;
+  bytes blob_key = 1;
 }
 
 message BlobStatusReply {
-	// The status of the blob.
-	BlobStatus status = 1;
-	// The signed blob certificate
-	SignedCertificate signed_certificate = 2;
+  // The status of the blob.
+  BlobStatus status = 1;
+  // The signed batch
+  SignedBatch signed_batch = 2;
+  BlobVerificationInfo blob_verification_info = 3;
 }
 
 // Utility method used to generate the commitment of blob given its data.
 // This can be used to construct BlobHeader.commitment
 message BlobCommitmentRequest {
-	bytes data = 1;
+  bytes data = 1;
 }
 
 message BlobCommitmentReply {
-	common.BlobCommitment blob_commitment = 1;
+  common.BlobCommitment blob_commitment = 1;
 }
 
 // Data Types
@@ -75,42 +76,52 @@ message BlobCommitmentReply {
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
-	UNKNOWN = 0;
+  UNKNOWN = 0;
 
-	// QUEUED means that the blob has been queued by the disperser for processing
-	QUEUED = 1;
+  // QUEUED means that the blob has been queued by the disperser for processing
+  QUEUED = 1;
 
-	// ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes
-	ENCODED = 2;
+  // ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes
+  ENCODED = 2;
 
-	// CERTIFIED means the blob has been dispersed and attested by the DA nodes
-	CERTIFIED = 3;
+  // CERTIFIED means the blob has been dispersed and attested by the DA nodes
+  CERTIFIED = 3;
 
-	// FAILED means that the blob has failed permanently (for reasons other than insufficient
-	// signatures, which is a separate state)
-	FAILED = 4;
+  // FAILED means that the blob has failed permanently (for reasons other than insufficient
+  // signatures, which is a separate state)
+  FAILED = 4;
 
-	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
-	// for at least one quorum.
-	INSUFFICIENT_SIGNATURES = 5;
+  // INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+  // for at least one quorum.
+  INSUFFICIENT_SIGNATURES = 5;
 }
 
-message SignedCertificate {
-	common.v2.BlobCertificate blob_certificate = 1;
+// SignedBatch is a batch of blobs with a signature.
+message SignedBatch {
+  // header contains metadata about the batch
+  common.v2.BatchHeader header = 1;
+  // attestation on the batch
   Attestation non_signer_stakes_and_signature = 2;
 }
 
-message Attestation {
-  repeated uint32 nonSignerQuorumBitmapIndices = 1;
-  repeated common.G1Commitment nonSignerPubkeys = 2;
-  repeated common.G1Commitment quorumApks = 3;
-  common.G2Commitment apkG2 = 4;
-  common.G1Commitment sigma = 5;
-  repeated uint32 quorumApkIndices = 6;
-  repeated uint32 totalStakeIndices = 7;
-  repeated NonSignerStakeIndicesForQuorum nonSignerStakeIndices = 8;
+// BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+message BlobVerificationInfo {
+  common.v2.BlobCertificate blob_certificate = 1;
+  // blob_index is the index of the blob in the batch
+  uint32 blob_index = 2;
+  // inclusion_proof is the inclusion proof of the blob in the batch
+  bytes inclusion_proof = 3;
 }
 
-message NonSignerStakeIndicesForQuorum {
-  repeated uint32 indices = 1;
+message Attestation {
+  // Serialized bytes of non signer public keys (G1 points)
+  repeated bytes non_signer_pubkeys = 1;
+  // Serialized bytes of G2 point that represents aggregate public key of all signers
+  bytes apk_g2 = 2;
+  // Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum
+  repeated bytes quorum_apks = 3;
+  // Serialized bytes of aggregate signature
+  bytes sigma = 4;
+  // Relevant quorum numbers for the attestation
+  repeated uint32 quorum_numbers = 5;
 }

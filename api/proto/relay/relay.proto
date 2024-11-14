@@ -1,29 +1,78 @@
 syntax = "proto3";
 package node;
-import "common/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Experimental: the following definitions are experimental and subject to change. //
 /////////////////////////////////////////////////////////////////////////////////////
 
+// Relay is a service that provides access to public relay functionality.
 service Relay {
-	// Note: the relay API is still being fleshed out. This definition is not yet complete.
+  // GetBlob retrieves a blob stored by the relay.
+  rpc GetBlob(GetBlobRequest) returns (GetBlobReply) {}
 
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	rpc GetChunk(GetChunkRequest) returns (GetChunkReply) {}
+  // GetChunks retrieves chunks from blobs stored by the relay.
+  rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
 }
 
-// Request a specific chunk
-message GetChunkRequest {
-	// The hash of the blob's header.
-	bytes header_hash = 1;
-	// The index of the chunk within the blob.
-	uint32 chunk_index = 2;
+// A request to fetch one or more blobs.
+message GetBlobRequest {
+  // The key of the blob to fetch.
+  bytes blob_key = 1;
 }
 
-// Reply to GetChunkRequest
-message GetChunkReply {
-	// The chunk requested.
-	common.ChunkData chunk = 1;
+// The reply to a GetBlobs request.
+message GetBlobReply {
+  // The blob requested.
+  bytes blob = 1;
+}
+
+// Request chunks from blobs stored by this relay.
+message GetChunksRequest {
+  // The chunk requests. Chunks are returned in the same order as they are requested.
+  repeated ChunkRequest chunk_requests = 1;
+
+  // If this is an authenticated request, this should hold the ID of the requester. If this
+  // is an unauthenticated request, this field should be empty.
+  uint64 requester_id = 2;
+
+  // If this is an authenticated request, this field will hold a signature by the requester
+  // on the chunks being requested.
+  bytes requester_signature = 3;
+}
+
+// A request for chunks within a specific blob. Each chunk is requested individually by its index.
+message ChunkRequestByIndex {
+  // The blob key.
+  bytes blob_key = 1;
+  // The index of the chunk within the blob.
+  repeated uint32 chunk_indices = 2;
+}
+
+// A request for chunks within a specific blob. Each chunk is requested a range of indices.
+message ChunkRequestByRange {
+  // The blob key.
+  bytes blob_key = 1;
+  // The first index to start fetching chunks from.
+  uint32 start_index = 2;
+  // One past the last index to fetch chunks from. Similar semantics to golang slices.
+  uint32 end_index = 3;
+}
+
+// A request for chunks within a specific blob.
+message ChunkRequest {
+  oneof request {
+    // Request chunks by their individual indices.
+    ChunkRequestByIndex by_index = 1;
+    // Request chunks by a range of indices.
+    ChunkRequestByRange by_range = 2;
+  }
+}
+
+// The reply to a GetChunks request.
+// Requests are fulfilled in all-or-nothing fashion. If any of the requested chunks are not found, the entire request will fail.
+message GetChunksReply {
+  // The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
+  // data is the raw data of the bundle (i.e. serialized byte array of the frames)
+  repeated bytes data = 1;
 }

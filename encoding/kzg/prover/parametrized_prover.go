@@ -3,6 +3,7 @@ package prover
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -29,26 +30,31 @@ type rsEncodeResult struct {
 	Duration time.Duration
 	Err      error
 }
+
 type lengthCommitmentResult struct {
 	LengthCommitment bn254.G2Affine
 	Duration         time.Duration
 	Err              error
 }
+
 type lengthProofResult struct {
 	LengthProof bn254.G2Affine
 	Duration    time.Duration
 	Err         error
 }
+
 type commitmentResult struct {
 	Commitment bn254.G1Affine
 	Duration   time.Duration
 	Err        error
 }
+
 type proofsResult struct {
 	Proofs   []bn254.G1Affine
 	Duration time.Duration
 	Err      error
 }
+
 type commitmentsResult struct {
 	commitment       *bn254.G1Affine
 	lengthCommitment *bn254.G2Affine
@@ -62,13 +68,13 @@ func (g *ParametrizedProver) EncodeBytes(inputBytes []byte) (*bn254.G1Affine, *b
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
 	}
+
 	return g.Encode(inputFr)
 }
 
 func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, []encoding.Frame, []uint32, error) {
-
-	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	if err := g.validateInput(inputFr); err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 
 	encodeStart := time.Now()
@@ -107,9 +113,8 @@ func (g *ParametrizedProver) Encode(inputFr []fr.Element) (*bn254.G1Affine, *bn2
 }
 
 func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affine, *bn254.G2Affine, *bn254.G2Affine, error) {
-
-	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	if err := g.validateInput(inputFr); err != nil {
+		return nil, nil, nil, err
 	}
 
 	encodeStart := time.Now()
@@ -174,9 +179,8 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element) (*bn254.G1Affi
 }
 
 func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, []uint32, error) {
-
-	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
-		return nil, nil, fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	if err := g.validateInput(inputFr); err != nil {
+		return nil, nil, err
 	}
 
 	proofChan := make(chan proofsResult, 1)
@@ -240,5 +244,42 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	}
 
 	return kzgFrames, rsResult.Indices, nil
+}
 
+func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encoding.Proof, error) {
+	if err := g.validateInput(inputFr); err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+
+	// Pad the input polynomial to the number of evaluations
+	paddingStart := time.Now()
+	paddedCoeffs := make([]fr.Element, g.NumEvaluations())
+	copy(paddedCoeffs, inputFr)
+	paddingEnd := time.Since(paddingStart)
+
+	proofs, err := g.Computer.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+
+	end := time.Since(start)
+
+	slog.Info("ComputeMultiFrameProofs process details",
+		"Input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
+		"Num_chunks", g.NumChunks,
+		"Chunk_length", g.ChunkLength,
+		"Total_duration", end,
+		"Padding_duration", paddingEnd,
+		"SRSOrder", g.SRSOrder,
+		"SRSOrder_shift", g.SRSOrder-uint64(len(inputFr)),
+	)
+
+	return proofs, err
+}
+
+func (g *ParametrizedProver) validateInput(inputFr []fr.Element) error {
+	if len(inputFr) > int(g.KzgConfig.SRSNumberToLoad) {
+		return fmt.Errorf("poly Coeff length %v is greater than Loaded SRS points %v", len(inputFr), int(g.KzgConfig.SRSNumberToLoad))
+	}
+
+	return nil
 }

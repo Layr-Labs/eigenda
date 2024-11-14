@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"golang.org/x/crypto/sha3"
 )
 
 type AccountID = string
@@ -483,34 +487,115 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
-	// Existing fields
-	AccountID string
+	// AccountID is the ETH account address for the payer
+	AccountID string `json:"account_id"`
 
-	// New fields
-	BinIndex uint32
+	// BinIndex represents the range of time at which the dispersal is made
+	BinIndex uint32 `json:"bin_index"`
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
-	CumulativePayment *big.Int
+	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
-func (pm *PaymentMetadata) Hash() []byte {
-	// Create a byte slice to hold the serialized data
-	data := make([]byte, 0, len(pm.AccountID)+4+pm.CumulativePayment.BitLen()/8+1)
+func (pm *PaymentMetadata) Hash() ([32]byte, error) {
+	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "accountID",
+			Type: "string",
+		},
+		{
+			Name: "binIndex",
+			Type: "uint32",
+		},
+		{
+			Name: "cumulativePayment",
+			Type: "uint256",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
 
-	// Append AccountID
-	data = append(data, []byte(pm.AccountID)...)
+	arguments := abi.Arguments{
+		{
+			Type: blobHeaderType,
+		},
+	}
 
-	// Append BinIndex
-	binIndexBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(binIndexBytes, pm.BinIndex)
-	data = append(data, binIndexBytes...)
+	bytes, err := arguments.Pack(pm)
+	if err != nil {
+		return [32]byte{}, err
+	}
 
-	// Append CumulativePayment
-	paymentBytes := pm.CumulativePayment.Bytes()
-	data = append(data, paymentBytes...)
+	var hash [32]byte
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(bytes)
+	copy(hash[:], hasher.Sum(nil)[:32])
 
-	return crypto.Keccak256(data)
+	return hash, nil
+}
+
+func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	return &types.AttributeValueMemberM{
+		Value: map[string]types.AttributeValue{
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"BinIndex":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.BinIndex)},
+			"CumulativePayment": &types.AttributeValueMemberN{
+				Value: pm.CumulativePayment.String(),
+			},
+		},
+	}, nil
+}
+
+func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
+	}
+	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
+	binIndex, err := strconv.ParseUint(m.Value["BinIndex"].(*types.AttributeValueMemberN).Value, 10, 32)
+	if err != nil {
+		return fmt.Errorf("failed to parse BinIndex: %w", err)
+	}
+	pm.BinIndex = uint32(binIndex)
+	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
+	return nil
+}
+
+func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+	return &commonpb.PaymentHeader{
+		AccountId:         pm.AccountID,
+		BinIndex:          pm.BinIndex,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
+// ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
+func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
+	return &PaymentMetadata{
+		AccountID:         header.AccountId,
+		BinIndex:          header.BinIndex,
+		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
+	}
+}
+
+// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
+func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader {
+	return &commonpb.PaymentHeader{
+		AccountId:         pm.AccountID,
+		BinIndex:          pm.BinIndex,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
+// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
+func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+	return &PaymentMetadata{
+		AccountID:         ph.AccountId,
+		BinIndex:          ph.BinIndex,
+		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+	}
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,

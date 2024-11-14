@@ -31,7 +31,6 @@ type Prover struct {
 var _ encoding.Prover = &Prover{}
 
 func NewProver(config *kzg.KzgConfig, loadG2Points bool) (*Prover, error) {
-
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
@@ -172,7 +171,6 @@ func (e *Prover) EncodeAndProve(data []byte, params encoding.EncodingParams) (en
 }
 
 func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*encoding.Frame, error) {
-
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
 		return nil, err
@@ -201,7 +199,6 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 }
 
 func (e *Prover) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
-
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
 		return encoding.BlobCommitments{}, err
@@ -231,6 +228,25 @@ func (e *Prover) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
 	}
 
 	return commitments, nil
+}
+
+func (e *Prover) GetMultiFrameProofs(data []byte, params encoding.EncodingParams) ([]encoding.Proof, error) {
+	symbols, err := rs.ToFrArray(data)
+	if err != nil {
+		return nil, err
+	}
+
+	enc, err := e.GetKzgEncoder(params)
+	if err != nil {
+		return nil, err
+	}
+
+	proofs, err := enc.GetMultiFrameProofs(symbols)
+	if err != nil {
+		return nil, err
+	}
+
+	return proofs, nil
 }
 
 func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedProver, error) {

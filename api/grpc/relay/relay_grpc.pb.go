@@ -19,15 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Relay_GetChunk_FullMethodName = "/node.Relay/GetChunk"
+	Relay_GetBlob_FullMethodName   = "/node.Relay/GetBlob"
+	Relay_GetChunks_FullMethodName = "/node.Relay/GetChunks"
 )
 
 // RelayClient is the client API for Relay service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RelayClient interface {
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error)
+	// GetBlob retrieves a blob stored by the relay.
+	GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobReply, error)
+	// GetChunks retrieves chunks from blobs stored by the relay.
+	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 }
 
 type relayClient struct {
@@ -38,9 +41,18 @@ func NewRelayClient(cc grpc.ClientConnInterface) RelayClient {
 	return &relayClient{cc}
 }
 
-func (c *relayClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ...grpc.CallOption) (*GetChunkReply, error) {
-	out := new(GetChunkReply)
-	err := c.cc.Invoke(ctx, Relay_GetChunk_FullMethodName, in, out, opts...)
+func (c *relayClient) GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobReply, error) {
+	out := new(GetBlobReply)
+	err := c.cc.Invoke(ctx, Relay_GetBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *relayClient) GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error) {
+	out := new(GetChunksReply)
+	err := c.cc.Invoke(ctx, Relay_GetChunks_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +63,10 @@ func (c *relayClient) GetChunk(ctx context.Context, in *GetChunkRequest, opts ..
 // All implementations must embed UnimplementedRelayServer
 // for forward compatibility
 type RelayServer interface {
-	// GetChunk retrieves a specific chunk for a blob custodied at the Node.
-	GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error)
+	// GetBlob retrieves a blob stored by the relay.
+	GetBlob(context.Context, *GetBlobRequest) (*GetBlobReply, error)
+	// GetChunks retrieves chunks from blobs stored by the relay.
+	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	mustEmbedUnimplementedRelayServer()
 }
 
@@ -60,8 +74,11 @@ type RelayServer interface {
 type UnimplementedRelayServer struct {
 }
 
-func (UnimplementedRelayServer) GetChunk(context.Context, *GetChunkRequest) (*GetChunkReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetChunk not implemented")
+func (UnimplementedRelayServer) GetBlob(context.Context, *GetBlobRequest) (*GetBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetBlob not implemented")
+}
+func (UnimplementedRelayServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
 }
 func (UnimplementedRelayServer) mustEmbedUnimplementedRelayServer() {}
 
@@ -76,20 +93,38 @@ func RegisterRelayServer(s grpc.ServiceRegistrar, srv RelayServer) {
 	s.RegisterService(&Relay_ServiceDesc, srv)
 }
 
-func _Relay_GetChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetChunkRequest)
+func _Relay_GetBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBlobRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RelayServer).GetChunk(ctx, in)
+		return srv.(RelayServer).GetBlob(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Relay_GetChunk_FullMethodName,
+		FullMethod: Relay_GetBlob_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RelayServer).GetChunk(ctx, req.(*GetChunkRequest))
+		return srv.(RelayServer).GetBlob(ctx, req.(*GetBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Relay_GetChunks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChunksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RelayServer).GetChunks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Relay_GetChunks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RelayServer).GetChunks(ctx, req.(*GetChunksRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -102,8 +137,12 @@ var Relay_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RelayServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetChunk",
-			Handler:    _Relay_GetChunk_Handler,
+			MethodName: "GetBlob",
+			Handler:    _Relay_GetBlob_Handler,
+		},
+		{
+			MethodName: "GetChunks",
+			Handler:    _Relay_GetChunks_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

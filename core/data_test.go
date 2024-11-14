@@ -2,6 +2,7 @@ package core_test
 
 import (
 	"bytes"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"math/rand"
 	"testing"
 
@@ -216,4 +217,14 @@ func TestChunksData(t *testing.T) {
 		_, err = gob.ToGnarkFormat()
 		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
 	}
+}
+
+func TestRoundTripProtobufSerialization(t *testing.T) {
+	tu.InitializeRandom()
+	bundle := createBundle(t, 64, 64, rand.Int())
+
+	protobufBundle := encoding.FramesToProtobuf(bundle)
+	bundle2 := encoding.FramesFromProtobuf(protobufBundle)
+
+	checkBundleEquivalence(t, bundle, bundle2)
 }

@@ -14,6 +14,7 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ory/dockertest/v3"
@@ -23,7 +24,7 @@ import (
 var (
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
-	dynamoClient       *commondynamodb.Client
+	dynamoClient       commondynamodb.Client
 	clientConfig       commonaws.ClientConfig
 
 	deployLocalStack bool
@@ -140,43 +141,42 @@ func TestBasicOperations(t *testing.T) {
 	createTable(t, tableName)
 
 	ctx := context.Background()
-	err := dynamoClient.PutItem(ctx, tableName,
-		commondynamodb.Item{
-			"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
-			"RequestedAt": &types.AttributeValueMemberN{Value: "123"},
-			"SecurityParams": &types.AttributeValueMemberL{
-				Value: []types.AttributeValue{
-					&types.AttributeValueMemberM{
-						Value: map[string]types.AttributeValue{
-							"QuorumID":           &types.AttributeValueMemberN{Value: "0"},
-							"AdversaryThreshold": &types.AttributeValueMemberN{Value: "80"},
-						},
+	item := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+		"RequestedAt": &types.AttributeValueMemberN{Value: "123"},
+		"SecurityParams": &types.AttributeValueMemberL{
+			Value: []types.AttributeValue{
+				&types.AttributeValueMemberM{
+					Value: map[string]types.AttributeValue{
+						"QuorumID":           &types.AttributeValueMemberN{Value: "0"},
+						"AdversaryThreshold": &types.AttributeValueMemberN{Value: "80"},
 					},
-					&types.AttributeValueMemberM{
-						Value: map[string]types.AttributeValue{
-							"QuorumID":           &types.AttributeValueMemberN{Value: "1"},
-							"AdversaryThreshold": &types.AttributeValueMemberN{Value: "70"},
-						},
+				},
+				&types.AttributeValueMemberM{
+					Value: map[string]types.AttributeValue{
+						"QuorumID":           &types.AttributeValueMemberN{Value: "1"},
+						"AdversaryThreshold": &types.AttributeValueMemberN{Value: "70"},
 					},
 				},
 			},
-			"BlobSize": &types.AttributeValueMemberN{Value: "123"},
-			"BlobKey":  &types.AttributeValueMemberS{Value: "blob1"},
-			"Status":   &types.AttributeValueMemberS{Value: "Processing"},
 		},
-	)
+		"BlobSize": &types.AttributeValueMemberN{Value: "123"},
+		"BlobKey":  &types.AttributeValueMemberS{Value: "blob1"},
+		"Status":   &types.AttributeValueMemberS{Value: "Processing"},
+	}
+	err := dynamoClient.PutItem(ctx, tableName, item)
 	assert.NoError(t, err)
 
-	item, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+	fetchedItem, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, "key", item["MetadataKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "123", item["RequestedAt"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "Processing", item["Status"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "blob1", item["BlobKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "123", item["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "Processing", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "blob1", fetchedItem["BlobKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, []types.AttributeValue{
 		&types.AttributeValueMemberM{
 			Value: map[string]types.AttributeValue{
@@ -190,7 +190,20 @@ func TestBasicOperations(t *testing.T) {
 				"AdversaryThreshold": &types.AttributeValueMemberN{Value: "70"},
 			},
 		},
-	}, item["SecurityParams"].(*types.AttributeValueMemberL).Value)
+	}, fetchedItem["SecurityParams"].(*types.AttributeValueMemberL).Value)
+
+	// Attempt to put an item with the same key
+	err = dynamoClient.PutItemWithCondition(ctx, tableName, commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
+	}, "attribute_not_exists(MetadataKey)", nil, nil)
+	assert.ErrorIs(t, err, commondynamodb.ErrConditionFailed)
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+	// Shouldn't have been updated
+	assert.Equal(t, "123", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
 
 	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
@@ -205,20 +218,37 @@ func TestBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
+	// Attempt to update the item with invalid condition
+	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, commondynamodb.Item{
+		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
+	}, expression.Name("Status").In(expression.Value("Dispersing")))
+	assert.Error(t, err)
+
+	// Attempt to update the item with valid condition
+	_, err = dynamoClient.UpdateItemWithCondition(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, commondynamodb.Item{
+		"RequestedAt": &types.AttributeValueMemberN{Value: "456"},
+	}, expression.Name("Status").In(expression.Value("Confirmed")))
+	assert.NoError(t, err)
+
 	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	}, "BlobSize", 1000)
 	assert.NoError(t, err)
 
-	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "key", item["MetadataKey"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "Confirmed", item["Status"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "0x123", item["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "0", item["BlobIndex"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1123", item["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "key", fetchedItem["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "Confirmed", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "0x123", fetchedItem["BatchHeaderHash"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "0", fetchedItem["BlobIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1123", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "456", fetchedItem["RequestedAt"].(*types.AttributeValueMemberN).Value)
 
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)

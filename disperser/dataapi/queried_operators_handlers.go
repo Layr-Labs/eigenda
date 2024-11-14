@@ -3,8 +3,10 @@ package dataapi
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -104,6 +106,70 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 	operatorEjections, err := s.subgraphClient.QueryOperatorEjectionsForTimeWindow(ctx, days, operatorId, first, skip)
 	if err != nil {
 		return nil, err
+	}
+
+	// create a sorted slice from the set of quorums
+	quorumSet := make(map[uint8]struct{})
+	for _, ejection := range operatorEjections {
+		quorumSet[ejection.Quorum] = struct{}{}
+	}
+	quorums := make([]uint8, 0, len(quorumSet))
+	for quorum := range quorumSet {
+		quorums = append(quorums, quorum)
+	}
+	sort.Slice(quorums, func(i, j int) bool {
+		return quorums[i] < quorums[j]
+	})
+
+	stateCache := make(map[uint64]*core.OperatorState)
+	ejectedOperatorIds := make(map[core.OperatorID]struct{})
+	for _, ejection := range operatorEjections {
+		previouseBlock := ejection.BlockNumber - 1
+		if _, exists := stateCache[previouseBlock]; !exists {
+			state, err := s.chainState.GetOperatorState(context.Background(), uint(previouseBlock), quorums)
+			if err != nil {
+				return nil, err
+			}
+			stateCache[previouseBlock] = state
+		}
+
+		// construct a set of ejected operator ids for later batch address lookup
+		opID, err := core.OperatorIDFromHex(ejection.OperatorId)
+		if err != nil {
+			return nil, err
+		}
+		ejectedOperatorIds[opID] = struct{}{}
+	}
+
+	// resolve operator id to operator addresses mapping
+	operatorIDs := make([]core.OperatorID, 0, len(ejectedOperatorIds))
+	for opID := range ejectedOperatorIds {
+		operatorIDs = append(operatorIDs, opID)
+	}
+	operatorAddresses, err := s.transactor.BatchOperatorIDToAddress(ctx, operatorIDs)
+	if err != nil {
+		return nil, err
+	}
+	operatorIdToAddress := make(map[string]string)
+	for i := range operatorAddresses {
+		operatorIdToAddress["0x"+operatorIDs[i].Hex()] = strings.ToLower(operatorAddresses[i].Hex())
+	}
+
+	for _, ejection := range operatorEjections {
+		state := stateCache[ejection.BlockNumber-1]
+		opID, err := core.OperatorIDFromHex(ejection.OperatorId)
+		if err != nil {
+			return nil, err
+		}
+
+		stakePercentage := float64(0)
+		if stake, ok := state.Operators[ejection.Quorum][opID]; ok {
+			totalStake := new(big.Float).SetInt(state.Totals[ejection.Quorum].Stake)
+			operatorStake := new(big.Float).SetInt(stake.Stake)
+			stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
+		}
+		ejection.StakePercentage = stakePercentage
+		ejection.OperatorAddress = operatorIdToAddress[ejection.OperatorId]
 	}
 
 	s.logger.Info("Get operator ejections", "days", days, "operatorId", operatorId, "len", len(operatorEjections), "duration", time.Since(startTime))
@@ -225,15 +291,20 @@ func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportRespon
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number - %s", err)
 	}
-	operatorState, err := s.indexedChainState.GetIndexedOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	operators, err := s.indexedChainState.GetIndexedOperators(context.Background(), currentBlock)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indexed operator state - %s", err)
+		return nil, fmt.Errorf("failed to fetch indexed operator info - %s", err)
 	}
-	s.logger.Info("Queried operator state", "count", len(operatorState.IndexedOperators))
+	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch operator state - %s", err)
+	}
 
 	nodeInfoWorkers := 20
 	nodeInfoTimeout := time.Duration(1 * time.Second)
-	semvers := semver.ScanOperators(operatorState.IndexedOperators, nodeInfoWorkers, nodeInfoTimeout, s.logger)
+	useRetrievalClient := false
+	semvers := semver.ScanOperators(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
 
 	// Create HostInfoReportResponse instance
 	semverReport := &SemverReportResponse{
