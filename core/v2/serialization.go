@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"math/big"
 
@@ -218,6 +220,19 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 	return blobCertHash, nil
 }
 
+func (c *BlobCertificate) Serialize() ([]byte, error) {
+	return encode(c)
+}
+
+func DeserializeBlobCertificate(data []byte) (*BlobCertificate, error) {
+	var c BlobCertificate
+	err := decode(data, &c)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 // GetBatchHeaderHash returns the hash of the batch header
 func (h BatchHeader) Hash() ([32]byte, error) {
 	var headerHash [32]byte
@@ -262,4 +277,37 @@ func (h BatchHeader) Hash() ([32]byte, error) {
 	copy(headerHash[:], hasher.Sum(nil)[:32])
 
 	return headerHash, nil
+}
+
+func (h BatchHeader) Serialize() ([]byte, error) {
+	return encode(h)
+}
+
+func DeserializeBatchHeader(data []byte) (*BatchHeader, error) {
+	var h BatchHeader
+	err := decode(data, &h)
+	if err != nil {
+		return nil, err
+	}
+	return &h, nil
+}
+
+func encode(obj any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(obj)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func decode(data []byte, obj any) error {
+	buf := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(buf)
+	err := dec.Decode(obj)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -202,7 +202,9 @@ func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
 }
 
 type BatchHeader struct {
-	BatchRoot            [32]byte
+	// BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch
+	BatchRoot [32]byte
+	// ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from
 	ReferenceBlockNumber uint64
 }
 

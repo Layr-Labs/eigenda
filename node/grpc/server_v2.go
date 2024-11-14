@@ -55,7 +55,3 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	return &pb.StoreChunksReply{}, api.NewErrorUnimplemented()
 }
-
-func (s *ServerV2) GetChunks(context.Context, *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-	return &pb.GetChunksReply{}, api.NewErrorUnimplemented()
-}

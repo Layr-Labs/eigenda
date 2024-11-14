@@ -205,14 +205,12 @@ func checkBatchByUniversalVerifier(
 	cst core.IndexedChainState,
 	packagedBlobs map[core.OperatorID][]*corev2.BlobShard,
 	pool common.WorkerPool,
-	referenceBlockNumber uint64,
 ) error {
 
 	ctx := context.Background()
 
 	quorums := []core.QuorumID{0, 1}
 	state, _ := cst.GetIndexedOperatorState(context.Background(), 0, quorums)
-	// numBlob := len(encodedBlobs)
 
 	var errList *multierror.Error
 
@@ -222,7 +220,7 @@ func checkBatchByUniversalVerifier(
 
 		blobs := packagedBlobs[id]
 
-		err := val.ValidateBlobs(ctx, blobs, pool, referenceBlockNumber)
+		err := val.ValidateBlobs(ctx, blobs, pool, state.OperatorState)
 		if err != nil {
 			errList = multierror.Append(errList, err)
 		}
@@ -268,7 +266,7 @@ func TestValidationSucceeds(t *testing.T) {
 		packagedBlobs, cst := prepareBlobs(t, operatorCount, headers, blobs, bn)
 
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(blobs)), func(t *testing.T) {
-			err := checkBatchByUniversalVerifier(cst, packagedBlobs, pool, bn)
+			err := checkBatchByUniversalVerifier(cst, packagedBlobs, pool)
 			assert.NoError(t, err)
 		})
 
