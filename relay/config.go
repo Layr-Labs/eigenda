@@ -16,6 +16,21 @@ const (
 )
 
 // Config is the configuration for the relay Server.
+//
+// Environment variables are mapped into this struct by taking ake the name of the field in this struct,
+// converting to upper case, and prepending "RELAY_". For example, "BlobCacheSize" can be set using the
+// environment variable "RELAY_BLOBCACHESIZE".
+//
+// For nested structs, add the name of the struct variable before the field name, separated by an underscore.
+// For example, "Log.Format" can be set using the environment variable "RELAY_LOG_FORMAT".
+//
+// Slice values can be set using a comma-separated list. For example, "Shards" can be set using the environment
+// variable "RELAY_RELAYIDS='1,2,3,4'".
+//
+// It is also possible to set the configuration using a configuration file. The path to the configuration file should
+// be passed as the first argument to the relay binary, e.g. "bin/relay config.yaml". The structure of the config
+// file should mirror the structure of this struct, with keys in the config file matching the field names
+// of this struct.
 type Config struct {
 
 	// Log is the configuration for the logger. Default is common.DefaultLoggerConfig().
