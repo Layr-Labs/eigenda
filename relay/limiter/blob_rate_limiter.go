@@ -3,7 +3,6 @@ package limiter
 import (
 	"fmt"
 	"golang.org/x/time/rate"
-	"golang.org/x/tools/container/intsets"
 	"sync/atomic"
 	"time"
 )
@@ -27,12 +26,15 @@ type BlobRateLimiter struct {
 	operationsInFlight atomic.Int64
 }
 
+// NewBlobRateLimiter creates a new BlobRateLimiter.
 func NewBlobRateLimiter(config *Config) *BlobRateLimiter {
-	globalGetBlobOpLimiter := rate.NewLimiter(rate.Limit(config.MaxGetBlobOpsPerSecond), 1)
+	globalGetBlobOpLimiter := rate.NewLimiter(
+		rate.Limit(config.MaxGetBlobOpsPerSecond),
+		config.GetBlobOpsBurstiness)
 
-	// Burst size is set to MaxInt. This is safe, as the requested size is always a size we've
-	// determined by reading the blob metadata, which is guaranteed to respect maximum blob size.
-	globalGetBlobBandwidthLimiter := rate.NewLimiter(rate.Limit(config.MaxGetBlobBytesPerSecond), intsets.MaxInt)
+	globalGetBlobBandwidthLimiter := rate.NewLimiter(
+		rate.Limit(config.MaxGetBlobBytesPerSecond),
+		config.GetBlobBytesBurstiness)
 
 	return &BlobRateLimiter{
 		config:           config,

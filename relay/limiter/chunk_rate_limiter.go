@@ -3,7 +3,6 @@ package limiter
 import (
 	"fmt"
 	"golang.org/x/time/rate"
-	"golang.org/x/tools/container/intsets"
 	"sync/atomic"
 	"time"
 )
@@ -44,10 +43,16 @@ type ChunkRateLimiter struct {
 	perClientOperationsInFlight map[string]*atomic.Int64
 }
 
+// NewChunkRateLimiter creates a new ChunkRateLimiter.
 func NewChunkRateLimiter(config *Config) *ChunkRateLimiter {
 
-	globalOpLimiter := rate.NewLimiter(rate.Limit(config.MaxGetChunkOpsPerSecond), 1)
-	globalBandwidthLimiter := rate.NewLimiter(rate.Limit(config.MaxGetChunkBytesPerSecond), intsets.MaxInt)
+	globalOpLimiter := rate.NewLimiter(rate.Limit(
+		config.MaxGetChunkOpsPerSecond),
+		config.GetChunkOpsBurstiness)
+
+	globalBandwidthLimiter := rate.NewLimiter(rate.Limit(
+		config.MaxGetChunkBytesPerSecond),
+		config.GetChunkBytesBurstiness)
 
 	return &ChunkRateLimiter{
 		config:                      config,
@@ -90,8 +95,13 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 		l.perClientOperationsInFlight[requesterID] = &atomic.Int64{}
 		clientInFlightCounter = l.perClientOperationsInFlight[requesterID]
 
+		l.perClientOpLimiter[requesterID] = rate.NewLimiter(
+			rate.Limit(l.config.MaxGetChunkOpsPerSecondClient),
+			l.config.GetChunkOpsBurstinessClient)
+
 		l.perClientBandwidthLimiter[requesterID] = rate.NewLimiter(
-			rate.Limit(l.config.MaxGetChunkBytesPerSecond), intsets.MaxInt)
+			rate.Limit(l.config.MaxGetChunkBytesPerSecond),
+			l.config.GetChunkBytesBurstinessClient)
 	}
 
 	countInFlight = clientInFlightCounter.Add(1)
