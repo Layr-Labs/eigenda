@@ -2,7 +2,9 @@ package auth
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
@@ -45,6 +47,16 @@ func (s *paymentSigner) SignBlobPayment(pm *core.PaymentMetadata) ([]byte, error
 	return sig, nil
 }
 
+func (s *paymentSigner) SignAccountID(accountID string) ([]byte, error) {
+	hash := crypto.Keccak256Hash([]byte(accountID))
+	sig, err := crypto.Sign(hash.Bytes(), s.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign account ID: %v", err)
+	}
+
+	return sig, nil
+}
+
 type NoopPaymentSigner struct{}
 
 func NewNoopPaymentSigner() *NoopPaymentSigner {
@@ -53,6 +65,10 @@ func NewNoopPaymentSigner() *NoopPaymentSigner {
 
 func (s *NoopPaymentSigner) SignBlobPayment(header *core.PaymentMetadata) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign blob payment header")
+}
+
+func (s *NoopPaymentSigner) SignAccountID(accountID string) ([]byte, error) {
+	return nil, fmt.Errorf("noop signer cannot sign account ID")
 }
 
 func (s *NoopPaymentSigner) GetAccountID() string {
@@ -88,6 +104,26 @@ func VerifyPaymentSignature(paymentHeader *core.PaymentMetadata, paymentSignatur
 	}
 
 	return nil
+}
+
+// VerifyAccountSignature verifies the signature against an account ID
+func VerifyAccountSignature(accountID string, paymentSignature []byte) bool {
+	pubKeyBytes, err := hex.DecodeString(accountID)
+	if err != nil {
+		log.Printf("Failed to decode AccountId: %v\n", err)
+		return false
+	}
+	accountPubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+	if err != nil {
+		log.Printf("Failed to unmarshal public key: %v\n", err)
+		return false
+	}
+
+	return crypto.VerifySignature(
+		crypto.FromECDSAPub(accountPubKey),
+		[]byte(accountID),
+		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
+	)
 }
 
 // GetAccountID returns the Ethereum address of the signer

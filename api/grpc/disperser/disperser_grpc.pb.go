@@ -21,8 +21,10 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	Disperser_DisperseBlob_FullMethodName              = "/disperser.Disperser/DisperseBlob"
 	Disperser_DisperseBlobAuthenticated_FullMethodName = "/disperser.Disperser/DisperseBlobAuthenticated"
+	Disperser_DispersePaidBlob_FullMethodName          = "/disperser.Disperser/DispersePaidBlob"
 	Disperser_GetBlobStatus_FullMethodName             = "/disperser.Disperser/GetBlobStatus"
 	Disperser_RetrieveBlob_FullMethodName              = "/disperser.Disperser/RetrieveBlob"
+	Disperser_GetPaymentState_FullMethodName           = "/disperser.Disperser/GetPaymentState"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -51,6 +53,11 @@ type DisperserClient interface {
 	//     AuthenticationData message.
 	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	DisperseBlobAuthenticated(ctx context.Context, opts ...grpc.CallOption) (Disperser_DisperseBlobAuthenticatedClient, error)
+	// This API require valid payments to accept blob to disperse from clients.
+	// This executes the dispersal async, i.e. it returns once the request
+	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// processing status of the blob.
+	DispersePaidBlob(ctx context.Context, in *DispersePaidBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
@@ -60,6 +67,8 @@ type DisperserClient interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error)
+	// This API is used to query the payment state of a given account.
+	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 }
 
 type disperserClient struct {
@@ -110,6 +119,15 @@ func (x *disperserDisperseBlobAuthenticatedClient) Recv() (*AuthenticatedReply, 
 	return m, nil
 }
 
+func (c *disperserClient) DispersePaidBlob(ctx context.Context, in *DispersePaidBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error) {
+	out := new(DisperseBlobReply)
+	err := c.cc.Invoke(ctx, Disperser_DispersePaidBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *disperserClient) GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error) {
 	out := new(BlobStatusReply)
 	err := c.cc.Invoke(ctx, Disperser_GetBlobStatus_FullMethodName, in, out, opts...)
@@ -122,6 +140,15 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, in *BlobStatusReque
 func (c *disperserClient) RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error) {
 	out := new(RetrieveBlobReply)
 	err := c.cc.Invoke(ctx, Disperser_RetrieveBlob_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *disperserClient) GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error) {
+	out := new(GetPaymentStateReply)
+	err := c.cc.Invoke(ctx, Disperser_GetPaymentState_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +181,11 @@ type DisperserServer interface {
 	//     AuthenticationData message.
 	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error
+	// This API require valid payments to accept blob to disperse from clients.
+	// This executes the dispersal async, i.e. it returns once the request
+	// is accepted. The client could use GetBlobStatus() API to poll the the
+	// processing status of the blob.
+	DispersePaidBlob(context.Context, *DispersePaidBlobRequest) (*DisperseBlobReply, error)
 	// This API is meant to be polled for the blob status.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
@@ -163,6 +195,8 @@ type DisperserServer interface {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error)
+	// This API is used to query the payment state of a given account.
+	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -176,11 +210,17 @@ func (UnimplementedDisperserServer) DisperseBlob(context.Context, *DisperseBlobR
 func (UnimplementedDisperserServer) DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error {
 	return status.Errorf(codes.Unimplemented, "method DisperseBlobAuthenticated not implemented")
 }
+func (UnimplementedDisperserServer) DispersePaidBlob(context.Context, *DispersePaidBlobRequest) (*DisperseBlobReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DispersePaidBlob not implemented")
+}
 func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlobStatus not implemented")
 }
 func (UnimplementedDisperserServer) RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveBlob not implemented")
+}
+func (UnimplementedDisperserServer) GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentState not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -239,6 +279,24 @@ func (x *disperserDisperseBlobAuthenticatedServer) Recv() (*AuthenticatedRequest
 	return m, nil
 }
 
+func _Disperser_DispersePaidBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DispersePaidBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).DispersePaidBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_DispersePaidBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).DispersePaidBlob(ctx, req.(*DispersePaidBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Disperser_GetBlobStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlobStatusRequest)
 	if err := dec(in); err != nil {
@@ -275,6 +333,24 @@ func _Disperser_RetrieveBlob_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Disperser_GetPaymentState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPaymentStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).GetPaymentState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_GetPaymentState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).GetPaymentState(ctx, req.(*GetPaymentStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -287,12 +363,20 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Disperser_DisperseBlob_Handler,
 		},
 		{
+			MethodName: "DispersePaidBlob",
+			Handler:    _Disperser_DispersePaidBlob_Handler,
+		},
+		{
 			MethodName: "GetBlobStatus",
 			Handler:    _Disperser_GetBlobStatus_Handler,
 		},
 		{
 			MethodName: "RetrieveBlob",
 			Handler:    _Disperser_RetrieveBlob_Handler,
+		},
+		{
+			MethodName: "GetPaymentState",
+			Handler:    _Disperser_GetPaymentState_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

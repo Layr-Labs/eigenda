@@ -11,6 +11,7 @@ import (
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/stretchr/testify/assert"
@@ -107,11 +108,12 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
+	noopPaymentSigner := auth.NewNoopPaymentSigner()
 	disp, err := clients.NewDisperserClient(&clients.Config{
 		Hostname: "localhost",
 		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
 		Timeout:  10 * time.Second,
-	}, nil)
+	}, nil, noopPaymentSigner)
 	assert.NoError(t, err)
 	assert.NotNil(t, disp)
 

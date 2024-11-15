@@ -51,5 +51,6 @@ func VerifySignature(message []byte, accountAddr geth.Address, sig []byte) error
 
 type PaymentSigner interface {
 	SignBlobPayment(header *PaymentMetadata) ([]byte, error)
+	SignAccountID(accountID string) ([]byte, error)
 	GetAccountID() string
 }

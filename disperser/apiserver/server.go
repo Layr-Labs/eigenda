@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"slices"
 	"strings"
@@ -323,6 +324,100 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		Result:    pb.BlobStatus_PROCESSING,
 		RequestId: []byte(metadataKey.String()),
 	}, nil
+}
+
+func (s *DispersalServer) DispersePaidBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*pb.DisperseBlobReply, error) {
+	blob, err := s.validatePaidRequestAndGetBlob(ctx, req)
+	binIndex := req.PaymentHeader.BinIndex
+	cumulativePayment := new(big.Int).SetBytes(req.PaymentHeader.CumulativePayment)
+	//todo: before disperse blob, validate the signature
+	signature := req.PaymentSignature
+	if err := auth.VerifyPaymentSignature(core.ConvertToPaymentMetadata(req.GetPaymentHeader()), signature); err != nil {
+		return nil, api.NewErrorInvalidArg("payment signature is invalid")
+	}
+	if err != nil {
+		for _, quorumID := range req.QuorumNumbers {
+			s.metrics.HandleFailedRequest(codes.InvalidArgument.String(), fmt.Sprint(quorumID), len(req.GetData()), "DispersePaidBlob")
+		}
+		s.metrics.HandleInvalidArgRpcRequest("DispersePaidBlob")
+		return nil, api.NewErrorInvalidArg(err.Error())
+	}
+
+	paymentHeader := core.PaymentMetadata{
+		AccountID:         blob.RequestHeader.AccountID,
+		BinIndex:          binIndex,
+		CumulativePayment: cumulativePayment,
+	}
+	reply, err := s.disperseBlob(ctx, blob, "", "DispersePaidBlob", &paymentHeader)
+	if err != nil {
+		// Note the DispersePaidBlob already updated metrics for this error.
+		s.logger.Info("failed to disperse blob", "err", err)
+	} else {
+		s.metrics.HandleSuccessfulRpcRequest("DispersePaidBlob")
+	}
+	return reply, err
+}
+
+func (s *DispersalServer) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	// validate the signature
+	if !auth.VerifyAccountSignature(req.AccountId, req.Signature) {
+		return nil, api.NewErrorInvalidArg("invalid signature")
+	}
+
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+
+	// off-chain account specific payment state
+	now := uint64(time.Now().Unix())
+	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
+	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, currentBinIndex)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+	}
+	// on-Chain account state
+	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+	}
+
+	paymentGlobalParams := pb.PaymentGlobalParams{
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
+	}
+
+	quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+	for i, v := range reservation.QuorumNumbers {
+		quorumNumbers[i] = uint32(v)
+	}
+	// build reply
+	reply := &pb.GetPaymentStateReply{
+		PaymentGlobalParams: &paymentGlobalParams,
+		CurrentBinUsage:     uint32(currentBinUsage),
+		NextBinUsage:        uint32(nextBinUsage),
+		OverflowBinUsage:    uint32(overflowBinUsage),
+		Reservation: &pb.Reservation{
+			SymbolsPerSecond: reservation.SymbolsPerSec,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
+			QuorumNumbers:    quorumNumbers,
+		},
+		CumulativePayment:        largestCumulativePayment.Bytes(),
+		OnChainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+	}
+	return reply, nil
 }
 
 func (s *DispersalServer) getAccountRate(origin, authenticatedAddress string, quorumID core.QuorumID) (*PerUserRateInfo, string, error) {
@@ -1071,4 +1166,98 @@ func contextError(err error) error {
 	}
 
 	return nil
+}
+
+// TODO: refactor checks with validateRequestAndGetBlob; most checks are the same, but paid requests have different quorum requirements
+func (s *DispersalServer) validatePaidRequestAndGetBlob(ctx context.Context, req *pb.DispersePaidBlobRequest) (*core.Blob, error) {
+
+	data := req.GetData()
+	blobSize := len(data)
+	// The blob size in bytes must be in range [1, maxBlobSize].
+	if blobSize > s.maxBlobSize {
+		return nil, fmt.Errorf("blob size cannot exceed %v Bytes", s.maxBlobSize)
+	}
+	if blobSize == 0 {
+		return nil, fmt.Errorf("blob size must be greater than 0")
+	}
+
+	if len(req.GetQuorumNumbers()) > 256 {
+		return nil, errors.New("number of custom_quorum_numbers must not exceed 256")
+	}
+
+	// validate every 32 bytes is a valid field element
+	_, err := rs.ToFrArray(data)
+	if err != nil {
+		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617: %v", err))
+	}
+
+	quorumConfig, err := s.updateQuorumConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum config: %w", err)
+	}
+
+	if len(req.GetQuorumNumbers()) > int(quorumConfig.QuorumCount) {
+		return nil, errors.New("number of custom_quorum_numbers must not exceed number of quorums")
+	}
+
+	seenQuorums := make(map[uint8]struct{})
+
+	// TODO: validate payment signature against payment metadata
+	if err = auth.VerifyPaymentSignature(core.ConvertToPaymentMetadata(req.GetPaymentHeader()), req.GetPaymentSignature()); err != nil {
+		return nil, fmt.Errorf("payment signature is invalid: %w", err)
+	}
+	// Unlike regular blob dispersal request validation, there's no check with required quorums
+	// Because Reservation has their specific quorum requirements, and on-demand is only allowed and paid to the required quorums.
+	// Payment specific validations are done within the meterer library.
+	for i := range req.GetQuorumNumbers() {
+
+		if req.GetQuorumNumbers()[i] > core.MaxQuorumID {
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, 254], but found %d", req.GetQuorumNumbers()[i])
+		}
+
+		quorumID := uint8(req.GetQuorumNumbers()[i])
+		if quorumID >= quorumConfig.QuorumCount {
+			return nil, fmt.Errorf("custom_quorum_numbers must be in range [0, %d], but found %d", s.quorumConfig.QuorumCount-1, quorumID)
+		}
+
+		if _, ok := seenQuorums[quorumID]; ok {
+			return nil, fmt.Errorf("custom_quorum_numbers must not contain duplicates")
+		}
+		seenQuorums[quorumID] = struct{}{}
+
+	}
+
+	if len(seenQuorums) == 0 {
+		return nil, fmt.Errorf("the blob must be sent to at least one quorum")
+	}
+
+	params := make([]*core.SecurityParam, len(seenQuorums))
+	i := 0
+	for quorumID := range seenQuorums {
+		params[i] = &core.SecurityParam{
+			QuorumID:              core.QuorumID(quorumID),
+			AdversaryThreshold:    quorumConfig.SecurityParams[quorumID].AdversaryThreshold,
+			ConfirmationThreshold: quorumConfig.SecurityParams[quorumID].ConfirmationThreshold,
+		}
+		err = params[i].Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid request: %w", err)
+		}
+		i++
+	}
+
+	header := core.BlobRequestHeader{
+		BlobAuthHeader: core.BlobAuthHeader{
+			AccountID: req.PaymentHeader.AccountId,
+		},
+		SecurityParams: params,
+	}
+
+	blob := &core.Blob{
+		RequestHeader: header,
+		Data:          data,
+	}
+
+	return blob, nil
 }

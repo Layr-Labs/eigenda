@@ -84,6 +84,58 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 	require.Equal(t, expectedBlob, resultBlob)
 }
 
+// func TestGetBlobPaymentStateSuccess(t *testing.T) {
+// 	disperserClient := clientsmock.NewMockDisperserClient()
+// 	expectedPaymentState := &grpcdisperser.GetPaymentStateReply{PaymentGlobalParams: &grpcdisperser.PaymentGlobalParams{
+// 		GlobalSymbolsPerSecond: 100000,
+// 		MinNumSymbols:          100,
+// 		PricePerSymbol:         10,
+// 		ReservationWindow:      100,
+// 		OnDemandQuorumNumbers:  []uint32{0, 1},
+// 	},
+// 		CurrentBinUsage:  100,
+// 		NextBinUsage:     200,
+// 		OverflowBinUsage: 300,
+// 		Reservation: &grpcdisperser.Reservation{
+// 			SymbolsPerSecond: 1000,
+// 			StartTimestamp:   0,
+// 			EndTimestamp:     math.MaxUint32,
+// 			QuorumNumbers:    []uint32{0, 1},
+// 		},
+// 		CumulativePayment:        []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a},
+// 		OnChainCumulativePayment: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a},
+// 	}
+// 	(disperserClient.On("GetPaymentState", mock.Anything, mock.Anything).
+// 		Return(expectedPaymentState, nil).Once())
+// 	logger := log.NewLogger(log.DiscardHandler())
+// 	eigendaClient := clients.EigenDAClient{
+// 		Log: logger,
+// 		Config: clients.EigenDAClientConfig{
+// 			RPC:                          "localhost:51001",
+// 			StatusQueryTimeout:           10 * time.Minute,
+// 			StatusQueryRetryInterval:     50 * time.Millisecond,
+// 			ResponseTimeout:              10 * time.Second,
+// 			CustomQuorumIDs:              []uint{},
+// 			SignerPrivateKeyHex:          "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
+// 			DisableTLS:                   false,
+// 			PutBlobEncodingVersion:       codecs.DefaultBlobEncoding,
+// 			DisablePointVerificationMode: false,
+// 			WaitForFinalization:          true,
+// 		},
+// 		Client: disperserClient,
+// 		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
+// 	}
+// 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
+// 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
+// 	require.NoError(t, err)
+// 	require.NotNil(t, blobInfo)
+// 	assert.Equal(t, finalizedBlobInfo, blobInfo)
+
+// 	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
+// 	require.NoError(t, err)
+// 	require.Equal(t, expectedBlob, resultBlob)
+// }
+
 func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	expectedBlobStatus := disperser.Processing
