@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"fmt"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -47,6 +49,23 @@ func (s BlobStatus) ToProfobuf() pb.BlobStatus {
 		return pb.BlobStatus_INSUFFICIENT_SIGNATURES
 	default:
 		return pb.BlobStatus_UNKNOWN
+	}
+}
+
+func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
+	switch s {
+	case pb.BlobStatus_QUEUED:
+		return Queued, nil
+	case pb.BlobStatus_ENCODED:
+		return Encoded, nil
+	case pb.BlobStatus_CERTIFIED:
+		return Certified, nil
+	case pb.BlobStatus_FAILED:
+		return Failed, nil
+	case pb.BlobStatus_INSUFFICIENT_SIGNATURES:
+		return InsufficientSignatures, nil
+	default:
+		return 0, fmt.Errorf("unknown blob status: %v", s)
 	}
 }
 
