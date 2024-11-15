@@ -19,6 +19,9 @@ service Disperser {
   
   // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
+
+	// GetPaymentState is a utility method to get the payment state of a given account.
+	rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
 // Requests and Replys
@@ -61,6 +64,26 @@ message BlobCommitmentRequest {
 
 message BlobCommitmentReply {
   common.BlobCommitment blob_commitment = 1;
+}
+
+// GetPaymentStateRequest contains parameters to query the payment state of an account.
+message GetPaymentStateRequest {
+	string account_id = 1;
+	bytes signature = 2;
+}
+
+// GetPaymentStateReply contains the payment state of an account.
+message GetPaymentStateReply {
+	// global payment vault parameters
+	PaymentGlobalParams payment_global_params = 1;
+	// off-chain account reservation usage records
+	repeated BinRecord bin_records = 2;
+	// on-chain account reservation setting
+	Reservation reservation = 3;
+	// off-chain on-demand payment usage
+	bytes cumulative_payment = 4;
+	// on-chain on-demand payment deposited
+	bytes on_chain_cumulative_payment = 5;
 }
 
 // Data Types
@@ -124,4 +147,25 @@ message Attestation {
   bytes sigma = 4;
   // Relevant quorum numbers for the attestation
   repeated uint32 quorum_numbers = 5;
+}
+
+message PaymentGlobalParams {
+	uint64 global_symbols_per_second = 1;
+	uint32 min_num_symbols = 2;
+	uint32 price_per_symbol = 3;
+	uint32 reservation_window = 4;
+	repeated uint32 on_demand_quorum_numbers = 5;
+}
+
+message Reservation {
+	uint64 symbols_per_second = 1;
+	uint32 start_timestamp = 2;
+	uint32 end_timestamp = 3;
+	repeated uint32 quorum_numbers = 4;
+	repeated uint32 quorum_split = 5;
+}
+
+message BinRecord {
+	uint32 index = 1;
+	uint64 usage = 2;
 }

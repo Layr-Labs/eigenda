@@ -405,9 +405,20 @@ func (s *DispersalServer) GetPaymentState(ctx context.Context, req *pb.GetPaymen
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams: &paymentGlobalParams,
-		CurrentBinUsage:     uint32(currentBinUsage),
-		NextBinUsage:        uint32(nextBinUsage),
-		OverflowBinUsage:    uint32(overflowBinUsage),
+		BinRecords: []*pb.BinRecord{
+			{
+				Index: uint32(currentBinIndex),
+				Usage: uint64(currentBinUsage),
+			},
+			{
+				Index: uint32(currentBinIndex + 1),
+				Usage: uint64(nextBinUsage),
+			},
+			{
+				Index: uint32(currentBinIndex + 2),
+				Usage: uint64(overflowBinUsage),
+			},
+		},
 		Reservation: &pb.Reservation{
 			SymbolsPerSecond: reservation.SymbolsPerSec,
 			StartTimestamp:   uint32(reservation.StartTimestamp),

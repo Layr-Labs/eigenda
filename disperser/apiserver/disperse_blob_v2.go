@@ -3,10 +3,13 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -30,7 +33,30 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	// TODO(ian-shim): handle payments and check rate limits
+	// handle payments and check rate limits
+	if req.GetBlobHeader().GetPaymentHeader() != nil {
+		binIndex := req.GetBlobHeader().GetPaymentHeader().GetBinIndex()
+		cumulativePayment := new(big.Int).SetBytes(req.GetBlobHeader().GetPaymentHeader().GetCumulativePayment())
+		signature := req.GetBlobHeader().GetSignature()
+		if err := auth.VerifyPaymentSignature(core.ConvertToPaymentMetadata(req.GetBlobHeader().GetPaymentHeader()), signature); err != nil {
+			return nil, api.NewErrorInvalidArg("payment signature is invalid")
+		}
+
+		paymentHeader := core.PaymentMetadata{
+			AccountID:         req.GetBlobHeader().GetPaymentHeader().GetAccountId(),
+			BinIndex:          binIndex,
+			CumulativePayment: cumulativePayment,
+		}
+
+		blobLength := encoding.GetBlobLength(uint(len(data)))
+		err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+		if err != nil {
+			return nil, api.NewErrorResourceExhausted(err.Error())
+		}
+	} else {
+		// Q: do we want a seprate check to use original rate limiter if there's no payment attached?
+		return nil, api.NewErrorInvalidArg("payment header is required")
+	}
 
 	blobKey, err := s.StoreBlob(ctx, data, blobHeader, time.Now(), onchainState.TTL)
 	if err != nil {

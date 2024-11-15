@@ -27,12 +27,6 @@ service Disperser {
 	// 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
 	rpc DisperseBlobAuthenticated(stream AuthenticatedRequest) returns (stream AuthenticatedReply);
 
-	// This API require valid payments to accept blob to disperse from clients.
-	// This executes the dispersal async, i.e. it returns once the request
-	// is accepted. The client could use GetBlobStatus() API to poll the the
-	// processing status of the blob.
-	rpc DispersePaidBlob(DispersePaidBlobRequest) returns (DisperseBlobReply) {}
-
 	// This API is meant to be polled for the blob status.
 	rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
@@ -43,9 +37,6 @@ service Disperser {
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
 	rpc RetrieveBlob(RetrieveBlobRequest) returns (RetrieveBlobReply) {}
-
-	// This API is used to query the payment state of a given account.
-	rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
 // Requests and Responses
@@ -149,26 +140,6 @@ message RetrieveBlobRequest {
 // RetrieveBlobReply contains the retrieved blob data
 message RetrieveBlobReply {
 	bytes data = 1;
-}
-
-// GetPaymentStateRequest contains parameters to query the payment state of an account.
-message GetPaymentStateRequest {
-	string account_id = 1;
-	bytes signature = 2;
-}
-
-// GetPaymentStateReply contains the payment state of an account.
-message GetPaymentStateReply {
-	// global payment vault parameters
-	PaymentGlobalParams payment_global_params = 1;
-	// off-chain account reservation usage records
-	repeated BinRecord bin_records = 2;
-	// on-chain account reservation setting
-	Reservation reservation = 3;
-	// off-chain on-demand payment usage
-	bytes cumulative_payment = 4;
-	// on-chain on-demand payment deposited
-	bytes on_chain_cumulative_payment = 5;
 }
 
 // Data Types
@@ -300,25 +271,4 @@ message BatchHeader {
 	// The Disperser will encode and disperse the blobs based on the onchain info
 	// (e.g. operator stakes) at this block number.
 	uint32 reference_block_number = 4;
-}
-
-message PaymentGlobalParams {
-	uint64 global_symbols_per_second = 1;
-	uint32 min_num_symbols = 2;
-	uint32 price_per_symbol = 3;
-	uint32 reservation_window = 4;
-	repeated uint32 on_demand_quorum_numbers = 5;
-}
-
-message Reservation {
-	uint64 symbols_per_second = 1;
-	uint32 start_timestamp = 2;
-	uint32 end_timestamp = 3;
-	repeated uint32 quorum_numbers = 4;
-	repeated uint32 quorum_split = 5;
-}
-
-message BinRecord {
-	uint32 index = 1;
-	uint64 usage = 2;
 }
