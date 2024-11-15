@@ -127,9 +127,6 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 
 func (e *Encoder) CreateFFTSettings(params encoding.EncodingParams) *fft.FFTSettings {
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
-	if params.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * params.NumChunks)))
-	}
 	return fft.NewFFTSettings(n)
 }
 
