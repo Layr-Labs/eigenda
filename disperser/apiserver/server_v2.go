@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
+	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -15,6 +16,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -38,6 +40,7 @@ type DispersalServerV2 struct {
 	chainReader   core.Reader
 	ratelimiter   common.RateLimiter
 	authenticator corev2.BlobRequestAuthenticator
+	prover        encoding.Prover
 	logger        logging.Logger
 
 	// state
@@ -55,6 +58,7 @@ func NewDispersalServerV2(
 	chainReader core.Reader,
 	ratelimiter common.RateLimiter,
 	authenticator corev2.BlobRequestAuthenticator,
+	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
@@ -70,6 +74,7 @@ func NewDispersalServerV2(
 		chainReader:   chainReader,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
+		prover:        prover,
 		logger:        logger,
 
 		onchainState:                OnchainState{},
@@ -145,7 +150,40 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 }
 
 func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
-	return &pb.BlobCommitmentReply{}, api.NewErrorUnimplemented()
+	if s.prover == nil {
+		return nil, api.NewErrorUnimplemented()
+	}
+	blobSize := len(req.GetData())
+	if blobSize == 0 {
+		return nil, api.NewErrorInvalidArg("data is empty")
+	}
+	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	}
+	c, err := s.prover.GetCommitments(req.GetData())
+	if err != nil {
+		return nil, api.NewErrorInternal("failed to get commitments")
+	}
+	commitment, err := c.Commitment.Serialize()
+	if err != nil {
+		return nil, api.NewErrorInternal("failed to serialize commitment")
+	}
+	lengthCommitment, err := c.LengthCommitment.Serialize()
+	if err != nil {
+		return nil, api.NewErrorInternal("failed to serialize length commitment")
+	}
+	lengthProof, err := c.LengthProof.Serialize()
+	if err != nil {
+		return nil, api.NewErrorInternal("failed to serialize length proof")
+	}
+
+	return &pb.BlobCommitmentReply{
+		BlobCommitment: &pbcommon.BlobCommitment{
+			Commitment:       commitment,
+			LengthCommitment: lengthCommitment,
+			LengthProof:      lengthProof,
+			Length:           uint32(c.Length),
+		}}, nil
 }
 
 func (s *DispersalServerV2) RefreshAllowlist() error {

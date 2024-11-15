@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -307,10 +308,27 @@ func TestV2GetBlobStatus(t *testing.T) {
 
 func TestV2GetBlobCommitment(t *testing.T) {
 	c := newTestServerV2(t)
-	_, err := c.DispersalServerV2.GetBlobCommitment(context.Background(), &pbv2.BlobCommitmentRequest{
-		Data: []byte{1},
+	data := make([]byte, 50)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+	commit, err := prover.GetCommitments(data)
+	require.NoError(t, err)
+	reply, err := c.DispersalServerV2.GetBlobCommitment(context.Background(), &pbv2.BlobCommitmentRequest{
+		Data: data,
 	})
-	assert.ErrorContains(t, err, "not implemented")
+	require.NoError(t, err)
+	commitment, err := new(encoding.G1Commitment).Deserialize(reply.BlobCommitment.Commitment)
+	require.NoError(t, err)
+	assert.Equal(t, commit.Commitment, commitment)
+	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthCommitment)
+	require.NoError(t, err)
+	assert.Equal(t, commit.LengthCommitment, lengthCommitment)
+	lengthProof, err := new(encoding.G2Commitment).Deserialize(reply.BlobCommitment.LengthProof)
+	require.NoError(t, err)
+	assert.Equal(t, commit.LengthProof, lengthProof)
+	assert.Equal(t, uint32(commit.Length), reply.BlobCommitment.Length)
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
@@ -344,7 +362,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	s := apiserver.NewDispersalServerV2(disperser.ServerConfig{
 		GrpcPort:    "51002",
 		GrpcTimeout: 1 * time.Second,
-	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, auth.NewAuthenticator(), 100, time.Hour, logger)
+	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, auth.NewAuthenticator(), prover, 100, time.Hour, logger)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
