@@ -129,7 +129,10 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 		}
 	}()
 
-	conn, err := grpc.Dial(fmt.Sprintf("localhost:%v", testConfig.Retriever.RETRIEVER_GRPC_PORT), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("localhost:%v", testConfig.Retriever.RETRIEVER_GRPC_PORT),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	assert.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 	ret := retriever.NewRetrieverClient(conn)

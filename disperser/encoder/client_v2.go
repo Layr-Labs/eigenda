@@ -27,7 +27,7 @@ func NewEncoderClientV2(addr string, timeout time.Duration) (disperser.EncoderCl
 
 func (c *clientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*encoding.FragmentInfo, error) {
 	// Establish connection
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		c.addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)

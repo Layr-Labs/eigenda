@@ -113,7 +113,7 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		core.OperatorSocket(op.Socket).GetDispersalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
