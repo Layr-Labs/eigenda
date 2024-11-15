@@ -331,7 +331,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
-		conn, err := grpc.Dial(addr, dialOptions...)
+		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err
 			return

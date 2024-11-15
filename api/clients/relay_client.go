@@ -178,7 +178,7 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 			return
 		}
 		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
-		conn, err := grpc.Dial(socket, dialOptions...)
+		conn, err := grpc.NewClient(socket, dialOptions...)
 		if err != nil {
 			initErr = err
 			return

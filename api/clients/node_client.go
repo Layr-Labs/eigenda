@@ -40,7 +40,7 @@ func (c client) GetBlobHeader(
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 ) (*core.BlobHeader, *merkletree.Proof, error) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		core.OperatorSocket(socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -85,7 +85,7 @@ func (c client) GetChunks(
 	quorumID core.QuorumID,
 	chunksChan chan RetrievedChunks,
 ) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)

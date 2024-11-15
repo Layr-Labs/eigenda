@@ -89,7 +89,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, oper
 
 // query operator host info endpoint if available
 func GetSemverInfo(ctx context.Context, socket string, userRetrievalClient bool, operatorId core.OperatorID, logger logging.Logger, timeout time.Duration) string {
-	conn, err := grpc.Dial(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "unreachable"
 	}
