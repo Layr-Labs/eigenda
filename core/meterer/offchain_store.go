@@ -292,7 +292,7 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 		return nil, fmt.Errorf("failed to parse payment: %w", err)
 	}
 
-	return big.NewInt(int64(payment)), nil
+	return new(big.Int).SetUint64(payment), nil
 }
 
 func parseBinUsage(bin map[string]types.AttributeValue) (uint64, error) {
