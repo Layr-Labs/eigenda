@@ -31,10 +31,10 @@ library EigenDARollupUtils {
      * @param blobVerificationProof the relevant data needed to prove inclusion of the blob and that the trust assumptions were as expected
      */
     function verifyBlob(
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
+        IEigenDAServiceManager.BlobHeader memory blobHeader,
         IEigenDAServiceManager eigenDAServiceManager,
-        BlobVerificationProof calldata blobVerificationProof
-    ) external view {
+        BlobVerificationProof memory blobVerificationProof
+    ) internal view {
         require(
             EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata) 
                 == eigenDAServiceManager.batchIdToBatchMetadataHash(blobVerificationProof.batchId),
@@ -104,10 +104,10 @@ library EigenDARollupUtils {
      * @param blobVerificationProofs the relevant data needed to prove inclusion of the blobs and that the trust assumptions were as expected
      */
     function verifyBlobs(
-        IEigenDAServiceManager.BlobHeader[] calldata blobHeaders,
+        IEigenDAServiceManager.BlobHeader[] memory blobHeaders,
         IEigenDAServiceManager eigenDAServiceManager,
-        BlobVerificationProof[] calldata blobVerificationProofs
-    ) external view {
+        BlobVerificationProof[] memory blobVerificationProofs
+    ) internal view {
         require(blobHeaders.length == blobVerificationProofs.length, "EigenDARollupUtils.verifyBlobs: blobHeaders and blobVerificationProofs must have the same length");
 
         bytes memory quorumAdversaryThresholdPercentages = eigenDAServiceManager.quorumAdversaryThresholdPercentages();
@@ -184,7 +184,7 @@ library EigenDARollupUtils {
     function getQuorumAdversaryThreshold(
         IEigenDAServiceManager eigenDAServiceManager,
         uint256 quorumNumber
-    ) public view returns(uint8 adversaryThresholdPercentage) {
+    ) internal view returns(uint8 adversaryThresholdPercentage) {
         if(eigenDAServiceManager.quorumAdversaryThresholdPercentages().length > quorumNumber){
             adversaryThresholdPercentage = uint8(eigenDAServiceManager.quorumAdversaryThresholdPercentages()[quorumNumber]);
         }
