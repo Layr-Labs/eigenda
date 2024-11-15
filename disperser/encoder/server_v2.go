@@ -123,6 +123,20 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 
 	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
+	// Check if the blob has already been encoded
+	if s.config.PreventReencoding && s.chunkWriter.ProofExists(ctx, blobKey) {
+		coefExist, fragmentInfo := s.chunkWriter.CoefficientsExists(ctx, blobKey)
+		if coefExist {
+			s.logger.Info("blob already encoded", "blobKey", blobKey.Hex())
+			return &pb.EncodeBlobReply{
+				FragmentInfo: &pb.FragmentInfo{
+					TotalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
+					FragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
+				},
+			}, nil
+		}
+	}
+
 	// Fetch blob data
 	fetchStart := time.Now()
 	data, err := s.blobStore.GetBlob(ctx, blobKey)

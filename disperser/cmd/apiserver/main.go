@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -181,6 +182,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
+	grpcMetrics := grpcprom.NewServerMetrics()
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
@@ -188,11 +190,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		grpcMetrics,
 		meterer,
 		ratelimiter,
 		config.RateConfig,
 		config.MaxBlobSize,
 	)
+
+	reg.MustRegister(grpcMetrics)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {

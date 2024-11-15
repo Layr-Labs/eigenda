@@ -67,6 +67,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_CHUNK_ENCODING"),
 	}
+	PreventReencodingFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "prevent-reencoding"),
+		Usage:    "if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PREVENT_REENCODING"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -81,6 +87,7 @@ var optionalFlags = []cli.Flag{
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
 	S3BucketNameFlag,
+	PreventReencodingFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -7,17 +7,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 )
+
+type testComponents struct {
+	encoderServer    *encoder.EncoderServerV2
+	blobStore        *blobstore.BlobStore
+	chunkStoreWriter chunkstore.ChunkWriter
+	chunkStoreReader chunkstore.ChunkReader
+	s3Client         *mock.S3Client
+	dynamoDBClient   *mock.MockDynamoDBClient
+}
 
 func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 	// We need the larger SRS for testing the encoder with 8192 chunks
@@ -62,6 +75,9 @@ func TestEncodeBlob(t *testing.T) {
 		return codec.ConvertByPaddingEmptyByte(data)
 	}
 
+	c := createTestComponents(t)
+	server := c.encoderServer
+
 	// Setup test data
 	data := createTestData(t, testDataSize)
 	blobSize := uint(len(data))
@@ -84,19 +100,16 @@ func TestEncodeBlob(t *testing.T) {
 	}
 
 	// Store test data
-	if err := blobStore.StoreBlob(ctx, blobKey, data); !assert.NoError(t, err, "Failed to store blob") {
+	if err := c.blobStore.StoreBlob(ctx, blobKey, data); !assert.NoError(t, err, "Failed to store blob") {
 		t.FailNow()
 	}
 
 	// Verify storage succeded
 	t.Run("Verify Blob Storage", func(t *testing.T) {
-		storedData, err := blobStore.GetBlob(ctx, blobKey)
+		storedData, err := c.blobStore.GetBlob(ctx, blobKey)
 		assert.NoError(t, err, "Failed to get stored blob")
 		assert.Equal(t, data, storedData, "Stored data doesn't match original")
 	})
-
-	// Initialize encoder server
-	server := initializeEncoder(t)
 
 	// Create and execute encoding request
 	req := &pb.EncodeBlobRequest{
@@ -107,10 +120,18 @@ func TestEncodeBlob(t *testing.T) {
 		},
 	}
 
+	expectedUploadCalls := 1
+	expectedFragmentedUploadObjectCalls := 0
+	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
+	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	resp, err := server.EncodeBlob(ctx, req)
 	if !assert.NoError(t, err, "EncodeBlob failed") {
 		t.FailNow()
 	}
+	expectedUploadCalls++
+	expectedFragmentedUploadObjectCalls++
+	assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
+	assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
@@ -119,21 +140,39 @@ func TestEncodeBlob(t *testing.T) {
 		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
 	})
 
+	expectedFragmentInfo := &encoding.FragmentInfo{
+		TotalChunkSizeBytes: resp.FragmentInfo.TotalChunkSizeBytes,
+		FragmentSizeBytes:   resp.FragmentInfo.FragmentSizeBytes,
+	}
+
 	// Verify chunk store data
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
 		// Check proofs
-		proofs, err := chunkStoreReader.GetChunkProofs(ctx, blobKey)
+		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
+		proofs, err := c.chunkStoreReader.GetChunkProofs(ctx, blobKey)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
 		// Check coefficients
-		fragmentInfo := &encoding.FragmentInfo{
-			TotalChunkSizeBytes: resp.FragmentInfo.TotalChunkSizeBytes,
-			FragmentSizeBytes:   resp.FragmentInfo.FragmentSizeBytes,
-		}
-		coefficients, err := chunkStoreReader.GetChunkCoefficients(ctx, blobKey, fragmentInfo)
+		coefExist, fetchedFragmentInfo := c.chunkStoreWriter.CoefficientsExists(ctx, blobKey)
+		assert.True(t, coefExist, "Coefficients should exist")
+		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
+
+		coefficients, err := c.chunkStoreReader.GetChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
 		assert.NoError(t, err, "Failed to get chunk coefficients")
 		assert.Len(t, coefficients, int(numChunks), "Unexpected number of coefficients")
+	})
+
+	t.Run("Verify Re-encoding is prevented", func(t *testing.T) {
+		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
+		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
+		// Create and execute encoding request again
+		resp, err := server.EncodeBlob(ctx, req)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(294916), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
+		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
+		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
+		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)
 	})
 }
 
@@ -153,17 +192,29 @@ func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 }
 
 // Helper function to initialize encoder
-func initializeEncoder(t *testing.T) *encoder.EncoderServerV2 {
+func createTestComponents(t *testing.T) *testComponents {
 	t.Helper()
 	prover, err := makeTestProver(300000)
-	if !assert.NoError(t, err, "Failed to create prover") {
-		t.FailNow()
-	}
-
+	require.NoError(t, err, "Failed to create prover")
 	metrics := encoder.NewMetrics("9000", logger)
-	return encoder.NewEncoderServerV2(encoder.ServerConfig{
+	s3Client := mock.NewS3Client()
+	dynamoDBClient := &mock.MockDynamoDBClient{}
+	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
+	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
+	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName)
+	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
 		GrpcPort:              "8080",
 		MaxConcurrentRequests: 10,
 		RequestPoolSize:       5,
+		PreventReencoding:     true,
 	}, blobStore, chunkStoreWriter, logger, prover, metrics)
+
+	return &testComponents{
+		encoderServer:    encoderServer,
+		blobStore:        blobStore,
+		chunkStoreWriter: chunkStoreWriter,
+		chunkStoreReader: chunkStoreReader,
+		s3Client:         s3Client,
+		dynamoDBClient:   dynamoDBClient,
+	}
 }
