@@ -110,7 +110,7 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 				// Intentionally log at debug level. External users can force this condition to trigger
 				// by requesting metadata for a blob that does not exist, and so it's important to avoid
 				// allowing hooligans to spam the logs in production environments.
-				m.logger.Debug("error retrieving metadata for blob %s: %v", boundKey.Hex(), err)
+				m.logger.Debugf("error retrieving metadata for blob %s: %v", boundKey.Hex(), err)
 				hadError.Store(true)
 				completionChannel <- &blobMetadataResult{
 					key: boundKey,
