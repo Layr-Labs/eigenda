@@ -44,7 +44,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		fragmentInfoMap[blobKey] = fragmentInfo
 	}
 
-	server, err := newChunkManager(context.Background(), logger, chunkReader, 10, 32)
+	server, err := newChunkProvider(context.Background(), logger, chunkReader, 10, 32)
 	require.NoError(t, err)
 
 	// Read it back.
@@ -57,11 +57,11 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 		}
 
-		fMap, err := server.GetFrames(context.Background(), &mMap)
+		fMap, err := server.GetFrames(context.Background(), mMap)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(*fMap))
-		readFrames := (*fMap)[key]
+		require.Equal(t, 1, len(fMap))
+		readFrames := (fMap)[key]
 		require.NotNil(t, readFrames)
 
 		// TODO: when I inspect this data using a debugger, the proofs are all made up of 0s... something
@@ -79,11 +79,11 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 			fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 		}
 
-		fMap, err := server.GetFrames(context.Background(), &mMap)
+		fMap, err := server.GetFrames(context.Background(), mMap)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(*fMap))
-		readFrames := (*fMap)[key]
+		require.Equal(t, 1, len(fMap))
+		readFrames := (fMap)[key]
 		require.NotNil(t, readFrames)
 
 		require.Equal(t, frames, readFrames)
@@ -124,7 +124,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		fragmentInfoMap[blobKey] = fragmentInfo
 	}
 
-	server, err := newChunkManager(context.Background(), logger, chunkReader, 10, 32)
+	server, err := newChunkProvider(context.Background(), logger, chunkReader, 10, 32)
 	require.NoError(t, err)
 
 	// Read it back.
@@ -142,13 +142,13 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 			}
 		}
 
-		fMap, err := server.GetFrames(context.Background(), &mMap)
+		fMap, err := server.GetFrames(context.Background(), mMap)
 		require.NoError(t, err)
 
-		require.Equal(t, batchSize, len(*fMap))
+		require.Equal(t, batchSize, len(fMap))
 		for key := range mMap {
 
-			readFrames := (*fMap)[key]
+			readFrames := (fMap)[key]
 			require.NotNil(t, readFrames)
 
 			expectedFramesForBlob := expectedFrames[key]

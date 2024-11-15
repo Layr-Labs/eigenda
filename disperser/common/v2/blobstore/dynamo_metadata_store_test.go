@@ -3,10 +3,12 @@ package blobstore_test
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -17,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
@@ -77,6 +80,11 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queued, 1)
 	assert.Equal(t, metadata1, queued[0])
+	// query to get newer blobs should result in 0 results
+	queued, err = blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Queued, metadata1.UpdatedAt+100)
+	assert.NoError(t, err)
+	assert.Len(t, queued, 0)
+
 	certified, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Certified, 0)
 	assert.NoError(t, err)
 	assert.Len(t, certified, 1)
@@ -149,6 +157,45 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	// get multiple certs
+	numCerts := 100
+	keys := make([]corev2.BlobKey, numCerts)
+	for i := 0; i < numCerts; i++ {
+		blobCert := &corev2.BlobCertificate{
+			BlobHeader: &corev2.BlobHeader{
+				BlobVersion:     0,
+				QuorumNumbers:   []core.QuorumID{0},
+				BlobCommitments: mockCommitment,
+				PaymentMetadata: core.PaymentMetadata{
+					AccountID:         "0x123",
+					BinIndex:          uint32(i),
+					CumulativePayment: big.NewInt(321),
+				},
+				Signature: []byte("signature"),
+			},
+			RelayKeys: []corev2.RelayKey{0},
+		}
+		blobKey, err := blobCert.BlobHeader.BlobKey()
+		assert.NoError(t, err)
+		keys[i] = blobKey
+		err = blobMetadataStore.PutBlobCertificate(ctx, blobCert, fragmentInfo)
+		assert.NoError(t, err)
+	}
+
+	certs, fragmentInfos, err := blobMetadataStore.GetBlobCertificates(ctx, keys)
+	assert.NoError(t, err)
+	assert.Len(t, certs, numCerts)
+	assert.Len(t, fragmentInfos, numCerts)
+	binIndexes := make(map[uint32]struct{})
+	for i := 0; i < numCerts; i++ {
+		assert.Equal(t, fragmentInfos[i], fragmentInfo)
+		binIndexes[certs[i].BlobHeader.PaymentMetadata.BinIndex] = struct{}{}
+	}
+	assert.Len(t, binIndexes, numCerts)
+	for i := 0; i < numCerts; i++ {
+		assert.Contains(t, binIndexes, uint32(i))
+	}
 
 	deleteItems(t, []commondynamodb.Key{
 		{
@@ -274,6 +321,78 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		},
 	})
+}
+
+func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
+	ctx := context.Background()
+	blobKey := corev2.BlobKey{1, 1, 1}
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 100,
+	}
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+	verificationInfo := &corev2.BlobVerificationInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey,
+		BlobIndex:      10,
+		InclusionProof: []byte("proof"),
+	}
+
+	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	assert.NoError(t, err)
+
+	fetchedInfo, err := blobMetadataStore.GetBlobVerificationInfo(ctx, blobKey, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, verificationInfo, fetchedInfo)
+
+	// attempt to put verification info with the same key should fail
+	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+
+	// put multiple verification infos
+	blobKey1 := corev2.BlobKey{2, 2, 2}
+	verificationInfo1 := &corev2.BlobVerificationInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey1,
+		BlobIndex:      12,
+		InclusionProof: []byte("proof 1"),
+	}
+	blobKey2 := corev2.BlobKey{3, 3, 3}
+	verificationInfo2 := &corev2.BlobVerificationInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey2,
+		BlobIndex:      14,
+		InclusionProof: []byte("proof 2"),
+	}
+	err = blobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	assert.NoError(t, err)
+
+	// test retries
+	nonTransientError := errors.New("non transient error")
+	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return(nil, nonTransientError).Once()
+	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	assert.ErrorIs(t, err, nonTransientError)
+
+	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return([]dynamodb.Item{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey1.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+	}, nil).Run(func(args mock.Arguments) {
+		items := args.Get(2).([]dynamodb.Item)
+		assert.Len(t, items, 2)
+	}).Once()
+	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil).
+		Run(func(args mock.Arguments) {
+			items := args.Get(2).([]dynamodb.Item)
+			assert.Len(t, items, 1)
+		}).
+		Once()
+	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	assert.NoError(t, err)
+	mockDynamoClient.AssertNumberOfCalls(t, "PutItems", 3)
 }
 
 func TestBlobMetadataStoreBatchAttestation(t *testing.T) {

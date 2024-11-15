@@ -9,4 +9,5 @@ type ServerConfig struct {
 	MaxConcurrentRequests    int
 	RequestPoolSize          int
 	EnableGnarkChunkEncoding bool
+	PreventReencoding        bool
 }

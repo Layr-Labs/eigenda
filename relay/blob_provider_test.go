@@ -34,7 +34,7 @@ func TestReadWrite(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	server, err := newBlobManager(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
 	require.NoError(t, err)
 
 	// Read the blobs back.
@@ -65,7 +65,7 @@ func TestNonExistentBlob(t *testing.T) {
 
 	blobStore := buildBlobStore(t, logger)
 
-	server, err := newBlobManager(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {

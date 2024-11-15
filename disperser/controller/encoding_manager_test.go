@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	blockNumber = uint32(100)
+	blockNumber = uint64(100)
 )
 
 type testComponents struct {
@@ -91,7 +91,7 @@ func TestGetRelayKeys(t *testing.T) {
 	}
 }
 
-func TestHandleBatch(t *testing.T) {
+func TestEncodingManagerHandleBatch(t *testing.T) {
 	ctx := context.Background()
 	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,
@@ -141,14 +141,14 @@ func TestHandleBatch(t *testing.T) {
 	assert.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
 }
 
-func TestHandleBatchNoBlobs(t *testing.T) {
+func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 	ctx := context.Background()
 	c := newTestComponents(t)
 	err := c.EncodingManager.HandleBatch(ctx)
 	assert.ErrorContains(t, err, "no blobs to encode")
 }
 
-func TestHandleBatchRetrySuccess(t *testing.T) {
+func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	ctx := context.Background()
 	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,
@@ -200,7 +200,7 @@ func TestHandleBatchRetrySuccess(t *testing.T) {
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
 }
 
-func TestHandleBatchRetryFailure(t *testing.T) {
+func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	ctx := context.Background()
 	blobHeader1 := &corev2.BlobHeader{
 		BlobVersion:     0,

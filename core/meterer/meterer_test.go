@@ -28,7 +28,7 @@ import (
 var (
 	dockertestPool           *dockertest.Pool
 	dockertestResource       *dockertest.Resource
-	dynamoClient             *commondynamodb.Client
+	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
 	accountID1               string
 	account1Reservations     core.ActiveReservation

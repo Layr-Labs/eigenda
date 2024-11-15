@@ -5,6 +5,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
@@ -189,7 +190,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -350,18 +351,18 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// Request the entire blob by range
 	for key, data := range expectedData {
-
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
-
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: 0,
 					EndIndex:   uint32(len(data)),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := getChunks(t, request)
@@ -369,30 +370,33 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
-		for i, frame := range response.Data[0].Data {
-			convertedFrame := encoding.FrameFromProtobuf(frame)
-			require.Equal(t, data[i], convertedFrame)
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
+		for i, frame := range bundle {
+			require.Equal(t, data[i], frame)
 		}
 	}
 
 	// Request the entire blob by index
 	for key, data := range expectedData {
-
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, len(data))
 		for i := range data {
 			indices[i] = uint32(i)
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := getChunks(t, request)
@@ -400,32 +404,32 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
-		for i, frame := range response.Data[0].Data {
-			convertedFrame := encoding.FrameFromProtobuf(frame)
-			require.Equal(t, data[i], convertedFrame)
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
+		for i, frame := range bundle {
+			require.Equal(t, data[i], frame)
 		}
 	}
 
 	// Request part of the blob back by range
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
-		startIndex := rand.Intn(len(data))
-		var endIndex int
-		if startIndex == len(data)-1 {
-			endIndex = len(data)
-		} else {
-			endIndex = startIndex + rand.Intn(len(data)-startIndex)
-		}
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		startIndex := rand.Intn(len(data) - 1)
+		endIndex := startIndex + rand.Intn(len(data)-startIndex-1) + 1
+
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: uint32(startIndex),
 					EndIndex:   uint32(endIndex),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := getChunks(t, request)
@@ -433,16 +437,17 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
 		for i := startIndex; i < endIndex; i++ {
-			convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i-startIndex])
-			require.Equal(t, data[i], convertedFrame)
+			require.Equal(t, data[i], bundle[i-startIndex])
 		}
 	}
 
 	// Request part of the blob back by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, 0)
 		for i := range data {
@@ -451,13 +456,16 @@ func TestReadWriteChunks(t *testing.T) {
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := getChunks(t, request)
@@ -465,10 +473,12 @@ func TestReadWriteChunks(t *testing.T) {
 
 		require.Equal(t, 1, len(response.Data))
 
+		bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+		require.NoError(t, err)
+
 		for i := 0; i < len(indices); i++ {
 			if i%2 == 0 {
-				convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i/2])
-				require.Equal(t, data[indices[i]], convertedFrame)
+				require.Equal(t, data[indices[i]], bundle[i/2])
 			}
 		}
 	}
@@ -538,24 +548,31 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		keys := make([]v2.BlobKey, 0, keyCount)
-		byteKeys := make([][]byte, 0, keyCount)
 		for key := range expectedData {
 			keys = append(keys, key)
-			boundKey := key
-			byteKeys = append(byteKeys, boundKey[:])
 			if len(keys) == keyCount {
 				break
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: byteKeys,
-			Request: &pb.GetChunksRequest_ByRange{
-				ByRange: &pb.ChunkRequestByRange{
-					StartIndex: 0,
-					EndIndex:   uint32(len(expectedData[keys[0]])),
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		for _, key := range keys {
+
+			boundKey := key
+			request := &pb.ChunkRequest{
+				Request: &pb.ChunkRequest_ByRange{
+					ByRange: &pb.ChunkRequestByRange{
+						BlobKey:    boundKey[:],
+						StartIndex: 0,
+						EndIndex:   uint32(len(expectedData[key])),
+					},
 				},
-			},
+			}
+
+			requestedChunks = append(requestedChunks, request)
+		}
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		response, err := getChunks(t, request)
@@ -565,9 +582,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 		for keyIndex, key := range keys {
 			data := expectedData[key]
-			for frameIndex, frame := range response.Data[keyIndex].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[frameIndex], convertedFrame)
+
+			bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+			require.NoError(t, err)
+
+			for frameIndex, frame := range bundle {
+				require.Equal(t, data[frameIndex], frame)
 			}
 		}
 	}
@@ -599,7 +619,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -654,17 +674,18 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request the entire blob by range. 25% of the blobs will be assigned to shards we don't have.
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
-
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: 0,
 					EndIndex:   uint32(len(data)),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -683,9 +704,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
-			for i, frame := range response.Data[0].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[i], convertedFrame)
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
+			for i, frame := range bundle {
+				require.Equal(t, data[i], frame)
 			}
 		} else {
 			require.Error(t, err)
@@ -695,21 +718,23 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request the entire blob by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, len(data))
 		for i := range data {
 			indices[i] = uint32(i)
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -727,9 +752,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
-			for i, frame := range response.Data[0].Data {
-				convertedFrame := encoding.FrameFromProtobuf(frame)
-				require.Equal(t, data[i], convertedFrame)
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
+			for i, frame := range bundle {
+				require.Equal(t, data[i], frame)
 			}
 		} else {
 			response, err := getChunks(t, request)
@@ -740,25 +767,22 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// Request part of the blob back by range
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
-		startIndex := rand.Intn(len(data))
-		var endIndex int
-		if startIndex == len(data)-1 {
-			endIndex = len(data)
-		} else {
-			endIndex = startIndex + rand.Intn(len(data)-startIndex)
-		}
+		startIndex := rand.Intn(len(data) - 1)
+		endIndex := startIndex + rand.Intn(len(data)-startIndex-1) + 1
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByRange{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
 				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    key[:],
 					StartIndex: uint32(startIndex),
 					EndIndex:   uint32(endIndex),
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -776,17 +800,18 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
 			for i := startIndex; i < endIndex; i++ {
-				convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i-startIndex])
-				require.Equal(t, data[i], convertedFrame)
+				require.Equal(t, data[i], bundle[i-startIndex])
 			}
 		}
 	}
 
 	// Request part of the blob back by index
 	for key, data := range expectedData {
-		keys := make([][]byte, 0)
-		keys = append(keys, key[:])
+		requestedChunks := make([]*pb.ChunkRequest, 0)
 
 		indices := make([]uint32, 0)
 		for i := range data {
@@ -795,13 +820,16 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: keys,
-			Request: &pb.GetChunksRequest_ByIndex{
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByIndex{
 				ByIndex: &pb.ChunkRequestByIndex{
+					BlobKey:      key[:],
 					ChunkIndices: indices,
 				},
 			},
+		})
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		isBlobInCorrectShard := false
@@ -819,10 +847,12 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 			require.Equal(t, 1, len(response.Data))
 
+			bundle, err := core.Bundle{}.Deserialize(response.Data[0])
+			require.NoError(t, err)
+
 			for i := 0; i < len(indices); i++ {
 				if i%2 == 0 {
-					convertedFrame := encoding.FrameFromProtobuf(response.Data[0].Data[i/2])
-					require.Equal(t, data[indices[i]], convertedFrame)
+					require.Equal(t, data[indices[i]], bundle[i/2])
 				}
 			}
 		} else {
@@ -859,7 +889,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
-	config.Shards = shardList
+	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -917,24 +947,31 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	// Read the blobs back. On average, we expect 25% of the blobs to be assigned to shards we don't have.
 	for i := 0; i < 10; i++ {
 		keys := make([]v2.BlobKey, 0, keyCount)
-		byteKeys := make([][]byte, 0, keyCount)
 		for key := range expectedData {
 			keys = append(keys, key)
-			boundKey := key
-			byteKeys = append(byteKeys, boundKey[:])
 			if len(keys) == keyCount {
 				break
 			}
 		}
 
-		request := &pb.GetChunksRequest{
-			BlobKeys: byteKeys,
-			Request: &pb.GetChunksRequest_ByRange{
-				ByRange: &pb.ChunkRequestByRange{
-					StartIndex: 0,
-					EndIndex:   uint32(len(expectedData[keys[0]])),
+		requestedChunks := make([]*pb.ChunkRequest, 0)
+		for _, key := range keys {
+
+			boundKey := key
+			request := &pb.ChunkRequest{
+				Request: &pb.ChunkRequest_ByRange{
+					ByRange: &pb.ChunkRequestByRange{
+						BlobKey:    boundKey[:],
+						StartIndex: 0,
+						EndIndex:   uint32(len(expectedData[key])),
+					},
 				},
-			},
+			}
+
+			requestedChunks = append(requestedChunks, request)
+		}
+		request := &pb.GetChunksRequest{
+			ChunkRequests: requestedChunks,
 		}
 
 		allInCorrectShard := true
@@ -962,9 +999,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 			for keyIndex, key := range keys {
 				data := expectedData[key]
-				for frameIndex, frame := range response.Data[keyIndex].Data {
-					convertedFrame := encoding.FrameFromProtobuf(frame)
-					require.Equal(t, data[frameIndex], convertedFrame)
+
+				bundle, err := core.Bundle{}.Deserialize(response.Data[keyIndex])
+				require.NoError(t, err)
+
+				for frameIndex, frame := range bundle {
+					require.Equal(t, data[frameIndex], frame)
 				}
 			}
 		} else {

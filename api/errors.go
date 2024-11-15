@@ -55,7 +55,11 @@ func NewErrorUnimplemented() error {
 
 // HTTP Mapping: 504 Gateway Timeout
 func NewErrorDeadlineExceeded(msg string) error {
-	return newErrorGRPC(codes.DeadlineExceeded, "msg")
+	return newErrorGRPC(codes.DeadlineExceeded, msg)
+}
+
+func NewErrorCanceled(msg string) error {
+	return newErrorGRPC(codes.Canceled, msg)
 }
 
 // ErrorFailover is returned by the disperser-client and eigenda-client to signify

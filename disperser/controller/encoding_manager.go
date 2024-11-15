@@ -22,7 +22,7 @@ import (
 var errNoBlobsToEncode = errors.New("no blobs to encode")
 
 type EncodingManagerConfig struct {
-	PullInterval time.Duration
+	PullInterval           time.Duration
 
 	EncodingRequestTimeout time.Duration
 	StoreTimeout           time.Duration

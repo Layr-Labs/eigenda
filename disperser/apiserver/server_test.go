@@ -26,6 +26,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 
@@ -809,7 +810,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	return apiserver.NewDispersalServer(disperser.ServerConfig{
 		GrpcPort:    "51001",
 		GrpcTimeout: 1 * time.Second,
-	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), mt, ratelimiter, rateConfig, testMaxBlobSize)
+	}, queue, transactor, logger, disperser.NewMetrics(prometheus.NewRegistry(), "9001", logger), grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
 }
 
 func disperseBlob(t *testing.T, server *apiserver.DispersalServer, data []byte) (pb.BlobStatus, uint, []byte) {

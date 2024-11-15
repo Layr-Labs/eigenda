@@ -9,8 +9,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
-	"github.com/Layr-Labs/eigenda/common/mock"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -19,6 +19,7 @@ import (
 	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
@@ -266,5 +267,52 @@ func TestRandomCoefficients(t *testing.T) {
 
 		err = builder.finish()
 		require.NoError(t, err)
+	}
+}
+
+func TestCheckProofCoefficientsExist(t *testing.T) {
+	tu.InitializeRandom()
+	client := mock.NewS3Client()
+
+	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	// require.NoError(t, err)
+	logger := logging.NewNoopLogger()
+
+	chunkSize := uint64(rand.Intn(1024) + 100)
+	fragmentSize := int(chunkSize / 2)
+
+	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
+	encoder, _ := rs.NewEncoder(params, true)
+
+	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
+	if encoder.ChunkLength == 1 {
+		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
+	}
+	fs := fft.NewFFTSettings(n)
+
+	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
+		Fs:             fs,
+		EncodingParams: params,
+	}
+
+	encoder.Computer = RsComputeDevice
+	require.NotNil(t, encoder)
+
+	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
+	ctx := context.Background()
+	for i := 0; i < 100; i++ {
+		key := corev2.BlobKey(tu.RandomBytes(32))
+
+		proofs := getProofs(t, rand.Intn(100)+100)
+		err := writer.PutChunkProofs(ctx, key, proofs)
+		require.NoError(t, err)
+		require.True(t, writer.ProofExists(ctx, key))
+
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
+		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
+		require.NoError(t, err)
+		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
+		require.True(t, exist)
+		require.Equal(t, metadata, fragmentInfo)
 	}
 }

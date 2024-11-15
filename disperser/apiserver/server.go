@@ -16,7 +16,7 @@ import (
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
-	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -27,6 +27,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,7 +51,8 @@ type DispersalServer struct {
 	ratelimiter   common.RateLimiter
 	authenticator core.BlobRequestAuthenticator
 
-	metrics *disperser.Metrics
+	metrics     *disperser.Metrics
+	grpcMetrics *grpcprom.ServerMetrics
 
 	maxBlobSize int
 
@@ -72,6 +74,7 @@ func NewDispersalServer(
 	tx core.Reader,
 	_logger logging.Logger,
 	metrics *disperser.Metrics,
+	grpcMetrics *grpcprom.ServerMetrics,
 	meterer *meterer.Meterer,
 	ratelimiter common.RateLimiter,
 	rateConfig RateConfig,
@@ -95,6 +98,7 @@ func NewDispersalServer(
 		metrics:       metrics,
 		logger:        logger,
 		meterer:       meterer,
+		grpcMetrics:   grpcMetrics,
 		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		mu:            &sync.RWMutex{},
@@ -300,12 +304,14 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
+	if ctxErr := contextError(err); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		for _, param := range securityParams {
 			s.metrics.HandleBlobStoreFailedRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 		}
 		s.metrics.HandleStoreFailureRpcRequest(apiMethodName)
-		s.logger.Error("failed to store blob", "err", err)
 		return nil, api.NewErrorInternal(fmt.Sprintf("store blob: %v", err))
 	}
 
@@ -740,12 +746,13 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	stageTimer = time.Now()
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
-		s.logger.Error("Failed to retrieve blob metadata", "err", err)
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 			s.metrics.HandleNotFoundRequest("RetrieveBlob")
+			s.logger.Warn("failed to retrieve blob metadata", "err", err)
 			return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
 		}
+		s.logger.Error("failed to retrieve blob metadata", "err", err)
 		s.metrics.HandleInternalFailureRpcRequest("RetrieveBlob")
 		s.metrics.IncrementFailedBlobRequestNum(codes.Internal.String(), "", "RetrieveBlob")
 		return nil, api.NewErrorInternal("failed to get blob metadata, please retry")
@@ -833,9 +840,15 @@ func (s *DispersalServer) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer(
+		opt,
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		))
+
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
@@ -1040,4 +1053,16 @@ func (s *DispersalServer) validateRequestAndGetBlob(ctx context.Context, req *pb
 	}
 
 	return blob, nil
+}
+
+func contextError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return api.NewErrorDeadlineExceeded(err.Error())
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return api.NewErrorCanceled(err.Error())
+	}
+
+	return nil
 }

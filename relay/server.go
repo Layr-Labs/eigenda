@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	v2pb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
@@ -31,14 +32,14 @@ type Server struct {
 	// maxProtoSize is the maximum size of a gRPC message that the server will accept.
 	maxProtoSize int
 
-	// metadataServer encapsulates logic for fetching metadata for blobs.
-	metadataServer *metadataManager
+	// metadataProvider encapsulates logic for fetching metadata for blobs.
+	metadataProvider *metadataProvider
 
-	// blobServer encapsulates logic for fetching blobs.
-	blobServer *blobManager
+	// blobProvider encapsulates logic for fetching blobs.
+	blobProvider *blobProvider
 
-	// chunkServer encapsulates logic for fetching chunks.
-	chunkServer *chunkManager
+	// chunkProvider encapsulates logic for fetching chunks.
+	chunkProvider *chunkProvider
 
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
@@ -53,68 +54,72 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader) (*Server, error) {
 
-	ms, err := newMetadataManager(
+	mp, err := newMetadataProvider(
 		ctx,
 		logger,
 		metadataStore,
 		config.MetadataCacheSize,
-		config.MetadataWorkPoolSize,
-		config.Shards)
+		config.MetadataMaxConcurrency,
+		config.RelayIDs)
 	if err != nil {
-		return nil, fmt.Errorf("error creating metadata server: %w", err)
+		return nil, fmt.Errorf("error creating metadata provider: %w", err)
 	}
 
-	bs, err := newBlobManager(
+	bp, err := newBlobProvider(
 		ctx,
 		logger,
 		blobStore,
 		config.BlobCacheSize,
-		config.BlobWorkPoolSize)
+		config.BlobMaxConcurrency)
 	if err != nil {
-		return nil, fmt.Errorf("error creating blob server: %w", err)
+		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
 
-	cs, err := newChunkManager(
+	cp, err := newChunkProvider(
 		ctx,
 		logger,
 		chunkReader,
 		config.ChunkCacheSize,
-		config.ChunkWorkPoolSize)
+		config.ChunkMaxConcurrency)
 	if err != nil {
-		return nil, fmt.Errorf("error creating chunk server: %w", err)
+		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
 
 	return &Server{
-		logger:         logger,
-		grpcPort:       config.GRPCPort,
-		maxProtoSize:   config.MaxGRPCMessageSize,
-		metadataServer: ms,
-		blobServer:     bs,
-		chunkServer:    cs,
+		logger:           logger,
+		grpcPort:         config.GRPCPort,
+		maxProtoSize:     config.MaxGRPCMessageSize,
+		metadataProvider: mp,
+		blobProvider:     bp,
+		chunkProvider:    cp,
 	}, nil
 }
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
-	// Future work:
+	// Future work	:
 	//  - global throttle
 	//  - per-connection throttle
 	//  - timeouts
 
-	keys := []v2.BlobKey{v2.BlobKey(request.BlobKey)}
-	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
+	key, err := v2.BytesToBlobKey(request.BlobKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid blob key: %w", err)
+	}
+
+	keys := []v2.BlobKey{key}
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
-	metadata := (*mMap)[v2.BlobKey(request.BlobKey)]
+	metadata := mMap[v2.BlobKey(request.BlobKey)]
 	if metadata == nil {
 		return nil, fmt.Errorf("blob not found")
 	}
 
-	key := v2.BlobKey(request.BlobKey)
-	data, err := s.blobServer.GetBlob(key)
+	data, err := s.blobProvider.GetBlob(key)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
@@ -135,75 +140,94 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	//  - per-connection throttle
 	//  - timeouts
 
-	keys := make([]v2.BlobKey, 0, len(request.GetBlobKeys()))
-
-	for _, keyBytes := range request.GetBlobKeys() {
-		keys = append(keys, v2.BlobKey(keyBytes))
+	if len(request.ChunkRequests) <= 0 {
+		return nil, fmt.Errorf("no chunk requests provided")
 	}
 
-	mMap, err := s.metadataServer.GetMetadataForBlobs(keys)
+	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
+
+	for _, chunkRequest := range request.ChunkRequests {
+		var key v2.BlobKey
+		if chunkRequest.GetByIndex() != nil {
+			var err error
+			key, err = v2.BytesToBlobKey(chunkRequest.GetByIndex().GetBlobKey())
+			if err != nil {
+				return nil, fmt.Errorf("invalid blob key: %w", err)
+			}
+		} else {
+			var err error
+			key, err = v2.BytesToBlobKey(chunkRequest.GetByRange().GetBlobKey())
+			if err != nil {
+				return nil, fmt.Errorf("invalid blob key: %w", err)
+			}
+		}
+		keys = append(keys, key)
+	}
+
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
 
-	frames, err := s.chunkServer.GetFrames(ctx, mMap)
+	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching frames: %w", err)
 	}
 
-	protoChunks := make([]*pb.Chunks, 0, len(*frames))
+	bytesToSend := make([][]byte, 0, len(keys))
 
 	// return data in the order that it was requested
-	for _, keyBytes := range request.GetBlobKeys() {
-		key := v2.BlobKey(keyBytes)
-		if request.GetByIndex() != nil {
-			blobFrames := (*frames)[key]
-			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, len(request.GetByIndex().ChunkIndices)),
-			}
-			protoChunks = append(protoChunks, chunks)
+	for _, chunkRequest := range request.ChunkRequests {
 
-			for index := range request.GetByIndex().ChunkIndices {
+		framesToSend := make([]*encoding.Frame, 0)
+
+		if chunkRequest.GetByIndex() != nil {
+			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
+			blobFrames := (frames)[key]
+
+			for index := range chunkRequest.GetByIndex().ChunkIndices {
 
 				if index >= len(blobFrames) {
 					return nil, fmt.Errorf(
 						"chunk index %d out of range for key %s, chunk count %d",
 						index, key.Hex(), len(blobFrames))
 				}
-				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
+
+				framesToSend = append(framesToSend, blobFrames[index])
 			}
 
 		} else {
-			startIndex := request.GetByRange().StartIndex
-			endIndex := request.GetByRange().EndIndex
+			key := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
+			startIndex := chunkRequest.GetByRange().StartIndex
+			endIndex := chunkRequest.GetByRange().EndIndex
 
-			blobFrames := (*frames)[key]
+			blobFrames := (frames)[key]
 
 			if startIndex > endIndex {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
 					startIndex, endIndex, key.Hex())
 			}
-			if endIndex > uint32(len((*frames)[key])) {
+			if endIndex > uint32(len((frames)[key])) {
 				return nil, fmt.Errorf(
 					"chunk range %d-%d is invald for key %s, chunk count %d",
-					request.GetByRange().StartIndex, request.GetByRange().EndIndex, key, len(blobFrames))
+					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))
 			}
 
-			chunks := &pb.Chunks{
-				Data: make([]*v2pb.Frame, 0, endIndex-startIndex),
-			}
-			protoChunks = append(protoChunks, chunks)
-
-			for index := startIndex; index < endIndex; index++ {
-				chunks.Data = append(chunks.Data, blobFrames[index].ToProtobuf())
-			}
+			framesToSend = append(framesToSend, blobFrames[startIndex:endIndex]...)
 		}
+
+		bundle := core.Bundle(framesToSend)
+		bundleBytes, err := bundle.Serialize()
+		if err != nil {
+			return nil, fmt.Errorf("error serializing bundle: %w", err)
+		}
+		bytesToSend = append(bytesToSend, bundleBytes)
 	}
 
 	return &pb.GetChunksReply{
-		Data: protoChunks,
+		Data: bytesToSend,
 	}, nil
 }
 
