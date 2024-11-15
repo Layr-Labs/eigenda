@@ -120,10 +120,11 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
-	err = disperserClient.InitializePaymentState(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error setting payment state: %w", err)
-	}
+	// TODO: uncomment this when we are using disperser client v2
+	// err = disperserClient.InitializePaymentState(context.Background())
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error setting payment state: %w", err)
+	// }
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	disperser_v2_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
@@ -19,8 +19,8 @@ var requiredQuorums = []uint8{0, 1}
 
 type Accountant interface {
 	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error)
-	AuthenticatePaymentStateRequest() (*disperser_rpc.GetPaymentStateRequest, error)
-	SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply)
+	AuthenticatePaymentStateRequest() (*disperser_v2_rpc.GetPaymentStateRequest, error)
+	SetPaymentState(paymentState *disperser_v2_rpc.GetPaymentStateReply)
 }
 
 var _ Accountant = &accountant{}
@@ -182,7 +182,7 @@ func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
 	return nil
 }
 
-func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) {
+func (a *accountant) SetPaymentState(paymentState *disperser_v2_rpc.GetPaymentStateReply) {
 	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
 	for i, quorum := range paymentState.Reservation.QuorumNumbers {
 		quorumNumbers[i] = uint8(quorum)
@@ -213,7 +213,7 @@ func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
 }
 
-func (a *accountant) AuthenticatePaymentStateRequest() (*disperser_rpc.GetPaymentStateRequest, error) {
+func (a *accountant) AuthenticatePaymentStateRequest() (*disperser_v2_rpc.GetPaymentStateRequest, error) {
 	accountID := a.paymentSigner.GetAccountID()
 
 	signature, err := a.paymentSigner.SignAccountID(accountID)
@@ -221,7 +221,7 @@ func (a *accountant) AuthenticatePaymentStateRequest() (*disperser_rpc.GetPaymen
 		return nil, err
 	}
 
-	request := &disperser_rpc.GetPaymentStateRequest{
+	request := &disperser_v2_rpc.GetPaymentStateRequest{
 		AccountId: accountID,
 		Signature: signature,
 	}

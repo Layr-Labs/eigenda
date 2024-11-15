@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -208,4 +209,77 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	s.onchainState.Store(onchainState)
 
 	return nil
+}
+
+func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	// validate the signature
+	if !auth.VerifyAccountSignature(req.AccountId, req.Signature) {
+		return nil, api.NewErrorInvalidArg("invalid signature")
+	}
+
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+
+	// off-chain account specific payment state
+	now := uint64(time.Now().Unix())
+	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
+	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, currentBinIndex)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+	}
+	// on-Chain account state
+	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+	}
+
+	paymentGlobalParams := pb.PaymentGlobalParams{
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
+	}
+
+	quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+	for i, v := range reservation.QuorumNumbers {
+		quorumNumbers[i] = uint32(v)
+	}
+	// build reply
+	reply := &pb.GetPaymentStateReply{
+		PaymentGlobalParams: &paymentGlobalParams,
+		BinRecords: []*pb.BinRecord{
+			{
+				Index: uint32(currentBinIndex),
+				Usage: uint64(currentBinUsage),
+			},
+			{
+				Index: uint32(currentBinIndex + 1),
+				Usage: uint64(nextBinUsage),
+			},
+			{
+				Index: uint32(currentBinIndex + 2),
+				Usage: uint64(overflowBinUsage),
+			},
+		},
+		Reservation: &pb.Reservation{
+			SymbolsPerSecond: reservation.SymbolsPerSec,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
+			QuorumNumbers:    quorumNumbers,
+		},
+		CumulativePayment:        largestCumulativePayment.Bytes(),
+		OnChainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+	}
+	return reply, nil
 }

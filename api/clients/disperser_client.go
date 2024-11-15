@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -55,10 +54,8 @@ type DisperserClient interface {
 	// DisperseBlobAuthenticated disperses a blob with an authenticated request.
 	// The BlobStatus returned will always be PROCESSSING if error is nil.
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
-	DispersePaidBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
-	InitializePaymentState(ctx context.Context) error
 }
 
 // See the NewDisperserClient constructor's documentation for details and usage examples.
@@ -178,59 +175,6 @@ func (c *disperserClient) DisperseBlob(ctx context.Context, data []byte, quorums
 	}
 
 	reply, err := c.client.DisperseBlob(ctxTimeout, request)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	blobStatus, err := disperser.FromBlobStatusProto(reply.GetResult())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return blobStatus, reply.GetRequestId(), nil
-}
-
-// DispersePaidBlob disperses a blob with a payment header and signature. Similar to DisperseBlob but with signed payment header.
-func (c *disperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	if c.accountant == nil {
-		return nil, nil, api.NewErrorInternal("not implemented")
-	}
-
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error initializing connection: %w", err)
-	}
-
-	ctxTimeout, cancel := context.WithTimeout(ctx, c.config.Timeout)
-	defer cancel()
-
-	quorumNumbers := make([]uint32, len(quorums))
-	for i, q := range quorums {
-		quorumNumbers[i] = uint32(q)
-	}
-
-	// check every 32 bytes of data are within the valid range for a bn254 field element
-	_, err = rs.ToFrArray(data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
-	}
-
-	header, signature, err := c.accountant.AccountBlob(ctx, uint64(encoding.GetBlobLength(uint(len(data)))), quorums)
-	if header == nil {
-		return nil, nil, errors.New("accountant returned nil pointer to header")
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	request := &disperser_rpc.DispersePaidBlobRequest{
-		Data:             data,
-		QuorumNumbers:    quorumNumbers,
-		PaymentHeader:    header,
-		PaymentSignature: signature,
-	}
-
-	reply, err := c.client.DispersePaidBlob(ctxTimeout, request)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -382,54 +326,6 @@ func (c *disperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash []by
 		return nil, err
 	}
 	return reply.Data, nil
-}
-
-func (c *disperserClient) getPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
-	err := c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, fmt.Errorf("error initializing connection: %w", err)
-	}
-
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
-	request, err := c.accountant.AuthenticatePaymentStateRequest()
-	if err != nil {
-		return nil, err
-	}
-	reply, err := c.client.GetPaymentState(ctxTimeout, request)
-	if err != nil {
-		return nil, err
-	}
-
-	return reply, nil
-}
-
-func (c *disperserClient) InitializePaymentState(ctx context.Context) error {
-	paymentState, err := c.getPaymentState(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting payment state from disperser: %w", err)
-	}
-	c.accountant.SetPaymentState(paymentState)
-	// c.accountant.binUsages = []uint64{uint64(paymentState.CurrentBinUsage), uint64(paymentState.NextBinUsage), uint64(paymentState.OverflowBinUsage)}
-	// c.accountant.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
-	// quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
-	// for i, q := range paymentState.Reservation.QuorumNumbers {
-	// 	quorumNumbers[i] = uint8(q)
-	// }
-	// c.accountant.reservation = core.ActiveReservation{
-	// 	StartTimestamp: uint64(paymentState.Reservation.StartTimestamp),
-	// 	EndTimestamp:   uint64(paymentState.Reservation.EndTimestamp),
-	// 	SymbolsPerSec:  paymentState.Reservation.SymbolsPerSecond,
-	// 	QuorumNumbers:  quorumNumbers,
-	// }
-	// c.accountant.onDemand = core.OnDemandPayment{
-	// 	CumulativePayment: new(big.Int).SetBytes(paymentState.OnChainCumulativePayment),
-	// }
-	// c.accountant.reservationWindow = paymentState.PaymentGlobalParams.ReservationWindow
-	// c.accountant.pricePerSymbol = paymentState.PaymentGlobalParams.PricePerSymbol
-	// c.accountant.minNumSymbols = paymentState.PaymentGlobalParams.MinNumSymbols
-	return nil
 }
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
