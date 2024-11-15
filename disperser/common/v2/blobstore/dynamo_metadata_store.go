@@ -524,6 +524,48 @@ func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKe
 	return responses, nil
 }
 
+func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
+	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk", commondynamodb.ExpressionValues{
+		":pk": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+	})
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(items) == 0 {
+		return nil, nil, fmt.Errorf("%w: no records found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	var header *corev2.BatchHeader
+	var attestation *corev2.Attestation
+	for _, item := range items {
+		if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, batchHeaderSK) {
+			header, err = UnmarshalBatchHeader(item)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to unmarshal batch header: %w", err)
+			}
+		} else if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, attestationSK) {
+			attestation, err = UnmarshalAttestation(item)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+			}
+		}
+	}
+
+	if header == nil {
+		return nil, nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	if attestation == nil {
+		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	return header, attestation, nil
+}
+
 func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacityUnits int64) *dynamodb.CreateTableInput {
 	return &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{

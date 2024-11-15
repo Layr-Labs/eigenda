@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -20,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -28,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type testComponents struct {
@@ -201,10 +204,105 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 
 func TestV2GetBlobStatus(t *testing.T) {
 	c := newTestServerV2(t)
-	_, err := c.DispersalServerV2.GetBlobStatus(context.Background(), &pbv2.BlobStatusRequest{
-		BlobKey: []byte{1},
+	ctx := peer.NewContext(context.Background(), c.Peer)
+
+	blobHeader := &corev2.BlobHeader{
+		BlobVersion:     0,
+		BlobCommitments: mockCommitment,
+		QuorumNumbers:   []core.QuorumID{0},
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         "0x1234",
+			BinIndex:          0,
+			CumulativePayment: big.NewInt(532),
+		},
+	}
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	now := time.Now()
+	metadata := &dispv2.BlobMetadata{
+		BlobHeader: blobHeader,
+		BlobStatus: dispv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err = c.BlobMetadataStore.PutBlobMetadata(ctx, metadata)
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		RelayKeys:  []corev2.RelayKey{0, 1, 2},
+	}
+	err = c.BlobMetadataStore.PutBlobCertificate(ctx, blobCert, nil)
+	require.NoError(t, err)
+
+	// Non ceritified blob status
+	status, err := c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
+		BlobKey: blobKey[:],
 	})
-	assert.ErrorContains(t, err, "not implemented")
+	require.NoError(t, err)
+	require.Equal(t, pbv2.BlobStatus_QUEUED, status.Status)
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Encoded)
+	require.NoError(t, err)
+	status, err = c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
+		BlobKey: blobKey[:],
+	})
+	require.NoError(t, err)
+	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
+
+	// Certified blob status
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Certified)
+	require.NoError(t, err)
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 100,
+	}
+	err = c.BlobMetadataStore.PutBatchHeader(ctx, batchHeader)
+	require.NoError(t, err)
+	verificationInfo0 := &corev2.BlobVerificationInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey,
+		BlobIndex:      123,
+		InclusionProof: []byte("inclusion proof"),
+	}
+	err = c.BlobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo0)
+	require.NoError(t, err)
+
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: &core.G2Point{
+			G2Affine: &bn254.G2Affine{
+				X: mockCommitment.LengthCommitment.X,
+				Y: mockCommitment.LengthCommitment.Y,
+			},
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+		},
+	}
+	err = c.BlobMetadataStore.PutAttestation(ctx, attestation)
+	require.NoError(t, err)
+
+	reply, err := c.DispersalServerV2.GetBlobStatus(context.Background(), &pbv2.BlobStatusRequest{
+		BlobKey: blobKey[:],
+	})
+	require.NoError(t, err)
+	require.Equal(t, pbv2.BlobStatus_CERTIFIED, reply.GetStatus())
+	blobHeaderProto, err := blobHeader.ToProtobuf()
+	require.NoError(t, err)
+	blobCertProto, err := blobCert.ToProtobuf()
+	require.NoError(t, err)
+	require.Equal(t, blobHeaderProto, reply.GetBlobVerificationInfo().GetBlobCertificate().GetBlobHeader())
+	require.Equal(t, blobCertProto.Relays, reply.GetBlobVerificationInfo().GetBlobCertificate().GetRelays())
+	require.Equal(t, verificationInfo0.BlobIndex, reply.GetBlobVerificationInfo().GetBlobIndex())
+	require.Equal(t, verificationInfo0.InclusionProof, reply.GetBlobVerificationInfo().GetInclusionProof())
+	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().BatchRoot)
+	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().ReferenceBlockNumber)
+	attestationProto := attestation.ToProtobuf()
+	require.Equal(t, attestationProto, reply.GetSignedBatch().GetAttestation())
 }
 
 func TestV2GetBlobCommitment(t *testing.T) {

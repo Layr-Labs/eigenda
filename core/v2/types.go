@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -208,6 +209,13 @@ type BatchHeader struct {
 	ReferenceBlockNumber uint64
 }
 
+func (h *BatchHeader) ToProtobuf() *commonpb.BatchHeader {
+	return &commonpb.BatchHeader{
+		BatchRoot:            h.BatchRoot[:],
+		ReferenceBlockNumber: h.ReferenceBlockNumber,
+	}
+}
+
 type Batch struct {
 	BatchHeader      *BatchHeader
 	BlobCertificates []*BlobCertificate
@@ -301,12 +309,54 @@ type Attestation struct {
 	QuorumNumbers []core.QuorumID
 }
 
+func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
+	nonSignerPubKeys := make([][]byte, len(a.NonSignerPubKeys))
+	for i, p := range a.NonSignerPubKeys {
+		pubkeyBytes := p.Bytes()
+		nonSignerPubKeys[i] = pubkeyBytes[:]
+	}
+
+	quorumAPKs := make([][]byte, len(a.QuorumAPKs))
+	for i, p := range a.QuorumAPKs {
+		apkBytes := p.Bytes()
+		quorumAPKs[i] = apkBytes[:]
+	}
+
+	quorumNumbers := make([]uint32, len(a.QuorumNumbers))
+	for i, q := range a.QuorumNumbers {
+		quorumNumbers[i] = uint32(q)
+	}
+
+	apkG2Bytes := a.APKG2.Bytes()
+	sigmaBytes := a.Sigma.Bytes()
+
+	return &disperserpb.Attestation{
+		NonSignerPubkeys: nonSignerPubKeys,
+		ApkG2:            apkG2Bytes[:],
+		QuorumApks:       quorumAPKs,
+		Sigma:            sigmaBytes[:],
+		QuorumNumbers:    quorumNumbers,
+	}
+}
+
 type BlobVerificationInfo struct {
 	*BatchHeader
 
 	BlobKey
 	BlobIndex      uint32
 	InclusionProof []byte
+}
+
+func (v *BlobVerificationInfo) ToProtobuf(blobCert *BlobCertificate) (*disperserpb.BlobVerificationInfo, error) {
+	blobCertProto, err := blobCert.ToProtobuf()
+	if err != nil {
+		return nil, err
+	}
+	return &disperserpb.BlobVerificationInfo{
+		BlobCertificate: blobCertProto,
+		BlobIndex:       v.BlobIndex,
+		InclusionProof:  v.InclusionProof,
+	}, nil
 }
 
 type BlobVersionParameters struct {
