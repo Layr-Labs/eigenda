@@ -86,6 +86,7 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 }
 
 func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2.BlobKey, status v2.BlobStatus) error {
+	s.logger.Debug("updating blob status", "blobKey", blobKey.Hex(), "status", status.String())
 	validStatuses := statusUpdatePrecondition[status]
 	if len(validStatuses) == 0 {
 		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
@@ -124,6 +125,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 
 		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
 	}
+	s.logger.Debug("successfully updated blob status", "blobKey", blobKey.Hex(), "status", status.String())
 
 	return err
 }
@@ -317,11 +319,14 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 	if err != nil {
 		return err
 	}
+	s.logger.Debug("putting blob certificate", item["PK"], item["SK"])
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		s.logger.Debug("blob certificate already exists", item["PK"], item["SK"])
 		return common.ErrAlreadyExists
 	}
+	s.logger.Debug("successfully put blob certificate")
 
 	return err
 }
@@ -590,12 +595,14 @@ func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verific
 // It retries failed items up to 2 times
 func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verificationInfos []*corev2.BlobVerificationInfo) error {
 	items := make([]commondynamodb.Item, len(verificationInfos))
+	s.logger.Debug("putting verification infos", "numItems", len(verificationInfos))
 	for i, info := range verificationInfos {
 		item, err := MarshalBlobVerificationInfo(info)
 		if err != nil {
 			return err
 		}
 		items[i] = item
+		s.logger.Debugf("putting verification info %d: %v", i, item["PK"])
 	}
 
 	numRetries := 3

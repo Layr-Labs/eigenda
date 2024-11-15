@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -39,15 +40,17 @@ var (
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName = "test-BlobMetadata"
-	bucketTableName   = "test-BucketStore"
-	logger            logging.Logger
-	ethClient         common.EthClient
-	rpcClient         common.RPCEthClient
-	mockRollup        *rollupbindings.ContractMockRollup
-	retrievalClient   clients.RetrievalClient
-	numConfirmations  int = 3
-	numRetries            = 0
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
+	logger              logging.Logger
+	ethClient           common.EthClient
+	rpcClient           common.RPCEthClient
+	mockRollup          *rollupbindings.ContractMockRollup
+	retrievalClient     clients.RetrievalClient
+	numConfirmations    int = 3
+	numRetries              = 0
+	relays                  = map[corev2.RelayKey]string{}
 
 	cancel context.CancelFunc
 )
@@ -91,7 +94,7 @@ var _ = BeforeSuite(func() {
 			dockertestPool = pool
 			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, "")
+			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
 			Expect(err).To(BeNil())
 
 		} else {
@@ -132,6 +135,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).To(BeNil())
 	err = setupRetrievalClient(testConfig)
 	Expect(err).To(BeNil())
+	for i, relayVars := range testConfig.Relays {
+		relays[corev2.RelayKey(i)] = fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
+	}
+	fmt.Println("======================= relays", relays)
 })
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
@@ -207,8 +214,9 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
-
-		cancel()
+		if cancel != nil {
+			cancel()
+		}
 
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()

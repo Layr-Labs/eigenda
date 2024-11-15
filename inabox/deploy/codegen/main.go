@@ -9,9 +9,11 @@ import (
 
 	dis "github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	bat "github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
+	controller "github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	enc "github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	opr "github.com/Layr-Labs/eigenda/node/flags"
 	churner "github.com/Layr-Labs/eigenda/operators/churner/flags"
+	relay "github.com/Layr-Labs/eigenda/relay/cmd/flags"
 	retriever "github.com/Layr-Labs/eigenda/retriever/flags"
 
 	"github.com/urfave/cli"
@@ -59,6 +61,14 @@ func getFlag(flag cli.Flag) Flag {
 	intFlag, ok := flag.(cli.IntFlag)
 	if ok {
 		return Flag{intFlag.Name, intFlag.EnvVar}
+	}
+	int64Flag, ok := flag.(cli.Int64Flag)
+	if ok {
+		return Flag{int64Flag.Name, int64Flag.EnvVar}
+	}
+	float64Flag, ok := flag.(cli.Float64Flag)
+	if ok {
+		return Flag{float64Flag.Name, float64Flag.EnvVar}
 	}
 	uint64Flag, ok := flag.(cli.Uint64Flag)
 	if ok {
@@ -119,6 +129,8 @@ func main() {
 	configs += genVars("OperatorVars", opr.Flags)
 	configs += genVars("RetrieverVars", retriever.Flags)
 	configs += genVars("ChurnerVars", churner.Flags)
+	configs += genVars("ControllerVars", controller.Flags)
+	configs += genVars("RelayVars", relay.Flags)
 
 	fmt.Println(configs)
 

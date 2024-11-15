@@ -67,8 +67,6 @@ func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (*relayCli
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 
-	logger.Info("creating relay client", "config", config)
-
 	initOnce := sync.Map{}
 	for key := range config.Sockets {
 		initOnce.Store(key, &sync.Once{})

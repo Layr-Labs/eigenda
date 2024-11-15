@@ -74,6 +74,7 @@ func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]k
 	}
 
 	keys = append(keys, batchHeaderKey)
+	s.logger.Debug("storing batch", "batchHeaderKey", batchHeaderKey)
 	dbBatch.PutWithTTL(batchHeaderKey, batchHeaderBytes, s.ttl)
 
 	// Store blob shards
@@ -93,6 +94,7 @@ func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]k
 			return nil, fmt.Errorf("failed to serialize blob certificate: %v", err)
 		}
 		keys = append(keys, blobCertificateKey)
+		s.logger.Debug("storing blob certificate", "blobCertificateKey", blobCertificateKey)
 		dbBatch.PutWithTTL(blobCertificateKey, blobCertificateBytes, s.ttl)
 
 		// Store bundles

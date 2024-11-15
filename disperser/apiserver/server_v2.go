@@ -155,6 +155,7 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 		return nil, api.NewErrorInternal("failed to serialize length proof")
 	}
 
+	s.logger.Debug("GetBlobCommitment", "length", c.Length)
 	return &pb.BlobCommitmentReply{
 		BlobCommitment: &pbcommon.BlobCommitment{
 			Commitment:       commitment,
