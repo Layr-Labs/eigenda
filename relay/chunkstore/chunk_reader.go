@@ -30,7 +30,6 @@ type chunkReader struct {
 	logger logging.Logger
 	client s3.Client
 	bucket string
-	shards []uint32
 }
 
 // NewChunkReader creates a new ChunkReader.
@@ -40,14 +39,12 @@ type chunkReader struct {
 func NewChunkReader(
 	logger logging.Logger,
 	s3Client s3.Client,
-	bucketName string,
-	shards []uint32) ChunkReader {
+	bucketName string) ChunkReader {
 
 	return &chunkReader{
 		logger: logger,
 		client: s3Client,
 		bucket: bucketName,
-		shards: shards,
 	}
 }
 

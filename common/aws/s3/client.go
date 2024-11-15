@@ -32,8 +32,11 @@ type Object struct {
 type client struct {
 	cfg      *commonaws.ClientConfig
 	s3Client *s3.Client
-	pool     *errgroup.Group
-	logger   logging.Logger
+
+	// concurrencyLimiter is a channel that limits the number of concurrent operations.
+	concurrencyLimiter chan struct{}
+
+	logger logging.Logger
 }
 
 var _ Client = (*client)(nil)
@@ -89,14 +92,14 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 			workers = 1
 		}
 
-		pool, _ := errgroup.WithContext(ctx)
+		pool := &errgroup.Group{}
 		pool.SetLimit(workers)
 
 		ref = &client{
-			cfg:      &cfg,
-			s3Client: s3Client,
-			pool:     pool,
-			logger:   logger.With("component", "S3Client"),
+			cfg:                &cfg,
+			s3Client:           s3Client,
+			concurrencyLimiter: make(chan struct{}, workers),
+			logger:             logger.With("component", "S3Client"),
 		}
 	})
 	return ref, err
@@ -225,20 +228,22 @@ func (s *client) FragmentedUploadObject(
 
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
-		s.pool.Go(func() error {
+		s.concurrencyLimiter <- struct{}{}
+		go func() {
+			defer func() {
+				<-s.concurrencyLimiter
+			}()
 			s.fragmentedWriteTask(ctx, resultChannel, fragmentCapture, bucket)
-			return nil
-		})
+		}()
 	}
 
 	for range fragments {
-		err := <-resultChannel
+		err = <-resultChannel
 		if err != nil {
 			return err
 		}
 	}
 	return ctx.Err()
-
 }
 
 // fragmentedWriteTask writes a single file to S3.
@@ -284,10 +289,13 @@ func (s *client) FragmentedDownloadObject(
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey
 		boundI := i
-		s.pool.Go(func() error {
+		s.concurrencyLimiter <- struct{}{}
+		go func() {
+			defer func() {
+				<-s.concurrencyLimiter
+			}()
 			s.readTask(ctx, resultChannel, bucket, boundFragmentKey, boundI)
-			return nil
-		})
+		}()
 	}
 
 	fragments := make([]*Fragment, len(fragmentKeys))

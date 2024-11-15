@@ -201,7 +201,7 @@ func createTestComponents(t *testing.T) *testComponents {
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chunkStoreWriter := chunkstore.NewChunkWriter(logger, s3Client, s3BucketName, 512*1024)
-	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName, []uint32{})
+	chunkStoreReader := chunkstore.NewChunkReader(logger, s3Client, s3BucketName)
 	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
 		GrpcPort:              "8080",
 		MaxConcurrentRequests: 10,

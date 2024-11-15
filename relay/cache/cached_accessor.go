@@ -1,4 +1,4 @@
-package relay
+package cache
 
 import (
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -9,7 +9,7 @@ import (
 // are expensive, and prevents multiple concurrent cache misses for the same key.
 type CachedAccessor[K comparable, V any] interface {
 	// Get returns the value for the given key. If the value is not in the cache, it will be fetched using the Accessor.
-	Get(key K) (*V, error)
+	Get(key K) (V, error)
 }
 
 // Accessor is function capable of fetching a value from a resource. Used by CachedAccessor when there is a cache miss.
@@ -20,7 +20,7 @@ type accessResult[V any] struct {
 	// wg.Wait() will block until the value is fetched.
 	wg sync.WaitGroup
 	// value is the value fetched by the Accessor, or nil if there was an error.
-	value *V
+	value V
 	// err is the error returned by the Accessor, or nil if the fetch was successful.
 	err error
 }
@@ -42,19 +42,19 @@ type cachedAccessor[K comparable, V any] struct {
 	lookupsInProgress map[K]*accessResult[V]
 
 	// cache is the LRU cache used to store values fetched by the accessor.
-	cache *lru.Cache[K, *V]
+	cache *lru.Cache[K, V]
 
 	// lock is used to protect the cache and lookupsInProgress map.
 	cacheLock sync.Mutex
 
 	// accessor is the function used to fetch values that are not in the cache.
-	accessor Accessor[K, *V]
+	accessor Accessor[K, V]
 }
 
 // NewCachedAccessor creates a new CachedAccessor.
-func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, *V]) (CachedAccessor[K, V], error) {
+func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, V]) (CachedAccessor[K, V], error) {
 
-	cache, err := lru.New[K, *V](cacheSize)
+	cache, err := lru.New[K, V](cacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func newAccessResult[V any]() *accessResult[V] {
 	return result
 }
 
-func (c *cachedAccessor[K, V]) Get(key K) (*V, error) {
+func (c *cachedAccessor[K, V]) Get(key K) (V, error) {
 
 	c.cacheLock.Lock()
 
