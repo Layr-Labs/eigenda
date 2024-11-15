@@ -15,8 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/wealdtech/go-merkletree/v2"
-	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
 var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
@@ -292,7 +290,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		ReferenceBlockNumber: referenceBlockNumber,
 	}
 
-	tree, err := BuildMerkleTree(certs)
+	tree, err := corev2.BuildMerkleTree(certs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle tree: %w", err)
 	}
@@ -396,22 +394,4 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, keys []corev2.BlobKe
 		}
 	}
 	return nil
-}
-
-func BuildMerkleTree(certs []*corev2.BlobCertificate) (*merkletree.MerkleTree, error) {
-	leafs := make([][]byte, len(certs))
-	for i, cert := range certs {
-		leaf, err := cert.Hash()
-		if err != nil {
-			return nil, fmt.Errorf("failed to compute blob header hash: %w", err)
-		}
-		leafs[i] = leaf[:]
-	}
-
-	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
-	if err != nil {
-		return nil, err
-	}
-
-	return tree, nil
 }

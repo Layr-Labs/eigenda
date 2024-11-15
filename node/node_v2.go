@@ -33,14 +33,9 @@ type RawBundles struct {
 	Bundles         map[core.QuorumID][]byte
 }
 
-func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch) ([]*corev2.BlobShard, []*RawBundles, error) {
+func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
 	if n.RelayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
-	}
-
-	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), n.Config.ID)
-	if err != nil {
-		return nil, nil, err
 	}
 
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
@@ -117,6 +112,7 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch) ([]*cor
 	}
 	pool.StopWait()
 
+	var err error
 	for i := 0; i < len(requests); i++ {
 		resp := <-bundleChan
 		if resp.err != nil {
@@ -133,4 +129,21 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch) ([]*cor
 	}
 
 	return blobShards, rawBundles, nil
+}
+
+func (n *Node) ValidateBatchV2(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	operatorState *core.OperatorState,
+) error {
+	if n.ValidatorV2 == nil {
+		return fmt.Errorf("store v2 is not set")
+	}
+
+	if err := n.ValidatorV2.ValidateBatchHeader(ctx, batch.BatchHeader, batch.BlobCertificates); err != nil {
+		return fmt.Errorf("failed to validate batch header: %v", err)
+	}
+	pool := workerpool.New(n.Config.NumBatchValidators)
+	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, pool, operatorState)
 }

@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,27 +16,32 @@ var (
 	ErrBlobQuorumSkip      = errors.New("blob skipped for a quorum before verification")
 )
 
+type ShardValidator interface {
+	ValidateBatchHeader(ctx context.Context, header *BatchHeader, blobCerts []*BlobCertificate) error
+	ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, state *core.OperatorState) error
+}
+
 type BlobShard struct {
 	*BlobCertificate
 	Bundles core.Bundles
 }
 
 // shardValidator implements the validation logic that a DA node should apply to its received data
-type ShardValidator struct {
+type shardValidator struct {
 	verifier   encoding.Verifier
-	chainState core.ChainState
 	operatorID core.OperatorID
 }
 
-func NewShardValidator(v encoding.Verifier, cst core.ChainState, operatorID core.OperatorID) *ShardValidator {
-	return &ShardValidator{
+var _ ShardValidator = (*shardValidator)(nil)
+
+func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID) *shardValidator {
+	return &shardValidator{
 		verifier:   v,
-		chainState: cst,
 		operatorID: operatorID,
 	}
 }
 
-func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShard, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
+func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShard, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
 
 	// Check if the operator is a member of the quorum
 	if _, ok := operatorState.Operators[quorum]; !ok {
@@ -72,7 +78,28 @@ func (v *ShardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	return chunks, &assignment, nil
 }
 
-func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, state *core.OperatorState) error {
+func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchHeader, blobCerts []*BlobCertificate) error {
+	if header == nil {
+		return fmt.Errorf("batch header is nil")
+	}
+
+	if len(blobCerts) == 0 {
+		return fmt.Errorf("no blob certificates")
+	}
+
+	tree, err := BuildMerkleTree(blobCerts)
+	if err != nil {
+		return fmt.Errorf("failed to build merkle tree: %v", err)
+	}
+
+	if !bytes.Equal(tree.Root(), header.BatchRoot[:]) {
+		return fmt.Errorf("batch root does not match")
+	}
+
+	return nil
+}
+
+func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, state *core.OperatorState) error {
 	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
@@ -152,7 +179,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 	for _, blobCommitments := range blobCommitmentList {
 		blobCommitments := blobCommitments
 		pool.Submit(func() {
-			v.VerifyBlobLengthWorker(blobCommitments, out)
+			v.verifyBlobLengthWorker(blobCommitments, out)
 		})
 	}
 	// check if commitments are equivalent
@@ -171,7 +198,7 @@ func (v *ShardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 	return nil
 }
 
-func (v *ShardValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
+func (v *shardValidator) universalVerifyWorker(params encoding.EncodingParams, subBatch *encoding.SubBatch, out chan error) {
 
 	err := v.verifier.UniversalVerifySubBatch(params, subBatch.Samples, subBatch.NumBlobs)
 	if err != nil {
@@ -182,7 +209,7 @@ func (v *ShardValidator) universalVerifyWorker(params encoding.EncodingParams, s
 	out <- nil
 }
 
-func (v *ShardValidator) VerifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
+func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCommitments, out chan error) {
 	err := v.verifier.VerifyBlobLength(blobCommitments)
 	if err != nil {
 		out <- err
