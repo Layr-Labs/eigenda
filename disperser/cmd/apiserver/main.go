@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -161,6 +162,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
+		prover, err := prover.NewProver(&config.EncodingConfig, true)
+		if err != nil {
+			return fmt.Errorf("failed to create encoder: %w", err)
+		}
 		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
@@ -172,6 +177,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			transactor,
 			ratelimiter,
 			authv2.NewAuthenticator(),
+			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,
 			logger,
