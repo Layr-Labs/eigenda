@@ -47,12 +47,13 @@ func newBlobProvider(
 
 // GetBlob retrieves a blob from the blob store.
 func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
+
 	data, err := s.blobCache.Get(blobKey)
 
 	if err != nil {
 		// It should not be possible for external users to force an error here since we won't
 		// even call this method if the blob key is invalid (so it's ok to have a noisy log here).
-		s.logger.Error("Failed to fetch blob: %v", err)
+		s.logger.Errorf("Failed to fetch blob: %v", err)
 		return nil, err
 	}
 
@@ -63,7 +64,7 @@ func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 	data, err := s.blobStore.GetBlob(s.ctx, blobKey)
 	if err != nil {
-		s.logger.Error("Failed to fetch blob: %v", err)
+		s.logger.Errorf("Failed to fetch blob: %v", err)
 		return nil, err
 	}
 

@@ -36,6 +36,7 @@ import (
 	retrievermock "github.com/Layr-Labs/eigenda/retriever/mock"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/peer"
 
@@ -292,7 +293,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
-	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, mt, ratelimiter, rateConfig, testMaxBlobSize)
+	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{
 		batcher:       batcher,
@@ -648,7 +649,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.Greater(t, headerReply.GetBlobHeader().GetQuorumHeaders()[0].GetChunkLength(), uint32(0))
 
 		if blobHeader == nil {
-			blobHeader, err = core.BlobHeaderFromProto(headerReply.GetBlobHeader())
+			blobHeader, err = core.BlobHeaderFromProtobuf(headerReply.GetBlobHeader())
 			assert.NoError(t, err)
 		}
 

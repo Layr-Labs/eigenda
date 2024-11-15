@@ -70,6 +70,21 @@ func TestBatchHeaderHash(t *testing.T) {
 	assert.Equal(t, "891d0936da4627f445ef193aad63afb173409af9e775e292e4e35aff790a45e2", hex.EncodeToString(hash[:]))
 }
 
+func TestBatchHeaderSerialization(t *testing.T) {
+	batchRoot := [32]byte{}
+	copy(batchRoot[:], []byte("batchRoot"))
+	batchHeader := &v2.BatchHeader{
+		ReferenceBlockNumber: 1000,
+		BatchRoot:            batchRoot,
+	}
+
+	serialized, err := batchHeader.Serialize()
+	assert.NoError(t, err)
+	deserialized, err := v2.DeserializeBatchHeader(serialized)
+	assert.NoError(t, err)
+	assert.Equal(t, batchHeader, deserialized)
+}
+
 func TestBlobCertHash(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
 	commitments, err := p.GetCommitments(data)
@@ -96,4 +111,33 @@ func TestBlobCertHash(t *testing.T) {
 	assert.NoError(t, err)
 	// 0xc4512b8702f69cb837fff50a93d3d28aada535b1f151b64db45859c3f5bb096a verified in solidity
 	assert.Equal(t, "c4512b8702f69cb837fff50a93d3d28aada535b1f151b64db45859c3f5bb096a", hex.EncodeToString(hash[:]))
+}
+
+func TestBlobCertSerialization(t *testing.T) {
+	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
+	commitments, err := p.GetCommitments(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobCert := &v2.BlobCertificate{
+		BlobHeader: &v2.BlobHeader{
+			BlobVersion:     0,
+			BlobCommitments: commitments,
+			QuorumNumbers:   []core.QuorumID{0, 1},
+			PaymentMetadata: core.PaymentMetadata{
+				AccountID:         "0x123",
+				BinIndex:          5,
+				CumulativePayment: big.NewInt(100),
+			},
+			Signature: []byte{1, 2, 3},
+		},
+		RelayKeys: []v2.RelayKey{4, 5, 6},
+	}
+
+	serialized, err := blobCert.Serialize()
+	assert.NoError(t, err)
+	deserialized, err := v2.DeserializeBlobCertificate(serialized)
+	assert.NoError(t, err)
+	assert.Equal(t, blobCert, deserialized)
 }

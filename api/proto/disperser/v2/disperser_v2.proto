@@ -101,7 +101,7 @@ message SignedBatch {
   // header contains metadata about the batch
   common.v2.BatchHeader header = 1;
   // attestation on the batch
-  Attestation non_signer_stakes_and_signature = 2;
+  Attestation attestation = 2;
 }
 
 // BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.

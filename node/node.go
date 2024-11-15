@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -62,12 +63,19 @@ type Node struct {
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
 
+	RelayClient clients.RelayClient
+
 	mu            sync.Mutex
 	CurrentSocket string
 }
 
 // NewNode creates a new Node with the provided config.
-func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
+func NewNode(
+	reg *prometheus.Registry,
+	config *Config,
+	pubIPProvider pubip.Provider,
+	logger logging.Logger,
+) (*Node, error) {
 	// Setup metrics
 	// sdkClients, err := buildSdkClients(config, logger)
 	// if err != nil {
@@ -160,6 +168,8 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
+	var relayClient clients.RelayClient
+	// Create a new relay client with relay addresses onchain
 	return &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -173,6 +183,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
+		RelayClient:             relayClient,
 	}, nil
 }
 

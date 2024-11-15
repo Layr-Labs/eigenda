@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -45,8 +46,8 @@ type Fragment struct {
 	Index       int
 }
 
-// breakIntoFragments breaks a file into fragments of the given size.
-func breakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
+// BreakIntoFragments breaks a file into fragments of the given size.
+func BreakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragment, error) {
 	fragmentCount := getFragmentCount(len(data), fragmentSize)
 	fragments := make([]*Fragment, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
@@ -69,8 +70,8 @@ func breakIntoFragments(fileKey string, data []byte, fragmentSize int) ([]*Fragm
 	return fragments, nil
 }
 
-// getFragmentKeys returns the keys for all fragments of a file.
-func getFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
+// GetFragmentKeys returns the keys for all fragments of a file.
+func GetFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 	keys := make([]string, fragmentCount)
 	for i := 0; i < fragmentCount; i++ {
 		fragmentKey, err := getFragmentKey(fileKey, fragmentCount, i)
@@ -80,6 +81,23 @@ func getFragmentKeys(fileKey string, fragmentCount int) ([]string, error) {
 		keys[i] = fragmentKey
 	}
 	return keys, nil
+}
+
+// AllFragmentsExist returns true if all keys are fragment keys.
+// It checks if all fragment keys starting with 0th fragment and ending with nth fragment (marked by "f" postfix) exist.
+// Warning: this function sorts the input slice in place and therefore mutates the ordering of the input slice.
+func SortAndCheckAllFragmentsExist(keys []string) bool {
+	sort.Strings(keys)
+	for i, key := range keys {
+		if !strings.HasSuffix(key, "-"+strconv.Itoa(i)) {
+			if strings.HasSuffix(key, "-"+strconv.Itoa(i)+"f") {
+				return i == len(keys)-1
+			}
+			return false
+		}
+	}
+
+	return false
 }
 
 // recombineFragments recombines fragments into a single file.

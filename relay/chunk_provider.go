@@ -91,7 +91,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 		go func() {
 			frames, err := s.frameCache.Get(*boundKey)
 			if err != nil {
-				s.logger.Error("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
+				s.logger.Errorf("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
 				completionChannel <- &framesResult{
 					key: boundKey.blobKey,
 					err: err,
@@ -126,6 +126,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 
 	var proofs []*encoding.Proof
 	var proofsErr error
+
 	go func() {
 		defer func() {
 			wg.Done()

@@ -412,8 +412,8 @@ func BatchHeaderFromProtobuf(in *pb.BatchHeader) (*BatchHeader, error) {
 	}, nil
 }
 
-// BlobHeaderFromProto constructs a core.BlobHeader from a proto of pb.BlobHeader.
-func BlobHeaderFromProto(h *pb.BlobHeader) (*BlobHeader, error) {
+// BlobHeaderFromProtobuf constructs a core.BlobHeader from a proto of pb.BlobHeader.
+func BlobHeaderFromProtobuf(h *pb.BlobHeader) (*BlobHeader, error) {
 	if h == nil {
 		return nil, fmt.Errorf("GetBlobHeaderFromProto: blob header is nil")
 
