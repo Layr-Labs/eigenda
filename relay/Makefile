@@ -7,7 +7,7 @@ clean:
 # Build the light node.
 build: clean
 	go mod tidy
-	go build -tags=viper_bind_struct -o ./bin/relay ./main
+	go build -o ./bin/relay ./cmd
 
 # Run the light node.
 run: build
