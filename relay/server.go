@@ -116,7 +116,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf("blob not found")
 	}
 
-	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes) // TODO make sure this field is populated
+	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
 
-	requiredBandwidth := 0 // TODO calculate this
+	requiredBandwidth := computeChunkRequestRequiredBandwidth(request, mMap)
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		return nil, err
@@ -246,4 +246,28 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	return &pb.GetChunksReply{
 		Data: bytesToSend,
 	}, nil
+}
+
+// TODO unit test
+// computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
+func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) int {
+	requiredBandwidth := 0
+	for _, req := range request.ChunkRequests {
+		var metadata *blobMetadata
+		var requestedChunks int
+
+		if req.GetByIndex() != nil {
+			key := v2.BlobKey(req.GetByIndex().GetBlobKey())
+			metadata = mMap[key]
+			requestedChunks = len(req.GetByIndex().ChunkIndices)
+		} else {
+			key := v2.BlobKey(req.GetByRange().GetBlobKey())
+			metadata = mMap[key]
+			requestedChunks = int(req.GetByRange().EndIndex - req.GetByRange().StartIndex)
+		}
+
+		requiredBandwidth += requestedChunks * int(metadata.chunkSizeBytes)
+	}
+
+	return requiredBandwidth
 }

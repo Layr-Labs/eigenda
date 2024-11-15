@@ -15,6 +15,8 @@ import (
 type blobMetadata struct {
 	// the size of the blob in bytes
 	blobSizeBytes uint32
+	// the size of each encoded chunk
+	chunkSizeBytes uint32
 	// the size of the file containing the encoded chunks
 	totalChunkSizeBytes uint32
 	// the fragment size used for uploading the encoded chunks
@@ -159,8 +161,15 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 		}
 	}
 
+	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length)
+	chunkSize, err := v2.GetChunkLength(cert.BlobHeader.BlobVersion, blobSize)
+	if err != nil {
+		return nil, fmt.Errorf("error getting chunk length: %w", err)
+	}
+
 	metadata := &blobMetadata{
-		blobSizeBytes:       0, /* Future work: populate this once it is added to the metadata store */
+		blobSizeBytes:       blobSize,
+		chunkSizeBytes:      chunkSize,
 		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
 		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 	}
