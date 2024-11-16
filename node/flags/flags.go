@@ -101,7 +101,7 @@ var (
 	// The files for encrypted private keys.
 	BlsKeyFileFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-key-file"),
-		Required: true,
+		Required: false,
 		Usage:    "Path to the encrypted bls private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_KEY_FILE"),
 	}
@@ -114,7 +114,7 @@ var (
 	// Passwords to decrypt the private keys.
 	BlsKeyPasswordFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-key-password"),
-		Required: true,
+		Required: false,
 		Usage:    "Password to decrypt bls private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_KEY_PASSWORD"),
 	}
