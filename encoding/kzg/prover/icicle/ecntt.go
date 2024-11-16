@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	ecntt "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ecntt"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
@@ -21,7 +21,7 @@ func (c *KzgMultiProofIcicleBackend) ECNttToGnarkOnDevice(batchPoints core.Devic
 }
 
 func (c *KzgMultiProofIcicleBackend) ECNttOnDevice(batchPoints core.DeviceSlice, isInverse bool, totalSize int) (core.DeviceSlice, error) {
-	var p icicle_bn254.Projective
+	var p iciclebn254.Projective
 	var out core.DeviceSlice
 
 	output, err := out.Malloc(p.Size(), totalSize)

@@ -79,12 +79,11 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(&config.EncoderConfig),
 		verifier.WithVerbose(true),
 		verifier.WithLoadG2Points(true),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}

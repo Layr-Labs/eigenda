@@ -15,18 +15,18 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 type KzgMultiProofIcicleBackend struct {
 	*kzg.KzgConfig
 	Fs             *fft.FFTSettings
-	FlatFFTPointsT []icicle_bn254.Affine
-	SRSIcicle      []icicle_bn254.Affine
+	FlatFFTPointsT []iciclebn254.Affine
+	SRSIcicle      []iciclebn254.Affine
 	SFs            *fft.FFTSettings
 	Srs            *kzg.SRS
-	NttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         runtime.Device
 }
@@ -84,7 +84,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	}
 
 	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
-	flattenCoeffStoreCopy := core.HostSliceFromElements[icicle_bn254.ScalarField](flattenCoeffStoreSf)
+	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
 
 	var icicleFFTBatch []bn254.G1Affine
 	var icicleErr error
@@ -132,7 +132,7 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 
 		secondECNttDone = time.Now()
 
-		flatProofsBatchHost := make(core.HostSlice[icicle_bn254.Projective], int(numPoly)*int(dimE))
+		flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
 		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
 		flatProofsBatch.Free()
 		icicleFFTBatch = icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))

@@ -16,12 +16,10 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-
-	opts := []prover.ProverOption{
+	group, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	group, err := prover.NewProver(opts...)
+	)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

@@ -73,18 +73,17 @@ func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint
 }
 
 func TestEncoder(t *testing.T) {
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	require.NoError(t, err)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithLoadG2Points(true),
-	}
-	v, _ := verifier.NewVerifier(vopts...)
+	)
+	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
 	commitments, chunks, err := p.EncodeAndProve(gettysburgAddressBytes, params)
@@ -128,11 +127,10 @@ func TestEncoder(t *testing.T) {
 // pkg: github.com/Layr-Labs/eigenda/core/encoding
 // BenchmarkEncode-12    	       1	2421900583 ns/op
 func BenchmarkEncode(b *testing.B) {
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	require.NoError(b, err)
 
 	params := encoding.EncodingParams{

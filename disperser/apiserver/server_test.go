@@ -654,11 +654,10 @@ func setup() {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	opts := []p.ProverOption{
+	prover, err = p.NewProver(
 		p.WithKZGConfig(config),
 		p.WithLoadG2Points(true),
-	}
-	prover, err = p.NewProver(opts...)
+	)
 	if err != nil {
 		teardown()
 		panic(fmt.Sprintf("failed to initialize KZG prover: %s", err.Error()))

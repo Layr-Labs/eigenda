@@ -60,18 +60,17 @@ func teardown() {
 
 func TestBenchmarkVerifyChunks(t *testing.T) {
 	t.Skip("This test is meant to be run manually, not as part of the test suite")
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	require.NoError(t, err)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithLoadG2Points(true),
-	}
-	v, _ := verifier.NewVerifier(vopts...)
+	)
+	require.NoError(t, err)
 
 	chunkLengths := []uint64{64, 128, 256, 512, 1024, 2048, 4096, 8192}
 	chunkCounts := []int{4, 8, 16}
@@ -122,18 +121,17 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 }
 
 func BenchmarkVerifyBlob(b *testing.B) {
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	require.NoError(b, err)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithLoadG2Points(true),
-	}
-	v, _ := verifier.NewVerifier(vopts...)
+	)
+	require.NoError(b, err)
 
 	params := encoding.EncodingParams{
 		ChunkLength: 256,

@@ -5,8 +5,8 @@ import "fmt"
 type BackendType string
 
 const (
-	BackendDefault BackendType = "default"
-	BackendIcicle  BackendType = "icicle"
+	GnarkBackend  BackendType = "gnark"
+	IcicleBackend BackendType = "icicle"
 )
 
 type Config struct {
@@ -19,11 +19,11 @@ type Config struct {
 // ParseBackendType converts a string to BackendType and validates it
 func ParseBackendType(backend string) (BackendType, error) {
 	switch BackendType(backend) {
-	case BackendDefault:
-		return BackendDefault, nil
-	case BackendIcicle:
-		return BackendIcicle, nil
+	case GnarkBackend:
+		return GnarkBackend, nil
+	case IcicleBackend:
+		return IcicleBackend, nil
 	default:
-		return "", fmt.Errorf("unsupported backend type: %s. Must be one of: default, icicle", backend)
+		return "", fmt.Errorf("unsupported backend type: %s. Must be one of: gnark, icicle", backend)
 	}
 }

@@ -9,17 +9,17 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	icicle_runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
+	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	runtime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 // IcicleDevice wraps the core device setup and configurations
 type IcicleDevice struct {
-	Device         icicle_runtime.Device
-	NttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+	Device         runtime.Device
+	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
-	FlatFFTPointsT []icicle_bn254.Affine
-	SRSG1Icicle    []icicle_bn254.Affine
+	FlatFFTPointsT []iciclebn254.Affine
+	SRSG1Icicle    []iciclebn254.Affine
 }
 
 // IcicleDeviceConfig holds configuration options for a single device.
@@ -39,28 +39,28 @@ type IcicleDeviceConfig struct {
 
 // NewIcicleDevice creates and initializes a new IcicleDevice
 func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
-	icicle_runtime.LoadBackendFromEnvOrDefault()
+	runtime.LoadBackendFromEnvOrDefault()
 
 	device := setupDevice(config.GPUEnable)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	var (
-		nttCfg         core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+		nttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 		msmCfg         core.MSMConfig
-		flatFftPointsT []icicle_bn254.Affine
-		srsG1Icicle    []icicle_bn254.Affine
+		flatFftPointsT []iciclebn254.Affine
+		srsG1Icicle    []iciclebn254.Affine
 		setupErr       error
-		icicleErr      icicle_runtime.EIcicleError
+		icicleErr      runtime.EIcicleError
 	)
 
 	// Setup NTT and optionally MSM on device
-	icicle_runtime.RunOnDevice(&device, func(args ...any) {
+	runtime.RunOnDevice(&device, func(args ...any) {
 		defer wg.Done()
 
 		// Setup NTT
 		nttCfg, icicleErr = SetupNTT(config.NTTSize)
-		if icicleErr != icicle_runtime.Success {
+		if icicleErr != runtime.Success {
 			setupErr = fmt.Errorf("could not setup NTT: %v", icicleErr.AsString())
 			return
 		}
@@ -71,7 +71,7 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 				config.FFTPointsT,
 				config.SRSG1,
 			)
-			if icicleErr != icicle_runtime.Success {
+			if icicleErr != runtime.Success {
 				setupErr = fmt.Errorf("could not setup MSM: %v", icicleErr.AsString())
 				return
 			}
@@ -94,7 +94,7 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 }
 
 // setupDevice initializes either a GPU or CPU device
-func setupDevice(gpuEnable bool) icicle_runtime.Device {
+func setupDevice(gpuEnable bool) runtime.Device {
 	if gpuEnable {
 		return setupGPUDevice()
 	}
@@ -103,12 +103,12 @@ func setupDevice(gpuEnable bool) icicle_runtime.Device {
 }
 
 // setupGPUDevice attempts to initialize a CUDA device, falling back to CPU if unavailable
-func setupGPUDevice() icicle_runtime.Device {
-	deviceCuda := icicle_runtime.CreateDevice("CUDA", 0)
-	if icicle_runtime.IsDeviceAvailable(&deviceCuda) {
-		device := icicle_runtime.CreateDevice("CUDA", 0)
+func setupGPUDevice() runtime.Device {
+	deviceCuda := runtime.CreateDevice("CUDA", 0)
+	if runtime.IsDeviceAvailable(&deviceCuda) {
+		device := runtime.CreateDevice("CUDA", 0)
 		slog.Info("CUDA device available, setting device")
-		icicle_runtime.SetDevice(&device)
+		runtime.SetDevice(&device)
 
 		return device
 	}
@@ -118,12 +118,12 @@ func setupGPUDevice() icicle_runtime.Device {
 }
 
 // setupCPUDevice initializes a CPU device
-func setupCPUDevice() icicle_runtime.Device {
-	device := icicle_runtime.CreateDevice("CPU", 0)
-	if icicle_runtime.IsDeviceAvailable(&device) {
+func setupCPUDevice() runtime.Device {
+	device := runtime.CreateDevice("CPU", 0)
+	if runtime.IsDeviceAvailable(&device) {
 		slog.Info("CPU device available, setting device")
 	}
-	icicle_runtime.SetDevice(&device)
+	runtime.SetDevice(&device)
 
 	return device
 }

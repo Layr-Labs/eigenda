@@ -178,11 +178,10 @@ func NewNode(
 	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
-	opts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(&config.EncoderConfig),
 		verifier.WithLoadG2Points(false),
-	}
-	v, err := verifier.NewVerifier(opts...)
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -21,9 +21,6 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-// ProverOption defines a function that configures a Prover
-type ProverOption func(*Prover) error
-
 type Prover struct {
 	Config    *encoding.Config
 	KzgConfig *kzg.KzgConfig
@@ -41,97 +38,13 @@ var _ encoding.Prover = &Prover{}
 
 // Default configuration values
 const (
-	defaultBackend        = encoding.BackendDefault
+	defaultBackend        = encoding.GnarkBackend
 	defaultGPUEnable      = false
 	defaultLoadG2Points   = true
 	defaultPreloadEncoder = false
 	defaultNTTSize        = 25 // Used for NTT setup in Icicle backend
 	defaultVerbose        = false
 )
-
-// WithBackend sets the backend type for the prover
-func WithBackend(backend encoding.BackendType) ProverOption {
-	return func(p *Prover) error {
-		p.Config.BackendType = backend
-		return nil
-	}
-}
-
-// WithGPU enables or disables GPU usage
-func WithGPU(enable bool) ProverOption {
-	return func(e *Prover) error {
-		e.Config.GPUEnable = enable
-		return nil
-	}
-}
-
-// WithKZGConfig sets the KZG configuration
-func WithKZGConfig(config *kzg.KzgConfig) ProverOption {
-	return func(p *Prover) error {
-		if config.SRSNumberToLoad > config.SRSOrder {
-			return errors.New("SRSOrder is less than srsNumberToLoad")
-		}
-		p.KzgConfig = config
-		return nil
-	}
-}
-
-// WithRSEncoder sets a custom RS encoder
-func WithRSEncoder(encoder *rs.Encoder) ProverOption {
-	return func(p *Prover) error {
-		p.Encoder = encoder
-		return nil
-	}
-}
-
-// WithRSEncoderOptions configures the RS encoder with specific options
-func WithRSEncoderOptions(opts ...rs.EncoderOption) ProverOption {
-	return func(p *Prover) error {
-		encoder, err := rs.NewEncoder(opts...)
-		if err != nil {
-			return fmt.Errorf("failed to create RS encoder: %w", err)
-		}
-		p.Encoder = encoder
-		return nil
-	}
-}
-
-// WithLoadG2Points enables or disables G2 points loading
-func WithLoadG2Points(load bool) ProverOption {
-	return func(p *Prover) error {
-		p.LoadG2Points = load
-		return nil
-	}
-}
-
-// WithPreloadEncoder enables or disables encoder preloading
-func WithPreloadEncoder(preload bool) ProverOption {
-	return func(p *Prover) error {
-		if !preload {
-			return nil
-		}
-
-		if p.KzgConfig == nil {
-			return errors.New("KZG config must be set before enabling preload encoder")
-		}
-
-		// Create table dir if not exist
-		err := os.MkdirAll(p.KzgConfig.CacheDir, os.ModePerm)
-		if err != nil {
-			return fmt.Errorf("cannot make CacheDir: %w", err)
-		}
-
-		return p.PreloadAllEncoders()
-	}
-}
-
-// WithVerbose enables or disables verbose logging
-func WithVerbose(verbose bool) ProverOption {
-	return func(p *Prover) error {
-		p.Config.Verbose = verbose
-		return nil
-	}
-}
 
 func NewProver(opts ...ProverOption) (*Prover, error) {
 	p := &Prover{
@@ -483,9 +396,9 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 	switch p.Config.BackendType {
 
-	case encoding.BackendDefault:
+	case encoding.GnarkBackend:
 		return p.createDefaultBackendProver(params, fs, ks)
-	case encoding.BackendIcicle:
+	case encoding.IcicleBackend:
 		return p.createIcicleBackendProver(params, fs, ks)
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", p.Config.BackendType)

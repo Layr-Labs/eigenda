@@ -13,9 +13,6 @@ import (
 	_ "go.uber.org/automaxprocs"
 )
 
-// EncoderOption defines the function signature for encoder options
-type EncoderOption func(*Encoder)
-
 type Encoder struct {
 	Config *encoding.Config
 
@@ -30,35 +27,10 @@ type EncoderDevice interface {
 
 // Default configuration values
 const (
-	defaultBackend   = encoding.BackendDefault
+	defaultBackend   = encoding.GnarkBackend
 	defaultGPUEnable = false
 	defaultVerbose   = false
 )
-
-// Option Definitions
-func WithBackend(backend encoding.BackendType) EncoderOption {
-	return func(e *Encoder) {
-		e.Config.BackendType = backend
-	}
-}
-
-func WithGPU(enable bool) EncoderOption {
-	return func(e *Encoder) {
-		e.Config.GPUEnable = enable
-	}
-}
-
-func WithNumWorkers(workers uint64) EncoderOption {
-	return func(e *Encoder) {
-		e.Config.NumWorker = workers
-	}
-}
-
-func WithVerbose(verbose bool) EncoderOption {
-	return func(e *Encoder) {
-		e.Config.Verbose = verbose
-	}
-}
 
 // NewEncoder creates a new encoder with the given options
 func NewEncoder(opts ...EncoderOption) (*Encoder, error) {
@@ -116,9 +88,9 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 	fs := e.CreateFFTSettings(params)
 
 	switch e.Config.BackendType {
-	case encoding.BackendDefault:
+	case encoding.GnarkBackend:
 		return e.createDefaultBackendEncoder(params, fs)
-	case encoding.BackendIcicle:
+	case encoding.IcicleBackend:
 		return e.createIcicleBackendEncoder(params, fs)
 	default:
 		return nil, fmt.Errorf("unsupported backend type: %v", e.Config.BackendType)

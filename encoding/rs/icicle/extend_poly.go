@@ -8,13 +8,13 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
-	icicle_bn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
+	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254/ntt"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 type RsIcicleComputeDevice struct {
-	NttCfg core.NTTConfig[[icicle_bn254.SCALAR_LIMBS]uint32]
+	NttCfg core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	Device runtime.Device
 }
 
@@ -28,8 +28,8 @@ func (g *RsIcicleComputeDevice) ExtendPolyEval(coeffs []fr.Element) ([]fr.Elemen
 	runtime.RunOnDevice(&g.Device, func(args ...any) {
 		defer wg.Done()
 		scalarsSF := icicle.ConvertFrToScalarFieldsBytes(coeffs)
-		scalars := core.HostSliceFromElements[icicle_bn254.ScalarField](scalarsSF)
-		outputDevice := make(core.HostSlice[icicle_bn254.ScalarField], len(coeffs))
+		scalars := core.HostSliceFromElements[iciclebn254.ScalarField](scalarsSF)
+		outputDevice := make(core.HostSlice[iciclebn254.ScalarField], len(coeffs))
 		ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
 		evals = icicle.ConvertScalarFieldsToFrBytes(outputDevice)
 	})

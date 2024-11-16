@@ -60,12 +60,10 @@ func makeTestProver() (encoding.Prover, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	opts := []prover.ProverOption{
+	return prover.NewProver(
 		prover.WithKZGConfig(config),
 		prover.WithLoadG2Points(true),
-	}
-
-	return prover.NewProver(opts...)
+	)
 }
 
 func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {

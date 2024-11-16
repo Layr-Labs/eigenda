@@ -73,20 +73,19 @@ func main() {
 
 	// create encoding object
 	rs_opts := []rs.EncoderOption{
-		rs.WithBackend(encoding.BackendIcicle),
+		rs.WithBackend(encoding.IcicleBackend),
 		rs.WithGPU(true),
 	}
 	rsEncoder, _ := rs.NewEncoder(rs_opts...)
 
-	prover_opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
 		prover.WithVerbose(true),
-		prover.WithBackend(encoding.BackendIcicle),
+		prover.WithBackend(encoding.IcicleBackend),
 		prover.WithGPU(true),
 		prover.WithRSEncoder(rsEncoder),
-	}
-	p, err := prover.NewProver(prover_opts...)
+	)
 
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)

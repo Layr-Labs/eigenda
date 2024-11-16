@@ -72,11 +72,10 @@ func TestKzgRs() {
 	}
 
 	// create encoding object
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
 	}

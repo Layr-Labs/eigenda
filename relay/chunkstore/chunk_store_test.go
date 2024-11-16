@@ -266,20 +266,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
-	encoder, _ := rs.NewEncoder(params, true)
-
-	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
-	if encoder.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
-	}
-
-	encoder.Computer = RsComputeDevice
+	encoder, _ := rs.NewEncoder()
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -292,7 +279,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, writer.ProofExists(ctx, key))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
 		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
 		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)

@@ -14,18 +14,16 @@ import (
 )
 
 func TestBatchEquivalence(t *testing.T) {
-	opts := []prover.ProverOption{
+	group, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	group, err := prover.NewProver(opts...)
+	)
 	require.NoError(t, err)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithLoadG2Points(true),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

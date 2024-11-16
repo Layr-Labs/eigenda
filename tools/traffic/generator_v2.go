@@ -178,12 +178,11 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(&config.RetrievalClientConfig.EncoderConfig),
 		verifier.WithVerbose(true),
 		verifier.WithLoadG2Points(true),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to build statusTracker: %s", err))
 	}

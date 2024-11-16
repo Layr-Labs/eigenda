@@ -53,20 +53,18 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	opts := []prover.ProverOption{
+	p, err := prover.NewProver(
 		prover.WithKZGConfig(config),
 		prover.WithLoadG2Points(true),
-	}
-	p, err := prover.NewProver(opts...)
+	)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(config),
 		verifier.WithLoadG2Points(true),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	)
 	if err != nil {
 		return nil, nil, err
 	}

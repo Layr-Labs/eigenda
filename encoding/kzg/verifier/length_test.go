@@ -12,19 +12,16 @@ import (
 )
 
 func TestLengthProof(t *testing.T) {
-
-	opts := []prover.ProverOption{
+	group, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	group, err := prover.NewProver(opts...)
+	)
 	require.Nil(t, err)
 
-	vopts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithLoadG2Points(true),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

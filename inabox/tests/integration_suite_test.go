@@ -172,12 +172,11 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		PreloadEncoder:  false,
 	}
 
-	opts := []verifier.VerifierOption{
+	v, err := verifier.NewVerifier(
 		verifier.WithKZGConfig(kzgConfig),
 		verifier.WithVerbose(true),
 		verifier.WithLoadG2Points(false),
-	}
-	v, err := verifier.NewVerifier(opts...)
+	)
 	if err != nil {
 		return err
 	}

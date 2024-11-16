@@ -6,7 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
-	rs_icicle "github.com/Layr-Labs/eigenda/encoding/rs/icicle"
+	rsicicle "github.com/Layr-Labs/eigenda/encoding/rs/icicle"
 )
 
 const (
@@ -27,7 +27,7 @@ func CreateIcicleBackendEncoder(e *Encoder, params encoding.EncodingParams, fs *
 		Config:         e.Config,
 		EncodingParams: params,
 		Fs:             fs,
-		RSEncoderComputer: &rs_icicle.RsIcicleComputeDevice{
+		RSEncoderComputer: &rsicicle.RsIcicleComputeDevice{
 			NttCfg: icicleDevice.NttCfg,
 			Device: icicleDevice.Device,
 		},

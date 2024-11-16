@@ -74,7 +74,10 @@ func setup(t *testing.T) {
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 		}
 		var err error
-		prover, err = p.NewProver(config, true)
+		prover, err = p.NewProver(
+			p.WithKZGConfig(config),
+			p.WithLoadG2Points(true),
+		)
 		require.NoError(t, err)
 	}
 }

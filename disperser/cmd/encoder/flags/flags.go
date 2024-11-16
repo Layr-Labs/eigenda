@@ -78,7 +78,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "backend"),
 		Usage:    "Backend to use for encoding",
 		Required: false,
-		Value:    string(encoding.BackendDefault),
+		Value:    string(encoding.GnarkBackend),
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BACKEND"),
 	}
 	PreventReencodingFlag = cli.BoolTFlag{
