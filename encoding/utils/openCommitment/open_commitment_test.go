@@ -57,11 +57,10 @@ func TestOpenCommitment(t *testing.T) {
 	}
 
 	// we need prover only to access kzg SRS, and get kzg commitment of encoding
-	opts := []prover.ProverOption{
+	group, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),
 		prover.WithLoadG2Points(true),
-	}
-	group, err := prover.NewProver(opts...)
+	)
 	require.NoError(t, err)
 
 	// get root of unit for blob
