@@ -162,7 +162,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		prover, err := prover.NewProver(&config.EncodingConfig, true)
+		prover, err := prover.NewProver(
+			prover.WithKZGConfig(&config.EncodingConfig),
+			prover.WithLoadG2Points(true),
+		)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
