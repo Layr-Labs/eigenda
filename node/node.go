@@ -18,9 +18,15 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/prometheus/client_golang/prometheus"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -33,8 +39,9 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gammazero/workerpool"
+
+	blssignerV1 "github.com/Layr-Labs/cerberus-api/pkg/api/v1"
 )
 
 const (
@@ -65,6 +72,7 @@ type Node struct {
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
+	BLSSigner               blssignerV1.SignerClient
 
 	RelayClient clients.RelayClient
 
@@ -85,19 +93,13 @@ func NewNode(
 	// 	return nil, err
 	// }
 
+	nodeLogger := logger.With("component", "Node")
+
 	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
 	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
 
-	// Generate BLS keys
-	keyPair, err := core.MakeKeyPairFromString(config.PrivateBls)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ID = keyPair.GetPubKeyG1().GetOperatorID()
-
 	// Make sure config folder exists.
-	err = os.MkdirAll(config.DbPath, os.ModePerm)
+	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
 	}
@@ -120,6 +122,47 @@ func NewNode(
 
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
+
+	var keyPair *core.KeyPair
+	var blsClient blssignerV1.SignerClient
+	if config.PrivateBls != "" {
+		nodeLogger.Info("using local keystore private key for BLS signing")
+		// Generate BLS keys
+		keyPair, err = core.MakeKeyPairFromString(config.PrivateBls)
+		if err != nil {
+			return nil, err
+		}
+
+		config.ID = keyPair.GetPubKeyG1().GetOperatorID()
+	} else {
+		pkBytes, err := hex.DecodeString(config.BLSPublicKeyHex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode BLS public key: %w", err)
+		}
+		pubkey := new(core.G1Point)
+		publicKey, err := pubkey.Deserialize(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		config.ID = publicKey.GetOperatorID()
+
+		nodeLogger.Info("creating signer client", "url", config.BLSRemoteSignerUrl)
+		creds := insecure.NewCredentials()
+		if config.BLSSignerTLSCertFilePath != "" {
+			creds, err = credentials.NewClientTLSFromFile(config.BLSSignerTLSCertFilePath, "")
+			if err != nil {
+				return nil, err
+			}
+		}
+		conn, err := grpc.NewClient(
+			config.BLSRemoteSignerUrl, grpc.WithTransportCredentials(creds),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new BLS remote signer client: %w", err)
+		}
+		blsClient = blssignerV1.NewSignerClient(conn)
+	}
 
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
@@ -166,7 +209,7 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
-	nodeLogger := logger.With("component", "Node")
+
 	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
 		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
@@ -190,10 +233,11 @@ func NewNode(
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		RelayClient:             relayClient,
+		BLSSigner:               blsClient,
 	}, nil
 }
 
-// Starts the Node. If the node is not registered, register it on chain, otherwise just
+// Start starts the Node. If the node is not registered, register it on chain, otherwise just
 // update its socket on chain.
 func (n *Node) Start(ctx context.Context) error {
 	if n.Config.EnableMetrics {
@@ -397,12 +441,41 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
-	sig := n.KeyPair.SignMessage(batchHeaderHash)
+	signature, err := n.SignMessage(ctx, batchHeaderHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign batch: %w", err)
+	}
+
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.Config.BLSPublicKeyHex, "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
-	return sig, nil
+	return signature, nil
+}
+
+func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	if n.Config.BLSRemoteSignerEnabled {
+		sigResp, err := n.BLSSigner.SignGeneric(
+			ctx,
+			&blssignerV1.SignGenericRequest{
+				PublicKey: n.Config.BLSPublicKeyHex,
+				Password:  n.Config.BLSKeyPassword,
+				Data:      data[:],
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign data: %w", err)
+		}
+		sig := new(core.Signature)
+		g, err := sig.Deserialize(sigResp.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+		}
+		return &core.Signature{
+			G1Point: g,
+		}, nil
+	}
+	return n.KeyPair.SignMessage(data), nil
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {

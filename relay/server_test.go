@@ -2,6 +2,9 @@ package relay
 
 import (
 	"context"
+	"math/rand"
+	"testing"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
@@ -11,15 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"math/rand"
-	"testing"
 )
 
 func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	conn, err := grpc.Dial("0.0.0.0:50051", opts...)
+	conn, err := grpc.NewClient("0.0.0.0:50051", opts...)
 	require.NoError(t, err)
 	defer func() {
 		err = conn.Close()
@@ -35,7 +36,7 @@ func getChunks(t *testing.T, request *pb.GetChunksRequest) (*pb.GetChunksReply, 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
-	conn, err := grpc.Dial("0.0.0.0:50051", opts...)
+	conn, err := grpc.NewClient("0.0.0.0:50051", opts...)
 	require.NoError(t, err)
 	defer func() {
 		err = conn.Close()
