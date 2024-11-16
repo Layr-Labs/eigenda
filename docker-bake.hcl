@@ -138,6 +138,15 @@ target "encoder-internal" {
   ]
 }
 
+target "encoder-icicle-internal" {
+  inherits = ["encoder-icicle"]
+  tags     = [
+    "${REGISTRY}/eigenda-encoder-icicle:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-encoder-icicle:${GIT_SHA}",
+    "${REGISTRY}/eigenda-encoder-icicle:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
 target "retriever" {
   context    = "."
   dockerfile = "./Dockerfile"
