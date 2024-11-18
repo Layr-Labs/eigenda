@@ -100,7 +100,7 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 			l.config.GetChunkOpsBurstinessClient)
 
 		l.perClientBandwidthLimiter[requesterID] = rate.NewLimiter(
-			rate.Limit(l.config.MaxGetChunkBytesPerSecond),
+			rate.Limit(l.config.MaxGetChunkBytesPerSecondClient),
 			l.config.GetChunkBytesBurstinessClient)
 	}
 
