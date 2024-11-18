@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// TODO test
-
 // BlobRateLimiter enforces rate limits on GetBlob operations.
 type BlobRateLimiter struct {
 
