@@ -25,7 +25,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	data := req.GetData()
-	blobHeader, err := corev2.NewBlobHeader(req.GetBlobHeader())
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
 	}
@@ -105,7 +105,7 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), validVersions))
 	}
 
-	blobHeader, err := corev2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
 	}

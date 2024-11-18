@@ -152,6 +152,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 	encodingStart := time.Now()
 	frames, err := s.prover.GetFrames(data, encodingParams)
 	if err != nil {
+		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
 	}
 	s.logger.Info("encoding frames", "duration", time.Since(encodingStart))
@@ -202,6 +203,11 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 	params = encoding.EncodingParams{
 		ChunkLength: req.EncodingParams.ChunkLength,
 		NumChunks:   req.EncodingParams.NumChunks,
+	}
+
+	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
+	if err != nil {
+		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid encoding parameters: %v", err)
 	}
 
 	return blobKey, params, nil

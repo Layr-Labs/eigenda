@@ -158,7 +158,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Equal(t, bh, vi0.BatchHeader)
 	certHash, err := cert.Hash()
 	require.NoError(t, err)
-	proof, err := core.DeserializeMerkleProof(vi0.InclusionProof)
+	proof, err := core.DeserializeMerkleProof(vi0.InclusionProof, uint64(vi0.BlobIndex))
 	require.NoError(t, err)
 	verified, err := merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{vi0.BatchRoot[:]}, keccak256.New())
 	require.NoError(t, err)
