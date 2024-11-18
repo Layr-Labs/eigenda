@@ -27,7 +27,8 @@ type IcicleDevice struct {
 //   - The NTTSize parameter is used to set the maximum domain size for NTT configuration.
 //   - The FFTPointsT and SRSG1 parameters are used to set up the MSM configuration.
 //   - MSM setup is optional and can be skipped by not providing these parameters.
-//     The reason for this is that not all applications require an MSM setup.
+//     The reason for this is that not all applications require an MSM setup. For example
+//     in the case of reed-solomon, it only requires the NTT setup.
 type IcicleDeviceConfig struct {
 	GPUEnable bool
 	NTTSize   uint8
