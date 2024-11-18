@@ -34,7 +34,7 @@ message GetChunksRequest {
 
   // If this is an authenticated request, this should hold the ID of the requester. If this
   // is an unauthenticated request, this field should be empty.
-  uint64 requester_id = 2;
+  bytes requester_id = 2;
 
   // If this is an authenticated request, this field will hold a signature by the requester
   // on the chunks being requested.
