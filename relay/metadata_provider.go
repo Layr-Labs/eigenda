@@ -38,9 +38,6 @@ type metadataProvider struct {
 	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
 	// that are not assigned to one of these IDs.
 	relayIDSet map[v2.RelayKey]struct{}
-
-	// concurrencyLimiter is a channel that limits the number of concurrent operations.
-	concurrencyLimiter chan struct{}
 }
 
 // newMetadataProvider creates a new metadataProvider.
@@ -58,14 +55,16 @@ func newMetadataProvider(
 	}
 
 	server := &metadataProvider{
-		ctx:                ctx,
-		logger:             logger,
-		metadataStore:      metadataStore,
-		relayIDSet:         relayIDSet,
-		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
+		ctx:           ctx,
+		logger:        logger,
+		metadataStore: metadataStore,
+		relayIDSet:    relayIDSet,
 	}
 
-	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](metadataCacheSize, server.fetchMetadata)
+	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](
+		metadataCacheSize,
+		maxIOConcurrency,
+		server.fetchMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata cache: %w", err)
 	}
@@ -101,12 +100,7 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 		}
 
 		boundKey := key
-		m.concurrencyLimiter <- struct{}{}
 		go func() {
-			defer func() {
-				<-m.concurrencyLimiter
-			}()
-
 			metadata, err := m.metadataCache.Get(boundKey)
 			if err != nil {
 				// Intentionally log at debug level. External users can force this condition to trigger

@@ -42,7 +42,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	ethClientConfig := geth.ReadEthClientConfig(ctx)
+	ethClientConfig := geth.ReadEthClientConfigRPCOnly(ctx)
 	numRelayAssignments := ctx.GlobalInt(flags.NumRelayAssignmentFlag.Name)
 	if numRelayAssignments < 1 || numRelayAssignments > int(MaxUint16) {
 		return Config{}, fmt.Errorf("invalid number of relay assignments: %d", numRelayAssignments)
@@ -53,7 +53,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	relays := make([]corev2.RelayKey, len(availableRelays))
 	for i, relay := range availableRelays {
-		if relay < 1 || relay > 65_535 {
+		if relay < 0 || relay > 65_535 {
 			return Config{}, fmt.Errorf("invalid relay: %d", relay)
 		}
 		relays[i] = corev2.RelayKey(relay)
@@ -70,6 +70,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NumEncodingRetries:     ctx.GlobalInt(flags.NumEncodingRetriesFlag.Name),
 			NumRelayAssignment:     uint16(numRelayAssignments),
 			AvailableRelays:        relays,
+			EncoderAddress:         ctx.GlobalString(flags.EncoderAddressFlag.Name),
 		},
 		DispatcherConfig: controller.DispatcherConfig{
 			PullInterval:           ctx.GlobalDuration(flags.DispatcherPullIntervalFlag.Name),

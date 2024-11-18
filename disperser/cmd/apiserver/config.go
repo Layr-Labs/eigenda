@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
 
@@ -31,6 +32,7 @@ type Config struct {
 	MetricsConfig               disperser.MetricsConfig
 	RatelimiterConfig           ratelimit.Config
 	RateConfig                  apiserver.RateConfig
+	EncodingConfig              kzg.KzgConfig
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
 	UpdateInterval              int
@@ -88,6 +90,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		RatelimiterConfig:           ratelimiterConfig,
 		RateConfig:                  rateConfig,
+		EncodingConfig:              kzg.ReadCLIConfig(ctx),
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),

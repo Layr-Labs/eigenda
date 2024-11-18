@@ -61,6 +61,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AVAILABLE_RELAYS"),
 	}
+	EncoderAddressFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "encoder-address"),
+		Usage:    "the http ip:port which the distributed encoder server is listening",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODER_ADDRESS"),
+	}
 	EncodingRequestTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-request-timeout"),
 		Usage:    "Timeout for encoding requests",
@@ -153,6 +159,7 @@ var requiredFlags = []cli.Flag{
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
+	EncoderAddressFlag,
 	DispatcherPullIntervalFlag,
 	NodeRequestTimeoutFlag,
 	NumConnectionsToNodesFlag,

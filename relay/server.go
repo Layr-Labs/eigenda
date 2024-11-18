@@ -2,8 +2,10 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -11,6 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+	"net"
 	"time"
 )
 
@@ -22,6 +27,14 @@ type Server struct {
 
 	// config is the configuration for the relay Server.
 	config *Config
+	// the logger for the server
+	logger logging.Logger
+
+	// grpcPort is the port that the relay server listens on.
+	grpcPort int
+
+	// maxProtoSize is the maximum size of a gRPC message that the server will accept.
+	maxProtoSize int
 
 	// metadataProvider encapsulates logic for fetching metadata for blobs.
 	metadataProvider *metadataProvider
@@ -37,6 +50,9 @@ type Server struct {
 
 	// chunkRateLimiter enforces rate limits on GetChunk operations.
 	chunkRateLimiter *limiter.ChunkRateLimiter
+
+	// grpcServer is the gRPC server.
+	grpcServer *grpc.Server
 }
 
 // NewServer creates a new relay Server.
@@ -48,7 +64,7 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader) (*Server, error) {
 
-	ms, err := newMetadataProvider(
+	mp, err := newMetadataProvider(
 		ctx,
 		logger,
 		metadataStore,
@@ -56,34 +72,36 @@ func NewServer(
 		config.MetadataMaxConcurrency,
 		config.RelayIDs)
 	if err != nil {
-		return nil, fmt.Errorf("error creating metadata server: %w", err)
+		return nil, fmt.Errorf("error creating metadata provider: %w", err)
 	}
 
-	bs, err := newBlobProvider(
+	bp, err := newBlobProvider(
 		ctx,
 		logger,
 		blobStore,
 		config.BlobCacheSize,
 		config.BlobMaxConcurrency)
 	if err != nil {
-		return nil, fmt.Errorf("error creating blob server: %w", err)
+		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
 
-	cs, err := newChunkProvider(
+	cp, err := newChunkProvider(
 		ctx,
 		logger,
 		chunkReader,
 		config.ChunkCacheSize,
 		config.ChunkMaxConcurrency)
 	if err != nil {
-		return nil, fmt.Errorf("error creating chunk server: %w", err)
+		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
 
 	return &Server{
-		config:           config,
-		metadataProvider: ms,
-		blobProvider:     bs,
-		chunkProvider:    cs,
+		logger:           logger,
+		grpcPort:         config.GRPCPort,
+		maxProtoSize:     config.MaxGRPCMessageSize,
+		metadataProvider: mp,
+		blobProvider:     bp,
+		chunkProvider:    cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits),
 	}, nil
@@ -270,4 +288,40 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 	}
 
 	return requiredBandwidth
+
+}
+
+// Start starts the server listening for requests. This method will block until the server is stopped.
+func (s *Server) Start() error {
+	// Serve grpc requests
+	addr := fmt.Sprintf("0.0.0.0:%d", s.grpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
+	}
+
+	opt := grpc.MaxRecvMsgSize(s.maxProtoSize)
+
+	s.grpcServer = grpc.NewServer(opt)
+	reflection.Register(s.grpcServer)
+	pb.RegisterRelayServer(s.grpcServer, s)
+
+	// Register Server for Health Checks
+	name := pb.Relay_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, s.grpcServer)
+
+	s.logger.Info("GRPC Listening", "port", s.grpcPort, "address", listener.Addr().String())
+
+	if err = s.grpcServer.Serve(listener); err != nil {
+		return errors.New("could not start GRPC server")
+	}
+
+	return nil
+}
+
+// Stop stops the server.
+func (s *Server) Stop() {
+	if s.grpcServer != nil {
+		s.grpcServer.Stop()
+	}
 }

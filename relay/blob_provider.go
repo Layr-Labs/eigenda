@@ -20,9 +20,6 @@ type blobProvider struct {
 
 	// blobCache is an LRU cache of blobs.
 	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
-
-	// concurrencyLimiter is a channel that limits the number of concurrent operations.
-	concurrencyLimiter chan struct{}
 }
 
 // newBlobProvider creates a new blobProvider.
@@ -34,13 +31,12 @@ func newBlobProvider(
 	maxIOConcurrency int) (*blobProvider, error) {
 
 	server := &blobProvider{
-		ctx:                ctx,
-		logger:             logger,
-		blobStore:          blobStore,
-		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
+		ctx:       ctx,
+		logger:    logger,
+		blobStore: blobStore,
 	}
 
-	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, server.fetchBlob)
+	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, maxIOConcurrency, server.fetchBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}
@@ -52,9 +48,7 @@ func newBlobProvider(
 // GetBlob retrieves a blob from the blob store.
 func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 
-	s.concurrencyLimiter <- struct{}{}
 	data, err := s.blobCache.Get(blobKey)
-	<-s.concurrencyLimiter
 
 	if err != nil {
 		// It should not be possible for external users to force an error here since we won't

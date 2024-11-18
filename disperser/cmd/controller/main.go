@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
+	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
@@ -75,12 +76,16 @@ func RunController(ctx *cli.Context) error {
 		config.DynamoDBTableName,
 	)
 
+	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
+	if err != nil {
+		return fmt.Errorf("failed to create encoder client: %v", err)
+	}
 	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
 	encodingManager, err := controller.NewEncodingManager(
 		config.EncodingManagerConfig,
 		blobMetadataStore,
 		encodingPool,
-		nil, // TODO(ian-shim): configure encodingClient
+		encoderClient,
 		chainReader,
 		logger,
 	)

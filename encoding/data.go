@@ -54,6 +54,30 @@ func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
 	}, nil
 }
 
+func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {
+	commitment, err := new(G1Commitment).Deserialize(c.Commitment)
+	if err != nil {
+		return nil, err
+	}
+
+	lengthCommitment, err := new(G2Commitment).Deserialize(c.LengthCommitment)
+	if err != nil {
+		return nil, err
+	}
+
+	lengthProof, err := new(G2Commitment).Deserialize(c.LengthProof)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BlobCommitments{
+		Commitment:       commitment,
+		LengthCommitment: lengthCommitment,
+		LengthProof:      lengthProof,
+		Length:           uint(c.Length),
+	}, nil
+}
+
 // Frame is a chunk of data with the associated multi-reveal proof
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk

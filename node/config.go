@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 	"fmt"
+
 	"os"
 	"strconv"
 	"strings"
@@ -13,9 +14,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
+
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/urfave/cli"
 )
 
@@ -74,6 +78,12 @@ type Config struct {
 	UseSecureGrpc                  bool
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
+
+	BLSRemoteSignerEnabled   bool
+	BLSRemoteSignerUrl       string
+	BLSPublicKeyHex          string
+	BLSKeyPassword           string
+	BLSSignerTLSCertFilePath string
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -143,14 +153,26 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ethClientConfig = geth.ReadEthClientConfig(ctx)
 	}
 
+	// check if BLS remote signer configuration is provided
+	blsRemoteSignerEnabled := ctx.GlobalBool(flags.BLSRemoteSignerEnabledFlag.Name)
+	if blsRemoteSignerEnabled && (ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name) == "" || ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name) == "") {
+		return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
+	}
+	if !blsRemoteSignerEnabled && (ctx.GlobalString(flags.BlsKeyFileFlag.Name) == "" || ctx.GlobalString(flags.BlsKeyPasswordFlag.Name) == "") {
+		return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+	}
+
 	// Decrypt BLS key
 	var privateBls string
 	if !testMode {
-		kp, err := bls.ReadPrivateKeyFromFile(ctx.GlobalString(flags.BlsKeyFileFlag.Name), ctx.GlobalString(flags.BlsKeyPasswordFlag.Name))
-		if err != nil {
-			return nil, fmt.Errorf("could not read or decrypt the BLS private key: %v", err)
+		// If remote signer fields are empty then try to read the BLS key from the file
+		if !blsRemoteSignerEnabled {
+			kp, err := bls.ReadPrivateKeyFromFile(ctx.GlobalString(flags.BlsKeyFileFlag.Name), ctx.GlobalString(flags.BlsKeyPasswordFlag.Name))
+			if err != nil {
+				return nil, fmt.Errorf("could not read or decrypt the BLS private key: %v", err)
+			}
+			privateBls = kp.PrivKey.String()
 		}
-		privateBls = kp.PrivKey.String()
 	} else {
 		privateBls = ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
 	}
@@ -205,5 +227,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ClientIPHeader:                 ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                  ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		DisableNodeInfoResources:       ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
+		BLSRemoteSignerUrl:             ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:                ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name),
+		BLSKeyPassword:                 ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
+		BLSSignerTLSCertFilePath:       ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
+		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
 	}, nil
 }

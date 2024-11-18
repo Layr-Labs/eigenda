@@ -32,7 +32,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, accessor)
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
 	require.NoError(t, err)
 
 	for i := 0; i < dataSize; i++ {
@@ -79,7 +79,7 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	ca, err := NewCachedAccessor(cacheSize, accessor)
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
 	require.NoError(t, err)
 
 	// Get the first cacheSize keys. This should fill the cache.
@@ -142,7 +142,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, accessor)
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -211,7 +211,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	ca, err := NewCachedAccessor(cacheSize, accessor)
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -253,4 +253,60 @@ func TestParallelAccessWithError(t *testing.T) {
 
 	// The internal lookupsInProgress map should no longer contain the key.
 	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+}
+
+func TestConcurrencyLimiter(t *testing.T) {
+	tu.InitializeRandom()
+
+	dataSize := 1024
+
+	baseData := make(map[int]string)
+	for i := 0; i < dataSize; i++ {
+		baseData[i] = tu.RandomString(10)
+	}
+
+	maxConcurrency := 10 + rand.Intn(10)
+
+	accessorLock := sync.RWMutex{}
+	accessorLock.Lock()
+	activeAccessors := atomic.Int64{}
+	accessor := func(key int) (*string, error) {
+		activeAccessors.Add(1)
+		accessorLock.Lock()
+		defer func() {
+			activeAccessors.Add(-1)
+		}()
+		accessorLock.Unlock()
+
+		value := baseData[key]
+		return &value, nil
+	}
+
+	cacheSize := 100
+	ca, err := NewCachedAccessor(cacheSize, maxConcurrency, accessor)
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(dataSize)
+	for i := 0; i < dataSize; i++ {
+		boundI := i
+		go func() {
+			value, err := ca.Get(boundI)
+			require.NoError(t, err)
+			require.Equal(t, baseData[boundI], *value)
+			wg.Done()
+		}()
+	}
+
+	// Wait for the goroutines to start. We want to give the goroutines a chance to do naughty things if they want.
+	// Eliminating this sleep will not cause the test to fail, but it may cause the test not to exercise the
+	// desired race condition.
+	time.Sleep(100 * time.Millisecond)
+
+	// The number of active accessors should be less than or equal to the maximum concurrency.
+	require.True(t, activeAccessors.Load() <= int64(maxConcurrency))
+
+	// Unlock the accessor. This will allow the goroutines to proceed.
+	accessorLock.Unlock()
+	wg.Wait()
 }

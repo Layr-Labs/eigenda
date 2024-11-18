@@ -22,7 +22,7 @@ import (
 var errNoBlobsToEncode = errors.New("no blobs to encode")
 
 type EncodingManagerConfig struct {
-	PullInterval           time.Duration
+	PullInterval time.Duration
 
 	EncodingRequestTimeout time.Duration
 	StoreTimeout           time.Duration
@@ -32,6 +32,8 @@ type EncodingManagerConfig struct {
 	NumRelayAssignment uint16
 	// AvailableRelays is a list of available relays
 	AvailableRelays []corev2.RelayKey
+	// EncoderAddress is the address of the encoder
+	EncoderAddress string
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob

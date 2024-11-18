@@ -80,7 +80,7 @@ func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPa
 		credential = credentials.NewTLS(config)
 	}
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		c.churnerURL,
 		grpc.WithTransportCredentials(credential),
 	)
