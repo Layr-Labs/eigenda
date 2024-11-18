@@ -69,13 +69,11 @@ func TestKzgRs() {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	// create encoding object
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	p, err := prover.NewProver(kzgConfig, nil)
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)
 	}

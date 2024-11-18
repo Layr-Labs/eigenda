@@ -81,15 +81,12 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
 	}
 
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(config),
-		prover.WithLoadG2Points(true),
-	)
+	p, err := prover.NewProver(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -12,13 +12,10 @@ import (
 )
 
 func TestUniversalVerify(t *testing.T) {
-	group, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	group, err := prover.NewProver(kzgConfig, nil)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, true)
+	v, err := verifier.NewVerifier(kzgConfig, nil)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
@@ -60,13 +57,10 @@ func TestUniversalVerify(t *testing.T) {
 
 func TestUniversalVerifyWithPowerOf2G2(t *testing.T) {
 	kzgConfigCopy := *kzgConfig
-	group, err := prover.NewProver(
-		prover.WithKZGConfig(&kzgConfigCopy),
-		prover.WithLoadG2Points(true),
-	)
+	group, err := prover.NewProver(&kzgConfigCopy, nil)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, true)
+	v, err := verifier.NewVerifier(kzgConfig, nil)
 	assert.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

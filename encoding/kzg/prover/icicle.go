@@ -12,15 +12,18 @@ import (
 	icicleprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/icicle"
 )
 
+const (
+	MAX_NTT_SIZE = 25
+)
+
 func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
 	_, fftPointsT, err := p.SetupFFTPoints(params)
 	if err != nil {
 		return nil, err
 	}
-
 	icicleDevice, err := icicle.NewIcicleDevice(icicle.IcicleDeviceConfig{
 		GPUEnable:  p.Config.GPUEnable,
-		NTTSize:    defaultNTTSize,
+		NTTSize:    MAX_NTT_SIZE,
 		FFTPointsT: fftPointsT,
 		SRSG1:      p.Srs.G1[:p.KzgConfig.SRSNumberToLoad],
 	})
@@ -46,7 +49,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 	}
 
 	// Set up default commitments backend
-	commitmentsBackend := &KzgCommitmentsDefaultBackend{
+	commitmentsBackend := &KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
 		KzgConfig:  p.KzgConfig,
@@ -54,11 +57,10 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 
 	return &ParametrizedProver{
 		EncodingParams:        params,
-		Encoder:               p.Encoder,
+		Encoder:               p.encoder,
 		KzgConfig:             p.KzgConfig,
 		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
 		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil
-
 }

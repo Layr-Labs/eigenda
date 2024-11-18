@@ -105,17 +105,15 @@ func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(config),
-		prover.WithLoadG2Points(true),
-	)
+	p, err := prover.NewProver(config, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	v, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -76,25 +75,18 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return err
 	}
 
-	if config.EncoderVersion == V2 {
-		// Create the encoder
-		cfg := &encoding.Config{
-			BackendType: backendType,
-			GPUEnable:   config.ServerConfig.GPUEnable,
-		}
-		rsEncoder, err := rs.NewEncoder(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create encoder: %w", err)
-		}
+	// Set the encoding config
+	encodingConfig := &encoding.Config{
+		BackendType: backendType,
+		GPUEnable:   config.ServerConfig.GPUEnable,
+		NumWorker:   config.EncoderConfig.NumWorker,
+	}
 
-		// We no longer compute the commitments in the encoder, so we don't need to load the G2 points
-		prover, err := prover.NewProver(
-			prover.WithKZGConfig(&config.EncoderConfig),
-			prover.WithLoadG2Points(false),
-			prover.WithBackend(backendType),
-			prover.WithGPU(config.ServerConfig.GPUEnable),
-			prover.WithRSEncoder(rsEncoder),
-		)
+	if config.EncoderVersion == V2 {
+		// We no longer load the G2 points in V2 because the KZG commitments are computed
+		// on the API server side.
+		config.EncoderConfig.LoadG2Points = false
+		prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
@@ -128,12 +120,8 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return server.Start()
 	}
 
-	prover, err := prover.NewProver(
-		prover.WithKZGConfig(&config.EncoderConfig),
-		prover.WithLoadG2Points(true),
-		prover.WithBackend(backendType),
-		prover.WithGPU(config.ServerConfig.GPUEnable),
-	)
+	config.EncoderConfig.LoadG2Points = true
+	prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}

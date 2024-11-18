@@ -25,23 +25,16 @@ type Verifier struct {
 	kzgConfig *kzg.KzgConfig
 	encoder   *rs.Encoder
 
-	Srs          *kzg.SRS
-	G2Trailing   []bn254.G2Affine
-	mu           sync.Mutex
-	LoadG2Points bool
+	Srs        *kzg.SRS
+	G2Trailing []bn254.G2Affine
+	mu         sync.Mutex
 
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
 var _ encoding.Verifier = &Verifier{}
 
-// Default configuration values
-const (
-	defaultLoadG2Points = true
-	defaultVerbose      = false
-)
-
-func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
+func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
@@ -56,7 +49,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	g2Trailing := make([]bn254.G2Affine, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if loadG2Points {
+	if config.LoadG2Points {
 		if len(config.G2Path) == 0 {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
@@ -101,12 +94,17 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
+	encoder, err := rs.NewEncoder(encoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder: %v", err)
+	}
+
 	encoderGroup := &Verifier{
 		kzgConfig:             config,
+		encoder:               encoder,
 		Srs:                   srs,
 		G2Trailing:            g2Trailing,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
-		LoadG2Points:          loadG2Points,
 	}
 
 	return encoderGroup, nil

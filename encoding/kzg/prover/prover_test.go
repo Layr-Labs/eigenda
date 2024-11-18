@@ -44,6 +44,7 @@ func setup() {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 2900,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	numNode = uint64(4)
@@ -73,13 +74,10 @@ func sampleFrames(frames []encoding.Frame, num uint64) ([]encoding.Frame, []uint
 }
 
 func TestEncoder(t *testing.T) {
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	p, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
-	v, err := verifier.NewVerifier(kzgConfig, true)
+	v, err := verifier.NewVerifier(kzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromMins(5, 5)
@@ -124,10 +122,7 @@ func TestEncoder(t *testing.T) {
 // pkg: github.com/Layr-Labs/eigenda/core/encoding
 // BenchmarkEncode-12    	       1	2421900583 ns/op
 func BenchmarkEncode(b *testing.B) {
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	p, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(b, err)
 
 	params := encoding.EncodingParams{

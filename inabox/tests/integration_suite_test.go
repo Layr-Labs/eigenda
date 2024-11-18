@@ -170,9 +170,10 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		SRSNumberToLoad: uint64(srsOrder),
 		NumWorker:       1,
 		PreloadEncoder:  false,
+		LoadG2Points:    true,
 	}
 
-	v, err := verifier.NewVerifier(kzgConfig, true)
+	v, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return err
 	}

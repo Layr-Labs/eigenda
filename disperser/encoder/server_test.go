@@ -42,12 +42,10 @@ func makeTestProver(numPoint uint64) (encoding.Prover, ServerConfig) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	p, _ := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	p, _ := prover.NewProver(kzgConfig, nil)
 	encoderServerConfig := ServerConfig{
 		GrpcPort:              "3000",
 		MaxConcurrentRequests: 16,

@@ -72,12 +72,10 @@ func setup(t *testing.T) {
 			SRSOrder:        8192,
 			SRSNumberToLoad: 8192,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+			LoadG2Points:    true,
 		}
 		var err error
-		prover, err = p.NewProver(
-			p.WithKZGConfig(config),
-			p.WithLoadG2Points(true),
-		)
+		prover, err = p.NewProver(config, nil)
 		require.NoError(t, err)
 	}
 }

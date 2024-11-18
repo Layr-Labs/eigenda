@@ -16,10 +16,7 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-	group, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	group, err := prover.NewProver(kzgConfig, nil)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

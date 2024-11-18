@@ -38,6 +38,7 @@ func TestOpenCommitment(t *testing.T) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	// input evaluation
@@ -57,10 +58,7 @@ func TestOpenCommitment(t *testing.T) {
 	}
 
 	// we need prover only to access kzg SRS, and get kzg commitment of encoding
-	group, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	group, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
 	// get root of unit for blob

@@ -26,6 +26,10 @@ type EncoderDevice interface {
 
 // NewEncoder creates a new encoder with the given options
 func NewEncoder(config *encoding.Config) (*Encoder, error) {
+	if config == nil {
+		config = encoding.DefaultConfig()
+	}
+
 	e := &Encoder{
 		Config:              config,
 		mu:                  sync.Mutex{},
@@ -71,7 +75,7 @@ func (e *Encoder) newEncoder(params encoding.EncodingParams) (*ParametrizedEncod
 
 	switch e.Config.BackendType {
 	case encoding.GnarkBackend:
-		return e.createDefaultBackendEncoder(params, fs)
+		return e.createGnarkBackendEncoder(params, fs)
 	case encoding.IcicleBackend:
 		return e.createIcicleBackendEncoder(params, fs)
 	default:
@@ -84,7 +88,7 @@ func (e *Encoder) CreateFFTSettings(params encoding.EncodingParams) *fft.FFTSett
 	return fft.NewFFTSettings(n)
 }
 
-func (e *Encoder) createDefaultBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
+func (e *Encoder) createGnarkBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
 	if e.Config.GPUEnable {
 		return nil, fmt.Errorf("GPU is not supported in default backend")
 	}

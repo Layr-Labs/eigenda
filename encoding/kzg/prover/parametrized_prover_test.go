@@ -14,10 +14,7 @@ import (
 )
 
 func TestProveAllCosetThreads(t *testing.T) {
-	group, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-	)
+	group, err := prover.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

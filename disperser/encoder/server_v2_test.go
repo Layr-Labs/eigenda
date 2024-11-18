@@ -49,12 +49,9 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    false,
 	}
-
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(false),
-	)
+	p, err := prover.NewProver(kzgConfig, nil)
 
 	return p, err
 }

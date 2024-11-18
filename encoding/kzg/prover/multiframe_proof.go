@@ -14,7 +14,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type KzgMultiProofDefaultBackend struct {
+type KzgMultiProofGnarkBackend struct {
 	*kzg.KzgConfig
 	Fs         *fft.FFTSettings
 	FFTPointsT [][]bn254.G1Affine // transpose of FFTPoints
@@ -25,7 +25,7 @@ type WorkerResult struct {
 	err error
 }
 
-func (p *KzgMultiProofDefaultBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
+func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
@@ -114,7 +114,7 @@ func (p *KzgMultiProofDefaultBackend) ComputeMultiFrameProof(polyFr []fr.Element
 	return proofs, nil
 }
 
-func (p *KzgMultiProofDefaultBackend) proofWorker(
+func (p *KzgMultiProofGnarkBackend) proofWorker(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
@@ -146,7 +146,7 @@ func (p *KzgMultiProofDefaultBackend) proofWorker(
 // phi ^ (coset size ) = 1
 //
 // implicitly pad slices to power of 2
-func (p *KzgMultiProofDefaultBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
+func (p *KzgMultiProofGnarkBackend) GetSlicesCoeff(polyFr []fr.Element, dimE, j, l uint64) ([]fr.Element, error) {
 	// there is a constant term
 	m := uint64(len(polyFr)) - 1
 	dim := (m - j) / l

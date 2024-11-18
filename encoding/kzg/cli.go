@@ -60,6 +60,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:    uint64(runtime.GOMAXPROCS(0)),
 		},
 		cli.BoolFlag{
+			Name:     VerboseFlagName,
+			Usage:    "Enable to see verbose output for encoding/decoding",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "VERBOSE"),
+		},
+		cli.BoolFlag{
 			Name:     CacheEncodedBlobsFlagName,
 			Usage:    "Enable to cache encoded results",
 			Required: false,
@@ -88,6 +94,7 @@ func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
 	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)
 	cfg.NumWorker = ctx.GlobalUint64(NumWorkerFlagName)
+	cfg.Verbose = ctx.GlobalBool(VerboseFlagName)
 	cfg.PreloadEncoder = ctx.GlobalBool(PreloadEncoderFlagName)
 	cfg.G2PowerOf2Path = ctx.GlobalString(G2PowerOf2PathFlagName)
 

@@ -67,6 +67,7 @@ func main() {
 		SRSOrder:        268435456,
 		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	fmt.Printf("* Task Starts\n")
@@ -74,17 +75,9 @@ func main() {
 	cfg := &encoding.Config{
 		BackendType: encoding.IcicleBackend,
 		GPUEnable:   true,
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
 	}
-	rsEncoder, err := rs.NewEncoder(cfg)
-
-	p, err := prover.NewProver(
-		prover.WithKZGConfig(kzgConfig),
-		prover.WithLoadG2Points(true),
-		prover.WithVerbose(true),
-		prover.WithBackend(encoding.IcicleBackend),
-		prover.WithGPU(true),
-		prover.WithRSEncoder(rsEncoder),
-	)
+	p, err := prover.NewProver(kzgConfig, cfg)
 
 	if err != nil {
 		log.Fatalf("Failed to create prover: %v", err)

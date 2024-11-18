@@ -7,13 +7,13 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-type KzgCommitmentsDefaultBackend struct {
+type KzgCommitmentsGnarkBackend struct {
 	*kzg.KzgConfig
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
 }
 
-func (p *KzgCommitmentsDefaultBackend) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *KzgCommitmentsGnarkBackend) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	inputLength := uint64(len(coeffs))
 	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-inputLength:]
 	config := ecc.MultiExpConfig{}
@@ -26,7 +26,7 @@ func (p *KzgCommitmentsDefaultBackend) ComputeLengthProof(coeffs []fr.Element) (
 	return &lengthProof, nil
 }
 
-func (p *KzgCommitmentsDefaultBackend) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
+func (p *KzgCommitmentsGnarkBackend) ComputeCommitment(coeffs []fr.Element) (*bn254.G1Affine, error) {
 	// compute commit for the full poly
 	config := ecc.MultiExpConfig{}
 	var commitment bn254.G1Affine
@@ -37,7 +37,7 @@ func (p *KzgCommitmentsDefaultBackend) ComputeCommitment(coeffs []fr.Element) (*
 	return &commitment, nil
 }
 
-func (p *KzgCommitmentsDefaultBackend) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
+func (p *KzgCommitmentsGnarkBackend) ComputeLengthCommitment(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	config := ecc.MultiExpConfig{}
 
 	var lengthCommitment bn254.G2Affine

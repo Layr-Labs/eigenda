@@ -13,10 +13,7 @@ func FuzzOnlySystematic(f *testing.F) {
 
 	f.Add(gettysburgAddressBytes)
 	f.Fuzz(func(t *testing.T, input []byte) {
-		group, err := prover.NewProver(
-			prover.WithKZGConfig(kzgConfig),
-			prover.WithLoadG2Points(true),
-		)
+		group, err := prover.NewProver(kzgConfig, nil)
 		require.NoError(t, err)
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
