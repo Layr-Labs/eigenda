@@ -7,6 +7,7 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
 import {EigenDABlobVerificationUtils} from "../libraries/EigenDABlobVerificationUtils.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
 contract EigenDABlobVerifier is IEigenDABlobVerifier {
 
@@ -30,8 +31,8 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
      * @param blobVerificationProof The blob verification proof to verify the blob against
      */
     function verifyBlobV1(
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
-        EigenDABlobVerificationUtils.BlobVerificationProof calldata blobVerificationProof
+        BlobHeader calldata blobHeader,
+        BlobVerificationProof calldata blobVerificationProof
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV1ForQuorums(
             eigenDAThresholdRegistry,
@@ -49,8 +50,8 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
      * @param additionalQuorumNumbersRequired The additional required quorum numbers 
      */
     function verifyBlobV1(
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
-        EigenDABlobVerificationUtils.BlobVerificationProof calldata blobVerificationProof,
+        BlobHeader calldata blobHeader,
+        BlobVerificationProof calldata blobVerificationProof,
         bytes calldata additionalQuorumNumbersRequired
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV1ForQuorums(
@@ -63,25 +64,18 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     }
 
     function verifyBlobV2(
-        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
-            eigenDASignatureVerifier,
-            signedCertificate,
-            quorumNumbersRequired()
         );
     }
 
+    /*
     function verifyBlobV2(
-        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate,
-        bytes calldata additionalQuorumNumbersRequired
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
-            eigenDASignatureVerifier,
-            signedCertificate,
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
         );
     }
+    */
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {

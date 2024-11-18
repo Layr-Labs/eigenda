@@ -10,6 +10,7 @@ import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to verify submissions of blobs on EigenDA.
@@ -17,42 +18,11 @@ import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier
  */
 library EigenDABlobVerificationUtils {
     using BN254 for BN254.G1Point;
-
-    struct BlobVerificationProof {
-        uint32 batchId;
-        uint32 blobIndex;
-        IEigenDAServiceManager.BatchMetadata batchMetadata;
-        bytes inclusionProof;
-        bytes quorumIndices;
-    }
-
-    struct SignedCertificate {
-        BlobCertificate blobCertificate;
-        Attestation nonSignerStakesAndSignature;
-    }
-
-    struct BlobCertificate {
-        bytes blobKey;
-        IEigenDAServiceManager.BlobHeader blobHeader;
-        uint32 referenceBlockNumber;
-        string[] relayKeys;
-    }
-
-    struct Attestation {
-        uint32[] nonSignerQuorumBitmapIndices;
-        BN254.G1Point[] nonSignerPubkeys;
-        BN254.G1Point[] quorumApks;
-        BN254.G2Point apkG2;
-        BN254.G1Point sigma;
-        uint32[] quorumApkIndices;
-        uint32[] totalStakeIndices;
-        uint32[][] nonSignerStakeIndices;
-    }
     
     function _verifyBlobV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
+        BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -113,9 +83,6 @@ library EigenDABlobVerificationUtils {
     }
 
     function _verifyBlobV2ForQuorums(
-        IEigenDASignatureVerifier eigenDASignatureVerifier,
-        SignedCertificate calldata signedCertificate,
-        bytes memory requiredQuorumNumbers
     ) internal view {}
 
 }

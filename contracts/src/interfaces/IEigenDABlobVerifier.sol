@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IEigenDAServiceManager} from "./IEigenDAServiceManager.sol";
 import {EigenDABlobVerificationUtils} from "../libraries/EigenDABlobVerificationUtils.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
+import "./IEigenDAStructs.sol";
 
 interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
 
@@ -13,8 +14,8 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
      * @param blobVerificationProof The blob verification proof to verify the blob against
      */
     function verifyBlobV1(
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
-        EigenDABlobVerificationUtils.BlobVerificationProof calldata blobVerificationProof
+        BlobHeader calldata blobHeader,
+        BlobVerificationProof calldata blobVerificationProof
     ) external view;
 
     /**
@@ -24,17 +25,16 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
      * @param additionalQuorumNumbersRequired The additional required quorum numbers 
      */
     function verifyBlobV1(
-        IEigenDAServiceManager.BlobHeader calldata blobHeader,
-        EigenDABlobVerificationUtils.BlobVerificationProof calldata blobVerificationProof,
+        BlobHeader calldata blobHeader,
+        BlobVerificationProof calldata blobVerificationProof,
         bytes calldata additionalQuorumNumbersRequired
     ) external view;
 
     function verifyBlobV2(
-        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate
     ) external view;
 
+    /*
     function verifyBlobV2(
-        EigenDABlobVerificationUtils.SignedCertificate calldata signedCertificate,
-        bytes calldata additionalQuorumNumbersRequired
     ) external view;
+    */
 }

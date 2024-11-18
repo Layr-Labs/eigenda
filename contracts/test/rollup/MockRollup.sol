@@ -6,6 +6,7 @@ import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import {IEigenDABlobVerifier} from "../../src/interfaces/IEigenDABlobVerifier.sol";
+import "../../src/interfaces/IEigenDAStructs.sol";
 
 struct Commitment {
     address confirmer; // confirmer who posted the commitment
@@ -33,8 +34,8 @@ contract MockRollup {
      * @param blobVerificationProof the blob verification proof
      */
     function postCommitment(
-        IEigenDAServiceManager.BlobHeader memory blobHeader, 
-        EigenDABlobVerificationUtils.BlobVerificationProof memory blobVerificationProof
+        BlobHeader memory blobHeader, 
+        BlobVerificationProof memory blobVerificationProof
     ) external { 
         // require commitment has not already been posted
         require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");

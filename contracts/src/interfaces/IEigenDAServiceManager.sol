@@ -5,6 +5,7 @@ import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
+import "./IEigenDAStructs.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     // EVENTS
@@ -22,41 +23,6 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
      * @param status The new status of the batch confirmer
      */
     event BatchConfirmerStatusChanged(address batchConfirmer, bool status);
-
-    // STRUCTS
-
-    struct QuorumBlobParam {
-        uint8 quorumNumber;
-        uint8 adversaryThresholdPercentage;
-        uint8 confirmationThresholdPercentage; 
-        uint32 chunkLength; // the length of the chunks in the quorum
-    }
-
-    struct BlobHeader {
-        BN254.G1Point commitment; // the kzg commitment to the blob
-        uint32 dataLength; // the length of the blob in coefficients of the polynomial
-        QuorumBlobParam[] quorumBlobParams; // the quorumBlobParams for each quorum
-    }
-
-    struct ReducedBatchHeader {
-        bytes32 blobHeadersRoot;
-        uint32 referenceBlockNumber;
-    }
-
-    struct BatchHeader {
-        bytes32 blobHeadersRoot;
-        bytes quorumNumbers; // each byte is a different quorum number
-        bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
-                                     // that has signed in the corresponding quorum in `quorumNumbers` 
-        uint32 referenceBlockNumber;
-    }
-    
-    // Relevant metadata for a given datastore
-    struct BatchMetadata {
-        BatchHeader batchHeader; // the header of the data store
-        bytes32 signatoryRecordHash; // the hash of the signatory record
-        uint32 confirmationBlockNumber; // the block number at which the batch was confirmed
-    }
 
     // FUNCTIONS
 

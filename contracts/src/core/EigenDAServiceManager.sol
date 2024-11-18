@@ -12,6 +12,7 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
