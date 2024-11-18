@@ -305,6 +305,10 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := DefaultConfig()
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -621,6 +625,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := DefaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -891,6 +899,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := DefaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,

@@ -89,19 +89,20 @@ type Config struct {
 // DefaultConfig returns the default configuration for the relay Server.
 func DefaultConfig() *Config {
 	return &Config{
-		Log:                    common.DefaultLoggerConfig(),
-		AWS:                    *aws.DefaultClientConfig(),
-		GRPCPort:               50051,
-		MaxGRPCMessageSize:     1024 * 1024 * 300,
-		BucketName:             "relay",
-		MetadataTableName:      "metadata",
-		MetadataCacheSize:      1024 * 1024,
-		MetadataMaxConcurrency: 32,
-		BlobCacheSize:          32,
-		BlobMaxConcurrency:     32,
-		ChunkCacheSize:         32,
-		ChunkMaxConcurrency:    32,
-		RateLimits:             *limiter.DefaultConfig(),
+		Log:                        common.DefaultLoggerConfig(),
+		AWS:                        *aws.DefaultClientConfig(),
+		GRPCPort:                   50051,
+		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		BucketName:                 "relay",
+		MetadataTableName:          "metadata",
+		MetadataCacheSize:          1024 * 1024,
+		MetadataMaxConcurrency:     32,
+		BlobCacheSize:              32,
+		BlobMaxConcurrency:         32,
+		ChunkCacheSize:             32,
+		ChunkMaxConcurrency:        32,
+		MaxKeysPerGetChunksRequest: 1024,
+		RateLimits:                 *limiter.DefaultConfig(),
 	}
 }
 

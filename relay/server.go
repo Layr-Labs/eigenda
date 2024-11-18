@@ -27,6 +27,7 @@ type Server struct {
 
 	// config is the configuration for the relay Server.
 	config *Config
+
 	// the logger for the server
 	logger logging.Logger
 
@@ -96,6 +97,7 @@ func NewServer(
 	}
 
 	return &Server{
+		config:           config,
 		logger:           logger,
 		grpcPort:         config.GRPCPort,
 		maxProtoSize:     config.MaxGRPCMessageSize,
@@ -166,13 +168,48 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
 
-	clientID := fmt.Sprintf("%d", request.RequesterId) //TODO
+	// Future work: client IDs will be fixed when authentication is implemented
+	clientID := fmt.Sprintf("%d", request.RequesterId)
 	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, err
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
+	keys, err := getKeysFromChunkRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
+	}
+
+	requiredBandwidth := computeChunkRequestRequiredBandwidth(request, mMap)
+	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
+	if err != nil {
+		return nil, err
+	}
+
+	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching frames: %w", err)
+	}
+
+	bytesToSend, err := gatherChunkDataToSend(frames, request)
+	if err != nil {
+		return nil, fmt.Errorf("error gathering chunk data: %w", err)
+	}
+
+	return &pb.GetChunksReply{
+		Data: bytesToSend,
+	}, nil
+}
+
+// getKeysFromChunkRequest gathers a slice of blob keys from a GetChunks request.
+func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error) {
 	keys := make([]v2.BlobKey, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
@@ -193,26 +230,16 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		keys = append(keys, key)
 	}
 
-	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
-	}
+	return keys, nil
+}
 
-	requiredBandwidth := computeChunkRequestRequiredBandwidth(request, mMap)
-	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
-	if err != nil {
-		return nil, err
-	}
+// gatherChunkDataToSend takes the chunk data and narrows it down to the data requested in the GetChunks request.
+func gatherChunkDataToSend(
+	frames map[v2.BlobKey][]*encoding.Frame,
+	request *pb.GetChunksRequest) ([][]byte, error) {
 
-	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching frames: %w", err)
-	}
+	bytesToSend := make([][]byte, 0, len(frames))
 
-	bytesToSend := make([][]byte, 0, len(keys))
-
-	// return data in the order that it was requested
 	for _, chunkRequest := range request.ChunkRequests {
 
 		framesToSend := make([]*encoding.Frame, 0)
@@ -261,12 +288,9 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		bytesToSend = append(bytesToSend, bundleBytes)
 	}
 
-	return &pb.GetChunksReply{
-		Data: bytesToSend,
-	}, nil
+	return bytesToSend, nil
 }
 
-// TODO unit test
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
 func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) int {
 	requiredBandwidth := 0
