@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// TODO test
-
 // ChunkRateLimiter enforces rate limits on GetChunk operations.
 type ChunkRateLimiter struct {
 
