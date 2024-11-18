@@ -23,9 +23,6 @@ type chunkProvider struct {
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
-
-	// concurrencyLimiter is a channel that limits the number of concurrent operations.
-	concurrencyLimiter chan struct{}
 }
 
 // blobKeyWithMetadata attaches some additional metadata to a blobKey.
@@ -47,13 +44,15 @@ func newChunkProvider(
 	maxIOConcurrency int) (*chunkProvider, error) {
 
 	server := &chunkProvider{
-		ctx:                ctx,
-		logger:             logger,
-		chunkReader:        chunkReader,
-		concurrencyLimiter: make(chan struct{}, maxIOConcurrency),
+		ctx:         ctx,
+		logger:      logger,
+		chunkReader: chunkReader,
 	}
 
-	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](cacheSize, server.fetchFrames)
+	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](
+		cacheSize,
+		maxIOConcurrency,
+		server.fetchFrames)
 	if err != nil {
 		return nil, err
 	}
@@ -128,11 +127,9 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 	var proofs []*encoding.Proof
 	var proofsErr error
 
-	s.concurrencyLimiter <- struct{}{}
 	go func() {
 		defer func() {
 			wg.Done()
-			<-s.concurrencyLimiter
 		}()
 		proofs, proofsErr = s.chunkReader.GetChunkProofs(s.ctx, key.blobKey)
 	}()

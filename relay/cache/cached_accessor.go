@@ -44,6 +44,9 @@ type cachedAccessor[K comparable, V any] struct {
 	// cache is the LRU cache used to store values fetched by the accessor.
 	cache *lru.Cache[K, V]
 
+	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
+	concurrencyLimiter chan struct{}
+
 	// lock is used to protect the cache and lookupsInProgress map.
 	cacheLock sync.Mutex
 
@@ -51,8 +54,15 @@ type cachedAccessor[K comparable, V any] struct {
 	accessor Accessor[K, V]
 }
 
-// NewCachedAccessor creates a new CachedAccessor.
-func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, V]) (CachedAccessor[K, V], error) {
+// NewCachedAccessor creates a new CachedAccessor. The cacheSize parameter specifies the maximum number of items
+// that can be stored in the cache. The concurrencyLimit parameter specifies the maximum number of concurrent
+// lookups that can be in progress at any given time. If a greater number of lookups are requested, the excess
+// lookups will block until a lookup completes. If concurrencyLimit is zero, then no limits are imposed. The accessor
+// parameter is the function used to fetch values that are not in the cache.
+func NewCachedAccessor[K comparable, V any](
+	cacheSize int,
+	concurrencyLimit int,
+	accessor Accessor[K, V]) (CachedAccessor[K, V], error) {
 
 	cache, err := lru.New[K, V](cacheSize)
 	if err != nil {
@@ -61,10 +71,16 @@ func NewCachedAccessor[K comparable, V any](cacheSize int, accessor Accessor[K, 
 
 	lookupsInProgress := make(map[K]*accessResult[V])
 
+	var concurrencyLimiter chan struct{}
+	if concurrencyLimit > 0 {
+		concurrencyLimiter = make(chan struct{}, concurrencyLimit)
+	}
+
 	return &cachedAccessor[K, V]{
-		cache:             cache,
-		accessor:          accessor,
-		lookupsInProgress: lookupsInProgress,
+		cache:              cache,
+		concurrencyLimiter: concurrencyLimiter,
+		accessor:           accessor,
+		lookupsInProgress:  lookupsInProgress,
 	}, nil
 }
 
@@ -102,7 +118,16 @@ func (c *cachedAccessor[K, V]) Get(key K) (V, error) {
 		return result.value, result.err
 	} else {
 		// We are the first goroutine to request this key.
+
+		if c.concurrencyLimiter != nil {
+			c.concurrencyLimiter <- struct{}{}
+		}
+
 		value, err := c.accessor(key)
+
+		if c.concurrencyLimiter != nil {
+			<-c.concurrencyLimiter
+		}
 
 		c.cacheLock.Lock()
 
