@@ -115,10 +115,7 @@ func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 		log.Fatal(err)
 	}
 
-	v, err := verifier.NewVerifier(
-		verifier.WithKZGConfig(config),
-		verifier.WithLoadG2Points(true),
-	)
+	v, err := verifier.NewVerifier(config, true)
 	if err != nil {
 		log.Fatal(err)
 	}

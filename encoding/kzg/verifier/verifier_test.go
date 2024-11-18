@@ -66,10 +66,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	v, err := verifier.NewVerifier(
-		verifier.WithKZGConfig(kzgConfig),
-		verifier.WithLoadG2Points(true),
-	)
+	v, err := verifier.NewVerifier(kzgConfig, true)
 	require.NoError(t, err)
 
 	chunkLengths := []uint64{64, 128, 256, 512, 1024, 2048, 4096, 8192}
@@ -127,10 +124,7 @@ func BenchmarkVerifyBlob(b *testing.B) {
 	)
 	require.NoError(b, err)
 
-	v, err := verifier.NewVerifier(
-		verifier.WithKZGConfig(kzgConfig),
-		verifier.WithLoadG2Points(true),
-	)
+	v, err := verifier.NewVerifier(kzgConfig, true)
 	require.NoError(b, err)
 
 	params := encoding.EncodingParams{

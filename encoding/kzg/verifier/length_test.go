@@ -18,10 +18,7 @@ func TestLengthProof(t *testing.T) {
 	)
 	require.Nil(t, err)
 
-	v, err := verifier.NewVerifier(
-		verifier.WithKZGConfig(kzgConfig),
-		verifier.WithLoadG2Points(true),
-	)
+	v, err := verifier.NewVerifier(kzgConfig, true)
 	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))

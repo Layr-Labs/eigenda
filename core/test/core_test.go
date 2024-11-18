@@ -61,10 +61,7 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(
-		verifier.WithKZGConfig(config),
-		verifier.WithLoadG2Points(true),
-	)
+	v, err := verifier.NewVerifier(config, true)
 	if err != nil {
 		return nil, nil, err
 	}
