@@ -78,7 +78,6 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	nodeClient := clients.NewNodeClient(config.Timeout)
-
 	v, err := verifier.NewVerifier(&config.EncoderConfig, true)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)

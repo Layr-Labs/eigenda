@@ -14,7 +14,8 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
-		enc, err := rs.NewEncoder()
+		cfg := encoding.DefaultConfig()
+		enc, err := rs.NewEncoder(cfg)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}

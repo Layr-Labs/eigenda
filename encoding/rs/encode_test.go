@@ -16,9 +16,9 @@ func TestEncodeDecode_InvertsWhenSamplingAllFrames(t *testing.T) {
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
 
-	enc, _ := rs.NewEncoder()
-	// enc, err := rsenc.GetRsEncoder(params)
-	// require.NotNil(t, enc)
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -40,7 +40,10 @@ func TestEncodeDecode_InvertsWhenSamplingMissingFrame(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder()
+
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	inputFr, err := rs.ToFrArray(GETTYSBURG_ADDRESS_BYTES)
 	assert.Nil(t, err)
@@ -62,7 +65,9 @@ func TestEncodeDecode_ErrorsWhenNotEnoughSampledFrames(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder()
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	fmt.Println("Num Chunks: ", params.NumChunks)
 

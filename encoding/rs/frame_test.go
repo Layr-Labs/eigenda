@@ -15,7 +15,9 @@ func TestEncodeDecodeFrame_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder()
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	require.Nil(t, err)
@@ -37,7 +39,9 @@ func TestGnarkEncodeDecodeFrame_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder()
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	require.Nil(t, err)
@@ -60,7 +64,9 @@ func TestGnarkEncodeDecodeFrames_AreInverses(t *testing.T) {
 	defer teardownSuite(t)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
-	enc, _ := rs.NewEncoder()
+	cfg := encoding.DefaultConfig()
+	enc, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 
 	frames, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
 	assert.NoError(t, err)

@@ -231,21 +231,17 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 
-	vopts := []verifier.Options{
-		verifier.WithKZGConfig(&kzg.KzgConfig{
-			G1Path:          retrievalClientConfig.RetrieverG1Path,
-			G2Path:          retrievalClientConfig.RetrieverG2Path,
-			G2PowerOf2Path:  retrievalClientConfig.RetrieverG2PointPowerOf2Path,
-			CacheDir:        retrievalClientConfig.RetrieverCachePath,
-			SRSOrder:        uint64(srsOrder),
-			SRSNumberToLoad: uint64(srsOrder),
-			NumWorker:       1,
-			PreloadEncoder:  false,
-			Verbose:         true,
-		}),
-		verifier.WithLoadG2Points(false),
-	}
-	v, err := verifier.NewVerifier(vopts...)
+	v, err := verifier.NewVerifier(&kzg.KzgConfig{
+		G1Path:          retrievalClientConfig.RetrieverG1Path,
+		G2Path:          retrievalClientConfig.RetrieverG2Path,
+		G2PowerOf2Path:  retrievalClientConfig.RetrieverG2PointPowerOf2Path,
+		CacheDir:        retrievalClientConfig.RetrieverCachePath,
+		NumWorker:       1,
+		SRSOrder:        uint64(srsOrder),
+		SRSNumberToLoad: uint64(srsOrder),
+		Verbose:         true,
+		PreloadEncoder:  false,
+	}, false)
 	if err != nil {
 		return err
 	}

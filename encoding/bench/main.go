@@ -71,12 +71,11 @@ func main() {
 
 	fmt.Printf("* Task Starts\n")
 
-	// create encoding object
-	rs_opts := []rs.EncoderOption{
-		rs.WithBackend(encoding.IcicleBackend),
-		rs.WithGPU(true),
+	cfg := &encoding.Config{
+		BackendType: encoding.IcicleBackend,
+		GPUEnable:   true,
 	}
-	rsEncoder, _ := rs.NewEncoder(rs_opts...)
+	rsEncoder, err := rs.NewEncoder(cfg)
 
 	p, err := prover.NewProver(
 		prover.WithKZGConfig(kzgConfig),

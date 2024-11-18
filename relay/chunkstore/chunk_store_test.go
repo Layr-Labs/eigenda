@@ -19,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -206,8 +207,9 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
-	encoder, _ := rs.NewEncoder()
-
+	cfg := encoding.DefaultConfig()
+	encoder, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -266,7 +268,9 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
-	encoder, _ := rs.NewEncoder()
+	cfg := encoding.DefaultConfig()
+	encoder, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)

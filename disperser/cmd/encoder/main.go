@@ -78,11 +78,11 @@ func RunEncoderServer(ctx *cli.Context) error {
 
 	if config.EncoderVersion == V2 {
 		// Create the encoder
-		opts := []rs.EncoderOption{
-			rs.WithBackend(backendType),
-			rs.WithGPU(config.ServerConfig.GPUEnable),
+		cfg := &encoding.Config{
+			BackendType: backendType,
+			GPUEnable:   config.ServerConfig.GPUEnable,
 		}
-		rsEncoder, err := rs.NewEncoder(opts...)
+		rsEncoder, err := rs.NewEncoder(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}

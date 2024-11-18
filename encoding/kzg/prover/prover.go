@@ -78,7 +78,8 @@ func NewProver(opts ...ProverOption) (*Prover, error) {
 
 	// Create default RS encoder if none provided
 	if p.Encoder == nil {
-		encoder, err := rs.NewEncoder()
+		cfg := encoding.DefaultConfig()
+		encoder, err := rs.NewEncoder(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create default RS encoder: %w", err)
 		}

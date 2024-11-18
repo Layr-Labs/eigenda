@@ -3,7 +3,6 @@ package rs
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -25,29 +24,12 @@ type EncoderDevice interface {
 	ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error)
 }
 
-// Default configuration values
-const (
-	defaultBackend   = encoding.GnarkBackend
-	defaultGPUEnable = false
-	defaultVerbose   = false
-)
-
 // NewEncoder creates a new encoder with the given options
-func NewEncoder(opts ...EncoderOption) (*Encoder, error) {
+func NewEncoder(config *encoding.Config) (*Encoder, error) {
 	e := &Encoder{
-		Config: &encoding.Config{
-			NumWorker:   uint64(runtime.GOMAXPROCS(0)),
-			BackendType: defaultBackend,
-			GPUEnable:   defaultGPUEnable,
-			Verbose:     defaultVerbose,
-		},
-
+		Config:              config,
 		mu:                  sync.Mutex{},
 		ParametrizedEncoder: make(map[encoding.EncodingParams]*ParametrizedEncoder),
-	}
-
-	for _, opt := range opts {
-		opt(e)
 	}
 
 	return e, nil
