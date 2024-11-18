@@ -10,10 +10,12 @@ import (
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/relay/authentication"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 	"net"
 	"time"
@@ -54,6 +56,9 @@ type Server struct {
 
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
+
+	// authenticator is used to authenticate requests to the relay service.
+	authenticator authentication.RequestAuthenticator // TODO set this
 }
 
 // NewServer creates a new relay Server.
@@ -96,6 +101,9 @@ func NewServer(
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
 
+	// TODO
+	authenticator := authentication.NewRequestAuthenticator(nil, 0)
+
 	return &Server{
 		config:           config,
 		logger:           logger,
@@ -106,6 +114,7 @@ func NewServer(
 		chunkProvider:    cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits),
+		authenticator:    authenticator,
 	}, nil
 }
 
@@ -168,9 +177,20 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
 
-	// Future work: client IDs will be fixed when authentication is implemented
-	clientID := fmt.Sprintf("%d", request.RequesterId)
-	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	client, ok := peer.FromContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get peer information")
+	}
+	clientAddress := client.Addr.String()
+
+	err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed: %w", err)
+	}
+	// TODO make methods take correct type
+	clientID := fmt.Sprintf("%x", request.RequesterId)
+
+	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, err
 	}
