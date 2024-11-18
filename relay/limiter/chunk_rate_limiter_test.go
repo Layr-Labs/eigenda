@@ -10,7 +10,7 @@ import (
 )
 
 func TestConcurrentGetChunksOperations(t *testing.T) {
-	tu.InitializeRandom(1172102200317107997) // TODO
+	tu.InitializeRandom()
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
