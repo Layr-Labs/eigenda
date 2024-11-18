@@ -18,8 +18,8 @@ type ParametrizedProver struct {
 	encoding.EncodingParams
 	*rs.Encoder
 
-	*kzg.KzgConfig
-	Ks *kzg.KZGSettings
+	KzgConfig *kzg.KzgConfig
+	Ks        *kzg.KZGSettings
 
 	KzgMultiProofBackend  KzgMultiProofsBackend
 	KzgCommitmentsBackend KzgCommitmentsBackend
@@ -173,8 +173,8 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 		"Commiting_duration", commitmentResult.Duration,
 		"LengthCommit_duration", lengthCommitmentResult.Duration,
 		"lengthProof_duration", lengthProofResult.Duration,
-		"SRSOrder", g.SRSOrder,
-		"SRSOrder_shift", g.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", g.KzgConfig.SRSOrder,
+		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
@@ -217,7 +217,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 			flatpaddedCoeffs = append(flatpaddedCoeffs, paddedCoeffs...)
 		}
 
-		proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+		proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProof(flatpaddedCoeffs, g.NumChunks, g.ChunkLength, g.KzgConfig.NumWorker)
 		proofChan <- proofsResult{
 			Proofs:   proofs,
 			Err:      err,
@@ -240,8 +240,8 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 		"Total_duration", totalProcessingTime,
 		"RS_encode_duration", rsResult.Duration,
 		"multiProof_duration", proofsResult.Duration,
-		"SRSOrder", g.SRSOrder,
-		"SRSOrder_shift", g.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", g.KzgConfig.SRSOrder,
+		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
 	)
 
 	// assemble frames
@@ -269,7 +269,7 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 	copy(paddedCoeffs, inputFr)
 	paddingEnd := time.Since(paddingStart)
 
-	proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.NumWorker)
+	proofs, err := g.KzgMultiProofBackend.ComputeMultiFrameProof(paddedCoeffs, g.NumChunks, g.ChunkLength, g.KzgConfig.NumWorker)
 
 	end := time.Since(start)
 
@@ -279,8 +279,8 @@ func (g *ParametrizedProver) GetMultiFrameProofs(inputFr []fr.Element) ([]encodi
 		"Chunk_length", g.ChunkLength,
 		"Total_duration", end,
 		"Padding_duration", paddingEnd,
-		"SRSOrder", g.SRSOrder,
-		"SRSOrder_shift", g.SRSOrder-uint64(len(inputFr)),
+		"SRSOrder", g.KzgConfig.SRSOrder,
+		"SRSOrder_shift", g.KzgConfig.SRSOrder-uint64(len(inputFr)),
 	)
 
 	return proofs, err
