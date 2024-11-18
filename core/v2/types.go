@@ -84,7 +84,7 @@ type BlobHeader struct {
 	Signature []byte
 }
 
-func NewBlobHeader(proto *commonpb.BlobHeader) (*BlobHeader, error) {
+func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
 	if err != nil {
 		return nil, err
@@ -202,6 +202,27 @@ func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
 	}, nil
 }
 
+func BlobCertificateFromProtobuf(proto *commonpb.BlobCertificate) (*BlobCertificate, error) {
+	if proto.GetBlobHeader() == nil {
+		return nil, errors.New("missing blob header in blob certificate")
+	}
+
+	blobHeader, err := BlobHeaderFromProtobuf(proto.GetBlobHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob header: %v", err)
+	}
+
+	relayKeys := make([]RelayKey, len(proto.GetRelays()))
+	for i, r := range proto.GetRelays() {
+		relayKeys[i] = RelayKey(r)
+	}
+
+	return &BlobCertificate{
+		BlobHeader: blobHeader,
+		RelayKeys:  relayKeys,
+	}, nil
+}
+
 type BatchHeader struct {
 	// BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch
 	BatchRoot [32]byte
@@ -272,7 +293,7 @@ func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
 
 	blobCerts := make([]*BlobCertificate, len(proto.GetBlobCertificates()))
 	for i, cert := range proto.GetBlobCertificates() {
-		blobHeader, err := NewBlobHeader(cert.GetBlobHeader())
+		blobHeader, err := BlobHeaderFromProtobuf(cert.GetBlobHeader())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create blob header: %v", err)
 		}

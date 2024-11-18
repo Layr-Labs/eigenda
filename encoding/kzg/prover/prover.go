@@ -265,6 +265,10 @@ func (g *Prover) GetKzgEncoder(params encoding.EncodingParams) (*ParametrizedPro
 	return enc, err
 }
 
+func (g *Prover) GetSRSOrder() uint64 {
+	return g.SRSOrder
+}
+
 // Detect the precomputed table from the specified directory
 // the file name follow the name convention of
 //

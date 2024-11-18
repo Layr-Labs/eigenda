@@ -112,6 +112,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	}
 
 	for _, blob := range blobMetadatas {
+		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
 		if err != nil {
 			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt, "paymentMetadata", blob.BlobHeader.PaymentMetadata)

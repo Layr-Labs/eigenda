@@ -65,3 +65,64 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 
 	assert.Equal(t, batch, newBatch)
 }
+
+func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
+	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
+	commitments, err := p.GetCommitments(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bh := &v2.BlobHeader{
+		BlobVersion:     0,
+		BlobCommitments: commitments,
+		QuorumNumbers:   []core.QuorumID{0, 1},
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         "0x123",
+			BinIndex:          5,
+			CumulativePayment: big.NewInt(100),
+		},
+		Signature: []byte{1, 2, 3},
+	}
+
+	pb, err := bh.ToProtobuf()
+	assert.NoError(t, err)
+
+	newBH, err := v2.BlobHeaderFromProtobuf(pb)
+	assert.NoError(t, err)
+
+	assert.Equal(t, bh, newBH)
+}
+
+func TestConvertBlobCertToFromProtobuf(t *testing.T) {
+	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
+	commitments, err := p.GetCommitments(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bh := &v2.BlobHeader{
+		BlobVersion:     0,
+		BlobCommitments: commitments,
+		QuorumNumbers:   []core.QuorumID{0, 1},
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         "0x123",
+			BinIndex:          5,
+			CumulativePayment: big.NewInt(100),
+		},
+		Signature: []byte{1, 2, 3},
+	}
+
+	blobCert := &v2.BlobCertificate{
+		BlobHeader: bh,
+		RelayKeys:  []v2.RelayKey{0, 1},
+	}
+
+	pb, err := blobCert.ToProtobuf()
+	assert.NoError(t, err)
+
+	newBlobCert, err := v2.BlobCertificateFromProtobuf(pb)
+	assert.NoError(t, err)
+
+	assert.Equal(t, blobCert, newBlobCert)
+}
