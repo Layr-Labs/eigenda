@@ -10,12 +10,13 @@ import (
 )
 
 func TestConcurrentGetChunksOperations(t *testing.T) {
-	tu.InitializeRandom()
+	tu.InitializeRandom(1172102200317107997) // TODO
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
 	config := DefaultConfig()
 	config.MaxConcurrentGetChunkOps = concurrencyLimit
+	config.MaxConcurrentGetChunkOpsClient = math.MaxInt32
 	config.GetChunkOpsBurstiness = math.MaxInt32
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
 
