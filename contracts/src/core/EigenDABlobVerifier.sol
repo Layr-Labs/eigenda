@@ -77,6 +77,11 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     }
     */
 
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+        return eigenDAThresholdRegistry.getBlobParams(version);
+    }
+
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();

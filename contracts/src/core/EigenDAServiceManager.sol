@@ -151,6 +151,11 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+        return eigenDAThresholdRegistry.getBlobParams(version);
+    }
+
     /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();

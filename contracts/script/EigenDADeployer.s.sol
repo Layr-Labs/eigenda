@@ -26,6 +26,7 @@ import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpg
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import "../src/interfaces/IEigenDAStructs.sol";
 
 // # To load the variables in the .env file
 // source .env
@@ -50,6 +51,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IRegistryCoordinator public registryCoordinatorImplementation;
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
+    EigenDAThresholdRegistry public eigenDAThresholdRegistryImplementation;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -103,7 +105,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-        eigenDAThresholdRegistry = new EigenDAThresholdRegistry(address(eigenDAServiceManager));
+        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
 
         registryCoordinator = RegistryCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
@@ -213,6 +217,25 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 addressConfig.eigenDACommunityMultisig,
                 confirmers,
                 addressConfig.eigenDACommunityMultisig
+            )
+        );
+
+        eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
+
+        uint16[] memory versions = new uint16[](0);
+        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            address(eigenDAThresholdRegistryImplementation),
+            abi.encodeWithSelector(
+                EigenDAThresholdRegistry.initialize.selector,
+                addressConfig.eigenDACommunityMultisig,
+                hex"212121",
+                hex"373737",
+                hex"0001",
+                versions,
+                versionedBlobParams
             )
         );
 

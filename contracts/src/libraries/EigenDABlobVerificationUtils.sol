@@ -85,4 +85,10 @@ library EigenDABlobVerificationUtils {
     function _verifyBlobV2ForQuorums(
     ) internal view {}
 
+    function _verifyBlobSecurityParams(
+        VersionedBlobParams memory blobParams,
+        SecurityThresholds memory securityThresholds
+    ) internal pure {
+    }
+
 }

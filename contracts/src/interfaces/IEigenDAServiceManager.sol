@@ -24,11 +24,6 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
      */
     event BatchConfirmerStatusChanged(address batchConfirmer, bool status);
 
-    // FUNCTIONS
-
-    /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
-    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
-
     /**
      * @notice This function is used for
      * - submitting data availabilty certificates,
@@ -40,8 +35,8 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external;
 
-    /// @notice This function is used for changing the batch confirmer
-    function setBatchConfirmer(address _batchConfirmer) external;
+    /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
+    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
 
     /// @notice Returns the current batchId
     function taskNumber() external view returns (uint32);
@@ -51,13 +46,4 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumsNumbersRequired
-    function quorumNumbersRequired() external view returns (bytes memory);
 }

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import "../interfaces/IEigenDAStructs.sol";
+
 interface IEigenDAThresholdRegistry {
+
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory);
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory);

@@ -13,7 +13,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     // CONSTANTS
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
-    //TODO: mechanism to change any of these values?
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
     uint32 public constant STORE_DURATION_BLOCKS = 2 weeks / 12 seconds;
 

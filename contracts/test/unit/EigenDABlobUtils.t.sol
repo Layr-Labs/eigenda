@@ -34,6 +34,10 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     EigenDAServiceManager eigenDAServiceManagerImplementation;
     EigenDABlobVerifier eigenDABlobVerifier;
     EigenDAThresholdRegistry eigenDAThresholdRegistry;
+    EigenDAThresholdRegistry eigenDAThresholdRegistryImplementation;
+    bytes quorumAdversaryThresholdPercentages = hex"212121";
+    bytes quorumConfirmationThresholdPercentages = hex"373737";
+    bytes quorumNumbersRequired = hex"0001";
 
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -50,7 +54,11 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             )
         );
 
-        eigenDAThresholdRegistry = new EigenDAThresholdRegistry(address(eigenDAServiceManager));
+        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
@@ -59,6 +67,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             stakeRegistry,
             eigenDAThresholdRegistry
         );
+
+        eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
         address[] memory confirmers = new address[](1);
         confirmers[0] = registryCoordinatorOwner;
@@ -74,6 +84,24 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 registryCoordinatorOwner,
                 confirmers,
                 registryCoordinatorOwner
+            )
+        );
+
+        uint16[] memory versions = new uint16[](0);
+        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
+
+        cheats.prank(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            address(eigenDAThresholdRegistryImplementation),
+            abi.encodeWithSelector(
+                EigenDAThresholdRegistry.initialize.selector,
+                registryCoordinatorOwner,
+                quorumAdversaryThresholdPercentages,
+                quorumConfirmationThresholdPercentages,
+                quorumNumbersRequired,
+                versions,
+                versionedBlobParams
             )
         );
 

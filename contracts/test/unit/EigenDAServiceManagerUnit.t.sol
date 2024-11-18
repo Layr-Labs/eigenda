@@ -26,8 +26,13 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
 
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
-    EigenDAThresholdRegistry eigenDAThresholdRegistry;
     EigenDABlobVerifier eigenDABlobVerifier;
+
+    EigenDAThresholdRegistry eigenDAThresholdRegistry;
+    EigenDAThresholdRegistry eigenDAThresholdRegistryImplementation;
+    bytes quorumAdversaryThresholdPercentages = hex"212121";
+    bytes quorumConfirmationThresholdPercentages = hex"373737";
+    bytes quorumNumbersRequired = hex"0001";
 
     uint256 feePerBytePerTime = 0;
 
@@ -44,7 +49,13 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             )
         );
 
-        eigenDAThresholdRegistry = new EigenDAThresholdRegistry(address(eigenDAServiceManager));
+        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
+
+        eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
@@ -68,6 +79,24 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                 registryCoordinatorOwner,
                 confirmers,
                 registryCoordinatorOwner
+            )
+        );
+
+        uint16[] memory versions = new uint16[](0);
+        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
+
+        cheats.prank(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            address(eigenDAThresholdRegistryImplementation),
+            abi.encodeWithSelector(
+                EigenDAThresholdRegistry.initialize.selector,
+                registryCoordinatorOwner,
+                quorumAdversaryThresholdPercentages,
+                quorumConfirmationThresholdPercentages,
+                quorumNumbersRequired,
+                versions,
+                versionedBlobParams
             )
         );
 

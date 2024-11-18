@@ -1,40 +1,57 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {EigenDAThresholdRegistryStorage} from "./EigenDAThresholdRegistryStorage.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
-contract EigenDAThresholdRegistry is IEigenDAThresholdRegistry, Ownable {
+contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpgradeable {
 
-    address public immutable eigenDAServiceManager;
-
-    bytes public quorumAdversaryThresholdPercentages = hex"212121";
-
-    bytes public quorumConfirmationThresholdPercentages = hex"373737";
-
-    bytes public quorumNumbersRequired = hex"0001";
-
-    modifier onlyServiceManagerOwner() {
-        require(msg.sender == Ownable(eigenDAServiceManager).owner(), "EigenDAThresholdRegistry: only the service manager owner can call this function");
-        _;
+    constructor() {
+        _disableInitializers();
     }
 
-    constructor(address _eigenDAServiceManager) {
-        eigenDAServiceManager = _eigenDAServiceManager;
+    function initialize(
+        address _initialOwner,
+        bytes memory _quorumAdversaryThresholdPercentages,
+        bytes memory _quorumConfirmationThresholdPercentages,
+        bytes memory _quorumNumbersRequired,
+        uint16[] memory _versions,
+        VersionedBlobParams[] memory _versionedBlobParams
+    ) external initializer {
+        _transferOwnership(_initialOwner);
+
+        quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
+        quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
+        quorumNumbersRequired = _quorumNumbersRequired;
+
+        require(_versions.length == _versionedBlobParams.length, "EigenDAThresholdRegistry: versions and versioned blob params length mismatch");
+        for (uint256 i = 0; i < _versions.length; ++i) {
+            versionedBlobParams[_versions[i]] = _versionedBlobParams[i];
+        }
     }
 
-    function updateQuorumAdversaryThresholdPercentages(bytes memory _quorumAdversaryThresholdPercentages) external onlyServiceManagerOwner {
+    function updateQuorumAdversaryThresholdPercentages(bytes memory _quorumAdversaryThresholdPercentages) external onlyOwner {
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
     }
 
-    function updateQuorumConfirmationThresholdPercentages(bytes memory _quorumConfirmationThresholdPercentages) external onlyServiceManagerOwner {
+    function updateQuorumConfirmationThresholdPercentages(bytes memory _quorumConfirmationThresholdPercentages) external onlyOwner {
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
     }
 
-    function updateQuorumNumbersRequired(bytes memory _quorumNumbersRequired) external onlyServiceManagerOwner {
+    function updateQuorumNumbersRequired(bytes memory _quorumNumbersRequired) external onlyOwner {
         quorumNumbersRequired = _quorumNumbersRequired;
+    }
+
+    function updateVersionedBlobParams(uint16 version, VersionedBlobParams memory _versionedBlobParams) external onlyOwner {
+        versionedBlobParams[version] = _versionedBlobParams;
+    }
+
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+        return versionedBlobParams[version];
     }
 
     /// @notice Gets the adversary threshold percentage for a quorum
