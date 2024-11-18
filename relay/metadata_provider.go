@@ -3,12 +3,13 @@ package relay
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	"sync/atomic"
+
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"sync/atomic"
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
@@ -79,8 +80,10 @@ func newMetadataProvider(
 type metadataMap map[v2.BlobKey]*blobMetadata
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
+// If any of the blobs do not exist, an error is returned.
+// Note that resulting metadata map may not have the same length as the input
+// keys slice if the input keys slice has duplicate items.
 func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, error) {
-
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
 		key      v2.BlobKey
@@ -94,7 +97,12 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 	// Set when the first error is encountered. Useful for preventing new operations from starting.
 	hadError := atomic.Bool{}
 
+	mMap := make(metadataMap)
 	for _, key := range keys {
+		mMap[key] = nil
+	}
+
+	for key := range mMap {
 		if hadError.Load() {
 			// Don't bother starting new operations if we've already encountered an error.
 			break
@@ -122,8 +130,7 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 		}()
 	}
 
-	mMap := make(metadataMap)
-	for len(mMap) < len(keys) {
+	for range mMap {
 		result := <-completionChannel
 		if result.err != nil {
 			return nil, fmt.Errorf("error fetching metadata for blob %s: %w", result.key.Hex(), result.err)

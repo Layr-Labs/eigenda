@@ -58,6 +58,13 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
+	if !s.config.EnableV2 {
+		return nil, api.NewErrorInvalidArg("v2 API is disabled")
+	}
+
+	if s.node.StoreV2 == nil {
+		return nil, api.NewErrorInternal("v2 store not initialized")
+	}
 	batch, err := s.validateStoreChunksRequest(in)
 	if err != nil {
 		return nil, err
@@ -68,6 +75,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("invalid batch header: %v", err))
 	}
 
+	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
 	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
 	if err != nil {
 		return nil, err
@@ -136,6 +144,14 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 }
 
 func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	if !s.config.EnableV2 {
+		return nil, api.NewErrorInvalidArg("v2 API is disabled")
+	}
+
+	if s.node.StoreV2 == nil {
+		return nil, api.NewErrorInternal("v2 store not initialized")
+	}
+
 	blobKey, err := corev2.BytesToBlobKey(in.GetBlobKey())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))

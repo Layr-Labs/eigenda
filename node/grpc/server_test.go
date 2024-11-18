@@ -83,6 +83,7 @@ func makeConfig(t *testing.T) *node.Config {
 		DbPath:                    t.TempDir(),
 		ID:                        opID,
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
+		EnableV2:                  false,
 	}
 }
 
