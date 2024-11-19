@@ -8,7 +8,7 @@ import (
 )
 
 type KzgCommitmentsGnarkBackend struct {
-	*kzg.KzgConfig
+	KzgConfig  *kzg.KzgConfig
 	Srs        *kzg.SRS
 	G2Trailing []bn254.G2Affine
 }
