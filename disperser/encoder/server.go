@@ -47,6 +47,7 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
+		queueStats:      make(map[int]int),
 	}
 }
 
