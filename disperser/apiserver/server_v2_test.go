@@ -67,7 +67,7 @@ func TestV2DisperseBlob(t *testing.T) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := corev2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
 	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	sig, err := signer.SignBlobRequest(blobHeader)

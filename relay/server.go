@@ -7,7 +7,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/authentication"
@@ -33,12 +33,6 @@ type Server struct {
 	// the logger for the server
 	logger logging.Logger
 
-	// grpcPort is the port that the relay server listens on.
-	grpcPort int
-
-	// maxProtoSize is the maximum size of a gRPC message that the server will accept.
-	maxProtoSize int
-
 	// metadataProvider encapsulates logic for fetching metadata for blobs.
 	metadataProvider *metadataProvider
 
@@ -59,6 +53,45 @@ type Server struct {
 
 	// authenticator is used to authenticate requests to the relay service.
 	authenticator authentication.RequestAuthenticator // TODO set this
+}
+
+type Config struct {
+
+	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
+	// serve data for any shard it can.
+	RelayIDs []v2.RelayKey
+
+	// GRPCPort is the port that the relay server listens on.
+	GRPCPort int
+
+	// MaxGRPCMessageSize is the maximum size of a gRPC message that the server will accept.
+	MaxGRPCMessageSize int
+
+	// MetadataCacheSize is the maximum number of items in the metadata cache.
+	MetadataCacheSize int
+
+	// MetadataMaxConcurrency puts a limit on the maximum number of concurrent metadata fetches actively running on
+	// goroutines.
+	MetadataMaxConcurrency int
+
+	// BlobCacheSize is the maximum number of items in the blob cache.
+	BlobCacheSize int
+
+	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
+	BlobMaxConcurrency int
+
+	// ChunkCacheSize is the maximum number of items in the chunk cache.
+	ChunkCacheSize int
+
+	// ChunkMaxConcurrency is the size of the work pool for fetching chunks. Note that this does not
+	// impact concurrency utilized by the s3 client to upload/download fragmented files.
+	ChunkMaxConcurrency int
+
+	// MaxKeysPerGetChunksRequest is the maximum number of keys that can be requested in a single GetChunks request.
+	MaxKeysPerGetChunksRequest int
+
+	// RateLimits contains configuration for rate limiting.
+	RateLimits limiter.Config
 }
 
 // NewServer creates a new relay Server.
@@ -107,8 +140,6 @@ func NewServer(
 	return &Server{
 		config:           config,
 		logger:           logger,
-		grpcPort:         config.GRPCPort,
-		maxProtoSize:     config.MaxGRPCMessageSize,
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
@@ -121,13 +152,14 @@ func NewServer(
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
-	// Future work:
+	// TODO(cody-littley):
 	//  - timeouts
 
 	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
 	if err != nil {
 		return nil, err
 	}
+	defer s.blobRateLimiter.FinishGetBlobOperation()
 
 	key, err := v2.BytesToBlobKey(request.BlobKey)
 	if err != nil {
@@ -165,7 +197,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
-	// Future work:
+	// TODO(cody-littley):
 	//  - authentication
 	//  - timeouts
 
@@ -207,7 +239,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
 
-	requiredBandwidth := computeChunkRequestRequiredBandwidth(request, mMap)
+	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
+	if err != nil {
+		return nil, fmt.Errorf("error computing required bandwidth: %w", err)
+	}
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		return nil, err
@@ -312,39 +347,44 @@ func gatherChunkDataToSend(
 }
 
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
-func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) int {
+func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) (int, error) {
 	requiredBandwidth := 0
 	for _, req := range request.ChunkRequests {
 		var metadata *blobMetadata
+		var key v2.BlobKey
 		var requestedChunks int
 
 		if req.GetByIndex() != nil {
-			key := v2.BlobKey(req.GetByIndex().GetBlobKey())
+			key = v2.BlobKey(req.GetByIndex().GetBlobKey())
 			metadata = mMap[key]
 			requestedChunks = len(req.GetByIndex().ChunkIndices)
 		} else {
-			key := v2.BlobKey(req.GetByRange().GetBlobKey())
+			key = v2.BlobKey(req.GetByRange().GetBlobKey())
 			metadata = mMap[key]
 			requestedChunks = int(req.GetByRange().EndIndex - req.GetByRange().StartIndex)
+		}
+
+		if metadata == nil {
+			return 0, fmt.Errorf("metadata not found for key %s", key.Hex())
 		}
 
 		requiredBandwidth += requestedChunks * int(metadata.chunkSizeBytes)
 	}
 
-	return requiredBandwidth
+	return requiredBandwidth, nil
 
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start() error {
 	// Serve grpc requests
-	addr := fmt.Sprintf("0.0.0.0:%d", s.grpcPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(s.maxProtoSize)
+	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
 
 	s.grpcServer = grpc.NewServer(opt)
 	reflection.Register(s.grpcServer)
@@ -354,7 +394,7 @@ func (s *Server) Start() error {
 	name := pb.Relay_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
-	s.logger.Info("GRPC Listening", "port", s.grpcPort, "address", listener.Addr().String())
+	s.logger.Info("GRPC Listening", "port", s.config.GRPCPort, "address", listener.Addr().String())
 
 	if err = s.grpcServer.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")

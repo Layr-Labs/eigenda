@@ -243,6 +243,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
+	newLastUpdatedAt := d.lastUpdatedAt
 	for i, metadata := range blobMetadatas {
 		if metadata == nil || metadata.BlobHeader == nil {
 			return nil, fmt.Errorf("invalid blob metadata")
@@ -252,8 +253,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			return nil, fmt.Errorf("failed to get blob key: %w", err)
 		}
 		keys[i] = blobKey
-		if metadata.UpdatedAt > d.lastUpdatedAt {
-			d.lastUpdatedAt = metadata.UpdatedAt
+		if metadata.UpdatedAt > newLastUpdatedAt {
+			newLastUpdatedAt = metadata.UpdatedAt
 		}
 	}
 
@@ -343,6 +344,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put blob verification infos: %w", err)
 	}
 
+	d.lastUpdatedAt = newLastUpdatedAt
 	return &batchData{
 		Batch: &corev2.Batch{
 			BatchHeader:      batchHeader,

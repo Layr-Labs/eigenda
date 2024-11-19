@@ -14,4 +14,12 @@ contract EigenDABlobUtilsHarness is Test {
     ) external view {
         EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
     }
+
+    function verifyBlobs(
+        IEigenDAServiceManager.BlobHeader[] calldata blobHeaders,
+        IEigenDAServiceManager eigenDAServiceManager,
+        EigenDARollupUtils.BlobVerificationProof[] calldata blobVerificationProofs
+    ) external view {
+        EigenDARollupUtils.verifyBlobs(blobHeaders, eigenDAServiceManager, blobVerificationProofs);
+    }
 }

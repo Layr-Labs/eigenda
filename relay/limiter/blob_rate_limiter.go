@@ -3,7 +3,7 @@ package limiter
 import (
 	"fmt"
 	"golang.org/x/time/rate"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -21,7 +21,10 @@ type BlobRateLimiter struct {
 	bandwidthLimiter *rate.Limiter
 
 	// operationsInFlight is the number of GetBlob operations currently in flight.
-	operationsInFlight atomic.Int64
+	operationsInFlight int
+
+	// this lock is used to provide thread safety
+	lock sync.Mutex
 }
 
 // NewBlobRateLimiter creates a new BlobRateLimiter.
@@ -50,18 +53,19 @@ func (l *BlobRateLimiter) BeginGetBlobOperation(now time.Time) error {
 		return nil
 	}
 
-	countInFlight := l.operationsInFlight.Add(1)
-	if countInFlight > int64(l.config.MaxConcurrentGetBlobOps) {
-		l.operationsInFlight.Add(-1)
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if l.operationsInFlight >= l.config.MaxConcurrentGetBlobOps {
 		return fmt.Errorf("global concurrent request limit exceeded for getBlob operations, try again later")
 	}
-
-	allowed := l.opLimiter.AllowN(now, 1)
-
-	if !allowed {
-		l.operationsInFlight.Add(-1)
+	if l.opLimiter.TokensAt(now) < 1 {
 		return fmt.Errorf("global rate limit exceeded for getBlob operations, try again later")
 	}
+
+	l.operationsInFlight++
+	l.opLimiter.AllowN(now, 1)
+
 	return nil
 }
 
@@ -73,7 +77,10 @@ func (l *BlobRateLimiter) FinishGetBlobOperation() {
 		return
 	}
 
-	l.operationsInFlight.Add(-1)
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	l.operationsInFlight--
 }
 
 // RequestGetBlobBandwidth should be called when a GetBlob is about to start downloading blob data
@@ -84,6 +91,8 @@ func (l *BlobRateLimiter) RequestGetBlobBandwidth(now time.Time, bytes uint32) e
 		// If the rate limiter is nil, do not enforce rate limits.
 		return nil
 	}
+
+	// no locking needed, the only thing we touch here is the bandwidthLimiter, which is inherently thread-safe
 
 	allowed := l.bandwidthLimiter.AllowN(now, int(bytes))
 	if !allowed {

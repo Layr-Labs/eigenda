@@ -3,7 +3,7 @@ package limiter
 import (
 	"fmt"
 	"golang.org/x/time/rate"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -22,7 +22,7 @@ type ChunkRateLimiter struct {
 	globalBandwidthLimiter *rate.Limiter
 
 	// globalOperationsInFlight is the number of GetChunk operations currently in flight.
-	globalOperationsInFlight atomic.Int64
+	globalOperationsInFlight int
 
 	// per-client limiters
 
@@ -38,7 +38,10 @@ type ChunkRateLimiter struct {
 	perClientBandwidthLimiter map[string]*rate.Limiter
 
 	// perClientOperationsInFlight is the number of GetChunk operations currently in flight for each client.
-	perClientOperationsInFlight map[string]*atomic.Int64
+	perClientOperationsInFlight map[string]int
+
+	// this lock is used to provide thread safety
+	lock sync.Mutex
 }
 
 // NewChunkRateLimiter creates a new ChunkRateLimiter.
@@ -56,10 +59,9 @@ func NewChunkRateLimiter(config *Config) *ChunkRateLimiter {
 		config:                      config,
 		globalOpLimiter:             globalOpLimiter,
 		globalBandwidthLimiter:      globalBandwidthLimiter,
-		globalOperationsInFlight:    atomic.Int64{},
 		perClientOpLimiter:          make(map[string]*rate.Limiter),
 		perClientBandwidthLimiter:   make(map[string]*rate.Limiter),
-		perClientOperationsInFlight: make(map[string]*atomic.Int64),
+		perClientOperationsInFlight: make(map[string]int),
 	}
 }
 
@@ -74,24 +76,13 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 		return nil
 	}
 
-	countInFlight := l.globalOperationsInFlight.Add(1)
-	if countInFlight > int64(l.config.MaxConcurrentGetChunkOps) {
-		l.globalOperationsInFlight.Add(-1)
-		return fmt.Errorf("global concurrent request limit exceeded for GetChunks operations, try again later")
-	}
+	l.lock.Lock()
+	defer l.lock.Unlock()
 
-	allowed := l.globalOpLimiter.AllowN(now, 1)
-	if !allowed {
-		l.globalOperationsInFlight.Add(-1)
-		return fmt.Errorf("global rate limit exceeded for GetChunks operations, try again later")
-	}
-
-	clientInFlightCounter, ok := l.perClientOperationsInFlight[requesterID]
+	_, ok := l.perClientOperationsInFlight[requesterID]
 	if !ok {
 		// This is the first time we've seen this client ID.
-
-		l.perClientOperationsInFlight[requesterID] = &atomic.Int64{}
-		clientInFlightCounter = l.perClientOperationsInFlight[requesterID]
+		l.perClientOperationsInFlight[requesterID] = 0
 
 		l.perClientOpLimiter[requesterID] = rate.NewLimiter(
 			rate.Limit(l.config.MaxGetChunkOpsPerSecondClient),
@@ -102,19 +93,23 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 			l.config.GetChunkBytesBurstinessClient)
 	}
 
-	countInFlight = clientInFlightCounter.Add(1)
-	if countInFlight > int64(l.config.MaxConcurrentGetChunkOpsClient) {
-		l.globalOperationsInFlight.Add(-1)
-		clientInFlightCounter.Add(-1)
+	if l.globalOperationsInFlight >= l.config.MaxConcurrentGetChunkOps {
+		return fmt.Errorf("global concurrent request limit exceeded for GetChunks operations, try again later")
+	}
+	if l.globalOpLimiter.TokensAt(now) < 1 {
+		return fmt.Errorf("global rate limit exceeded for GetChunks operations, try again later")
+	}
+	if l.perClientOperationsInFlight[requesterID] >= l.config.MaxConcurrentGetChunkOpsClient {
 		return fmt.Errorf("client concurrent request limit exceeded for GetChunks")
 	}
-
-	allowed = l.perClientOpLimiter[requesterID].AllowN(now, 1)
-	if !allowed {
-		l.globalOperationsInFlight.Add(-1)
-		clientInFlightCounter.Add(-1)
+	if l.perClientOpLimiter[requesterID].TokensAt(now) < 1 {
 		return fmt.Errorf("client rate limit exceeded for GetChunks, try again later")
 	}
+
+	l.globalOperationsInFlight++
+	l.perClientOperationsInFlight[requesterID]++
+	l.globalOpLimiter.AllowN(now, 1)
+	l.perClientOpLimiter[requesterID].AllowN(now, 1)
 
 	return nil
 }
@@ -125,8 +120,11 @@ func (l *ChunkRateLimiter) FinishGetChunkOperation(requesterID string) {
 		return
 	}
 
-	l.globalOperationsInFlight.Add(-1)
-	l.perClientOperationsInFlight[requesterID].Add(-1)
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	l.globalOperationsInFlight--
+	l.perClientOperationsInFlight[requesterID]--
 }
 
 // RequestGetChunkBandwidth should be called when a GetChunk is about to start downloading chunk data.
@@ -135,6 +133,8 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 		// If the rate limiter is nil, do not enforce rate limits.
 		return nil
 	}
+
+	// no lock needed here, as the bandwidth limiters themselves are thread-safe
 
 	allowed := l.globalBandwidthLimiter.AllowN(now, bytes)
 	if !allowed {

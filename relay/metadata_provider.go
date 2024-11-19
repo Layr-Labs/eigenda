@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync/atomic"
@@ -155,8 +156,10 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 		}
 	}
 
+	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length)
 	chunkSize, err := v2.GetChunkLength(cert.BlobHeader.BlobVersion, blobSize)
+	chunkSize *= encoding.BYTES_PER_SYMBOL
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk length: %w", err)
 	}

@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"math/rand"
 	"testing"
 
@@ -15,6 +16,37 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+func defaultConfig() *Config {
+	return &Config{
+		GRPCPort:                   50051,
+		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		MetadataCacheSize:          1024 * 1024,
+		MetadataMaxConcurrency:     32,
+		BlobCacheSize:              32,
+		BlobMaxConcurrency:         32,
+		ChunkCacheSize:             32,
+		ChunkMaxConcurrency:        32,
+		MaxKeysPerGetChunksRequest: 1024,
+		RateLimits: limiter.Config{
+			MaxGetBlobOpsPerSecond:          1024,
+			GetBlobOpsBurstiness:            1024,
+			MaxGetBlobBytesPerSecond:        20 * 1024 * 1024,
+			GetBlobBytesBurstiness:          20 * 1024 * 1024,
+			MaxConcurrentGetBlobOps:         1024,
+			MaxGetChunkOpsPerSecond:         1024,
+			GetChunkOpsBurstiness:           1024,
+			MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
+			GetChunkBytesBurstiness:         20 * 1024 * 1024,
+			MaxConcurrentGetChunkOps:        1024,
+			MaxGetChunkOpsPerSecondClient:   8,
+			GetChunkOpsBurstinessClient:     8,
+			MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
+			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
+			MaxConcurrentGetChunkOpsClient:  1,
+		},
+	}
+}
 
 func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 	var opts []grpc.DialOption
@@ -62,7 +94,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -139,7 +171,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -190,7 +222,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	}
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.RelayIDs = shardList
 	server, err := NewServer(
 		context.Background(),
@@ -304,7 +336,7 @@ func TestReadWriteChunks(t *testing.T) {
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
@@ -503,7 +535,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -623,7 +655,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.RelayIDs = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
@@ -897,7 +929,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
 	// This is the server used to read it back
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.RelayIDs = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
