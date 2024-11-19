@@ -84,7 +84,7 @@ struct BlobCommitment {
 }
 
 struct SignedBatch {
-	BatchHeaderV2 batchHeader;
+    BatchHeaderV2 batchHeader;
     Attestation attestation;
 }
 

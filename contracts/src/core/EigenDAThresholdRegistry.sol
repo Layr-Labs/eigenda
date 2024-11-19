@@ -51,6 +51,10 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         versionedBlobParams[version] = _versionedBlobParams;
     }
 
+    function updateDefaultSecurityThresholdsV2(SecurityThresholds memory _defaultSecurityThresholdsV2) external onlyOwner {
+        defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
+    }
+
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
         return versionedBlobParams[version];

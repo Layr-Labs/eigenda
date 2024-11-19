@@ -100,7 +100,7 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
      * @param batchHeader The batch headers of the blobs
      * @param blobVerificationProof The blob verification proofs for the blobs
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignatures to verify the blobs against
-     * @param securityThresholds The set ofcustom security thresholds to verify the blobs against
+     * @param securityThresholds The set of custom security thresholds to verify the blobs against
      * @param additionalQuorumNumbersRequired The additional required quorum numbers
      */
     function verifyBlobV2(
