@@ -41,6 +41,11 @@ func (e *MockEncoder) GetMultiFrameProofs(data []byte, params encoding.EncodingP
 	return args.Get(0).([]encoding.Proof), args.Error(1)
 }
 
+func (e *MockEncoder) GetSRSOrder() uint64 {
+	args := e.Called()
+	return args.Get(0).(uint64)
+}
+
 func (e *MockEncoder) VerifyFrames(chunks []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
 	args := e.Called(chunks, indices, commitments, params)
 	time.Sleep(e.Delay)

@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
@@ -31,12 +33,6 @@ type Server struct {
 	// the logger for the server
 	logger logging.Logger
 
-	// grpcPort is the port that the relay server listens on.
-	grpcPort int
-
-	// maxProtoSize is the maximum size of a gRPC message that the server will accept.
-	maxProtoSize int
-
 	// metadataProvider encapsulates logic for fetching metadata for blobs.
 	metadataProvider *metadataProvider
 
@@ -54,6 +50,58 @@ type Server struct {
 
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
+}
+
+// Config is the configuration for the relay Server.
+type Config struct {
+
+	// Log is the configuration for the logger.
+	Log common.LoggerConfig
+
+	// Configuration for the AWS client.
+	AWS aws.ClientConfig
+
+	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
+	// serve data for any shard it can.
+	RelayIDs []v2.RelayKey
+
+	// GRPCPort is the port that the relay server listens on.
+	GRPCPort int
+
+	// BucketName is the name of the S3 bucket that stores blobs.
+	BucketName string
+
+	// MetadataTableName is the name of the DynamoDB table that stores metadata.
+	MetadataTableName string
+
+	// MaxGRPCMessageSize is the maximum size of a gRPC message that the server will accept.
+	MaxGRPCMessageSize int
+
+	// MetadataCacheSize is the maximum number of items in the metadata cache.
+	MetadataCacheSize int
+
+	// MetadataMaxConcurrency puts a limit on the maximum number of concurrent metadata fetches actively running on
+	// goroutines.
+	MetadataMaxConcurrency int
+
+	// BlobCacheSize is the maximum number of items in the blob cache.
+	BlobCacheSize int
+
+	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
+	BlobMaxConcurrency int
+
+	// ChunkCacheSize is the maximum number of items in the chunk cache.
+	ChunkCacheSize int
+
+	// ChunkMaxConcurrency is the size of the work pool for fetching chunks. Note that this does not
+	// impact concurrency utilized by the s3 client to upload/download fragmented files.
+	ChunkMaxConcurrency int
+
+	// MaxKeysPerGetChunksRequest is the maximum number of keys that can be requested in a single GetChunks request.
+	MaxKeysPerGetChunksRequest int
+
+	// RateLimits contains configuration for rate limiting.
+	RateLimits limiter.Config
 }
 
 // NewServer creates a new relay Server.
@@ -99,8 +147,6 @@ func NewServer(
 	return &Server{
 		config:           config,
 		logger:           logger,
-		grpcPort:         config.GRPCPort,
-		maxProtoSize:     config.MaxGRPCMessageSize,
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
@@ -318,13 +364,13 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start() error {
 	// Serve grpc requests
-	addr := fmt.Sprintf("0.0.0.0:%d", s.grpcPort)
+	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("could not start tcp listener on %s: %w", addr, err)
 	}
 
-	opt := grpc.MaxRecvMsgSize(s.maxProtoSize)
+	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
 
 	s.grpcServer = grpc.NewServer(opt)
 	reflection.Register(s.grpcServer)
@@ -334,7 +380,7 @@ func (s *Server) Start() error {
 	name := pb.Relay_ServiceDesc.ServiceName
 	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
-	s.logger.Info("GRPC Listening", "port", s.grpcPort, "address", listener.Addr().String())
+	s.logger.Info("GRPC Listening", "port", s.config.GRPCPort, "address", listener.Addr().String())
 
 	if err = s.grpcServer.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")

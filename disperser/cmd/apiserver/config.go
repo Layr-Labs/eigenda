@@ -72,6 +72,25 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 
+	encodingConfig := kzg.ReadCLIConfig(ctx)
+	if version == uint(V2) {
+		if encodingConfig.G1Path == "" {
+			return Config{}, fmt.Errorf("G1Path must be specified for disperser version 2")
+		}
+		if encodingConfig.G2Path == "" {
+			return Config{}, fmt.Errorf("G2Path must be specified for disperser version 2")
+		}
+		if encodingConfig.CacheDir == "" {
+			return Config{}, fmt.Errorf("CacheDir must be specified for disperser version 2")
+		}
+		if encodingConfig.SRSOrder <= 0 {
+			return Config{}, fmt.Errorf("SRSOrder must be specified for disperser version 2")
+		}
+		if encodingConfig.SRSNumberToLoad <= 0 {
+			return Config{}, fmt.Errorf("SRSNumberToLoad must be specified for disperser version 2")
+		}
+	}
+
 	config := Config{
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
@@ -90,7 +109,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		},
 		RatelimiterConfig:           ratelimiterConfig,
 		RateConfig:                  rateConfig,
-		EncodingConfig:              kzg.ReadCLIConfig(ctx),
+		EncodingConfig:              encodingConfig,
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
 		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),

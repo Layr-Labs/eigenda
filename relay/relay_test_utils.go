@@ -3,6 +3,15 @@ package relay
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -24,14 +33,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
-	"time"
 )
 
 var (
@@ -196,7 +197,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
-	blobHeader, err := v2.NewBlobHeader(blobHeaderProto)
+	blobHeader, err := v2.BlobHeaderFromProtobuf(blobHeaderProto)
 	require.NoError(t, err)
 
 	return blobHeader, data

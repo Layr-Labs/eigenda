@@ -493,8 +493,10 @@ func SerializeMerkleProof(proof *merkletree.Proof) []byte {
 	return proofBytes
 }
 
-func DeserializeMerkleProof(data []byte) (*merkletree.Proof, error) {
-	proof := &merkletree.Proof{}
+func DeserializeMerkleProof(data []byte, index uint64) (*merkletree.Proof, error) {
+	proof := &merkletree.Proof{
+		Index: index,
+	}
 	if len(data)%32 != 0 {
 		return nil, fmt.Errorf("invalid proof length")
 	}
