@@ -21,7 +21,8 @@ import {EigenDABlobVerifier} from "../src/core/EigenDABlobVerifier.sol";
 import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
-
+import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
+import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
@@ -45,6 +46,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
     OperatorStateRetriever public operatorStateRetriever;
+    EigenDARelayRegistry public eigenDARelayRegistry;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -52,6 +54,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
     EigenDAThresholdRegistry public eigenDAThresholdRegistryImplementation;
+    EigenDARelayRegistry public eigenDARelayRegistryImplementation;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -106,6 +109,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
         eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        eigenDARelayRegistry = EigenDARelayRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
 
@@ -200,7 +206,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             rewardsCoordinator,
             registryCoordinator,
             stakeRegistry,
-            eigenDAThresholdRegistry
+            eigenDAThresholdRegistry,
+            eigenDARelayRegistry
         );
 
         address[] memory confirmers = new address[](1);
@@ -247,6 +254,14 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
             IRegistryCoordinator(address(registryCoordinator))
+        );
+
+        eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            address(eigenDARelayRegistryImplementation),
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
     }
 }

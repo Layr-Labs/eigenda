@@ -13,6 +13,8 @@ import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/cor
 import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
@@ -28,6 +30,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
     EigenDABlobVerifier eigenDABlobVerifier;
+    EigenDARelayRegistry eigenDARelayRegistry;
+    EigenDARelayRegistry eigenDARelayRegistryImplementation;
 
     EigenDAThresholdRegistry eigenDAThresholdRegistry;
     EigenDAThresholdRegistry eigenDAThresholdRegistryImplementation;
@@ -57,6 +61,12 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             )
         );
 
+        eigenDARelayRegistry = EigenDARelayRegistry(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
+
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
@@ -64,7 +74,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             rewardsCoordinator,
             registryCoordinator,
             stakeRegistry,
-            eigenDAThresholdRegistry
+            eigenDAThresholdRegistry,
+            eigenDARelayRegistry
         );
 
         address[] memory confirmers = new address[](1);
@@ -109,6 +120,15 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
             IRegistryCoordinator(address(registryCoordinator))
+        );
+
+        eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
+
+        cheats.prank(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            address(eigenDARelayRegistryImplementation),
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, registryCoordinatorOwner)
         );
     }
 

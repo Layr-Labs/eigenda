@@ -15,6 +15,8 @@ import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/cor
 import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
 
@@ -34,6 +36,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     EigenDAServiceManager eigenDAServiceManager;
     EigenDAServiceManager eigenDAServiceManagerImplementation;
     EigenDABlobVerifier eigenDABlobVerifier;
+    EigenDARelayRegistry eigenDARelayRegistry;
+    EigenDARelayRegistry eigenDARelayRegistryImplementation;
     EigenDAThresholdRegistry eigenDAThresholdRegistry;
     EigenDAThresholdRegistry eigenDAThresholdRegistryImplementation;
     bytes quorumAdversaryThresholdPercentages = hex"212121";
@@ -62,12 +66,19 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             )
         );
 
+        eigenDARelayRegistry = EigenDARelayRegistry(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
+
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
             rewardsCoordinator,
             registryCoordinator,
             stakeRegistry,
-            eigenDAThresholdRegistry
+            eigenDAThresholdRegistry,
+            eigenDARelayRegistry
         );
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
@@ -114,6 +125,15 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
             IRegistryCoordinator(address(registryCoordinator))
+        );
+
+        eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
+
+        cheats.prank(proxyAdminOwner);
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            address(eigenDARelayRegistryImplementation),
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, registryCoordinatorOwner)
         );
     }
 

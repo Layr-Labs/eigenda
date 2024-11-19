@@ -3,7 +3,7 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-
+import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
  * @author Layr Labs, Inc.
@@ -37,9 +37,14 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     uint32 public constant BLOCK_STALE_MEASURE = 300;
 
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+    IEigenDARelayRegistry public immutable eigenDARelayRegistry;
 
-    constructor(IEigenDAThresholdRegistry _eigenDAThresholdRegistry) {
+    constructor(
+        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
+        IEigenDARelayRegistry _eigenDARelayRegistry
+    ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
+        eigenDARelayRegistry = _eigenDARelayRegistry;
     }
 
     /// @notice The current batchId
