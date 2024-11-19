@@ -33,12 +33,10 @@ type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
-	rateConfig        RateConfig
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
 
 	chainReader   core.Reader
-	ratelimiter   common.RateLimiter
 	authenticator corev2.BlobRequestAuthenticator
 	prover        encoding.Prover
 	logger        logging.Logger
@@ -67,12 +65,10 @@ func NewDispersalServerV2(
 
 	return &DispersalServerV2{
 		serverConfig:      serverConfig,
-		rateConfig:        rateConfig,
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
 		chainReader:   chainReader,
-		ratelimiter:   ratelimiter,
 		authenticator: authenticator,
 		prover:        prover,
 		logger:        logger,
@@ -105,10 +101,6 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
 	}
 
-	if err := s.RefreshAllowlist(); err != nil {
-		return fmt.Errorf("failed to refresh allowlist: %w", err)
-	}
-
 	go func() {
 		ticker := time.NewTicker(s.onchainStateRefreshInterval)
 		defer ticker.Stop()
@@ -118,21 +110,6 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 			case <-ticker.C:
 				if err := s.RefreshOnchainState(ctx); err != nil {
 					s.logger.Error("failed to refresh onchain quorum state", "err", err)
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	go func() {
-		t := time.NewTicker(s.rateConfig.AllowlistRefreshInterval)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				if err := s.RefreshAllowlist(); err != nil {
-					s.logger.Error("failed to refresh allowlist", "err", err)
 				}
 			case <-ctx.Done():
 				return
@@ -184,22 +161,6 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 			LengthProof:      lengthProof,
 			Length:           uint32(c.Length),
 		}}, nil
-}
-
-func (s *DispersalServerV2) RefreshAllowlist() error {
-	s.logger.Debug("Refreshing onchain quorum state")
-	al, err := ReadAllowlistFromFile(s.rateConfig.AllowlistFile)
-	if err != nil {
-		return fmt.Errorf("failed to load allowlist: %w", err)
-	}
-	s.rateConfig.Allowlist = al
-	for account, rateInfoByQuorum := range al {
-		for quorumID, rateInfo := range rateInfoByQuorum {
-			s.logger.Info("[Allowlist]", "account", account, "name", rateInfo.Name, "quorumID", quorumID, "throughput", rateInfo.Throughput, "blobRate", rateInfo.BlobRate)
-		}
-	}
-
-	return nil
 }
 
 // refreshOnchainState refreshes the onchain quorum state.
