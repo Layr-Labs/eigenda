@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/binary"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/core"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -42,8 +43,8 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 }
 
 // SignGetChunksRequest signs the given GetChunksRequest with the given private key.
-func SignGetChunksRequest(request *pb.GetChunksRequest, privateKey []byte) ([]byte, error) {
-	//hash := HashGetChunksRequest(request)
-	// TODO implement this
-	return nil, nil
+func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) {
+	hash := HashGetChunksRequest(request)
+	signature := keys.SignMessage(([32]byte)(hash))
+	request.RequesterSignature = signature.G1Point.Serialize()
 }

@@ -61,9 +61,8 @@ func TestValidRequest(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.RequesterId = operatorID[:]
-	hash := HashGetChunksRequest(request)
-	signature := ics.KeyPairs[operatorID].SignMessage([32]byte(hash))
-	request.RequesterSignature = signature.G1Point.Serialize()
+	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	signature := request.RequesterSignature
 
 	now := time.Now()
 
@@ -78,7 +77,7 @@ func TestValidRequest(t *testing.T) {
 	// To probe at this, intentionally make a request that would be considered invalid if it were authenticated.
 	invalidRequest := randomGetChunksRequest()
 	invalidRequest.RequesterId = operatorID[:]
-	invalidRequest.RequesterSignature = signature.G1Point.Serialize() // the previous signature is invalid here
+	invalidRequest.RequesterSignature = signature // the previous signature is invalid here
 
 	start := now
 	for now.Before(start.Add(timeout)) {
@@ -124,9 +123,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.RequesterId = operatorID[:]
-	hash := HashGetChunksRequest(request)
-	signature := ics.KeyPairs[operatorID].SignMessage([32]byte(hash))
-	request.RequesterSignature = signature.G1Point.Serialize()
+	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	signature := request.RequesterSignature
 
 	now := time.Now()
 
@@ -141,7 +139,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	// To probe at this, intentionally make a request that would be considered invalid if it were authenticated.
 	invalidRequest := randomGetChunksRequest()
 	invalidRequest.RequesterId = operatorID[:]
-	invalidRequest.RequesterSignature = signature.G1Point.Serialize() // the previous signature is invalid here
+	invalidRequest.RequesterSignature = signature // the previous signature is invalid here
 
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
@@ -197,9 +195,7 @@ func TestBadSignature(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.RequesterId = operatorID[:]
-	hash := HashGetChunksRequest(request)
-	signature := ics.KeyPairs[operatorID].SignMessage([32]byte(hash))
-	request.RequesterSignature = signature.G1Point.Serialize()
+	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
 
 	now := time.Now()
 
@@ -216,15 +212,6 @@ func TestBadSignature(t *testing.T) {
 	// Change a byte in the signature to make it invalid
 	request.RequesterSignature[0] = request.RequesterSignature[0] ^ 1
 
-	err = authenticator.AuthenticateGetChunksRequest(
-		"foobar",
-		request,
-		now)
-	require.Error(t, err)
-
-	// Sign different data with the same key.
-	signature = ics.KeyPairs[operatorID].SignMessage([32]byte(tu.RandomBytes(32)))
-	request.RequesterSignature = signature.G1Point.Serialize()
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
 		request,
