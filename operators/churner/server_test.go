@@ -28,7 +28,7 @@ var (
 	keyPair                        *dacore.KeyPair
 	quorumIds                      = []uint32{0, 1}
 	logger                         = logging.NewNoopLogger()
-	transactorMock                 = &coremock.MockTransactor{}
+	transactorMock                 = &coremock.MockWriter{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -129,7 +129,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: invalid request: the quorum_id must be in range [0, 1], but found 2")
 }
 
-func setupMockTransactor() {
+func setupMockWriter() {
 	transactorMock.On("StakeRegistry").Return(gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), nil).Once()
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
 	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(0), nil)
@@ -179,7 +179,7 @@ func newTestServer(t *testing.T) *churner.Server {
 		t.Fatalf("Generating random BLS keys Error: %s", err.Error())
 	}
 
-	setupMockTransactor()
+	setupMockWriter()
 
 	metrics := churner.NewMetrics("9001", logger)
 	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)

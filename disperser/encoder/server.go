@@ -17,8 +17,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// TODO: Add EncodeMetrics
-type Server struct {
+type EncoderServer struct {
 	pb.UnimplementedEncoderServer
 
 	config  ServerConfig
@@ -31,8 +30,8 @@ type Server struct {
 	requestPool     chan struct{}
 }
 
-func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *Server {
-	return &Server{
+func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServer {
+	return &EncoderServer{
 		config:  config,
 		logger:  logger.With("component", "EncoderServer"),
 		prover:  prover,
@@ -43,7 +42,43 @@ func NewServer(config ServerConfig, logger logging.Logger, prover encoding.Prove
 	}
 }
 
-func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
+func (s *EncoderServer) Start() error {
+	// Serve grpc requests
+	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("Could not start tcp listener: %v", err)
+	}
+
+	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+	gs := grpc.NewServer(opt)
+	reflection.Register(gs)
+	pb.RegisterEncoderServer(gs, s)
+
+	// Register Server for Health Checks
+	name := pb.Encoder_ServiceDesc.ServiceName
+	healthcheck.RegisterHealthServer(name, gs)
+
+	s.close = func() {
+		err := listener.Close()
+		if err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+		gs.GracefulStop()
+	}
+
+	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
+	return gs.Serve(listener)
+}
+
+func (s *EncoderServer) Close() {
+	if s.close == nil {
+		return
+	}
+	s.close()
+}
+
+func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	startTime := time.Now()
 	select {
 	case s.requestPool <- struct{}{}:
@@ -72,18 +107,16 @@ func (s *Server) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb
 	return reply, err
 }
 
-func (s *Server) popRequest() {
+func (s *EncoderServer) popRequest() {
 	<-s.requestPool
 	<-s.runningRequests
 }
 
-func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
-
+func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	begin := time.Now()
 
 	if len(req.Data) == 0 {
 		return nil, errors.New("handleEncoding: missing data")
-
 	}
 
 	if req.EncodingParams == nil {
@@ -97,7 +130,6 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 	}
 
 	commits, chunks, err := s.prover.EncodeAndProve(req.GetData(), encodingParams)
-
 	if err != nil {
 		return nil, err
 	}
@@ -155,41 +187,4 @@ func (s *Server) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) 
 		Chunks:              chunksData,
 		ChunkEncodingFormat: format,
 	}, nil
-}
-
-func (s *Server) Start() error {
-
-	// Serve grpc requests
-	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("Could not start tcp listener: %v", err)
-	}
-
-	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
-	reflection.Register(gs)
-	pb.RegisterEncoderServer(gs, s)
-
-	// Register Server for Health Checks
-	name := pb.Encoder_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
-
-	s.close = func() {
-		err := listener.Close()
-		if err != nil {
-			log.Printf("failed to close listener: %v", err)
-		}
-		gs.GracefulStop()
-	}
-
-	s.logger.Info("port", s.config.GrpcPort, "address", listener.Addr().String(), "GRPC Listening")
-	return gs.Serve(listener)
-}
-
-func (s *Server) Close() {
-	if s.close == nil {
-		return
-	}
-	s.close()
 }

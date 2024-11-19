@@ -32,8 +32,8 @@ func TestRegisterOperator(t *testing.T) {
 		QuorumIDs:           []core.QuorumID{0, 1},
 		RegisterNodeAtStart: false,
 	}
-	createMockTx := func(quorumIDs []uint8) *coremock.MockTransactor {
-		tx := &coremock.MockTransactor{}
+	createMockTx := func(quorumIDs []uint8) *coremock.MockWriter {
+		tx := &coremock.MockWriter{}
 		tx.On("GetRegisteredQuorumIdsForOperator").Return(quorumIDs, nil)
 		tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
 			MaxOperatorCount:         1,
@@ -72,7 +72,7 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 		OperatorId: operatorID,
 		QuorumIDs:  []core.QuorumID{1},
 	}
-	tx := &coremock.MockTransactor{}
+	tx := &coremock.MockWriter{}
 	tx.On("GetRegisteredQuorumIdsForOperator").Return([]uint8{2}, nil)
 	tx.On("GetOperatorSetParams", mock.Anything, mock.Anything).Return(&core.OperatorSetParam{
 		MaxOperatorCount:         1,

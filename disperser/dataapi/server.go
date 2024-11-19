@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net/http"
 	"os"
@@ -17,10 +18,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -41,7 +44,8 @@ const (
 	maxOperatorsNonsigningPercentageAge = 10
 	maxOperatorPortCheckAge             = 60
 	maxNonSignerAge                     = 10
-	maxDeregisteredOperatorAage         = 10
+	maxDeregisteredOperatorAge          = 10
+	maxEjectedOperatorAge               = 10
 	maxThroughputAge                    = 10
 	maxMetricAage                       = 10
 	maxFeedBlobsAge                     = 10
@@ -49,6 +53,7 @@ const (
 	maxDisperserAvailabilityAge         = 3
 	maxChurnerAvailabilityAge           = 3
 	maxBatcherAvailabilityAge           = 3
+	maxOperatorsStakeAge                = 300 // not expect the stake change to happen frequently
 )
 
 var errNotFound = errors.New("not found")
@@ -119,6 +124,17 @@ type (
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+
 	QueriedStateOperatorMetadata struct {
 		OperatorId           string `json:"operator_id"`
 		BlockNumber          uint   `json:"block_number"`
@@ -130,6 +146,19 @@ type (
 	QueriedStateOperatorsResponse struct {
 		Meta Meta                            `json:"meta"`
 		Data []*QueriedStateOperatorMetadata `json:"data"`
+	}
+
+	QueriedOperatorEjections struct {
+		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
+		Quorum          uint8   `json:"quorum"`
+		BlockNumber     uint64  `json:"block_number"`
+		BlockTimestamp  string  `json:"block_timestamp"`
+		TransactionHash string  `json:"transaction_hash"`
+		StakePercentage float64 `json:"stake_percentage"`
+	}
+	QueriedOperatorEjectionsResponse struct {
+		Ejections []*QueriedOperatorEjections `json:"ejections"`
 	}
 
 	ServiceAvailability struct {
@@ -154,7 +183,7 @@ type (
 		RetrievalOnline bool   `json:"retrieval_online"`
 	}
 	SemverReportResponse struct {
-		Semver map[string]int `json:"semver"`
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
 	}
 
 	ErrorResponse struct {
@@ -169,7 +198,7 @@ type (
 		blobstore         disperser.BlobStore
 		promClient        PrometheusClient
 		subgraphClient    SubgraphClient
-		transactor        core.Transactor
+		transactor        core.Reader
 		chainState        core.ChainState
 		indexedChainState core.IndexedChainState
 
@@ -187,7 +216,7 @@ func NewServer(
 	blobstore disperser.BlobStore,
 	promClient PrometheusClient,
 	subgraphClient SubgraphClient,
-	transactor core.Transactor,
+	transactor core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
@@ -251,9 +280,11 @@ func (s *server) Start() error {
 		operatorsInfo := v1.Group("/operators-info")
 		{
 			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+			operatorsInfo.GET("/operator-ejections", s.FetchOperatorEjections)
 			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
 			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
 			operatorsInfo.GET("/semver-scan", s.SemverScan)
+			operatorsInfo.GET("/operators-stake", s.OperatorsStake)
 		}
 		metrics := v1.Group("/metrics")
 		{
@@ -675,6 +706,77 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, metric)
 }
 
+// OperatorsStake godoc
+//
+//	@Summary	Operator stake distribution query
+//	@Tags		OperatorsStake
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorsStakeResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/operators-stake [get]
+func (s *server) OperatorsStake(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorsStake", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
+
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("OperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to fetch current block number - %s", err))
+		return
+	}
+	state, err := s.chainState.GetOperatorState(c, currentBlock, []core.QuorumID{0, 1, 2})
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("OperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to fetch indexed operator state - %s", err))
+		return
+	}
+
+	tqs, quorumsStake := operators.GetRankedOperators(state)
+	s.metrics.UpdateOperatorsStake(tqs, quorumsStake)
+
+	stakeRanked := make(map[string][]*OperatorStake)
+	for q, operators := range quorumsStake {
+		quorum := fmt.Sprintf("%d", q)
+		stakeRanked[quorum] = make([]*OperatorStake, 0)
+		for i, op := range operators {
+			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
+					QuorumId:        quorum,
+					OperatorId:      op.OperatorId.Hex(),
+					StakePercentage: op.StakeShare / 100.0,
+					Rank:            i + 1,
+				})
+			}
+		}
+	}
+	stakeRanked["total"] = make([]*OperatorStake, 0)
+	for i, op := range tqs {
+		if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+			stakeRanked["total"] = append(stakeRanked["total"], &OperatorStake{
+				QuorumId:        "total",
+				OperatorId:      op.OperatorId.Hex(),
+				StakePercentage: op.StakeShare / 100.0,
+				Rank:            i + 1,
+			})
+		}
+	}
+	operatorsStakeResponse := &OperatorsStakeResponse{
+		StakeRankedOperators: stakeRanked,
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("OperatorsStake")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
+	c.JSON(http.StatusOK, operatorsStakeResponse)
+}
+
 // FetchDeregisteredOperators godoc
 //
 //	@Summary	Fetch list of operators that have been deregistered for days. Days is a query parameter with a default value of 14 and max value of 30.
@@ -716,7 +818,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
@@ -765,12 +867,73 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
 		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
+	})
+}
+
+// FetchOperatorEjections godoc
+//
+//	@Summary	Fetch list of operator ejections over last N days.
+//	@Tags		OperatorsInfo
+//	@Produce	json
+//	@Param		days		query		int		false	"Lookback in days [default: 1]"
+//	@Param		operator_id	query		string	false	"Operator ID filter [default: all operators]"
+//	@Param		first		query		int		false	"Return first N ejections [default: 1000]"
+//	@Param		skip		query		int		false	"Skip first N ejections [default: 0]"
+//	@Success	200			{object}	QueriedOperatorEjectionsResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators-info/operator-ejections [get]
+func (s *server) FetchOperatorEjections(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
+
+	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
+	parsedDays, err := strconv.ParseInt(days, 10, 32)
+	if err != nil || parsedDays < math.MinInt32 || parsedDays > math.MaxInt32 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+		return
+	}
+	daysInt := int32(parsedDays)
+
+	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
+	parsedFirst, err := strconv.ParseInt(first, 10, 32)
+	if err != nil || parsedFirst < 1 || parsedFirst > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
+		return
+	}
+	firstInt := int32(parsedFirst)
+
+	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
+	parsedSkip, err := strconv.ParseInt(skip, 10, 32)
+	if err != nil || parsedSkip < 0 || parsedSkip > 1000000000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
+		return
+	}
+	skipInt := int32(parsedSkip)
+
+	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
+	if err != nil {
+		s.logger.Error("Failed to fetch ejected operators", "error", err)
+		s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorEjections")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
+	c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
+		Ejections: operatorEjections,
 	})
 }
 

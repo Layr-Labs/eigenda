@@ -78,7 +78,7 @@ type Batcher struct {
 	AssignmentCoordinator core.AssignmentCoordinator
 	Aggregator            core.SignatureAggregator
 	EncodingStreamer      *EncodingStreamer
-	Transactor            core.Transactor
+	Transactor            core.Writer
 	TransactionManager    TxnManager
 	Metrics               *Metrics
 	HeartbeatChan         chan time.Time
@@ -99,7 +99,7 @@ func NewBatcher(
 	aggregator core.SignatureAggregator,
 	ethClient common.EthClient,
 	finalizer Finalizer,
-	transactor core.Transactor,
+	transactor core.Writer,
 	txnManager TxnManager,
 	logger logging.Logger,
 	metrics *Metrics,
@@ -154,13 +154,24 @@ func (b *Batcher) RecoverState(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
 	}
+	expired := 0
+	processing := 0
 	for _, meta := range metas {
-		err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
-		if err != nil {
-			return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+		if meta.Expiry == 0 || meta.Expiry < uint64(time.Now().Unix()) {
+			err = b.Queue.MarkBlobFailed(ctx, meta.GetBlobKey())
+			if err != nil {
+				return fmt.Errorf("failed to mark blob (%s) as failed: %w", meta.GetBlobKey(), err)
+			}
+			expired += 1
+		} else {
+			err = b.Queue.MarkBlobProcessing(ctx, meta.GetBlobKey())
+			if err != nil {
+				return fmt.Errorf("failed to mark blob (%s) as processing: %w", meta.GetBlobKey(), err)
+			}
+			processing += 1
 		}
 	}
-	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas))
+	b.logger.Info("Recovering state took", "duration", time.Since(start), "numBlobs", len(metas), "expired", expired, "processing", processing)
 	return nil
 }
 
@@ -291,7 +302,7 @@ func (b *Batcher) updateConfirmationInfo(
 				blobsToRetry = append(blobsToRetry, batchData.blobs[blobIndex])
 				continue
 			}
-			proof = serializeProof(merkleProof)
+			proof = core.SerializeMerkleProof(merkleProof)
 		}
 
 		confirmationInfo := &disperser.ConfirmationInfo{
@@ -550,14 +561,6 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func serializeProof(proof *merkletree.Proof) []byte {
-	proofBytes := make([]byte, 0)
-	for _, hash := range proof.Hashes {
-		proofBytes = append(proofBytes, hash[:]...)
-	}
-	return proofBytes
 }
 
 func (b *Batcher) parseBatchIDFromReceipt(txReceipt *types.Receipt) (uint32, error) {

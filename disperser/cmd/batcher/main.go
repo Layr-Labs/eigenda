@@ -176,7 +176,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	tx, err := coreeth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func RunBatcher(ctx *cli.Context) error {
 	if err != nil || storeDurationBlocks == 0 {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, config.BlobstoreConfig.ShadowTableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	queue := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
 	cs := coreeth.NewChainState(tx, client)
@@ -239,18 +239,13 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Batcher", "socket", httpSocket)
 	}
 
-	if config.EnableMinibatch {
-		// TODO: implement and run batchConfirmer for minibatch
-		return errors.New("minibatch is not supported")
-	} else {
-		batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
-		if err != nil {
-			return err
-		}
-		err = batcher.Start(context.Background())
-		if err != nil {
-			return err
-		}
+	batcher, err := batcher.NewBatcher(config.BatcherConfig, config.TimeoutConfig, queue, dispatcher, ics, asgn, encoderClient, agg, client, finalizer, tx, txnManager, logger, metrics, handleBatchLivenessChan)
+	if err != nil {
+		return err
+	}
+	err = batcher.Start(context.Background())
+	if err != nil {
+		return err
 	}
 
 	// Signal readiness

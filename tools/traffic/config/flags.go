@@ -80,6 +80,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "INSTANCE_LAUNCH_INTERVAL"),
 	}
 
+	MetricsBlacklistFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-blacklist"),
+		Usage:    "Any metric with a label exactly matching this string will not be sent to the metrics server.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_BLACKLIST"),
+	}
+
+	MetricsFuzzyBlacklistFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-fuzzy-blacklist"),
+		Usage:    "Any metric that contains any string in this list will not be sent to the metrics server.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_FUZZY_BLACKLIST"),
+	}
+
 	/* Configuration for the blob writer. */
 
 	NumWriteInstancesFlag = cli.UintFlag{
@@ -192,13 +206,6 @@ var (
 		Value:    3.0,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "REQUIRED_DOWNLOADS"),
 	}
-	ReadOverflowTableSizeFlag = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "read-overflow-table-size"),
-		Usage:    "Size of the overflow table for read requests.",
-		Required: false,
-		Value:    1024,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "READ_OVERFLOW_TABLE_SIZE"),
-	}
 	FetchBatchHeaderTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "fetch-batch-header-timeout"),
 		Usage:    "Amount of time to wait for a batch header to be fetched.",
@@ -243,9 +250,10 @@ var optionalFlags = []cli.Flag{
 	FetchBatchHeaderTimeoutFlag,
 	RetrieveBlobChunksTimeoutFlag,
 	GetBlobStatusTimeoutFlag,
-	ReadOverflowTableSizeFlag,
 	WriteTimeoutFlag,
 	VerificationChannelCapacityFlag,
+	MetricsBlacklistFlag,
+	MetricsFuzzyBlacklistFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

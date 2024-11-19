@@ -2,15 +2,16 @@ package workers
 
 import (
 	"context"
+	"math/rand"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 // BlobStatusTracker periodically polls the disperser service to verify the status of blobs that were recently written.
@@ -203,15 +204,14 @@ func (tracker *BlobStatusTracker) getBlobStatus(key *UnconfirmedKey) (*disperser
 	ctxTimeout, cancel := context.WithTimeout(*tracker.ctx, tracker.config.GetBlobStatusTimeout)
 	defer cancel()
 
-	status, err := metrics.InvokeAndReportLatency[*disperser.BlobStatusReply](tracker.getStatusLatencyMetric,
-		func() (*disperser.BlobStatusReply, error) {
-			return tracker.disperser.GetBlobStatus(ctxTimeout, key.Key)
-		})
+	start := time.Now()
+	status, err := tracker.disperser.GetBlobStatus(ctxTimeout, key.Key)
 
 	if err != nil {
 		tracker.getStatusErrorCountMetric.Increment()
 		return nil, err
 	}
+	tracker.getStatusLatencyMetric.ReportLatency(time.Since(start))
 
 	return status, nil
 }

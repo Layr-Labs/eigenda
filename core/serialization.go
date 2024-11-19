@@ -10,9 +10,13 @@ import (
 	"regexp"
 	"slices"
 
+	"github.com/Layr-Labs/eigenda/api"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
@@ -391,6 +395,117 @@ func (h *BlobHeader) Deserialize(data []byte) (*BlobHeader, error) {
 	}
 
 	return h, err
+}
+
+// GetBatchHeader constructs a core.BatchHeader from a proto of pb.StoreChunksRequest.
+// Note the StoreChunksRequest is validated as soon as it enters the node gRPC
+// interface, see grpc.Server.validateStoreChunkRequest.
+func BatchHeaderFromProtobuf(in *pb.BatchHeader) (*BatchHeader, error) {
+	if in == nil || len(in.GetBatchRoot()) == 0 {
+		return nil, fmt.Errorf("batch header is nil or empty")
+	}
+	var batchRoot [32]byte
+	copy(batchRoot[:], in.GetBatchRoot())
+	return &BatchHeader{
+		ReferenceBlockNumber: uint(in.GetReferenceBlockNumber()),
+		BatchRoot:            batchRoot,
+	}, nil
+}
+
+// BlobHeaderFromProtobuf constructs a core.BlobHeader from a proto of pb.BlobHeader.
+func BlobHeaderFromProtobuf(h *pb.BlobHeader) (*BlobHeader, error) {
+	if h == nil {
+		return nil, fmt.Errorf("GetBlobHeaderFromProto: blob header is nil")
+
+	}
+
+	commitX := new(fp.Element).SetBytes(h.GetCommitment().GetX())
+	commitY := new(fp.Element).SetBytes(h.GetCommitment().GetY())
+	commitment := &encoding.G1Commitment{
+		X: *commitX,
+		Y: *commitY,
+	}
+
+	if !(*bn254.G1Affine)(commitment).IsInSubGroup() {
+		return nil, errors.New("commitment is not in the subgroup")
+	}
+
+	var lengthCommitment, lengthProof encoding.G2Commitment
+	if h.GetLengthCommitment() != nil {
+		lengthCommitment.X.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA0())
+		lengthCommitment.X.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetXA1())
+		lengthCommitment.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA0())
+		lengthCommitment.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthCommitment().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthCommitment).IsInSubGroup() {
+		return nil, errors.New("lengthCommitment is not in the subgroup")
+	}
+
+	if h.GetLengthProof() != nil {
+		lengthProof.X.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA0())
+		lengthProof.X.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetXA1())
+		lengthProof.Y.A0 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA0())
+		lengthProof.Y.A1 = *new(fp.Element).SetBytes(h.GetLengthProof().GetYA1())
+	}
+
+	if !(*bn254.G2Affine)(&lengthProof).IsInSubGroup() {
+		return nil, errors.New("lengthProof is not in the subgroup")
+	}
+
+	quorumHeaders := make([]*BlobQuorumInfo, len(h.GetQuorumHeaders()))
+	for i, header := range h.GetQuorumHeaders() {
+		if header.GetQuorumId() > MaxQuorumID {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("quorum ID must be in range [0, %d], but found %d", MaxQuorumID, header.GetQuorumId()))
+		}
+		if err := ValidateSecurityParam(header.GetConfirmationThreshold(), header.GetAdversaryThreshold()); err != nil {
+			return nil, err
+		}
+
+		quorumHeaders[i] = &BlobQuorumInfo{
+			SecurityParam: SecurityParam{
+				QuorumID:              QuorumID(header.GetQuorumId()),
+				AdversaryThreshold:    uint8(header.GetAdversaryThreshold()),
+				ConfirmationThreshold: uint8(header.GetConfirmationThreshold()),
+				QuorumRate:            header.GetRatelimit(),
+			},
+			ChunkLength: uint(header.GetChunkLength()),
+		}
+	}
+
+	return &BlobHeader{
+		BlobCommitments: encoding.BlobCommitments{
+			Commitment:       commitment,
+			LengthCommitment: &lengthCommitment,
+			LengthProof:      &lengthProof,
+			Length:           uint(h.GetLength()),
+		},
+		QuorumInfos: quorumHeaders,
+		AccountID:   h.AccountId,
+	}, nil
+}
+
+func SerializeMerkleProof(proof *merkletree.Proof) []byte {
+	proofBytes := make([]byte, 0)
+	for _, hash := range proof.Hashes {
+		proofBytes = append(proofBytes, hash[:]...)
+	}
+	return proofBytes
+}
+
+func DeserializeMerkleProof(data []byte, index uint64) (*merkletree.Proof, error) {
+	proof := &merkletree.Proof{
+		Index: index,
+	}
+	if len(data)%32 != 0 {
+		return nil, fmt.Errorf("invalid proof length")
+	}
+	for i := 0; i < len(data); i += 32 {
+		var hash [32]byte
+		copy(hash[:], data[i:i+32])
+		proof.Hashes = append(proof.Hashes, hash[:])
+	}
+	return proof, nil
 }
 
 func encode(obj any) ([]byte, error) {

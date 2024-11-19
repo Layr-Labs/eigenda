@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"strings"
 )
 
 // Metrics allows the creation of metrics for the traffic generator.
@@ -31,22 +32,39 @@ type metrics struct {
 
 	httpPort string
 	logger   logging.Logger
+
+	metricsBlacklist      []string
+	metricsFuzzyBlacklist []string
 }
 
 // NewMetrics creates a new Metrics instance.
-func NewMetrics(httpPort string, logger logging.Logger) Metrics {
+func NewMetrics(
+	httpPort string,
+	logger logging.Logger,
+	metricsBlacklist []string,
+	metricsFuzzyBlacklist []string) Metrics {
+
 	namespace := "eigenda_generator"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
+	if metricsBlacklist == nil {
+		metricsBlacklist = []string{}
+	}
+	if metricsFuzzyBlacklist == nil {
+		metricsFuzzyBlacklist = []string{}
+	}
+
 	metrics := &metrics{
-		count:    buildCounterCollector(namespace, reg),
-		latency:  buildLatencyCollector(namespace, reg),
-		gauge:    buildGaugeCollector(namespace, reg),
-		registry: reg,
-		httpPort: httpPort,
-		logger:   logger.With("component", "GeneratorMetrics"),
+		count:                 buildCounterCollector(namespace, reg),
+		latency:               buildLatencyCollector(namespace, reg),
+		gauge:                 buildGaugeCollector(namespace, reg),
+		registry:              reg,
+		httpPort:              httpPort,
+		logger:                logger.With("component", "GeneratorMetrics"),
+		metricsBlacklist:      metricsBlacklist,
+		metricsFuzzyBlacklist: metricsFuzzyBlacklist,
 	}
 	return metrics
 }
@@ -71,6 +89,7 @@ func (metrics *metrics) NewLatencyMetric(description string) LatencyMetric {
 	return &latencyMetric{
 		metrics:     metrics,
 		description: description,
+		disabled:    metrics.isBlacklisted(description),
 	}
 }
 
@@ -79,6 +98,7 @@ func (metrics *metrics) NewCountMetric(description string) CountMetric {
 	return &countMetric{
 		metrics:     metrics,
 		description: description,
+		disabled:    metrics.isBlacklisted(description),
 	}
 }
 
@@ -87,5 +107,21 @@ func (metrics *metrics) NewGaugeMetric(description string) GaugeMetric {
 	return &gaugeMetric{
 		metrics:     metrics,
 		description: description,
+		disabled:    metrics.isBlacklisted(description),
 	}
+}
+
+// isBlacklisted returns true if the metric name is blacklisted.
+func (metrics *metrics) isBlacklisted(metricName string) bool {
+	for _, blacklisted := range metrics.metricsBlacklist {
+		if metricName == blacklisted {
+			return true
+		}
+	}
+	for _, blacklisted := range metrics.metricsFuzzyBlacklist {
+		if strings.Contains(metricName, blacklisted) {
+			return true
+		}
+	}
+	return false
 }

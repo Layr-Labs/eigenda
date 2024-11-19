@@ -32,8 +32,6 @@ type Config struct {
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 
-	EnableMinibatch bool
-
 	EnableGnarkBundleEncoding bool
 }
 
@@ -89,7 +87,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,
-		EnableMinibatch:               ctx.Bool(flags.EnableMinibatchFlag.Name),
 		EnableGnarkBundleEncoding:     ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 	}
 	return config, nil

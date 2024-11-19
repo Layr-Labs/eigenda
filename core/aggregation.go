@@ -80,12 +80,12 @@ type SignatureAggregator interface {
 
 type StdSignatureAggregator struct {
 	Logger     logging.Logger
-	Transactor Transactor
+	Transactor Reader
 	// OperatorAddresses contains the ethereum addresses of the operators corresponding to their operator IDs
 	OperatorAddresses *lru.Cache[OperatorID, gethcommon.Address]
 }
 
-func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*StdSignatureAggregator, error) {
+func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSignatureAggregator, error) {
 	operatorAddrs, err := lru.New[OperatorID, gethcommon.Address](maxNumOperatorAddresses)
 	if err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
+	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
 
 	return stakeThreshold
 }

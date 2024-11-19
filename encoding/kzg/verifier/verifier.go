@@ -41,8 +41,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	// read the whole order, and treat it as entire SRS for low degree proof
 	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
-		log.Println("failed to read G1 points", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
 	s2 := make([]bn254.G2Affine, 0)
@@ -56,8 +55,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 
 		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to read %d G2 points from %s: %v", config.SRSNumberToLoad, config.G2Path, err)
 		}
 
 		g2Trailing, err = kzg.ReadG2PointSection(
@@ -67,7 +65,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 			config.NumWorker,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read trailing G2 points from %s: %v", config.G2Path, err)
 		}
 	} else {
 		if len(config.G2PowerOf2Path) == 0 && len(config.G2Path) == 0 {
@@ -90,8 +88,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	}
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
-		log.Println("Could not create srs", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create SRS: %v", err)
 	}
 
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))

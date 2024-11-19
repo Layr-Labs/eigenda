@@ -36,12 +36,12 @@ var _ = Describe("Inabox Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		disp := clients.NewDisperserClient(&clients.Config{
+		disp, err := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
 		}, signer)
-
+		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 
 		data := make([]byte, 1024)
@@ -141,6 +141,15 @@ var _ = Describe("Inabox Integration", func() {
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve blob 1 from quorum 1
 		)
+		Expect(err).To(BeNil())
+
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve blob 1 from quorum 2
+		)
 		Expect(err).NotTo(BeNil())
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
@@ -159,6 +168,14 @@ var _ = Describe("Inabox Integration", func() {
 			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve from quorum 1
+		)
+		Expect(err).To(BeNil())
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve from quorum 2
 		)
 		Expect(err).NotTo(BeNil())
 	})

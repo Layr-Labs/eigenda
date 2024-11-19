@@ -56,6 +56,7 @@ func TestFinalizedBlob(t *testing.T) {
 	blobIndex := uint32(10)
 	sigRecordHash := [32]byte{0}
 	inclusionProof := []byte{1, 2, 3, 4, 5}
+	expiry := uint64(time.Now().Add(time.Hour).Unix())
 	confirmationInfo := &disperser.ConfirmationInfo{
 		BatchHeaderHash:         batchHeaderHash,
 		BlobIndex:               blobIndex,
@@ -73,7 +74,7 @@ func TestFinalizedBlob(t *testing.T) {
 		BlobHash:     metadataKey1.BlobHash,
 		MetadataHash: metadataKey1.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -86,7 +87,7 @@ func TestFinalizedBlob(t *testing.T) {
 		BlobHash:     metadataKey2.BlobHash,
 		MetadataHash: metadataKey2.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry + 1,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -164,11 +165,12 @@ func TestUnfinalizedBlob(t *testing.T) {
 		ConfirmationBlockNumber: uint32(150),
 		Fee:                     []byte{0},
 	}
+	expiry := uint64(time.Now().Add(100000).Unix())
 	metadata := &disperser.BlobMetadata{
 		BlobHash:     metadataKey.BlobHash,
 		MetadataHash: metadataKey.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -234,11 +236,12 @@ func TestNoReceipt(t *testing.T) {
 		ConfirmationBlockNumber: uint32(150),
 		Fee:                     []byte{0},
 	}
+	expiry := uint64(time.Now().Add(100000).Unix())
 	metadata := &disperser.BlobMetadata{
 		BlobHash:     metadataKey.BlobHash,
 		MetadataHash: metadataKey.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{

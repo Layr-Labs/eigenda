@@ -8,7 +8,6 @@ import (
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/node"
 	"github.com/wealdtech/go-merkletree/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -41,7 +40,7 @@ func (c client) GetBlobHeader(
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 ) (*core.BlobHeader, *merkletree.Proof, error) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		core.OperatorSocket(socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -64,7 +63,7 @@ func (c client) GetBlobHeader(
 		return nil, nil, err
 	}
 
-	blobHeader, err := node.GetBlobHeaderFromProto(reply.GetBlobHeader())
+	blobHeader, err := core.BlobHeaderFromProtobuf(reply.GetBlobHeader())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +85,7 @@ func (c client) GetChunks(
 	quorumID core.QuorumID,
 	chunksChan chan RetrievedChunks,
 ) {
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)

@@ -13,7 +13,7 @@ import (
 func TestAuthentication(t *testing.T) {
 
 	// Make the authenticator
-	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+	authenticator := auth.NewAuthenticator()
 
 	// Make the signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
@@ -43,7 +43,7 @@ func TestAuthentication(t *testing.T) {
 func TestAuthenticationFail(t *testing.T) {
 
 	// Make the authenticator
-	authenticator := auth.NewAuthenticator(auth.AuthConfig{})
+	authenticator := auth.NewAuthenticator()
 
 	// Make the signer
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

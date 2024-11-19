@@ -49,10 +49,10 @@ jobs:
 
       # Build And Push Images
       - name: Build Docker images
-        run: docker buildx bake
+        run: docker buildx bake ci-release
       - name: Push Docker images
         if: github.ref == 'refs/heads/master'
-        run: docker buildx bake --push
+        run: docker buildx bake ci-release --push
 
       - name: Send GitHub Action trigger data to Slack workflow
         if: ${{ failure() }}

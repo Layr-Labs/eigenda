@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 )
@@ -130,7 +129,7 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 		if denom.Cmp(big.NewInt(0)) == 0 {
 			return nil, AssignmentInfo{}, fmt.Errorf("gammaChunkLength %d and total stake %d in quorum %d must be greater than 0", gammaChunkLength, totalStakes, quorum)
 		}
-		m := roundUpDivideBig(num, denom)
+		m := RoundUpDivideBig(num, denom)
 
 		numChunks += uint(m.Uint64())
 		chunksByOperator[r.Index] = uint(m.Uint64())
@@ -204,15 +203,15 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		}
 		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
-		maxChunkLength := uint(roundUpDivideBig(num, denom).Uint64())
+		maxChunkLength := uint(RoundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := roundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := RoundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2
 		}
 
-		maxChunkLength = uint(nextPowerOf2(uint64(maxChunkLength)))
+		maxChunkLength = uint(NextPowerOf2(maxChunkLength))
 
 		if info.ChunkLength > maxChunkLength {
 			return false, fmt.Errorf("%w: chunk length: %d, max chunk length: %d", ErrChunkLengthTooLarge, info.ChunkLength, maxChunkLength)
@@ -260,23 +259,4 @@ func (c *StdAssignmentCoordinator) CalculateChunkLength(state *OperatorState, bl
 
 	}
 
-}
-
-func roundUpDivideBig(a, b *big.Int) *big.Int {
-
-	one := new(big.Int).SetUint64(1)
-	num := new(big.Int).Sub(new(big.Int).Add(a, b), one) // a + b - 1
-	res := new(big.Int).Div(num, b)                      // (a + b - 1) / b
-	return res
-
-}
-
-func roundUpDivide(a, b uint) uint {
-	return (a + b - 1) / b
-
-}
-
-func nextPowerOf2(d uint64) uint64 {
-	nextPower := math.Ceil(math.Log2(float64(d)))
-	return uint64(math.Pow(2.0, nextPower))
 }

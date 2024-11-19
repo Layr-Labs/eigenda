@@ -11,6 +11,14 @@ type Prover interface {
 	// for any number M such that M*params.ChunkLength > BlobCommitments.Length, then any set of M chunks will be sufficient to
 	// reconstruct the blob.
 	EncodeAndProve(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
+
+	GetCommitments(data []byte) (BlobCommitments, error)
+
+	GetFrames(data []byte, params EncodingParams) ([]*Frame, error)
+
+	GetMultiFrameProofs(data []byte, params EncodingParams) ([]Proof, error)
+
+	GetSRSOrder() uint64
 }
 
 type Verifier interface {

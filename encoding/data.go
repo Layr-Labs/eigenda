@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -28,11 +29,60 @@ type BlobCommitments struct {
 	Length           uint          `json:"length"`
 }
 
+// ToProfobuf converts the BlobCommitments to protobuf format
+func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
+	commitData, err := c.Commitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	lengthCommitData, err := c.LengthCommitment.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	lengthProofData, err := c.LengthProof.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pbcommon.BlobCommitment{
+		Commitment:       commitData,
+		LengthCommitment: lengthCommitData,
+		LengthProof:      lengthProofData,
+		Length:           uint32(c.Length),
+	}, nil
+}
+
+func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {
+	commitment, err := new(G1Commitment).Deserialize(c.Commitment)
+	if err != nil {
+		return nil, err
+	}
+
+	lengthCommitment, err := new(G2Commitment).Deserialize(c.LengthCommitment)
+	if err != nil {
+		return nil, err
+	}
+
+	lengthProof, err := new(G2Commitment).Deserialize(c.LengthProof)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BlobCommitments{
+		Commitment:       commitment,
+		LengthCommitment: lengthCommitment,
+		LengthProof:      lengthProof,
+		Length:           uint(c.Length),
+	}, nil
+}
+
 // Frame is a chunk of data with the associated multi-reveal proof
 type Frame struct {
 	// Proof is the multireveal proof corresponding to the chunk
 	Proof Proof
-	// Coeffs contains the coefficience of the interpolating polynomial of the chunk
+	// Coeffs contains the coefficients of the interpolating polynomial of the chunk
 	Coeffs []Symbol
 }
 
@@ -61,3 +111,11 @@ type SubBatch struct {
 }
 
 type ChunkNumber = uint
+
+// FragmentInfo contains metadata about how chunk coefficients file is stored.
+type FragmentInfo struct {
+	// TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.
+	TotalChunkSizeBytes uint32
+	// FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.
+	FragmentSizeBytes uint32
+}

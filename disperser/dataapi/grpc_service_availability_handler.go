@@ -80,13 +80,13 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 	// Create Pre-configured connections to the services
 	// Saves from having to create new connection on each request
 
-	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+	disperserConn, err := grpcConnection.Dial(disperserHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
 
 	if err != nil {
 		return nil
 	}
 
-	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})), grpc.WithBlock())
+	churnerConn, err := grpcConnection.Dial(churnerHostName, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
 
 	if err != nil {
 		return nil
@@ -100,12 +100,12 @@ func NewEigenDAServiceHealthCheck(grpcConnection GRPCConn, disperserHostName, ch
 
 // Create Connection to the service
 func (rc *GRPCDialerSkipTLS) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	// Create client options with timeout
+	opts = append(opts, grpc.WithConnectParams(grpc.ConnectParams{
+		MinConnectTimeout: 10 * time.Second,
+	}))
 
-	// TODO: make this a configurable option
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel() // Ensure the context is cancelled to free resources
-
-	return grpc.DialContext(ctx, serviceName, opts...)
+	return grpc.NewClient(serviceName, opts...)
 }
 
 // CheckServiceHealth matches the HealthCheckService interface

@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-// Config configures the traffic generator workers.
+// WorkerConfig configures the traffic generator workers.
 type WorkerConfig struct {
 	// The number of worker threads that generate write traffic.
 	NumWriteInstances uint
@@ -31,10 +31,6 @@ type WorkerConfig struct {
 	// 0 or 1 times with the specified probability (e.g. 0.2 means each blob has a 20% chance of being downloaded).
 	// If greater than 1.0, then each blob will be downloaded the specified number of times.
 	RequiredDownloads float64
-	// The size of a table of blobs to optionally read when we run out of blobs that we are required to read. Blobs
-	// that are no longer required are added to this table, and when the table is at capacity they are randomly retired.
-	// Set this to 0 to disable this feature.
-	ReadOverflowTableSize uint
 	// The amount of time to wait for a batch header to be fetched.
 	FetchBatchHeaderTimeout time.Duration
 	// The amount of time to wait for a blob to be retrieved.
@@ -46,4 +42,12 @@ type WorkerConfig struct {
 	SignerPrivateKey string
 	// Custom quorum numbers to use for the traffic generator.
 	CustomQuorums []uint8
+
+	// Any metric with a label exactly matching one of the strings in this list will not be sent to the metrics server.
+	MetricsBlacklist []string
+
+	// Any metric that contains any string in this list will not be sent to the metrics server. For example,
+	// including the string "_returned_chunk" will cause all metrics in the form of
+	// "operator_fb390a64122db3957fb220c3c42d5f71e97ab0c995da4e1e5cc3261602dac527_returned_chunk" to be omitted.
+	MetricsFuzzyBlacklist []string
 }

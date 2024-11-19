@@ -107,15 +107,16 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	disp := clients.NewDisperserClient(&clients.Config{
+	disp, err := clients.NewDisperserClient(&clients.Config{
 		Hostname: "localhost",
 		Port:     testConfig.Dispersers[0].DISPERSER_SERVER_GRPC_PORT,
 		Timeout:  10 * time.Second,
 	}, nil)
+	assert.NoError(t, err)
 	assert.NotNil(t, disp)
 
 	data := make([]byte, c.blobSize)
-	_, err := rand.Read(data)
+	_, err = rand.Read(data)
 	assert.NoError(t, err)
 
 	dispersalTicker := time.NewTicker(c.dispersalInterval)
@@ -128,7 +129,10 @@ func testRatelimit(t *testing.T, testConfig *deploy.Config, c ratelimitTestCase)
 		}
 	}()
 
-	conn, err := grpc.Dial(fmt.Sprintf("localhost:%v", testConfig.Retriever.RETRIEVER_GRPC_PORT), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("localhost:%v", testConfig.Retriever.RETRIEVER_GRPC_PORT),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
 	assert.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 	ret := retriever.NewRetrieverClient(conn)

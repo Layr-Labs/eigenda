@@ -39,16 +39,15 @@ var (
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName       = "test-BlobMetadata"
-	shadowMetadataTableName = ""
-	bucketTableName         = "test-BucketStore"
-	logger                  logging.Logger
-	ethClient               common.EthClient
-	rpcClient               common.RPCEthClient
-	mockRollup              *rollupbindings.ContractMockRollup
-	retrievalClient         clients.RetrievalClient
-	numConfirmations        int = 3
-	numRetries                  = 0
+	metadataTableName = "test-BlobMetadata"
+	bucketTableName   = "test-BucketStore"
+	logger            logging.Logger
+	ethClient         common.EthClient
+	rpcClient         common.RPCEthClient
+	mockRollup        *rollupbindings.ContractMockRollup
+	retrievalClient   clients.RetrievalClient
+	numConfirmations  int = 3
+	numRetries            = 0
 
 	cancel context.CancelFunc
 )
@@ -92,7 +91,7 @@ var _ = BeforeSuite(func() {
 			dockertestPool = pool
 			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, shadowMetadataTableName, bucketTableName)
+			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, "")
 			Expect(err).To(BeNil())
 
 		} else {
@@ -150,7 +149,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	tx, err := eth.NewTransactor(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}

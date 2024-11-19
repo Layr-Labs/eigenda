@@ -7,6 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -22,9 +24,14 @@ type MetricsConfig struct {
 type Metrics struct {
 	registry *prometheus.Registry
 
-	NumRequests *prometheus.CounterVec
-	Latency     *prometheus.SummaryVec
-	Semvers     *prometheus.GaugeVec
+	NumRequests    *prometheus.CounterVec
+	Latency        *prometheus.SummaryVec
+	OperatorsStake *prometheus.GaugeVec
+
+	Semvers                *prometheus.GaugeVec
+	SemversStakePctQuorum0 *prometheus.GaugeVec
+	SemversStakePctQuorum1 *prometheus.GaugeVec
+	SemversStakePctQuorum2 *prometheus.GaugeVec
 
 	httpPort string
 	logger   logging.Logger
@@ -60,6 +67,37 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 				Help: "Node semver install base",
 			},
 			[]string{"semver"},
+		),
+		SemversStakePctQuorum0: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_0",
+				Help: "Node semver stake percentage in quorum 0",
+			},
+			[]string{"semver_stake_pct_quorum_0"},
+		),
+		SemversStakePctQuorum1: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_1",
+				Help: "Node semver stake percentage in quorum 1",
+			},
+			[]string{"semver_stake_pct_quorum_1"},
+		),
+		SemversStakePctQuorum2: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "node_semvers_stake_pct_quorum_2",
+				Help: "Node semver stake percentage in quorum 2",
+			},
+			[]string{"semver_stake_pct_quorum_2"},
+		),
+		OperatorsStake: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "operators_stake",
+				Help:      "the sum of stake percentages of top N operators",
+			},
+			// The "quorum" can be: total, 0, 1, ...
+			// The "topn" can be: 1, 2, 3, 5, 8, 10
+			[]string{"quorum", "topn"},
 		),
 		registry: reg,
 		httpPort: httpPort,
@@ -98,9 +136,41 @@ func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 }
 
 // UpdateSemverMetrics updates the semver metrics
-func (g *Metrics) UpdateSemverCounts(semverData map[string]int) {
-	for semver, count := range semverData {
-		g.Semvers.WithLabelValues(semver).Set(float64(count))
+func (g *Metrics) UpdateSemverCounts(semverData map[string]*semver.SemverMetrics) {
+	for semver, metrics := range semverData {
+		g.Semvers.WithLabelValues(semver).Set(float64(metrics.Operators))
+		for quorum, stakePct := range metrics.QuorumStakePercentage {
+			switch quorum {
+			case 0:
+				g.SemversStakePctQuorum0.WithLabelValues(semver).Set(stakePct)
+			case 1:
+				g.SemversStakePctQuorum1.WithLabelValues(semver).Set(stakePct)
+			case 2:
+				g.SemversStakePctQuorum2.WithLabelValues(semver).Set(stakePct)
+			default:
+				g.logger.Error("Unable to log semver quorum stake percentage for quorum", "semver", semver, "quorum", quorum, "stake", stakePct)
+			}
+		}
+	}
+}
+
+func (g *Metrics) updateStakeMetrics(rankedOperators []*operators.OperatorStakeShare, label string) {
+	indices := []int{0, 1, 2, 4, 7, 9}
+	accuStake := float64(0)
+	idx := 0
+	for i, op := range rankedOperators {
+		accuStake += op.StakeShare
+		if idx < len(indices) && i == indices[idx] {
+			g.OperatorsStake.WithLabelValues(label, fmt.Sprintf("%d", i+1)).Set(accuStake / 100)
+			idx++
+		}
+	}
+}
+
+func (g *Metrics) UpdateOperatorsStake(totalRanked []*operators.OperatorStakeShare, quorumRanked map[uint8][]*operators.OperatorStakeShare) {
+	g.updateStakeMetrics(totalRanked, "total")
+	for q, operators := range quorumRanked {
+		g.updateStakeMetrics(operators, fmt.Sprintf("%d", q))
 	}
 }
 
@@ -143,7 +213,7 @@ func (collector *DynamoDBCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
-	count, err := collector.blobMetadataStore.GetBlobMetadataByStatusCount(context.Background(), disperser.Processing)
+	count, err := collector.blobMetadataStore.GetBlobMetadataCountByStatus(context.Background(), disperser.Processing)
 	if err != nil {
 		collector.logger.Error("failed to get count of blob metadata by status", "err", err)
 		return

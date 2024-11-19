@@ -7,7 +7,8 @@ service Encoder {
   rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
 }
 
-// BlomCommitments contains the blob's commitment, degree proof, and the actual degree
+// BlobCommitments contains the blob's commitment, degree proof, and the actual degree
+// DEPRECATED: use common.BlobCommitment instead
 message BlobCommitment {
   bytes commitment = 1;
   bytes length_commitment = 2;

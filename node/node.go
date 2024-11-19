@@ -12,31 +12,36 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/wealdtech/go-merkletree/v2"
-	"github.com/wealdtech/go-merkletree/v2/keccak256"
-	"google.golang.org/protobuf/proto"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gammazero/workerpool"
+
+	blssignerV1 "github.com/Layr-Labs/cerberus-api/pkg/api/v1"
 )
 
 const (
@@ -59,38 +64,42 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
+	StoreV2                 StoreV2
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
-	Transactor              core.Transactor
+	ValidatorV2             corev2.ShardValidator
+	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
+	BLSSigner               blssignerV1.SignerClient
+
+	RelayClient clients.RelayClient
 
 	mu            sync.Mutex
 	CurrentSocket string
 }
 
 // NewNode creates a new Node with the provided config.
-func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
+func NewNode(
+	reg *prometheus.Registry,
+	config *Config,
+	pubIPProvider pubip.Provider,
+	logger logging.Logger,
+) (*Node, error) {
 	// Setup metrics
 	// sdkClients, err := buildSdkClients(config, logger)
 	// if err != nil {
 	// 	return nil, err
 	// }
 
+	nodeLogger := logger.With("component", "Node")
+
 	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
 	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
 
-	// Generate BLS keys
-	keyPair, err := core.MakeKeyPairFromString(config.PrivateBls)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ID = keyPair.GetPubKeyG1().GetOperatorID()
-
 	// Make sure config folder exists.
-	err = os.MkdirAll(config.DbPath, os.ModePerm)
+	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
 	}
@@ -106,13 +115,54 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	}
 
 	// Create Transactor
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
+
+	var keyPair *core.KeyPair
+	var blsClient blssignerV1.SignerClient
+	if config.PrivateBls != "" {
+		nodeLogger.Info("using local keystore private key for BLS signing")
+		// Generate BLS keys
+		keyPair, err = core.MakeKeyPairFromString(config.PrivateBls)
+		if err != nil {
+			return nil, err
+		}
+
+		config.ID = keyPair.GetPubKeyG1().GetOperatorID()
+	} else {
+		pkBytes, err := hex.DecodeString(config.BLSPublicKeyHex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode BLS public key: %w", err)
+		}
+		pubkey := new(core.G1Point)
+		publicKey, err := pubkey.Deserialize(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		config.ID = publicKey.GetOperatorID()
+
+		nodeLogger.Info("creating signer client", "url", config.BLSRemoteSignerUrl)
+		creds := insecure.NewCredentials()
+		if config.BLSSignerTLSCertFilePath != "" {
+			creds, err = credentials.NewClientTLSFromFile(config.BLSSignerTLSCertFilePath, "")
+			if err != nil {
+				return nil, err
+			}
+		}
+		conn, err := grpc.NewClient(
+			config.BLSRemoteSignerUrl, grpc.WithTransportCredentials(creds),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new BLS remote signer client: %w", err)
+		}
+		blsClient = blssignerV1.NewSignerClient(conn)
+	}
 
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
@@ -126,6 +176,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
+	validatorV2 := corev2.NewShardValidator(v, config.ID)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -158,12 +209,14 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
-	nodeLogger := logger.With("component", "Node")
+
 	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
 		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
+	var relayClient clients.RelayClient
+	// Create a new relay client with relay addresses onchain
 	return &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -171,16 +224,20 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
+		StoreV2:                 nil,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
+		ValidatorV2:             validatorV2,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
+		RelayClient:             relayClient,
+		BLSSigner:               blsClient,
 	}, nil
 }
 
-// Starts the Node. If the node is not registered, register it on chain, otherwise just
+// Start starts the Node. If the node is not registered, register it on chain, otherwise just
 // update its socket on chain.
 func (n *Node) Start(ctx context.Context) error {
 	if n.Config.EnableMetrics {
@@ -384,132 +441,41 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
-	sig := n.KeyPair.SignMessage(batchHeaderHash)
+	signature, err := n.SignMessage(ctx, batchHeaderHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign batch: %w", err)
+	}
+
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.Config.BLSPublicKeyHex, "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
-	return sig, nil
+	return signature, nil
 }
 
-// ProcessBlobs validates the blobs are correct, stores data into the node's Store, and then returns a signature for each blob.
-// This method is similar to ProcessBatch method except that it doesn't require a batch.
-//
-// Notes:
-//   - If the blob is stored already, it's no-op to store it more than once
-//   - If the blob is stored, but the processing fails after that, these data items will not be rollback
-//   - These data items will be garbage collected eventually when they become stale.
-func (n *Node) ProcessBlobs(ctx context.Context, blobs []*core.BlobMessage, rawBlobs []*node.Blob) ([]*core.Signature, error) {
-	start := time.Now()
-	log := n.Logger
-
-	if len(blobs) == 0 {
-		return nil, errors.New("number of blobs must be greater than zero")
-	}
-
-	if len(blobs) != len(rawBlobs) {
-		return nil, errors.New("number of parsed blobs must be the same as number of blobs from protobuf request")
-	}
-
-	// Measure num batches received and its size in bytes
-	batchSize := uint64(0)
-	for _, blob := range blobs {
-		for quorumID, bundle := range blob.Bundles {
-			n.Metrics.AcceptBlobs(quorumID, bundle.Size())
-		}
-		batchSize += blob.Bundles.Size()
-	}
-	n.Metrics.AcceptBatches("received", batchSize)
-
-	log.Debug("Start processing blobs", "batchSizeBytes", batchSize, "numBlobs", len(blobs))
-
-	// Store the blobs
-	// Run this in a goroutine so we can parallelize the blob storing and blob verifaction work.
-	// This should be able to improve latency without needing more CPUs, because blob
-	// storing is an IO operation.
-	type storeResult struct {
-		// Whether StoreBatch failed.
-		err error
-
-		// The keys that are stored to database for a single batch.
-		// Defined only if the batch not already exists and gets stored to database successfully.
-		keys *[][]byte
-
-		// Latency to store the batch.
-		// Defined only if the batch not already exists and gets stored to database successfully.
-		latency time.Duration
-	}
-	storeChan := make(chan storeResult)
-	go func(n *Node) {
-		start := time.Now()
-		keys, err := n.Store.StoreBlobs(ctx, blobs, rawBlobs)
+func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	if n.Config.BLSRemoteSignerEnabled {
+		sigResp, err := n.BLSSigner.SignGeneric(
+			ctx,
+			&blssignerV1.SignGenericRequest{
+				PublicKey: n.Config.BLSPublicKeyHex,
+				Password:  n.Config.BLSKeyPassword,
+				Data:      data[:],
+			},
+		)
 		if err != nil {
-			// If batch already exists, we don't store it again, but we should not
-			// error out in such case.
-			if errors.Is(err, ErrBatchAlreadyExist) {
-				storeChan <- storeResult{err: nil, keys: nil, latency: 0}
-			} else {
-				storeChan <- storeResult{err: fmt.Errorf("failed to store batch: %w", err), keys: nil, latency: 0}
-			}
-			return
+			return nil, fmt.Errorf("failed to sign data: %w", err)
 		}
-		storeChan <- storeResult{err: nil, keys: keys, latency: time.Since(start)}
-	}(n)
-
-	// Validate batch
-	// Assumes that all blobs have been validated to have the same reference block number.
-	stageTimer := time.Now()
-	referenceBlockNumber := uint(0)
-	for _, blob := range rawBlobs {
-		blobRefBlock := blob.GetHeader().GetReferenceBlockNumber()
-		if referenceBlockNumber == 0 && blobRefBlock != 0 {
-			referenceBlockNumber = uint(blobRefBlock)
-			break
+		sig := new(core.Signature)
+		g, err := sig.Deserialize(sigResp.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize signature: %w", err)
 		}
+		return &core.Signature{
+			G1Point: g,
+		}, nil
 	}
-	if referenceBlockNumber == 0 {
-		return nil, errors.New("reference block number is not set")
-	}
-
-	err := n.ValidateBlobs(ctx, blobs, referenceBlockNumber)
-	if err != nil {
-		// If we have already stored the batch into database, but it's not valid, we
-		// revert all the keys for that batch.
-		result := <-storeChan
-		if result.keys != nil {
-			log.Debug("Batch validation failed, rolling back the key/value entries stored in database", "number of entires", len(*result.keys), "referenceBlockNumber", referenceBlockNumber)
-			if deleteKeysErr := n.Store.DeleteKeys(ctx, result.keys); deleteKeysErr != nil {
-				log.Error("Failed to delete the invalid batch that should be rolled back", "err", deleteKeysErr)
-			}
-		}
-		return nil, err
-	}
-	n.Metrics.RecordStoreChunksStage("validated", batchSize, time.Since(stageTimer))
-	log.Debug("Validate blobs took", "duration:", time.Since(stageTimer))
-
-	// Before we sign the blobs, we should first complete the batch storing successfully.
-	result := <-storeChan
-	if result.err != nil {
-		return nil, fmt.Errorf("failed to store blobs: %w", result.err)
-	}
-	if result.keys != nil {
-		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
-		n.Logger.Debug("StoreBlobs succeeded", "duration:", result.latency)
-	} else {
-		n.Logger.Warn("StoreBlobs skipped because the batch already exists in the store")
-	}
-
-	// Sign all blobs if all validation checks pass and data items are written to database.
-	stageTimer = time.Now()
-	signatures, err := n.SignBlobs(blobs, referenceBlockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign blobs: %w", err)
-	}
-	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("SignBlobs succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
-
-	log.Debug("Exiting ProcessBlobs", "duration", time.Since(start))
-	return signatures, nil
+	return n.KeyPair.SignMessage(data), nil
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
@@ -535,112 +501,6 @@ func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blob
 		return fmt.Errorf("failed to validate batch with operator state %x: %w", strings.Join(hStr, ","), err)
 	}
 	n.Logger.Debug("ValidateBatch completed", "get operator state duration", getStateDuration, "total duration", time.Since(start))
-	return nil
-}
-
-// ValidateBlobs validates the blob commitments are correct
-func (n *Node) ValidateBlobs(ctx context.Context, blobs []*core.BlobMessage, referenceBlockNumber uint) error {
-	start := time.Now()
-	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, referenceBlockNumber, n.Config.ID)
-	if err != nil {
-		return err
-	}
-	getStateDuration := time.Since(start)
-
-	pool := workerpool.New(n.Config.NumBatchValidators)
-	err = n.Validator.ValidateBlobs(blobs, operatorState, pool)
-	if err != nil {
-		h, hashErr := operatorState.Hash()
-		if hashErr != nil {
-			n.Logger.Error("failed to get operator state hash", "err", hashErr)
-		}
-
-		hStr := make([]string, 0, len(h))
-		for q, hash := range h {
-			hStr = append(hStr, fmt.Sprintf("%d: %x", q, hash))
-		}
-		return fmt.Errorf("failed to validate batch with operator state %x: %w", strings.Join(hStr, ","), err)
-	}
-	n.Logger.Debug("ValidateBlob completed", "get operator state duration", getStateDuration, "total duration", time.Since(start))
-	return nil
-}
-
-func (n *Node) SignBlobs(blobs []*core.BlobMessage, referenceBlockNumber uint) ([]*core.Signature, error) {
-	start := time.Now()
-	signatures := make([]*core.Signature, len(blobs))
-	for i, blob := range blobs {
-		if blob == nil || blob.BlobHeader == nil {
-			signatures[i] = nil
-			continue
-		}
-		batchHeader := &core.BatchHeader{
-			ReferenceBlockNumber: referenceBlockNumber,
-			BatchRoot:            [32]byte{},
-		}
-		_, err := batchHeader.SetBatchRoot([]*core.BlobHeader{blob.BlobHeader})
-		if err != nil {
-			return nil, fmt.Errorf("failed to set batch root: %w", err)
-		}
-		batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get batch header hash: %w", err)
-		}
-		sig := n.KeyPair.SignMessage(batchHeaderHash)
-		signatures[i] = sig
-	}
-
-	n.Logger.Debug("SignBlobs completed", "duration", time.Since(start))
-	return signatures, nil
-}
-
-// ValidateBlobHeadersRoot validates the blob headers root hash
-// by comparing it with the merkle tree root hash of the blob headers.
-// It also checks if all blob headers have the same reference block number
-func (n *Node) ValidateBatchContents(ctx context.Context, blobHeaderHashes [][32]byte, batchHeader *core.BatchHeader) error {
-	leafs := make([][]byte, 0)
-	for _, blobHeaderHash := range blobHeaderHashes {
-		blobHeaderBytes, err := n.Store.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash)
-		if err != nil {
-			return fmt.Errorf("failed to get blob header by hash: %w", err)
-		}
-		if blobHeaderBytes == nil {
-			return fmt.Errorf("blob header not found for hash %x", blobHeaderHash)
-		}
-
-		var protoBlobHeader node.BlobHeader
-		err = proto.Unmarshal(blobHeaderBytes, &protoBlobHeader)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal blob header: %w", err)
-		}
-		if uint32(batchHeader.ReferenceBlockNumber) != protoBlobHeader.GetReferenceBlockNumber() {
-			return errors.New("blob headers have different reference block numbers")
-		}
-
-		blobHeader, err := GetBlobHeaderFromProto(&protoBlobHeader)
-		if err != nil {
-			return fmt.Errorf("failed to get blob header from proto: %w", err)
-		}
-
-		blobHeaderHash, err := blobHeader.GetBlobHeaderHash()
-		if err != nil {
-			return fmt.Errorf("failed to get blob header hash: %w", err)
-		}
-		leafs = append(leafs, blobHeaderHash[:])
-	}
-
-	if len(leafs) == 0 {
-		return errors.New("no blob headers found")
-	}
-
-	tree, err := merkletree.NewTree(merkletree.WithData(leafs), merkletree.WithHashType(keccak256.New()))
-	if err != nil {
-		return fmt.Errorf("failed to create merkle tree: %w", err)
-	}
-
-	if !reflect.DeepEqual(tree.Root(), batchHeader.BatchRoot[:]) {
-		return errors.New("invalid batch header")
-	}
-
 	return nil
 }
 

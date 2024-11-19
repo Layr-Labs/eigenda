@@ -8,9 +8,11 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 )
 
 // BlobStore is an in-memory implementation of the BlobStore interface
@@ -62,6 +64,7 @@ func (q *BlobStore) StoreBlob(ctx context.Context, blob *core.Blob, requestedAt 
 			BlobSize:          uint(len(blob.Data)),
 			RequestedAt:       requestedAt,
 		},
+		Expiry: requestedAt + uint64(time.Hour),
 	}
 
 	return blobKey, nil
@@ -73,7 +76,7 @@ func (q *BlobStore) GetBlobContent(ctx context.Context, blobHash disperser.BlobH
 	if holder, ok := q.Blobs[blobHash]; ok {
 		return holder.Data, nil
 	} else {
-		return nil, disperser.ErrBlobNotFound
+		return nil, common.ErrBlobNotFound
 	}
 }
 
@@ -91,7 +94,7 @@ func (q *BlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadata *dis
 	}
 	blobKey := existingMetadata.GetBlobKey()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return nil, disperser.ErrBlobNotFound
+		return nil, common.ErrBlobNotFound
 	}
 	newMetadata := *existingMetadata
 	newMetadata.BlobStatus = disperser.Confirmed
@@ -104,7 +107,7 @@ func (q *BlobStore) MarkBlobDispersing(ctx context.Context, blobKey disperser.Bl
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 	q.Metadata[blobKey].BlobStatus = disperser.Dispersing
 	return nil
@@ -115,7 +118,7 @@ func (q *BlobStore) MarkBlobInsufficientSignatures(ctx context.Context, existing
 	defer q.mu.Unlock()
 	blobKey := existingMetadata.GetBlobKey()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return nil, disperser.ErrBlobNotFound
+		return nil, common.ErrBlobNotFound
 	}
 	newMetadata := *existingMetadata
 	newMetadata.BlobStatus = disperser.InsufficientSignatures
@@ -128,7 +131,7 @@ func (q *BlobStore) MarkBlobFinalized(ctx context.Context, blobKey disperser.Blo
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 
 	q.Metadata[blobKey].BlobStatus = disperser.Finalized
@@ -139,7 +142,7 @@ func (q *BlobStore) MarkBlobProcessing(ctx context.Context, blobKey disperser.Bl
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 
 	q.Metadata[blobKey].BlobStatus = disperser.Processing
@@ -150,7 +153,7 @@ func (q *BlobStore) MarkBlobFailed(ctx context.Context, blobKey disperser.BlobKe
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[blobKey]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 
 	q.Metadata[blobKey].BlobStatus = disperser.Failed
@@ -161,7 +164,7 @@ func (q *BlobStore) IncrementBlobRetryCount(ctx context.Context, existingMetadat
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[existingMetadata.GetBlobKey()]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 
 	q.Metadata[existingMetadata.GetBlobKey()].NumRetries++
@@ -172,7 +175,7 @@ func (q *BlobStore) UpdateConfirmationBlockNumber(ctx context.Context, existingM
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, ok := q.Metadata[existingMetadata.GetBlobKey()]; !ok {
-		return disperser.ErrBlobNotFound
+		return common.ErrBlobNotFound
 	}
 
 	if q.Metadata[existingMetadata.GetBlobKey()].ConfirmationInfo == nil {
@@ -194,7 +197,7 @@ func (q *BlobStore) GetBlobsByMetadata(ctx context.Context, metadata []*disperse
 				Data:          holder.Data,
 			}
 		} else {
-			return nil, disperser.ErrBlobNotFound
+			return nil, common.ErrBlobNotFound
 		}
 	}
 	return blobs, nil
@@ -225,7 +228,7 @@ func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, s
 		i++
 	}
 	sort.Slice(keys, func(i, j int) bool {
-		return q.Metadata[keys[i]].RequestMetadata.RequestedAt < q.Metadata[keys[j]].RequestMetadata.RequestedAt
+		return q.Metadata[keys[i]].Expiry < q.Metadata[keys[j]].Expiry
 	})
 	for _, key := range keys {
 		meta := q.Metadata[key]
@@ -234,17 +237,17 @@ func (q *BlobStore) GetBlobMetadataByStatusWithPagination(ctx context.Context, s
 				metas = append(metas, meta)
 				if len(metas) == int(limit) {
 					return metas, &disperser.BlobStoreExclusiveStartKey{
-						BlobStatus:  int32(meta.BlobStatus),
-						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+						BlobStatus: int32(meta.BlobStatus),
+						Expiry:     int64(meta.Expiry),
 					}, nil
 				}
-			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.RequestMetadata.RequestedAt > uint64(exclusiveStartKey.RequestedAt) {
+			} else if meta.BlobStatus == disperser.BlobStatus(exclusiveStartKey.BlobStatus) && meta.Expiry > uint64(exclusiveStartKey.Expiry) {
 				foundStart = true // Found the starting point, start appending metas from next item
 				metas = append(metas, meta)
 				if len(metas) == int(limit) {
 					return metas, &disperser.BlobStoreExclusiveStartKey{
-						BlobStatus:  int32(meta.BlobStatus),
-						RequestedAt: int64(meta.RequestMetadata.RequestedAt),
+						BlobStatus: int32(meta.BlobStatus),
+						Expiry:     int64(meta.Expiry),
 					}, nil
 				}
 			}
@@ -264,7 +267,7 @@ func (q *BlobStore) GetMetadataInBatch(ctx context.Context, batchHeaderHash [32]
 		}
 	}
 
-	return nil, disperser.ErrBlobNotFound
+	return nil, common.ErrBlobNotFound
 }
 
 func (q *BlobStore) GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*disperser.BlobMetadata, error) {
@@ -325,7 +328,7 @@ func (q *BlobStore) GetBlobMetadata(ctx context.Context, blobKey disperser.BlobK
 	if meta, ok := q.Metadata[blobKey]; ok {
 		return meta, nil
 	}
-	return nil, disperser.ErrBlobNotFound
+	return nil, common.ErrBlobNotFound
 }
 
 func (q *BlobStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []disperser.BlobKey) ([]*disperser.BlobMetadata, error) {

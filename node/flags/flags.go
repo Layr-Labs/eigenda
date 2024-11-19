@@ -101,7 +101,7 @@ var (
 	// The files for encrypted private keys.
 	BlsKeyFileFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-key-file"),
-		Required: true,
+		Required: false,
 		Usage:    "Path to the encrypted bls private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_KEY_FILE"),
 	}
@@ -114,7 +114,7 @@ var (
 	// Passwords to decrypt the private keys.
 	BlsKeyPasswordFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-key-password"),
-		Required: true,
+		Required: false,
 		Usage:    "Password to decrypt bls private key",
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_KEY_PASSWORD"),
 	}
@@ -272,6 +272,34 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_NODE_INFO_RESOURCES"),
 	}
+
+	BLSRemoteSignerEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-remote-signer-enabled"),
+		Usage:    "Set to true to enable the BLS remote signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_REMOTE_SIGNER_ENABLED"),
+	}
+
+	BLSRemoteSignerUrlFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-remote-signer-url"),
+		Usage:    "The URL of the BLS remote signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_REMOTE_SIGNER_URL"),
+	}
+
+	BLSPublicKeyHexFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-public-key-hex"),
+		Usage:    "The hex-encoded public key of the BLS signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_PUBLIC_KEY_HEX"),
+	}
+
+	BLSSignerCertFileFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-signer-cert-file"),
+		Usage:    "The path to the BLS signer certificate file",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -314,6 +342,10 @@ var optionalFlags = []cli.Flag{
 	DataApiUrlFlag,
 	DisableNodeInfoResourcesFlag,
 	EnableGnarkBundleEncodingFlag,
+	BLSRemoteSignerEnabledFlag,
+	BLSRemoteSignerUrlFlag,
+	BLSPublicKeyHexFlag,
+	BLSSignerCertFileFlag,
 }
 
 func init() {

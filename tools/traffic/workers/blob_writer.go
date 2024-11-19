@@ -5,13 +5,14 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"sync"
-	"time"
 )
 
 // BlobWriter sends blobs to a disperser at a configured rate.
@@ -111,13 +112,16 @@ func (writer *BlobWriter) writeNextBlob() {
 		writer.logger.Error("failed to get random data", "err", err)
 		return
 	}
-	key, err := metrics.InvokeAndReportLatency(writer.writeLatencyMetric, func() ([]byte, error) {
-		return writer.sendRequest(data)
-	})
+	start := time.Now()
+	key, err := writer.sendRequest(data)
 	if err != nil {
 		writer.writeFailureMetric.Increment()
 		writer.logger.Error("failed to send blob request", "err", err)
 		return
+	} else {
+		end := time.Now()
+		duration := end.Sub(start)
+		writer.writeLatencyMetric.ReportLatency(duration)
 	}
 
 	writer.writeSuccessMetric.Increment()
