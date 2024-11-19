@@ -105,6 +105,51 @@ func TestValidRequest(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestAuthenticationSavingDisabled(t *testing.T) {
+	tu.InitializeRandom()
+
+	operatorID := mock.MakeOperatorId(0)
+	stakes := map[core.QuorumID]map[core.OperatorID]int{
+		core.QuorumID(0): {
+			operatorID: 1,
+		},
+	}
+	ics, err := mock.NewChainDataMock(stakes)
+	require.NoError(t, err)
+
+	// This disables saving of authentication results.
+	timeout := time.Duration(0)
+
+	authenticator := NewRequestAuthenticator(ics, timeout)
+
+	request := randomGetChunksRequest()
+	request.RequesterId = operatorID[:]
+	hash := HashGetChunksRequest(request)
+	signature := ics.KeyPairs[operatorID].SignMessage([32]byte(hash))
+	request.RequesterSignature = signature.G1Point.Serialize()
+
+	now := time.Now()
+
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	err = authenticator.AuthenticateGetChunksRequest(
+		"foobar",
+		request,
+		now)
+	require.NoError(t, err)
+
+	// There is no authentication timeout, so a new request should trigger authentication.
+	// To probe at this, intentionally make a request that would be considered invalid if it were authenticated.
+	invalidRequest := randomGetChunksRequest()
+	invalidRequest.RequesterId = operatorID[:]
+	invalidRequest.RequesterSignature = signature.G1Point.Serialize() // the previous signature is invalid here
+
+	err = authenticator.AuthenticateGetChunksRequest(
+		"foobar",
+		invalidRequest,
+		now)
+	require.Error(t, err)
+}
+
 func TestNonExistingClient(t *testing.T) {
 	tu.InitializeRandom()
 
