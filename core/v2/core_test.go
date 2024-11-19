@@ -79,6 +79,7 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		SRSOrder:        8192,
 		SRSNumberToLoad: 8192,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	p, err := prover.NewProver(config, nil)

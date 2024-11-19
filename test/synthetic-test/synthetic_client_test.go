@@ -241,6 +241,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		SRSNumberToLoad: uint64(srsOrder),
 		Verbose:         true,
 		PreloadEncoder:  false,
+		LoadG2Points:    true,
 	}, false)
 	if err != nil {
 		return err
