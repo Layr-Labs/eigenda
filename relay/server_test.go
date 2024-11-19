@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"math/rand"
 	"testing"
 
@@ -18,14 +19,32 @@ import (
 
 func defaultConfig() *Config {
 	return &Config{
-		GRPCPort:               50051,
-		MaxGRPCMessageSize:     1024 * 1024 * 300,
-		MetadataCacheSize:      1024 * 1024,
-		MetadataMaxConcurrency: 32,
-		BlobCacheSize:          32,
-		BlobMaxConcurrency:     32,
-		ChunkCacheSize:         32,
-		ChunkMaxConcurrency:    32,
+		GRPCPort:                   50051,
+		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		MetadataCacheSize:          1024 * 1024,
+		MetadataMaxConcurrency:     32,
+		BlobCacheSize:              32,
+		BlobMaxConcurrency:         32,
+		ChunkCacheSize:             32,
+		ChunkMaxConcurrency:        32,
+		MaxKeysPerGetChunksRequest: 1024,
+		RateLimits: limiter.Config{
+			MaxGetBlobOpsPerSecond:          1024,
+			GetBlobOpsBurstiness:            1024,
+			MaxGetBlobBytesPerSecond:        20 * 1024 * 1024,
+			GetBlobBytesBurstiness:          20 * 1024 * 1024,
+			MaxConcurrentGetBlobOps:         1024,
+			MaxGetChunkOpsPerSecond:         1024,
+			GetChunkOpsBurstiness:           1024,
+			MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
+			GetChunkBytesBurstiness:         20 * 1024 * 1024,
+			MaxConcurrentGetChunkOps:        1024,
+			MaxGetChunkOpsPerSecondClient:   8,
+			GetChunkOpsBurstinessClient:     8,
+			MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
+			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
+			MaxConcurrentGetChunkOpsClient:  1,
+		},
 	}
 }
 
@@ -318,6 +337,10 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -634,6 +657,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -904,6 +931,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,

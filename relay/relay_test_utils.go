@@ -178,7 +178,7 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 
 func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 
-	data := tu.RandomBytes(128)
+	data := tu.RandomBytes(225) // TODO talk to Ian about this
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitments(data)

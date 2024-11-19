@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -12,21 +13,6 @@ import (
 )
 
 // Config is the configuration for the relay Server.
-//
-// Environment variables are mapped into this struct by taking the name of the field in this struct,
-// converting to upper case, and prepending "RELAY_". For example, "BlobCacheSize" can be set using the
-// environment variable "RELAY_BLOBCACHESIZE".
-//
-// For nested structs, add the name of the struct variable before the field name, separated by an underscore.
-// For example, "Log.Format" can be set using the environment variable "RELAY_LOG_FORMAT".
-//
-// Slice values can be set using a comma-separated list. For example, "RelayIDs" can be set using the environment
-// variable "RELAY_RELAYIDS='1,2,3,4'".
-//
-// It is also possible to set the configuration using a configuration file. The path to the configuration file should
-// be passed as the first argument to the relay binary, e.g. "bin/relay config.yaml". The structure of the config
-// file should mirror the structure of this struct, with keys in the config file matching the field names
-// of this struct.
 type Config struct {
 
 	// Log is the configuration for the logger. Default is common.DefaultLoggerConfig().
@@ -70,6 +56,23 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BlobMaxConcurrency:     ctx.Int(flags.BlobMaxConcurrencyFlag.Name),
 			ChunkCacheSize:         ctx.Int(flags.ChunkCacheSizeFlag.Name),
 			ChunkMaxConcurrency:    ctx.Int(flags.ChunkMaxConcurrencyFlag.Name),
+			RateLimits: limiter.Config{
+				MaxGetBlobOpsPerSecond:          ctx.Float64(flags.MaxGetBlobOpsPerSecondFlag.Name),
+				GetBlobOpsBurstiness:            ctx.Int(flags.GetBlobOpsBurstinessFlag.Name),
+				MaxGetBlobBytesPerSecond:        ctx.Float64(flags.MaxGetBlobBytesPerSecondFlag.Name),
+				GetBlobBytesBurstiness:          ctx.Int(flags.GetBlobBytesBurstinessFlag.Name),
+				MaxConcurrentGetBlobOps:         ctx.Int(flags.MaxConcurrentGetBlobOpsFlag.Name),
+				MaxGetChunkOpsPerSecond:         ctx.Float64(flags.MaxGetChunkOpsPerSecondFlag.Name),
+				GetChunkOpsBurstiness:           ctx.Int(flags.GetChunkOpsBurstinessFlag.Name),
+				MaxGetChunkBytesPerSecond:       ctx.Float64(flags.MaxGetChunkBytesPerSecondFlag.Name),
+				GetChunkBytesBurstiness:         ctx.Int(flags.GetChunkBytesBurstinessFlag.Name),
+				MaxConcurrentGetChunkOps:        ctx.Int(flags.MaxConcurrentGetChunkOpsFlag.Name),
+				MaxGetChunkOpsPerSecondClient:   ctx.Float64(flags.MaxGetChunkOpsPerSecondClientFlag.Name),
+				GetChunkOpsBurstinessClient:     ctx.Int(flags.GetChunkOpsBurstinessClientFlag.Name),
+				MaxGetChunkBytesPerSecondClient: ctx.Float64(flags.MaxGetChunkBytesPerSecondClientFlag.Name),
+				GetChunkBytesBurstinessClient:   ctx.Int(flags.GetChunkBytesBurstinessClientFlag.Name),
+				MaxConcurrentGetChunkOpsClient:  ctx.Int(flags.MaxConcurrentGetChunkOpsClientFlag.Name),
+			},
 		},
 	}
 	for i, id := range relayIDs {
