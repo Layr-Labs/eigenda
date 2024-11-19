@@ -160,7 +160,9 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
 	}
-	c, err := s.prover.GetCommitments(req.GetData())
+	length := uint64(encoding.GetBlobLengthPowerOf2(uint(blobSize)))
+
+	c, err := s.prover.GetCommitments(req.GetData(), length)
 	if err != nil {
 		return nil, api.NewErrorInternal("failed to get commitments")
 	}

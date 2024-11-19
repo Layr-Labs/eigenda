@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,7 +35,8 @@ func TestPaymentHash(t *testing.T) {
 
 func TestBlobKeyFromHeader(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
+	commitments, err := p.GetCommitments(data, length)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +89,8 @@ func TestBatchHeaderSerialization(t *testing.T) {
 
 func TestBlobCertHash(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
+	commitments, err := p.GetCommitments(data, length)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +118,8 @@ func TestBlobCertHash(t *testing.T) {
 
 func TestBlobCertSerialization(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
+	commitments, err := p.GetCommitments(data, length)
 	if err != nil {
 		t.Fatal(err)
 	}
