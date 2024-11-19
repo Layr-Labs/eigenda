@@ -3,7 +3,9 @@ package flags
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/urfave/cli"
+	"time"
 )
 
 const (
@@ -189,6 +191,38 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
 		Value:    1,
 	}
+	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
+		Usage:    "Address of the BLS operator state retriever",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR"),
+	}
+	EigenDAServiceManagerAddrFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigen-da-service-manager-addr"),
+		Usage:    "Address of the Eigen DA service manager",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
+	}
+	IndexerPullIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "indexer-pull-interval"),
+		Usage:    "Interval to pull from the indexer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INDEXER_PULL_INTERVAL"),
+		Value:    5 * time.Minute,
+	}
+	AuthenticationTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "authentication-timeout"),
+		Usage:    "Duration to keep authentication results",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_TIMEOUT"),
+		Value:    5 * time.Minute,
+	}
+	AuthenticationDisabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),
+		Usage:    "Disable GetChunks() authentication",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_DISABLED"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -196,6 +230,10 @@ var requiredFlags = []cli.Flag{
 	BucketNameFlag,
 	MetadataTableNameFlag,
 	RelayIDsFlag,
+	BlsOperatorStateRetrieverAddrFlag,
+	EigenDAServiceManagerAddrFlag,
+	AuthenticationTimeoutFlag,
+	AuthenticationDisabledFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -221,6 +259,7 @@ var optionalFlags = []cli.Flag{
 	MaxGetChunkBytesPerSecondClientFlag,
 	GetChunkBytesBurstinessClientFlag,
 	MaxConcurrentGetChunkOpsClientFlag,
+	IndexerPullIntervalFlag,
 }
 
 var Flags []cli.Flag
@@ -229,4 +268,5 @@ func init() {
 	Flags = append(requiredFlags, optionalFlags...)
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
 }

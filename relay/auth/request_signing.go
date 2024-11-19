@@ -40,3 +40,10 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 
 	return hasher.Sum(nil)
 }
+
+// SignGetChunksRequest signs the given GetChunksRequest with the given private key.
+func SignGetChunksRequest(request *pb.GetChunksRequest, privateKey []byte) ([]byte, error) {
+	//hash := HashGetChunksRequest(request)
+	// TODO implement this
+	return nil, nil
+}

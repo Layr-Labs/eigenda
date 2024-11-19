@@ -45,6 +45,7 @@ func defaultConfig() *Config {
 			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
 			MaxConcurrentGetChunkOpsClient:  1,
 		},
+		AuthenticationDisabled: true,
 	}
 }
 
@@ -101,6 +102,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		config,
 		metadataStore,
 		blobStore,
+		nil, /* not used in this test*/
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
@@ -178,7 +180,8 @@ func TestReadNonExistentBlob(t *testing.T) {
 		config,
 		metadataStore,
 		blobStore,
-		nil /* not used in this test */)
+		nil, /* not used in this test */
+		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
@@ -230,6 +233,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		config,
 		metadataStore,
 		blobStore,
+		nil, /* not used in this test*/
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
@@ -347,7 +351,8 @@ func TestReadWriteChunks(t *testing.T) {
 		config,
 		metadataStore,
 		nil, /* not used in this test*/
-		chunkReader)
+		chunkReader,
+		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
@@ -542,7 +547,8 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		config,
 		metadataStore,
 		nil, /* not used in this test */
-		chunkReader)
+		chunkReader,
+		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
@@ -667,7 +673,8 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		config,
 		metadataStore,
 		nil, /* not used in this test*/
-		chunkReader)
+		chunkReader,
+		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
@@ -941,7 +948,8 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		config,
 		metadataStore,
 		nil, /* not used in this test */
-		chunkReader)
+		chunkReader,
+		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {

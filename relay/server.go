@@ -52,7 +52,7 @@ type Server struct {
 	grpcServer *grpc.Server
 
 	// authenticator is used to authenticate requests to the relay service.
-	authenticator auth.RequestAuthenticator // TODO set this
+	authenticator auth.RequestAuthenticator
 }
 
 type Config struct {
@@ -92,6 +92,14 @@ type Config struct {
 
 	// RateLimits contains configuration for rate limiting.
 	RateLimits limiter.Config
+
+	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
+	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
+	// will be authenticated independently, regardless of timing.
+	AuthenticationTimeout time.Duration
+
+	// AuthenticationDisabled will disable authentication if set to true.
+	AuthenticationDisabled bool
 }
 
 // NewServer creates a new relay Server.
@@ -101,7 +109,8 @@ func NewServer(
 	config *Config,
 	metadataStore *blobstore.BlobMetadataStore,
 	blobStore *blobstore.BlobStore,
-	chunkReader chunkstore.ChunkReader) (*Server, error) {
+	chunkReader chunkstore.ChunkReader,
+	ics core.IndexedChainState) (*Server, error) {
 
 	mp, err := newMetadataProvider(
 		ctx,
@@ -134,8 +143,10 @@ func NewServer(
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
 
-	// TODO
-	authenticator := auth.NewRequestAuthenticator(nil, 0)
+	var authenticator auth.RequestAuthenticator
+	if !config.AuthenticationDisabled {
+		authenticator = auth.NewRequestAuthenticator(ics, config.AuthenticationTimeout)
+	}
 
 	return &Server{
 		config:           config,
@@ -219,9 +230,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, fmt.Errorf("auth failed: %w", err)
 	}
-	// TODO make methods take correct type
-	clientID := fmt.Sprintf("%x", request.RequesterId)
 
+	clientID := string(request.RequesterId)
 	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, err

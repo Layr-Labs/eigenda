@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -29,6 +31,11 @@ type Config struct {
 
 	// RelayConfig is the configuration for the relay.
 	RelayConfig relay.Config
+
+	EthClientConfig               geth.EthClientConfig
+	IndexerPullInterval           time.Duration
+	BLSOperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr     string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -73,7 +80,13 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				GetChunkBytesBurstinessClient:   ctx.Int(flags.GetChunkBytesBurstinessClientFlag.Name),
 				MaxConcurrentGetChunkOpsClient:  ctx.Int(flags.MaxConcurrentGetChunkOpsClientFlag.Name),
 			},
+			AuthenticationTimeout:  ctx.Duration(flags.AuthenticationTimeoutFlag.Name),
+			AuthenticationDisabled: ctx.Bool(flags.AuthenticationDisabledFlag.Name),
 		},
+		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		IndexerPullInterval:           ctx.Duration(flags.IndexerPullIntervalFlag.Name),
+		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
+		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 	}
 	for i, id := range relayIDs {
 		config.RelayConfig.RelayIDs[i] = core.RelayKey(id)

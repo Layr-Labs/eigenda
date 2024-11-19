@@ -3,6 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"log"
 	"os"
 
@@ -64,6 +72,10 @@ func RunRelay(ctx *cli.Context) error {
 	metadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
 	blobStore := blobstore.NewBlobStore(config.BucketName, s3Client, logger)
 	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
+	ics, err := buildICS(logger, &config)
+	if err != nil {
+		return fmt.Errorf("failed to build ics: %w", err)
+	}
 
 	server, err := relay.NewServer(
 		context.Background(),
@@ -71,7 +83,8 @@ func RunRelay(ctx *cli.Context) error {
 		&config.RelayConfig,
 		metadataStore,
 		blobStore,
-		chunkReader)
+		chunkReader,
+		ics)
 	if err != nil {
 		return fmt.Errorf("failed to create relay server: %w", err)
 	}
@@ -82,4 +95,43 @@ func RunRelay(ctx *cli.Context) error {
 	}
 
 	return nil
+}
+
+func buildICS(logger logging.Logger, config *Config) (core.IndexedChainState, error) {
+	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rpc client: %w", err)
+	}
+
+	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
+	if err != nil {
+		logger.Error("Cannot create chain.Client", "err", err)
+		return nil, err
+	}
+
+	tx, err := coreeth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eth writer: %w", err)
+	}
+
+	idx, err := coreindexer.CreateNewIndexer(
+		&indexer.Config{
+			PullInterval: config.IndexerPullInterval,
+		},
+		client,
+		rpcClient,
+		config.EigenDAServiceManagerAddr,
+		logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create indexer: %w", err)
+	}
+
+	cs := coreeth.NewChainState(tx, client)
+	ics, err := coreindexer.NewIndexedChainState(cs, idx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create indexed chain state: %w", err)
+	}
+
+	return ics, nil
 }
