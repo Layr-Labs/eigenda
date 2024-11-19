@@ -94,16 +94,21 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 	}
 
 	if l.globalOperationsInFlight >= l.config.MaxConcurrentGetChunkOps {
-		return fmt.Errorf("global concurrent request limit exceeded for GetChunks operations, try again later")
+		return fmt.Errorf(
+			"global concurrent request limit %d exceeded for GetChunks operations, try again later",
+			l.config.MaxConcurrentGetChunkOps)
 	}
 	if l.globalOpLimiter.TokensAt(now) < 1 {
-		return fmt.Errorf("global rate limit exceeded for GetChunks operations, try again later")
+		return fmt.Errorf("global rate limit %0.1fhz exceeded for GetChunks operations, try again later",
+			l.config.MaxGetChunkOpsPerSecond)
 	}
 	if l.perClientOperationsInFlight[requesterID] >= l.config.MaxConcurrentGetChunkOpsClient {
-		return fmt.Errorf("client concurrent request limit exceeded for GetChunks")
+		return fmt.Errorf("client concurrent request limit %d exceeded for GetChunks",
+			l.config.MaxConcurrentGetChunkOpsClient)
 	}
 	if l.perClientOpLimiter[requesterID].TokensAt(now) < 1 {
-		return fmt.Errorf("client rate limit exceeded for GetChunks, try again later")
+		return fmt.Errorf("client rate limit %0.1fhz exceeded for GetChunks, try again later",
+			l.config.MaxGetChunkOpsPerSecondClient)
 	}
 
 	l.globalOperationsInFlight++
@@ -138,13 +143,19 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 
 	allowed := l.globalBandwidthLimiter.AllowN(now, bytes)
 	if !allowed {
-		return fmt.Errorf("global rate limit exceeded for GetChunk bandwidth, try again later")
+		return fmt.Errorf("global rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
+			int(l.config.MaxGetChunkBytesPerSecond/1024/1024))
 	}
 
-	allowed = l.perClientBandwidthLimiter[requesterID].AllowN(now, bytes)
+	limiter, ok := l.perClientBandwidthLimiter[requesterID]
+	if !ok {
+		return fmt.Errorf("internal error, unable to find bandwidth limiter for client ID %s", requesterID)
+	}
+	allowed = limiter.AllowN(now, bytes)
 	if !allowed {
 		l.globalBandwidthLimiter.AllowN(now, -bytes)
-		return fmt.Errorf("client rate limit exceeded for GetChunk bandwidth, try again later")
+		return fmt.Errorf("client rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
+			int(l.config.MaxGetChunkBytesPerSecondClient/1024/1024))
 	}
 
 	return nil

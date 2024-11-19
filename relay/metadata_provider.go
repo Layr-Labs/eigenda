@@ -157,7 +157,7 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	}
 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
-	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length)
+	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
 	chunkSize, err := v2.GetChunkLength(cert.BlobHeader.BlobVersion, blobSize)
 	chunkSize *= encoding.BYTES_PER_SYMBOL
 	if err != nil {
