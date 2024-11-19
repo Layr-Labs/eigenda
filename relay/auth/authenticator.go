@@ -1,4 +1,4 @@
-package authentication
+package auth
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // RequestAuthenticator authenticates requests to the relay service. This object is thread safe.
 type RequestAuthenticator interface {
 	// AuthenticateGetChunksRequest authenticates a GetChunksRequest, returning an error if the request is invalid.
-	// The address is the address of the peer that sent the request. This may be used to cache authentication results
+	// The address is the address of the peer that sent the request. This may be used to cache auth results
 	// in order to save server resources.
 	AuthenticateGetChunksRequest(
 		address string,
@@ -21,7 +21,7 @@ type RequestAuthenticator interface {
 		now time.Time) error
 }
 
-// authenticationTimeout is used to track the expiration of an authentication.
+// authenticationTimeout is used to track the expiration of an auth.
 type authenticationTimeout struct {
 	clientID   string
 	expiration time.Time
@@ -38,8 +38,8 @@ type requestAuthenticator struct {
 	// authenticationTimeouts is a list of authentications that have been performed, along with their expiration times.
 	authenticationTimeouts []*authenticationTimeout
 
-	// authenticationTimeoutDuration is the duration for which an authentication is valid.
-	// If this is zero, then authentication saving is disabled, and each request will be authenticated independently.
+	// authenticationTimeoutDuration is the duration for which an auth is valid.
+	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
 	authenticationTimeoutDuration time.Duration
 
 	// savedAuthLock is used for thread safe atomic modification of the authenticatedClients map and the
@@ -66,7 +66,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	now time.Time) error {
 
 	if a == nil {
-		// do not enforce authentication if the authenticator is nil
+		// do not enforce auth if the authenticator is nil
 		return nil
 	}
 
@@ -111,7 +111,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	return nil
 }
 
-// saveAuthenticationResult saves the result of an authentication.
+// saveAuthenticationResult saves the result of an auth.
 func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, address string) {
 	if a.authenticationTimeoutDuration == 0 {
 		// Authentication saving is disabled.

@@ -10,7 +10,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/relay/authentication"
+	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -52,7 +52,7 @@ type Server struct {
 	grpcServer *grpc.Server
 
 	// authenticator is used to authenticate requests to the relay service.
-	authenticator authentication.RequestAuthenticator // TODO set this
+	authenticator auth.RequestAuthenticator // TODO set this
 }
 
 type Config struct {
@@ -135,7 +135,7 @@ func NewServer(
 	}
 
 	// TODO
-	authenticator := authentication.NewRequestAuthenticator(nil, 0)
+	authenticator := auth.NewRequestAuthenticator(nil, 0)
 
 	return &Server{
 		config:           config,
@@ -198,7 +198,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
 	// TODO(cody-littley):
-	//  - authentication
+	//  - auth
 	//  - timeouts
 
 	if len(request.ChunkRequests) <= 0 {
@@ -217,7 +217,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("authentication failed: %w", err)
+		return nil, fmt.Errorf("auth failed: %w", err)
 	}
 	// TODO make methods take correct type
 	clientID := fmt.Sprintf("%x", request.RequesterId)

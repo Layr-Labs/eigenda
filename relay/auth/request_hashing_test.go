@@ -1,4 +1,4 @@
-package authentication
+package auth
 
 import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"

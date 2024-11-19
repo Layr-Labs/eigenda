@@ -200,7 +200,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	assert.ErrorContains(t, err, "authentication failed")
+	assert.ErrorContains(t, err, "auth failed")
 }
 
 func TestV2GetBlobStatus(t *testing.T) {

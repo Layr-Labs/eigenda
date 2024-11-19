@@ -27,8 +27,8 @@ type ChunkRateLimiter struct {
 	// per-client limiters
 
 	// Note: in its current form, these expose a DOS vector, since an attacker can create many clients IDs
-	// and force these maps to become arbitrarily large. This will be remedied when authentication
-	// is implemented, as only authentication will happen prior to rate limiting.
+	// and force these maps to become arbitrarily large. This will be remedied when auth
+	// is implemented, as only auth will happen prior to rate limiting.
 
 	// perClientOpLimiter enforces per-client rate limits on the maximum rate of GetChunk operations
 	perClientOpLimiter map[string]*rate.Limiter

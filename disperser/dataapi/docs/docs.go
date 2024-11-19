@@ -765,7 +765,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "quorumRate": {
-                    "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
+                    "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup auth. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
                     "type": "integer"
                 }
             }

@@ -1,4 +1,4 @@
-package authentication
+package auth
 
 import (
 	"encoding/binary"

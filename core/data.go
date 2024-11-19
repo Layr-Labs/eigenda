@@ -30,7 +30,7 @@ type SecurityParam struct {
 	AdversaryThreshold uint8
 	// ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum
 	ConfirmationThreshold uint8
-	// Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
+	// Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup auth. This is used
 	// for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
 	// data was posted to the DA node.
 	QuorumRate common.RateParam
