@@ -110,7 +110,7 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
 	}
 	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %s", err.Error()))
+		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
 	// TODO(ian-shim): validate commitment, length is power of 2 and less than maxNumSymbolsPerBlob, payment metadata
