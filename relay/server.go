@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -52,14 +50,7 @@ type Server struct {
 	grpcServer *grpc.Server
 }
 
-// Config is the configuration for the relay Server.
 type Config struct {
-
-	// Log is the configuration for the logger.
-	Log common.LoggerConfig
-
-	// Configuration for the AWS client.
-	AWS aws.ClientConfig
 
 	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
 	// serve data for any shard it can.
@@ -67,12 +58,6 @@ type Config struct {
 
 	// GRPCPort is the port that the relay server listens on.
 	GRPCPort int
-
-	// BucketName is the name of the S3 bucket that stores blobs.
-	BucketName string
-
-	// MetadataTableName is the name of the DynamoDB table that stores metadata.
-	MetadataTableName string
 
 	// MaxGRPCMessageSize is the maximum size of a gRPC message that the server will accept.
 	MaxGRPCMessageSize int

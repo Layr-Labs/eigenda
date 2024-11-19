@@ -8,12 +8,32 @@ import (
 	"time"
 )
 
+func defaultConfig() *Config {
+	return &Config{
+		MaxGetBlobOpsPerSecond:          1024,
+		GetBlobOpsBurstiness:            1024,
+		MaxGetBlobBytesPerSecond:        20 * 1024 * 1024,
+		GetBlobBytesBurstiness:          20 * 1024 * 1024,
+		MaxConcurrentGetBlobOps:         1024,
+		MaxGetChunkOpsPerSecond:         1024,
+		GetChunkOpsBurstiness:           1024,
+		MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
+		GetChunkBytesBurstiness:         20 * 1024 * 1024,
+		MaxConcurrentGetChunkOps:        1024,
+		MaxGetChunkOpsPerSecondClient:   8,
+		GetChunkOpsBurstinessClient:     8,
+		MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
+		GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
+		MaxConcurrentGetChunkOpsClient:  1,
+	}
+}
+
 func TestConcurrentBlobOperations(t *testing.T) {
 	tu.InitializeRandom()
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxConcurrentGetBlobOps = concurrencyLimit
 	// Make the burstiness limit high enough that we won't be rate limited
 	config.GetBlobOpsBurstiness = concurrencyLimit * 100
@@ -44,7 +64,7 @@ func TestConcurrentBlobOperations(t *testing.T) {
 func TestGetBlobOpRateLimit(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetBlobOpsPerSecond = float64(2 + rand.Intn(10))
 	config.GetBlobOpsBurstiness = int(config.MaxGetBlobOpsPerSecond) + rand.Intn(10)
 	config.MaxConcurrentGetBlobOps = 1
@@ -105,7 +125,7 @@ func TestGetBlobOpRateLimit(t *testing.T) {
 func TestGetBlobBandwidthLimit(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetBlobBytesPerSecond = float64(1024 + rand.Intn(1024*1024))
 	config.GetBlobBytesBurstiness = int(config.MaxGetBlobBytesPerSecond) + rand.Intn(1024*1024)
 

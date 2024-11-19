@@ -14,7 +14,7 @@ func TestConcurrentGetChunksOperations(t *testing.T) {
 
 	concurrencyLimit := 1 + rand.Intn(10)
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxConcurrentGetChunkOps = concurrencyLimit
 	config.MaxConcurrentGetChunkOpsClient = math.MaxInt32
 	config.GetChunkOpsBurstiness = math.MaxInt32
@@ -48,7 +48,7 @@ func TestConcurrentGetChunksOperations(t *testing.T) {
 func TestGetChunksRateLimit(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetChunkOpsPerSecond = float64(2 + rand.Intn(10))
 	config.GetChunkOpsBurstiness = int(config.MaxGetChunkOpsPerSecond) + rand.Intn(10)
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
@@ -113,7 +113,7 @@ func TestGetChunksRateLimit(t *testing.T) {
 func TestGetChunksBandwidthLimit(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetChunkBytesPerSecond = float64(1024 + rand.Intn(1024*1024))
 	config.GetChunkBytesBurstiness = int(config.MaxGetBlobBytesPerSecond) + rand.Intn(1024*1024)
 	config.GetChunkBytesBurstinessClient = math.MaxInt32
@@ -161,7 +161,7 @@ func TestGetChunksBandwidthLimit(t *testing.T) {
 func TestPerClientConcurrencyLimit(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxConcurrentGetChunkOpsClient = 1 + rand.Intn(10)
 	config.MaxConcurrentGetChunkOps = 2 * config.MaxConcurrentGetChunkOpsClient
 	config.GetChunkOpsBurstinessClient = math.MaxInt32
@@ -210,7 +210,7 @@ func TestPerClientConcurrencyLimit(t *testing.T) {
 func TestOpLimitPerClient(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetChunkOpsPerSecondClient = float64(2 + rand.Intn(10))
 	config.GetChunkOpsBurstinessClient = int(config.MaxGetChunkOpsPerSecondClient) + rand.Intn(10)
 	config.GetChunkOpsBurstiness = math.MaxInt32
@@ -266,7 +266,7 @@ func TestOpLimitPerClient(t *testing.T) {
 func TestBandwidthLimitPerClient(t *testing.T) {
 	tu.InitializeRandom()
 
-	config := DefaultConfig()
+	config := defaultConfig()
 	config.MaxGetChunkBytesPerSecondClient = float64(1024 + rand.Intn(1024*1024))
 	config.GetChunkBytesBurstinessClient = int(config.MaxGetBlobBytesPerSecond) + rand.Intn(1024*1024)
 	config.GetChunkBytesBurstiness = math.MaxInt32
