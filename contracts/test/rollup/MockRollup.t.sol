@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.9;
 
@@ -15,6 +15,8 @@ import {EigenDABlobVerifier} from "../../src/core/EigenDABlobVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
+import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
 
@@ -35,6 +37,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
     bytes quorumAdversaryThresholdPercentages = hex"212121";
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
+    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(33, 55);
 
     uint8 defaultCodingRatioPercentage = 10;
     uint32 defaultReferenceBlockNumber = 100;
@@ -99,7 +102,8 @@ contract MockRollupTest is BLSMockAVSDeployer {
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
                 versions,
-                versionedBlobParams
+                versionedBlobParams,
+                defaultSecurityThresholds
             )
         );
 
@@ -123,7 +127,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
         eigenDABlobVerifier = new EigenDABlobVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager))
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            OperatorStateRetriever(address(operatorStateRetriever)),
+            IRegistryCoordinator(address(registryCoordinator))
         );
 
         mockRollup = new MockRollup(eigenDABlobVerifier, s1);

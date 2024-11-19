@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
@@ -114,7 +114,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             // signed stake > total stake
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
-                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
+                quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
                 "EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"
             );
         }
@@ -191,4 +191,8 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }
 
+    /// @notice Gets the default security thresholds for V2
+    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
+        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
+    }
 }

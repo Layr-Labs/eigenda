@@ -31,4 +31,7 @@ interface IEigenDAThresholdRegistry {
     function getIsQuorumRequired(
         uint8 quorumNumber
     ) external view returns (bool);
+
+    /// @notice Gets the default security thresholds for V2
+    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory);
 }

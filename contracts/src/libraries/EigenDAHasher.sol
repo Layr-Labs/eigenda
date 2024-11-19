@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.9;
 
@@ -42,7 +42,6 @@ library EigenDAHasher {
     /**
      * @notice given the batchHeader in the provided metdata, calculates the hash of the batchMetadata
      * @param batchMetadata the metadata of the batch
-     * @return the hash of the batchMetadata
      */
     function hashBatchMetadata(
         BatchMetadata memory batchMetadata
@@ -103,5 +102,21 @@ library EigenDAHasher {
      */
     function hashBatchHeaderToReducedBatchHeader(BatchHeader memory batchHeader) internal pure returns(bytes32) {
         return keccak256(abi.encode(convertBatchHeaderToReducedBatchHeader(batchHeader)));
+    }
+
+    /**
+     * @notice hashes the given V2 batch header 
+     * @param batchHeader the V2 batch header to hash
+     */
+    function hashBatchHeaderV2(BatchHeaderV2 memory batchHeader) internal pure returns(bytes32) {
+        return keccak256(abi.encode(batchHeader));
+    }
+
+    /**
+     * @notice hashes the given V2 blob header
+     * @param blobHeader the V2 blob header to hash
+     */
+    function hashBlobHeaderV2(BlobHeaderV2 memory blobHeader) internal pure returns(bytes32) {
+        return keccak256(abi.encode(blobHeader));
     }
 }

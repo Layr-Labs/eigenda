@@ -19,14 +19,16 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
         uint16[] memory _versions,
-        VersionedBlobParams[] memory _versionedBlobParams
+        VersionedBlobParams[] memory _versionedBlobParams,
+        SecurityThresholds memory _defaultSecurityThresholdsV2
     ) external initializer {
         _transferOwnership(_initialOwner);
 
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
         quorumNumbersRequired = _quorumNumbersRequired;
-
+        defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
+        
         require(_versions.length == _versionedBlobParams.length, "EigenDAThresholdRegistry: versions and versioned blob params length mismatch");
         for (uint256 i = 0; i < _versions.length; ++i) {
             versionedBlobParams[_versions[i]] = _versionedBlobParams[i];
@@ -78,6 +80,11 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     ) public view virtual returns (bool) {
         uint256 quorumBitmap = BitmapUtils.setBit(0, quorumNumber);
         return (quorumBitmap & BitmapUtils.orderedBytesArrayToBitmap(quorumNumbersRequired) == quorumBitmap);
+    }
+
+    /// @notice Gets the default security thresholds for V2
+    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
+        return defaultSecurityThresholdsV2;
     }
 
 }

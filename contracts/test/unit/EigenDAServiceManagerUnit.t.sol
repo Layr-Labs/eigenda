@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -12,6 +12,7 @@ import {EigenDABlobVerifier} from "../../src/core/EigenDABlobVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
@@ -33,6 +34,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     bytes quorumAdversaryThresholdPercentages = hex"212121";
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
+    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(33, 55);
 
     uint256 feePerBytePerTime = 0;
 
@@ -96,14 +98,17 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
                 versions,
-                versionedBlobParams
+                versionedBlobParams,
+                defaultSecurityThresholds
             )
         );
 
         eigenDABlobVerifier = new EigenDABlobVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager))
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            OperatorStateRetriever(address(operatorStateRetriever)),
+            IRegistryCoordinator(address(registryCoordinator))
         );
     }
 

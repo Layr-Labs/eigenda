@@ -244,7 +244,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDABlobVerifier = new EigenDABlobVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager))
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            OperatorStateRetriever(address(operatorStateRetriever)),
+            IRegistryCoordinator(address(registryCoordinator))
         );
     }
 }

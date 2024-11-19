@@ -14,5 +14,7 @@ abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
 
     mapping(uint16 => VersionedBlobParams) public versionedBlobParams;
 
-    uint256[46] private __GAP;
+    SecurityThresholds public defaultSecurityThresholdsV2;
+
+    uint256[45] private __GAP;
 }

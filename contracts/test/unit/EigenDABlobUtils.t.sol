@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -14,6 +14,7 @@ import {EigenDABlobVerifier} from "../../src/core/EigenDABlobVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
 
@@ -38,6 +39,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
     bytes quorumAdversaryThresholdPercentages = hex"212121";
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
+    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(33, 55);
 
     uint32 defaultReferenceBlockNumber = 100;
     uint32 defaultConfirmationBlockNumber = 1000;
@@ -101,14 +103,17 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
                 versions,
-                versionedBlobParams
+                versionedBlobParams,
+                defaultSecurityThresholds
             )
         );
 
         eigenDABlobVerifier = new EigenDABlobVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
-            IEigenDASignatureVerifier(address(eigenDAServiceManager))
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            OperatorStateRetriever(address(operatorStateRetriever)),
+            IRegistryCoordinator(address(registryCoordinator))
         );
     }
 
@@ -153,6 +158,52 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
 
         uint256 gasBefore = gasleft();
         eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        uint256 gasAfter = gasleft();
+        emit log_named_uint("gas used", gasBefore - gasAfter);
+    }
+
+    function testVerifyBlobs_TwoBlobs(uint256 pseudoRandomNumber) public {
+        uint256 numQuorumBlobParams = 2;
+        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
+        uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
+        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
+        BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
+        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
+        // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
+        for (uint i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
+            batchHeader.quorumNumbers = abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
+            batchHeader.signedStakeForQuorums = abi.encodePacked(batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].confirmationThresholdPercentage);        }
+        batchHeader.referenceBlockNumber = uint32(block.number);
+        // add dummy batch metadata
+        BatchMetadata memory batchMetadata;
+        batchMetadata.batchHeader = batchHeader;
+        batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
+        batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
+        stdstore
+            .target(address(eigenDAServiceManager))
+            .sig("batchIdToBatchMetadataHash(uint32)")
+            .with_key(defaultBatchId)
+            .checked_write(batchMetadata.hashBatchMetadata());
+        BlobVerificationProof[] memory blobVerificationProofs = new BlobVerificationProof[](2);
+        blobVerificationProofs[0].batchId = defaultBatchId;
+        blobVerificationProofs[1].batchId = defaultBatchId;
+        blobVerificationProofs[0].batchMetadata = batchMetadata;
+        blobVerificationProofs[1].batchMetadata = batchMetadata;
+        blobVerificationProofs[0].inclusionProof = abi.encodePacked(keccak256(secondBlobHash));
+        blobVerificationProofs[1].inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
+        blobVerificationProofs[0].blobIndex = 0;
+        blobVerificationProofs[1].blobIndex = 1;
+        blobVerificationProofs[0].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        blobVerificationProofs[1].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
+        for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
+            blobVerificationProofs[0].quorumIndices[i] = bytes1(uint8(i));
+            blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
+        }
+        uint256 gasBefore = gasleft();
+        eigenDABlobVerifier.verifyBlobsV1(blobHeader, blobVerificationProofs);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
