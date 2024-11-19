@@ -209,7 +209,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
 	// TODO(cody-littley):
-	//  - auth
 	//  - timeouts
 
 	if len(request.ChunkRequests) <= 0 {
@@ -233,6 +232,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	clientID := string(request.RequesterId)
 	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+
 	if err != nil {
 		return nil, err
 	}

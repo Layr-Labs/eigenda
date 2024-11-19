@@ -2,16 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/relay/limiter"
-	"time"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/cmd/flags"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/urfave/cli"
+	"time"
 )
 
 // Config is the configuration for the relay Server.
