@@ -143,7 +143,7 @@ func NewServer(
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
 
-	// Future work:
+	// TODO(cody-littley):
 	//  - timeouts
 
 	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
@@ -188,7 +188,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
-	// Future work:
+	// TODO(cody-littley):
 	//  - authentication
 	//  - timeouts
 
@@ -219,7 +219,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
 
-	requiredBandwidth := computeChunkRequestRequiredBandwidth(request, mMap)
+	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
+	if err != nil {
+		return nil, fmt.Errorf("error computing required bandwidth: %w", err)
+	}
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		return nil, err
@@ -324,26 +327,31 @@ func gatherChunkDataToSend(
 }
 
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
-func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) int {
+func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) (int, error) {
 	requiredBandwidth := 0
 	for _, req := range request.ChunkRequests {
 		var metadata *blobMetadata
+		var key v2.BlobKey
 		var requestedChunks int
 
 		if req.GetByIndex() != nil {
-			key := v2.BlobKey(req.GetByIndex().GetBlobKey())
+			key = v2.BlobKey(req.GetByIndex().GetBlobKey())
 			metadata = mMap[key]
 			requestedChunks = len(req.GetByIndex().ChunkIndices)
 		} else {
-			key := v2.BlobKey(req.GetByRange().GetBlobKey())
+			key = v2.BlobKey(req.GetByRange().GetBlobKey())
 			metadata = mMap[key]
 			requestedChunks = int(req.GetByRange().EndIndex - req.GetByRange().StartIndex)
+		}
+
+		if metadata == nil {
+			return 0, fmt.Errorf("metadata not found for key %s", key.Hex())
 		}
 
 		requiredBandwidth += requestedChunks * int(metadata.chunkSizeBytes)
 	}
 
-	return requiredBandwidth
+	return requiredBandwidth, nil
 
 }
 
