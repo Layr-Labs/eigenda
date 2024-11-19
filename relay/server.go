@@ -150,6 +150,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	if err != nil {
 		return nil, err
 	}
+	defer s.blobRateLimiter.FinishGetBlobOperation()
 
 	key, err := v2.BytesToBlobKey(request.BlobKey)
 	if err != nil {
