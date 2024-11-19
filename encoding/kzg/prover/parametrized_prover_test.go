@@ -45,7 +45,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 
 		lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 		require.Nil(t, err)
 		assert.Nil(t, verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}

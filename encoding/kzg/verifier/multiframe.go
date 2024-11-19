@@ -212,11 +212,11 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.kzgConfig)
+	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.kzgConfig.SRSOrder, v.kzgConfig.G2PowerOf2Path)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, v.kzgConfig)
+		G2atD, err = kzg.ReadG2Point(D, v.kzgConfig.SRSOrder, v.kzgConfig.G2Path)
 		if err != nil {
 			return err
 		}

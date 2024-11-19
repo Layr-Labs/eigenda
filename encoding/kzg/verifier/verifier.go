@@ -178,7 +178,7 @@ func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error 
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
 
-	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig)
+	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig.SRSOrder, v.kzgConfig.G1Path)
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.F
 		return err
 	}
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig.SRSOrder, v.KzgConfig.G2Path)
 	if err != nil {
 		return err
 	}

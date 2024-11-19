@@ -37,7 +37,7 @@ func TestVerify(t *testing.T) {
 	lc := fs.ExpandedRootsOfUnity[uint64(0)]
 	require.NotNil(t, lc)
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 	require.Nil(t, err)
 	assert.Nil(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
 }

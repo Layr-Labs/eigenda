@@ -122,7 +122,7 @@ func TestKzgRs() {
 		}
 		lc := rsEncoder.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}
