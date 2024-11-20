@@ -28,6 +28,7 @@ func NewFIFOCache[K comparable, V any](maxWeight uint64) *FIFOCache[K, V] {
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: defaultWeightCalculator,
+		expirationQueue:  &queue.LinkedQueue[K]{},
 	}
 }
 
