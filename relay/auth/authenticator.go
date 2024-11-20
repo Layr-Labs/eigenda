@@ -75,6 +75,9 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	}
 
 	key, err := a.getOperatorKey(core.OperatorID(request.OperatorId))
+	if err != nil {
+		return fmt.Errorf("failed to get operator key: %w", err)
+	}
 
 	g1Point, err := (&core.G1Point{}).Deserialize(request.OperatorSignature)
 	if err != nil {
