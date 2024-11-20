@@ -6,15 +6,13 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConvertBatchToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
-	commitments, err := p.GetCommitments(data, length)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,9 +68,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-
-	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
-	commitments, err := p.GetCommitments(data, length)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,8 +96,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
-	commitments, err := p.GetCommitments(data, length)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

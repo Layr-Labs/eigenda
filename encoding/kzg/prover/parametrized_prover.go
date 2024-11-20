@@ -32,19 +32,19 @@ type rsEncodeResult struct {
 }
 
 type lengthCommitmentResult struct {
-	LengthCommitment bn254.G2Affine
+	LengthCommitment *bn254.G2Affine
 	Duration         time.Duration
 	Err              error
 }
 
 type lengthProofResult struct {
-	LengthProof bn254.G2Affine
+	LengthProof *bn254.G2Affine
 	Duration    time.Duration
 	Err         error
 }
 
 type commitmentResult struct {
-	Commitment bn254.G1Affine
+	Commitment *bn254.G1Affine
 	Duration   time.Duration
 	Err        error
 }
@@ -128,7 +128,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 		start := time.Now()
 		commit, err := g.Computer.ComputeCommitment(inputFr)
 		commitmentChan <- commitmentResult{
-			Commitment: *commit,
+			Commitment: commit,
 			Err:        err,
 			Duration:   time.Since(start),
 		}
@@ -138,7 +138,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 		start := time.Now()
 		lengthCommitment, err := g.Computer.ComputeLengthCommitment(inputFr)
 		lengthCommitmentChan <- lengthCommitmentResult{
-			LengthCommitment: *lengthCommitment,
+			LengthCommitment: lengthCommitment,
 			Err:              err,
 			Duration:         time.Since(start),
 		}
@@ -148,7 +148,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 		start := time.Now()
 		lengthProof, err := g.Computer.ComputeLengthProofForLength(inputFr, length)
 		lengthProofChan <- lengthProofResult{
-			LengthProof: *lengthProof,
+			LengthProof: lengthProof,
 			Err:         err,
 			Duration:    time.Since(start),
 		}
@@ -175,7 +175,7 @@ func (g *ParametrizedProver) GetCommitments(inputFr []fr.Element, length uint64)
 	if g.Verbose {
 		log.Printf("Total encoding took      %v\n", totalProcessingTime)
 	}
-	return &commitmentResult.Commitment, &lengthCommitmentResult.LengthCommitment, &lengthProofResult.LengthProof, nil
+	return commitmentResult.Commitment, lengthCommitmentResult.LengthCommitment, lengthProofResult.LengthProof, nil
 }
 
 func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, []uint32, error) {

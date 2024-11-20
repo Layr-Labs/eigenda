@@ -181,8 +181,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 	data := tu.RandomBytes(128)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	length := uint64(encoding.GetBlobLengthPowerOf2(uint(len(data))))
-	commitments, err := prover.GetCommitments(data, length)
+	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	require.NoError(t, err)
 	commitmentProto, err := commitments.ToProtobuf()

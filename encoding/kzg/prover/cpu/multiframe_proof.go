@@ -37,7 +37,8 @@ func (p *KzgCpuProofDevice) ComputeLengthProofForLength(coeffs []fr.Element, len
 		return nil, fmt.Errorf("length is less than the number of coefficients")
 	}
 
-	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-length:]
+	start := p.KzgConfig.SRSNumberToLoad - length
+	shiftedSecret := p.G2Trailing[start : start+uint64(len(coeffs))]
 	config := ecc.MultiExpConfig{}
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	var lengthProof bn254.G2Affine
