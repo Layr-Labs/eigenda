@@ -60,9 +60,9 @@ func TestValidRequest(t *testing.T) {
 	authenticator := NewRequestAuthenticator(ics, timeout)
 
 	request := randomGetChunksRequest()
-	request.RequesterId = operatorID[:]
+	request.OperatorId = operatorID[:]
 	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.RequesterSignature
+	signature := request.OperatorSignature
 
 	now := time.Now()
 
@@ -76,8 +76,8 @@ func TestValidRequest(t *testing.T) {
 	// Making additional requests before timeout elapses should not trigger authentication for the address "foobar".
 	// To probe at this, intentionally make a request that would be considered invalid if it were authenticated.
 	invalidRequest := randomGetChunksRequest()
-	invalidRequest.RequesterId = operatorID[:]
-	invalidRequest.RequesterSignature = signature // the previous signature is invalid here
+	invalidRequest.OperatorId = operatorID[:]
+	invalidRequest.OperatorSignature = signature // the previous signature is invalid here
 
 	start := now
 	for now.Before(start.Add(timeout)) {
@@ -122,9 +122,9 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	authenticator := NewRequestAuthenticator(ics, timeout)
 
 	request := randomGetChunksRequest()
-	request.RequesterId = operatorID[:]
+	request.OperatorId = operatorID[:]
 	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.RequesterSignature
+	signature := request.OperatorSignature
 
 	now := time.Now()
 
@@ -138,8 +138,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	// There is no authentication timeout, so a new request should trigger authentication.
 	// To probe at this, intentionally make a request that would be considered invalid if it were authenticated.
 	invalidRequest := randomGetChunksRequest()
-	invalidRequest.RequesterId = operatorID[:]
-	invalidRequest.RequesterSignature = signature // the previous signature is invalid here
+	invalidRequest.OperatorId = operatorID[:]
+	invalidRequest.OperatorSignature = signature // the previous signature is invalid here
 
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
@@ -167,7 +167,7 @@ func TestNonExistingClient(t *testing.T) {
 	invalidOperatorID := tu.RandomBytes(32)
 
 	request := randomGetChunksRequest()
-	request.RequesterId = invalidOperatorID
+	request.OperatorId = invalidOperatorID
 
 	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
@@ -194,7 +194,7 @@ func TestBadSignature(t *testing.T) {
 	authenticator := NewRequestAuthenticator(ics, timeout)
 
 	request := randomGetChunksRequest()
-	request.RequesterId = operatorID[:]
+	request.OperatorId = operatorID[:]
 	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
 
 	now := time.Now()
@@ -210,7 +210,7 @@ func TestBadSignature(t *testing.T) {
 	now = now.Add(timeout)
 
 	// Change a byte in the signature to make it invalid
-	request.RequesterSignature[0] = request.RequesterSignature[0] ^ 1
+	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
 
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",

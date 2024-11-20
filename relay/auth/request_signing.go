@@ -15,7 +15,7 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 
 	hasher := sha3.NewLegacyKeccak256()
 
-	hasher.Write(request.GetRequesterId())
+	hasher.Write(request.GetOperatorId())
 	for _, chunkRequest := range request.GetChunkRequests() {
 		if chunkRequest.GetByIndex() != nil {
 			getByIndex := chunkRequest.GetByIndex()
@@ -46,5 +46,5 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) {
 	hash := HashGetChunksRequest(request)
 	signature := keys.SignMessage(([32]byte)(hash))
-	request.RequesterSignature = signature.G1Point.Serialize()
+	request.OperatorSignature = signature.G1Point.Serialize()
 }

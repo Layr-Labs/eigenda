@@ -32,13 +32,15 @@ message GetChunksRequest {
   // The chunk requests. Chunks are returned in the same order as they are requested.
   repeated ChunkRequest chunk_requests = 1;
 
-  // If this is an authenticated request, this should hold the ID of the requester. If this
-  // is an unauthenticated request, this field should be empty.
-  bytes requester_id = 2;
+  // If this is an authenticated request, this should hold the ID of the operator. If this
+  // is an unauthenticated request, this field should be empty. Relays may choose to reject
+  // unauthenticated requests.
+  bytes operator_id = 2;
 
   // If this is an authenticated request, this field will hold a signature by the requester
-  // on the chunks being requested.
-  bytes requester_signature = 3;
+  // on the hash of this request. Signature should be computed with relay.auth.SignGetChunksRequest()
+  // or an equivalent implementation. Relays may choose to reject unauthenticated requests.
+  bytes operator_signature = 3;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested individually by its index.

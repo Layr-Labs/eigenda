@@ -79,14 +79,14 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		return fmt.Errorf("failed to get operators: %w", err)
 	}
 
-	operatorID := core.OperatorID(request.RequesterId)
+	operatorID := core.OperatorID(request.OperatorId)
 	operator, ok := operators[operatorID]
 	if !ok {
-		return errors.New("operator not found")
+		return fmt.Errorf("operator not found (block %d)", blockNumber)
 	}
 	key := operator.PubkeyG2
 
-	g1Point, err := (&core.G1Point{}).Deserialize(request.RequesterSignature)
+	g1Point, err := (&core.G1Point{}).Deserialize(request.OperatorSignature)
 	if err != nil {
 		return fmt.Errorf("failed to deserialize signature: %w", err)
 	}

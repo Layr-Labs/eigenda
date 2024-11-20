@@ -39,7 +39,7 @@ func randomGetChunksRequest() *pb.GetChunksRequest {
 		}
 	}
 	return &pb.GetChunksRequest{
-		RequesterId:   tu.RandomBytes(32),
+		OperatorId:    tu.RandomBytes(32),
 		ChunkRequests: requestedChunks,
 	}
 }
@@ -60,12 +60,12 @@ func TestHashGetChunksRequest(t *testing.T) {
 	require.NotEqual(t, hashA, hashB)
 
 	// Adding a signature should not affect the hash
-	requestA.RequesterSignature = tu.RandomBytes(32)
+	requestA.OperatorSignature = tu.RandomBytes(32)
 	hashAA = HashGetChunksRequest(requestA)
 	require.Equal(t, hashA, hashAA)
 
 	// Changing the requester ID should change the hash
-	requestA.RequesterId = tu.RandomBytes(32)
+	requestA.OperatorId = tu.RandomBytes(32)
 	hashAA = HashGetChunksRequest(requestA)
 	require.NotEqual(t, hashA, hashAA)
 }

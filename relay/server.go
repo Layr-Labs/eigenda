@@ -232,7 +232,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 	}
 
-	clientID := string(request.RequesterId)
+	clientID := string(request.OperatorId)
 	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 
 	if err != nil {
