@@ -228,13 +228,13 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
 
-	client, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, errors.New("could not get peer information")
-	}
-	clientAddress := client.Addr.String()
-
 	if s.authenticator != nil {
+		client, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("could not get peer information")
+		}
+		clientAddress := client.Addr.String()
+
 		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("auth failed: %w", err)

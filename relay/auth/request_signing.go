@@ -49,9 +49,10 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 	return hasher.Sum(nil)
 }
 
-// SignGetChunksRequest signs the given GetChunksRequest with the given private key.
-func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) {
+// SignGetChunksRequest signs the given GetChunksRequest with the given private key. Does not
+// write the signature into the request.
+func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) []byte {
 	hash := HashGetChunksRequest(request)
 	signature := keys.SignMessage(([32]byte)(hash))
-	request.OperatorSignature = signature.G1Point.Serialize()
+	return signature.G1Point.Serialize()
 }

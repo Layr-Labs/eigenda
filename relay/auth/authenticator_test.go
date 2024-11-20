@@ -62,8 +62,8 @@ func TestValidRequest(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.OperatorSignature
+	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = signature
 
 	now := time.Now()
 
@@ -125,8 +125,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.OperatorSignature
+	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = signature
 
 	now := time.Now()
 
@@ -199,7 +199,7 @@ func TestBadSignature(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = SignGetChunksRequest(ics.KeyPairs[operatorID], request)
 
 	now := time.Now()
 
