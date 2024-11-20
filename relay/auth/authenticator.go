@@ -45,6 +45,9 @@ type requestAuthenticator struct {
 	// savedAuthLock is used for thread safe atomic modification of the authenticatedClients map and the
 	// authenticationTimeouts queue.
 	savedAuthLock sync.Mutex
+
+	// keyCache is used to cache the public keys of operators. Operator keys are assumed to never change.
+	keyCache sync.Map
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
@@ -57,6 +60,7 @@ func NewRequestAuthenticator(
 		authenticatedClients:          make(map[string]struct{}),
 		authenticationTimeouts:        make([]*authenticationTimeout, 0),
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
+		keyCache:                      sync.Map{},
 	}
 }
 
@@ -70,21 +74,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		return nil
 	}
 
-	blockNumber, err := a.ics.GetCurrentBlockNumber()
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
-	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
-	if err != nil {
-		return fmt.Errorf("failed to get operators: %w", err)
-	}
-
-	operatorID := core.OperatorID(request.OperatorId)
-	operator, ok := operators[operatorID]
-	if !ok {
-		return fmt.Errorf("operator not found (block %d)", blockNumber)
-	}
-	key := operator.PubkeyG2
+	key, err := a.getOperatorKey(core.OperatorID(request.OperatorId))
 
 	g1Point, err := (&core.G1Point{}).Deserialize(request.OperatorSignature)
 	if err != nil {
@@ -104,6 +94,33 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 
 	a.saveAuthenticationResult(now, address)
 	return nil
+}
+
+// getOperatorKey returns the public key of the operator with the given ID, caching the result.
+func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core.G2Point, error) {
+	untypedKey, ok := a.keyCache.Load(operatorID)
+	if ok {
+		key := untypedKey.(*core.G2Point)
+		return key, nil
+	}
+
+	blockNumber, err := a.ics.GetCurrentBlockNumber()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operators: %w", err)
+	}
+
+	operator, ok := operators[operatorID]
+	if !ok {
+		return nil, errors.New("operator not found")
+	}
+	key := operator.PubkeyG2
+
+	a.keyCache.Store(operatorID, key)
+	return key, nil
 }
 
 // saveAuthenticationResult saves the result of an auth.
