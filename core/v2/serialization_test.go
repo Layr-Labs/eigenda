@@ -34,7 +34,7 @@ func TestPaymentHash(t *testing.T) {
 
 func TestBlobKeyFromHeader(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,8 +52,8 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 0xb19d368345990c79744fe571fe99f427f35787b9383c55089fb5bd6a5c171bbc verified in solidity
-	assert.Equal(t, "b19d368345990c79744fe571fe99f427f35787b9383c55089fb5bd6a5c171bbc", blobKey.Hex())
+	// 0x40efb7273649f39590b27550ea06eeb81efd6ae4d719385a302fbd93173a395d verified in solidity
+	assert.Equal(t, "40efb7273649f39590b27550ea06eeb81efd6ae4d719385a302fbd93173a395d", blobKey.Hex())
 }
 
 func TestBatchHeaderHash(t *testing.T) {
@@ -87,7 +87,7 @@ func TestBatchHeaderSerialization(t *testing.T) {
 
 func TestBlobCertHash(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,13 +109,13 @@ func TestBlobCertHash(t *testing.T) {
 
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
-	// 0xc4512b8702f69cb837fff50a93d3d28aada535b1f151b64db45859c3f5bb096a verified in solidity
-	assert.Equal(t, "c4512b8702f69cb837fff50a93d3d28aada535b1f151b64db45859c3f5bb096a", hex.EncodeToString(hash[:]))
+	// 0x3719a91e2a294feafdd624c1c88a6f1db1a5c79ee0863b352255bc9162f02751 verified in solidity
+	assert.Equal(t, "3719a91e2a294feafdd624c1c88a6f1db1a5c79ee0863b352255bc9162f02751", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
