@@ -94,7 +94,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
 
     }
 
-    function xtestChallenge(uint256 pseudoRandomNumber) public {
+    function testChallenge(uint256 pseudoRandomNumber) public {
         //get commitment with illegal value
         (BlobHeader memory blobHeader, BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
 
@@ -189,7 +189,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
         return blobHeader;
     }
 
-    function xtestGetQuorumAdversaryThreshold () public {
+    function testGetQuorumAdversaryThreshold () public {
         require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 0) == 33, "getQuorumAdversaryThreshold failed");
         //require(EigenDARollupUtils.getQuorumAdversaryThreshold(eigenDAServiceManager, 1) == 33, "getQuorumAdversaryThreshold failed");
     }

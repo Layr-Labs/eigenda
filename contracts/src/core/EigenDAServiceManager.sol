@@ -159,17 +159,17 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
+        return hex"212121";
     }
 
     /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
+        return hex"373737";
     }
 
     /// @notice Returns the bytes array of quorumsNumbersRequired
     function quorumNumbersRequired() external view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumNumbersRequired();
+        return hex"0001";
     }
 
     function getQuorumAdversaryThresholdPercentage(

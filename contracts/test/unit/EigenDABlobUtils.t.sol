@@ -77,7 +77,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness = new EigenDABlobUtilsHarness();
     }
 
-    function xtestVerifyBlob_TwoQuorums(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_TwoQuorums(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -123,7 +123,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
-    function xtestVerifyBlobs_TwoBlobs(uint256 pseudoRandomNumber) public {
+    function testVerifyBlobs_TwoBlobs(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -175,7 +175,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
-    function xtestVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -189,7 +189,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
-    function xtestVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -215,7 +215,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
-    function xtestVerifyBlob_RandomNumberOfQuorums(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_RandomNumberOfQuorums(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2 + (pseudoRandomNumber % 192);
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -261,7 +261,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
-    function xtestVerifyBlob_RequiredQuorumsNotMet(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_RequiredQuorumsNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 1;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -305,7 +305,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
-    function xtestVerifyBlob_AdversayThresholdNotMet(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_AdversayThresholdNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -354,7 +354,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
-    function xtestVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -399,7 +399,7 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
         eigenDABlobUtilsHarness.verifyBlob(blobHeader[1], eigenDAServiceManager, blobVerificationProof);
     }
 
-    function xtestVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
+    function testVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
