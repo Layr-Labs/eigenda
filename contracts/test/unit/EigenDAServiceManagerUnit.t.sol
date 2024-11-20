@@ -8,11 +8,14 @@ import {EigenDAServiceManager, IRewardsCoordinator} from "../../src/core/EigenDA
 import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import "../../src/interfaces/IEigenDAStructs.sol";
+import {IEigenDAThresholdRegistry} from "../../src/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
-    using EigenDAHasher for IEigenDAServiceManager.BatchHeader;
-    using EigenDAHasher for IEigenDAServiceManager.ReducedBatchHeader;
+    using EigenDAHasher for BatchHeader;
+    using EigenDAHasher for ReducedBatchHeader;
 
     address confirmer = address(uint160(uint256(keccak256(abi.encodePacked("confirmer")))));
     address notConfirmer = address(uint160(uint256(keccak256(abi.encodePacked("notConfirmer")))));
@@ -35,7 +38,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             avsDirectory,
             rewardsCoordinator,
             registryCoordinator,
-            stakeRegistry
+            stakeRegistry,
+            IEigenDAThresholdRegistry(address(0)),
+            IEigenDARelayRegistry(address(0))
         );
 
         address[] memory confirmers = new address[](1);
@@ -61,7 +66,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_AllSigning_Valid(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
         
         uint32 batchIdToConfirm = eigenDAServiceManager.batchId();
@@ -82,7 +87,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_Revert_NotEOA(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
         cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata"));
@@ -94,7 +99,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_Revert_NotConfirmer(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
         cheats.expectRevert(bytes("onlyBatchConfirmer: not from batch confirmer"));
@@ -113,7 +118,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         (, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) = 
             _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(pseudoRandomNumber, 0, quorumBitmap);
 
-        IEigenDAServiceManager.BatchHeader memory batchHeader = 
+        BatchHeader memory batchHeader = 
             _getRandomBatchHeader(pseudoRandomNumber, quorumNumbers, uint32(block.number + 1), 100);
 
         bytes32 batchHeaderHash = batchHeader.hashBatchHeaderMemory();
@@ -128,7 +133,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_Revert_PastBlocknumber(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
         cheats.roll(block.number + eigenDAServiceManager.BLOCK_STALE_MEASURE());
@@ -141,7 +146,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_Revert_Threshold(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(1, pseudoRandomNumber, 100);
 
         cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"));
@@ -153,7 +158,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_NonSigner_Valid(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(1, pseudoRandomNumber, 75);
 
         uint32 batchIdToConfirm = eigenDAServiceManager.batchId();
@@ -174,7 +179,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     }
 
     function testConfirmBatch_Revert_LengthMismatch(uint256 pseudoRandomNumber) public {
-        (IEigenDAServiceManager.BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
+        (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
         batchHeader.signedStakeForQuorums = new bytes(0);
 
@@ -186,7 +191,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         );
     }
 
-    function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (IEigenDAServiceManager.BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
+    function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
         // register a bunch of operators
         uint256 quorumBitmap = 1;
         bytes memory quorumNumbers = BitmapUtils.bitmapToBytesArray(quorumBitmap);
@@ -196,7 +201,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(_pseudoRandomNumber, _nonSigners, quorumBitmap);
 
         // get a random batch header
-        IEigenDAServiceManager.BatchHeader memory batchHeader = _getRandomBatchHeader(_pseudoRandomNumber, quorumNumbers, referenceBlockNumber, _threshold);
+        BatchHeader memory batchHeader = _getRandomBatchHeader(_pseudoRandomNumber, quorumNumbers, referenceBlockNumber, _threshold);
 
         // set batch specific signature
         bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
@@ -205,8 +210,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         return (batchHeader, nonSignerStakesAndSignature);
     }
 
-    function _getRandomBatchHeader(uint256 pseudoRandomNumber, bytes memory quorumNumbers, uint32 referenceBlockNumber, uint8 threshold) internal pure returns(IEigenDAServiceManager.BatchHeader memory) {
-        IEigenDAServiceManager.BatchHeader memory batchHeader;
+    function _getRandomBatchHeader(uint256 pseudoRandomNumber, bytes memory quorumNumbers, uint32 referenceBlockNumber, uint8 threshold) internal pure returns(BatchHeader memory) {
+        BatchHeader memory batchHeader;
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked("blobHeadersRoot", pseudoRandomNumber));
         batchHeader.quorumNumbers = quorumNumbers;
         batchHeader.signedStakeForQuorums = new bytes(quorumNumbers.length);
