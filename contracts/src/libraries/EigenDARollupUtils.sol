@@ -7,6 +7,7 @@ import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import {EigenDAHasher} from "./EigenDAHasher.sol";
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.
@@ -14,15 +15,6 @@ import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
  */
 library EigenDARollupUtils {
     using BN254 for BN254.G1Point;
-
-    // STRUCTS
-    struct BlobVerificationProof {
-        uint32 batchId;
-        uint32 blobIndex;
-        IEigenDAServiceManager.BatchMetadata batchMetadata;
-        bytes inclusionProof;
-        bytes quorumIndices;
-    }
     
     /**
      * @notice Verifies the inclusion of a blob within a batch confirmed in `eigenDAServiceManager` and its trust assumptions
@@ -31,7 +23,7 @@ library EigenDARollupUtils {
      * @param blobVerificationProof the relevant data needed to prove inclusion of the blob and that the trust assumptions were as expected
      */
     function verifyBlob(
-        IEigenDAServiceManager.BlobHeader memory blobHeader,
+        BlobHeader memory blobHeader,
         IEigenDAServiceManager eigenDAServiceManager,
         BlobVerificationProof memory blobVerificationProof
     ) internal view {
@@ -104,7 +96,7 @@ library EigenDARollupUtils {
      * @param blobVerificationProofs the relevant data needed to prove inclusion of the blobs and that the trust assumptions were as expected
      */
     function verifyBlobs(
-        IEigenDAServiceManager.BlobHeader[] memory blobHeaders,
+        BlobHeader[] memory blobHeaders,
         IEigenDAServiceManager eigenDAServiceManager,
         BlobVerificationProof[] memory blobVerificationProofs
     ) internal view {
