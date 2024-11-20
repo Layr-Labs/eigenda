@@ -101,12 +101,8 @@ type Config struct {
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
 
-	// TODO flagify
-	// The maximum time permitted for a GetChunks operation to complete. If zero then no timeout is enforced.
-	GetChunksTimeout time.Duration
-
-	// The maximum time permitted for a GetBlob operation to complete. If zero then no timeout is enforced.
-	GetBlobTimeout time.Duration
+	// Timeouts contains configuration for relay timeouts.
+	Timeouts TimeoutConfig
 }
 
 // NewServer creates a new relay Server.
@@ -125,7 +121,8 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataMaxConcurrency,
-		config.RelayIDs)
+		config.RelayIDs,
+		config.Timeouts.InternalGetMetadataTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata provider: %w", err)
 	}
@@ -135,7 +132,8 @@ func NewServer(
 		logger,
 		blobStore,
 		config.BlobCacheSize,
-		config.BlobMaxConcurrency)
+		config.BlobMaxConcurrency,
+		config.Timeouts.InternalGetBlobTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
@@ -145,7 +143,9 @@ func NewServer(
 		logger,
 		chunkReader,
 		config.ChunkCacheSize,
-		config.ChunkMaxConcurrency)
+		config.ChunkMaxConcurrency,
+		config.Timeouts.InternalGetProofsTimeout,
+		config.Timeouts.InternalGetCoefficientsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
@@ -169,9 +169,9 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-	if s.config.GetChunksTimeout > 0 {
+	if s.config.Timeouts.GetChunksTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.config.GetBlobTimeout)
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetBlobTimeout)
 		defer cancel()
 	}
 

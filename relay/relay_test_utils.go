@@ -3,15 +3,6 @@ package relay
 import (
 	"context"
 	"fmt"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
-	"time"
-
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -33,6 +24,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
 )
 
 var (
@@ -155,12 +153,10 @@ func buildBlobStore(t *testing.T, logger logging.Logger) *blobstore.BlobStore {
 func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReader, chunkstore.ChunkWriter) {
 
 	cfg := aws.ClientConfig{
-		Region:               "us-east-1",
-		AccessKey:            "localstack",
-		SecretAccessKey:      "localstack",
-		EndpointURL:          localstackHost,
-		FragmentWriteTimeout: time.Duration(10) * time.Second,
-		FragmentReadTimeout:  time.Duration(10) * time.Second,
+		Region:          "us-east-1",
+		AccessKey:       "localstack",
+		SecretAccessKey: "localstack",
+		EndpointURL:     localstackHost,
 	}
 
 	client, err := s3.NewClient(context.Background(), cfg, logger)
@@ -178,7 +174,7 @@ func buildChunkStore(t *testing.T, logger logging.Logger) (chunkstore.ChunkReade
 
 func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 
-	data := tu.RandomBytes(225) // TODO talk to Ian about this
+	data := tu.RandomBytes(225)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitments(data)

@@ -7,6 +7,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestReadWrite(t *testing.T) {
@@ -34,7 +35,13 @@ func TestReadWrite(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(
+		context.Background(),
+		logger,
+		blobStore,
+		10,
+		32,
+		10*time.Second)
 	require.NoError(t, err)
 
 	// Read the blobs back.
@@ -65,7 +72,13 @@ func TestNonExistentBlob(t *testing.T) {
 
 	blobStore := buildBlobStore(t, logger)
 
-	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(
+		context.Background(),
+		logger,
+		blobStore,
+		10,
+		32,
+		10*time.Second)
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {

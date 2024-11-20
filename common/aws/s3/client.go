@@ -223,9 +223,6 @@ func (s *client) FragmentedUploadObject(
 	}
 	resultChannel := make(chan error, len(fragments))
 
-	ctx, cancel := context.WithTimeout(ctx, s.cfg.FragmentWriteTimeout)
-	defer cancel()
-
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
 		s.concurrencyLimiter <- struct{}{}
@@ -282,9 +279,6 @@ func (s *client) FragmentedDownloadObject(
 		return nil, err
 	}
 	resultChannel := make(chan *readResult, len(fragmentKeys))
-
-	ctx, cancel := context.WithTimeout(ctx, s.cfg.FragmentWriteTimeout)
-	defer cancel()
 
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey

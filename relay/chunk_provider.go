@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
+	"time"
 )
 
 type chunkProvider struct {
@@ -23,6 +24,12 @@ type chunkProvider struct {
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
+
+	// fetchTimeout is the maximum time to wait for a chunk proof fetch operation to complete.
+	proofFetchTimeout time.Duration
+
+	// coefficientFetchTimeout is the maximum time to wait for a chunk coefficient fetch operation to complete.
+	coefficientFetchTimeout time.Duration
 }
 
 // blobKeyWithMetadata attaches some additional metadata to a blobKey.
@@ -41,12 +48,16 @@ func newChunkProvider(
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
 	cacheSize int,
-	maxIOConcurrency int) (*chunkProvider, error) {
+	maxIOConcurrency int,
+	proofFetchTimeout time.Duration,
+	coefficientFetchTimeout time.Duration) (*chunkProvider, error) {
 
 	server := &chunkProvider{
-		ctx:         ctx,
-		logger:      logger,
-		chunkReader: chunkReader,
+		ctx:                     ctx,
+		logger:                  logger,
+		chunkReader:             chunkReader,
+		proofFetchTimeout:       proofFetchTimeout,
+		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
 	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](
@@ -128,10 +139,13 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 	var proofsErr error
 
 	go func() {
+		ctx, cancel := context.WithTimeout(s.ctx, s.proofFetchTimeout)
 		defer func() {
 			wg.Done()
+			cancel()
 		}()
-		proofs, proofsErr = s.chunkReader.GetChunkProofs(s.ctx, key.blobKey)
+
+		proofs, proofsErr = s.chunkReader.GetChunkProofs(ctx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
@@ -139,7 +153,10 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 		FragmentSizeBytes:   key.metadata.fragmentSizeBytes,
 	}
 
-	coefficients, err := s.chunkReader.GetChunkCoefficients(s.ctx, key.blobKey, fragmentInfo)
+	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
+	defer cancel()
+
+	coefficients, err := s.chunkReader.GetChunkCoefficients(ctx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}

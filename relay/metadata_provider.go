@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync/atomic"
+	"time"
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
@@ -39,6 +40,9 @@ type metadataProvider struct {
 	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
 	// that are not assigned to one of these IDs.
 	relayIDSet map[v2.RelayKey]struct{}
+
+	// fetchTimeout is the maximum time to wait for a metadata fetch operation to complete.
+	fetchTimeout time.Duration
 }
 
 // newMetadataProvider creates a new metadataProvider.
@@ -48,7 +52,8 @@ func newMetadataProvider(
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	maxIOConcurrency int,
-	relayIDs []v2.RelayKey) (*metadataProvider, error) {
+	relayIDs []v2.RelayKey,
+	fetchTimeout time.Duration) (*metadataProvider, error) {
 
 	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
 	for _, id := range relayIDs {
@@ -60,6 +65,7 @@ func newMetadataProvider(
 		logger:        logger,
 		metadataStore: metadataStore,
 		relayIDSet:    relayIDSet,
+		fetchTimeout:  fetchTimeout,
 	}
 
 	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](
@@ -136,8 +142,12 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
+
+	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
+	defer cancel()
+
 	// Retrieve the metadata from the store.
-	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(m.ctx, key)
+	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
