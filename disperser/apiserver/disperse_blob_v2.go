@@ -70,11 +70,12 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest) error {
 	data := req.GetData()
 	blobSize := len(data)
-	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
-	}
 	if blobSize == 0 {
 		return api.NewErrorInvalidArg("blob size must be greater than 0")
+	}
+	blobLength := encoding.GetBlobLengthPowerOf2(uint(blobSize))
+	if blobLength > uint(s.maxNumSymbolsPerBlob) {
+		return api.NewErrorInvalidArg("blob size too big")
 	}
 
 	blobHeaderProto := req.GetBlobHeader()
@@ -90,8 +91,8 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("too many quorum numbers specified: maximum is %d", s.onchainState.QuorumCount))
 	}
 
-	for quorum := range blobHeaderProto.GetQuorumNumbers() {
-		if quorum > int(s.onchainState.QuorumCount) {
+	for _, quorum := range blobHeaderProto.GetQuorumNumbers() {
+		if quorum > corev2.MaxQuorumID || uint8(quorum) >= s.onchainState.QuorumCount {
 			return api.NewErrorInvalidArg(fmt.Sprintf("invalid quorum number %d; maximum is %d", quorum, s.onchainState.QuorumCount))
 		}
 	}
@@ -119,7 +120,17 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	// TODO(ian-shim): validate commitment, length is power of 2 and less than maxNumSymbolsPerBlob, payment metadata
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+		return api.NewErrorInvalidArg("invalid payment metadata")
+	}
+
+	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)
+	if err != nil {
+		return api.NewErrorInternal(fmt.Sprintf("failed to get commitments: %v", err))
+	}
+	if !commitments.Equal(&blobHeader.BlobCommitments) {
+		return api.NewErrorInvalidArg("invalid blob commitment")
+	}
 
 	return nil
 }
