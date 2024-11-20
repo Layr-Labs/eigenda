@@ -149,7 +149,8 @@ func (c *disperserClientV2) DisperseBlob(
 		blobCommitments = *deserialized
 	} else {
 		// if prover is configured, get commitments from prover
-		blobCommitments, err = c.prover.GetCommitments(data)
+
+		blobCommitments, err = c.prover.GetCommitmentsForPaddedLength(data)
 		if err != nil {
 			return nil, [32]byte{}, fmt.Errorf("error getting blob commitments: %w", err)
 		}

@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/relay/limiter"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
@@ -18,14 +20,32 @@ import (
 
 func defaultConfig() *Config {
 	return &Config{
-		GRPCPort:               50051,
-		MaxGRPCMessageSize:     1024 * 1024 * 300,
-		MetadataCacheSize:      1024 * 1024,
-		MetadataMaxConcurrency: 32,
-		BlobCacheSize:          32,
-		BlobMaxConcurrency:     32,
-		ChunkCacheSize:         32,
-		ChunkMaxConcurrency:    32,
+		GRPCPort:                   50051,
+		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		MetadataCacheSize:          1024 * 1024,
+		MetadataMaxConcurrency:     32,
+		BlobCacheSize:              32,
+		BlobMaxConcurrency:         32,
+		ChunkCacheSize:             32,
+		ChunkMaxConcurrency:        32,
+		MaxKeysPerGetChunksRequest: 1024,
+		RateLimits: limiter.Config{
+			MaxGetBlobOpsPerSecond:          1024,
+			GetBlobOpsBurstiness:            1024,
+			MaxGetBlobBytesPerSecond:        20 * 1024 * 1024,
+			GetBlobBytesBurstiness:          20 * 1024 * 1024,
+			MaxConcurrentGetBlobOps:         1024,
+			MaxGetChunkOpsPerSecond:         1024,
+			GetChunkOpsBurstiness:           1024,
+			MaxGetChunkBytesPerSecond:       20 * 1024 * 1024,
+			GetChunkBytesBurstiness:         20 * 1024 * 1024,
+			MaxConcurrentGetChunkOps:        1024,
+			MaxGetChunkOpsPerSecondClient:   8,
+			GetChunkOpsBurstinessClient:     8,
+			MaxGetChunkBytesPerSecondClient: 2 * 1024 * 1024,
+			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
+			MaxConcurrentGetChunkOpsClient:  1,
+		},
 	}
 }
 
@@ -318,6 +338,10 @@ func TestReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -634,6 +658,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -904,6 +932,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
+	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
+	config.RateLimits.GetChunkOpsBurstiness = 1000
+	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
+	config.RateLimits.GetChunkOpsBurstinessClient = 1000
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -984,6 +1016,16 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 			requestedChunks = append(requestedChunks, request)
 		}
+		// Add a request for duplicate key with different index range
+		requestedChunks = append(requestedChunks, &pb.ChunkRequest{
+			Request: &pb.ChunkRequest_ByRange{
+				ByRange: &pb.ChunkRequestByRange{
+					BlobKey:    keys[0][:],
+					StartIndex: uint32(len(expectedData[keys[0]]) / 2),
+					EndIndex:   uint32(len(expectedData[keys[0]])),
+				},
+			},
+		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
 		}
@@ -1005,11 +1047,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		response, err := getChunks(t, request)
-
 		if allInCorrectShard {
 			require.NoError(t, err)
 
-			require.Equal(t, keyCount, len(response.Data))
+			require.Equal(t, keyCount+1, len(response.Data))
 
 			for keyIndex, key := range keys {
 				data := expectedData[key]
@@ -1020,6 +1061,17 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 				for frameIndex, frame := range bundle {
 					require.Equal(t, data[frameIndex], frame)
 				}
+			}
+
+			// Check the duplicate key
+			key := keys[0]
+			data := expectedData[key][len(expectedData[key])/2:]
+
+			bundle, err := core.Bundle{}.Deserialize(response.Data[keyCount])
+			require.NoError(t, err)
+
+			for frameIndex, frame := range bundle {
+				require.Equal(t, data[frameIndex], frame)
 			}
 		} else {
 			require.Error(t, err)

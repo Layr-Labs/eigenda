@@ -12,4 +12,5 @@ type ProofDevice interface {
 	ComputeMultiFrameProof(blobFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error)
 	ComputeLengthCommitment(blobFr []fr.Element) (*bn254.G2Affine, error)
 	ComputeLengthProof(blobFr []fr.Element) (*bn254.G2Affine, error)
+	ComputeLengthProofForLength(blobFr []fr.Element, length uint64) (*bn254.G2Affine, error)
 }

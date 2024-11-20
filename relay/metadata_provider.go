@@ -3,11 +3,13 @@ package relay
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	"sync/atomic"
+
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"sync/atomic"
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
@@ -15,6 +17,8 @@ import (
 type blobMetadata struct {
 	// the size of the blob in bytes
 	blobSizeBytes uint32
+	// the size of each encoded chunk
+	chunkSizeBytes uint32
 	// the size of the file containing the encoded chunks
 	totalChunkSizeBytes uint32
 	// the fragment size used for uploading the encoded chunks
@@ -76,8 +80,10 @@ func newMetadataProvider(
 type metadataMap map[v2.BlobKey]*blobMetadata
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
+// If any of the blobs do not exist, an error is returned.
+// Note that resulting metadata map may not have the same length as the input
+// keys slice if the input keys slice has duplicate items.
 func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, error) {
-
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
 		key      v2.BlobKey
@@ -91,7 +97,12 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 	// Set when the first error is encountered. Useful for preventing new operations from starting.
 	hadError := atomic.Bool{}
 
+	mMap := make(metadataMap)
 	for _, key := range keys {
+		mMap[key] = nil
+	}
+
+	for key := range mMap {
 		if hadError.Load() {
 			// Don't bother starting new operations if we've already encountered an error.
 			break
@@ -119,8 +130,7 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 		}()
 	}
 
-	mMap := make(metadataMap)
-	for len(mMap) < len(keys) {
+	for range mMap {
 		result := <-completionChannel
 		if result.err != nil {
 			return nil, fmt.Errorf("error fetching metadata for blob %s: %w", result.key.Hex(), result.err)
@@ -153,8 +163,17 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 		}
 	}
 
+	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
+	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length)
+	chunkSize, err := v2.GetChunkLength(cert.BlobHeader.BlobVersion, blobSize)
+	chunkSize *= encoding.BYTES_PER_SYMBOL
+	if err != nil {
+		return nil, fmt.Errorf("error getting chunk length: %w", err)
+	}
+
 	metadata := &blobMetadata{
-		blobSizeBytes:       0, /* Future work: populate this once it is added to the metadata store */
+		blobSizeBytes:       blobSize,
+		chunkSizeBytes:      chunkSize,
 		totalChunkSizeBytes: fragmentInfo.TotalChunkSizeBytes,
 		fragmentSizeBytes:   fragmentInfo.FragmentSizeBytes,
 	}

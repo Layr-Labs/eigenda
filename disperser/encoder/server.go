@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
@@ -27,7 +29,14 @@ type EncoderServer struct {
 	close   func()
 
 	runningRequests chan struct{}
-	requestPool     chan struct{}
+	requestPool     chan blobRequest
+
+	queueStats map[string]int
+	queueLock  sync.Mutex
+}
+
+type blobRequest struct {
+	blobSizeByte int
 }
 
 func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServer {
@@ -38,7 +47,8 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 		metrics: metrics,
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan struct{}, config.RequestPoolSize),
+		requestPool:     make(chan blobRequest, config.RequestPoolSize),
+		queueStats:      make(map[string]int),
 	}
 }
 
@@ -80,8 +90,13 @@ func (s *EncoderServer) Close() {
 
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	startTime := time.Now()
+	blobSize := len(req.GetData())
 	select {
-	case s.requestPool <- struct{}{}:
+	case s.requestPool <- blobRequest{blobSizeByte: blobSize}:
+		s.queueLock.Lock()
+		s.queueStats[common.BlobSizeBucket(blobSize)]++
+		s.metrics.ObserveQueue(s.queueStats)
+		s.queueLock.Unlock()
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(len(req.GetData()))
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
@@ -91,16 +106,16 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 	defer s.popRequest()
 
 	if ctx.Err() != nil {
-		s.metrics.IncrementCanceledBlobRequestNum(len(req.GetData()))
+		s.metrics.IncrementCanceledBlobRequestNum(blobSize)
 		return nil, ctx.Err()
 	}
 
 	s.metrics.ObserveLatency("queuing", time.Since(startTime))
 	reply, err := s.handleEncoding(ctx, req)
 	if err != nil {
-		s.metrics.IncrementFailedBlobRequestNum(len(req.GetData()))
+		s.metrics.IncrementFailedBlobRequestNum(blobSize)
 	} else {
-		s.metrics.IncrementSuccessfulBlobRequestNum(len(req.GetData()))
+		s.metrics.IncrementSuccessfulBlobRequestNum(blobSize)
 	}
 	s.metrics.ObserveLatency("total", time.Since(startTime))
 
@@ -108,8 +123,12 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 }
 
 func (s *EncoderServer) popRequest() {
-	<-s.requestPool
+	blobRequest := <-s.requestPool
 	<-s.runningRequests
+	s.queueLock.Lock()
+	s.queueStats[common.BlobSizeBucket(blobRequest.blobSizeByte)]--
+	s.metrics.ObserveQueue(s.queueStats)
+	s.queueLock.Unlock()
 }
 
 func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
