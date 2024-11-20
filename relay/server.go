@@ -100,6 +100,13 @@ type Config struct {
 
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
+
+	// TODO flagify
+	// The maximum time permitted for a GetChunks operation to complete. If zero then no timeout is enforced.
+	GetChunksTimeout time.Duration
+
+	// The maximum time permitted for a GetBlob operation to complete. If zero then no timeout is enforced.
+	GetBlobTimeout time.Duration
 }
 
 // NewServer creates a new relay Server.
@@ -162,9 +169,11 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-
-	// TODO(cody-littley):
-	//  - timeouts
+	if s.config.GetChunksTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.GetBlobTimeout)
+		defer cancel()
+	}
 
 	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
 	if err != nil {
@@ -178,7 +187,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 
 	keys := []v2.BlobKey{key}
-	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
@@ -193,7 +202,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, err
 	}
 
-	data, err := s.blobProvider.GetBlob(key)
+	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
@@ -207,9 +216,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-
-	// TODO(cody-littley):
-	//  - timeouts
 
 	if len(request.ChunkRequests) <= 0 {
 		return nil, fmt.Errorf("no chunk requests provided")
@@ -245,7 +251,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, err
 	}
 
-	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)

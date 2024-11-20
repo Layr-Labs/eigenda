@@ -27,7 +27,7 @@ func TestGetNonExistentBlob(t *testing.T) {
 
 	// Try to fetch a non-existent blobs
 	for i := 0; i < 10; i++ {
-		_, err := server.GetMetadataForBlobs([]v2.BlobKey{v2.BlobKey(tu.RandomBytes(32))})
+		_, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{v2.BlobKey(tu.RandomBytes(32))})
 		require.Error(t, err)
 	}
 }
@@ -85,7 +85,7 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 
 	// Fetch the metadata from the server.
 	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
-		mMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		mMap, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{blobKey})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(mMap))
 		metadata := mMap[blobKey]
@@ -96,7 +96,7 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 
 	// Read it back again. This uses a different code pathway due to the cache.
 	for blobKey, totalChunkSizeBytes := range totalChunkSizeMap {
-		mMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		mMap, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{blobKey})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(mMap))
 		metadata := mMap[blobKey]
@@ -168,7 +168,7 @@ func TestBatchedFetch(t *testing.T) {
 			}
 		}
 
-		mMap, err := server.GetMetadataForBlobs(keys)
+		mMap, err := server.GetMetadataForBlobs(context.Background(), keys)
 		require.NoError(t, err)
 
 		assert.Equal(t, keyCount, len(mMap))
@@ -261,7 +261,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 			}
 		}
 
-		mMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		mMap, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{blobKey})
 
 		if isBlobInCorrectShard {
 			// The blob is in the relay's shard, should be returned like normal
@@ -288,7 +288,7 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 			}
 		}
 
-		mMap, err := server.GetMetadataForBlobs([]v2.BlobKey{blobKey})
+		mMap, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{blobKey})
 
 		if isBlobInCorrectShard {
 			// The blob is in the relay's shard, should be returned like normal
@@ -401,7 +401,7 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 			}
 		}
 
-		mMap, err := server.GetMetadataForBlobs(keys)
+		mMap, err := server.GetMetadataForBlobs(context.Background(), keys)
 		if areKeysInCorrectShard {
 			require.NoError(t, err)
 			assert.Equal(t, keyCount, len(mMap))

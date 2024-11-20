@@ -46,9 +46,9 @@ func newBlobProvider(
 }
 
 // GetBlob retrieves a blob from the blob store.
-func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
+func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte, error) {
 
-	data, err := s.blobCache.Get(blobKey)
+	data, err := s.blobCache.Get(ctx, blobKey)
 
 	if err != nil {
 		// It should not be possible for external users to force an error here since we won't

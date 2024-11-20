@@ -79,7 +79,7 @@ func newMetadataProvider(
 type metadataMap map[v2.BlobKey]*blobMetadata
 
 // GetMetadataForBlobs retrieves metadata about multiple blobs in parallel.
-func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, error) {
+func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.BlobKey) (metadataMap, error) {
 
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
@@ -102,7 +102,7 @@ func (m *metadataProvider) GetMetadataForBlobs(keys []v2.BlobKey) (metadataMap, 
 
 		boundKey := key
 		go func() {
-			metadata, err := m.metadataCache.Get(boundKey)
+			metadata, err := m.metadataCache.Get(ctx, boundKey)
 			if err != nil {
 				// Intentionally log at debug level. External users can force this condition to trigger
 				// by requesting metadata for a blob that does not exist, and so it's important to avoid
