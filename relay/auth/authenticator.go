@@ -20,6 +20,9 @@ type RequestAuthenticator interface {
 		origin string,
 		request *pb.GetChunksRequest,
 		now time.Time) error
+
+	// PreloadCache preloads the key cache with the public keys of all operators that are currently indexed.
+	PreloadCache() error
 }
 
 // authenticationTimeout is used to track the expiration of an auth.
@@ -69,6 +72,23 @@ func NewRequestAuthenticator(
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
 		keyCache:                      keyCache,
 	}, nil
+}
+
+func (a *requestAuthenticator) PreloadCache() error {
+	blockNumber, err := a.ics.GetCurrentBlockNumber()
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get operators: %w", err)
+	}
+
+	for operatorID, operator := range operators {
+		a.keyCache.Add(operatorID, operator.PubkeyG2)
+	}
+
+	return nil
 }
 
 func (a *requestAuthenticator) AuthenticateGetChunksRequest(
