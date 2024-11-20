@@ -2,6 +2,7 @@ package verify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -26,6 +27,17 @@ type Config struct {
 	SvcManagerAddr       string
 	EthConfirmationDepth uint64
 	WaitForFinalization  bool
+}
+
+// Custom MarshalJSON function to control what gets included in the JSON output
+func (c Config) MarshalJSON() ([]byte, error) {
+	type Alias Config // Use an alias to avoid recursion with MarshalJSON
+	aux := (Alias)(c)
+	// Conditionally include a masked password if it is set
+	if aux.RPCURL != "" {
+		aux.RPCURL = "*****"
+	}
+	return json.Marshal(aux)
 }
 
 // TODO: right now verification and confirmation depth are tightly coupled. we should decouple them

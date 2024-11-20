@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +46,19 @@ type Config struct {
 	AccessKeySecret string
 	Bucket          string
 	Path            string
+}
+
+// Custom MarshalJSON function to control what gets included in the JSON output
+// TODO: Probably best would be to separate config from secrets everywhere.
+// Then we could just log the config and not worry about secrets.
+func (c Config) MarshalJSON() ([]byte, error) {
+	type Alias Config // Use an alias to avoid recursion with MarshalJSON
+	aux := (Alias)(c)
+	// Conditionally include a masked password if it is set
+	if aux.AccessKeySecret != "" {
+		aux.AccessKeySecret = "*****"
+	}
+	return json.Marshal(aux)
 }
 
 // Store ... S3 store

@@ -133,7 +133,6 @@ func createRedisConfig(eigendaCfg server.Config) server.CLIConfig {
 		Password: "",
 		DB:       0,
 		Eviction: 10 * time.Minute,
-		Profile:  true,
 	}
 	return server.CLIConfig{
 		EigenDAConfig: eigendaCfg,

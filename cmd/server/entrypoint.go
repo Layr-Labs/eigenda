@@ -73,17 +73,20 @@ func StartProxySvr(cliCtx *cli.Context) error {
 }
 
 // TODO: we should probably just change EdaClientConfig struct definition in eigenda-client
-// to have a `json:"-"` tag on the SignerPrivateKeyHex field, to prevent the privateKey from being marshaled at all
 func prettyPrintConfig(cliCtx *cli.Context, log log.Logger) error {
 	// we read a new config which we modify to hide private info in order to log the rest
 	cfg := server.ReadCLIConfig(cliCtx)
-	cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "HIDDEN"
-	cfg.EigenDAConfig.VerifierConfig.RPCURL = "HIDDEN"
+	if cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex != "" {
+		cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "*****" // marshaling defined in client config
+	}
+	if cfg.EigenDAConfig.EdaClientConfig.EthRpcUrl != "" {
+		cfg.EigenDAConfig.EdaClientConfig.EthRpcUrl = "*****" // hiding as RPC providers typically use sensitive API keys within
+	}
 
 	configJSON, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config: %v", string(configJSON)))
+	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v", string(configJSON)))
 	return nil
 }
