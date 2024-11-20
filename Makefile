@@ -39,7 +39,6 @@ protoc-local: clean
 	./api/builder/protoc.sh
 
 lint:
-	golint -set_exit_status ./...
 	go tool fix ./..
 	golangci-lint run
 
