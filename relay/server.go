@@ -93,6 +93,9 @@ type Config struct {
 	// RateLimits contains configuration for rate limiting.
 	RateLimits limiter.Config
 
+	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
+	AuthenticationKeyCacheSize int
+
 	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
 	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
 	// will be authenticated independently, regardless of timing.
@@ -145,7 +148,13 @@ func NewServer(
 
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
-		authenticator = auth.NewRequestAuthenticator(ics, config.AuthenticationTimeout)
+		authenticator, err = auth.NewRequestAuthenticator(
+			ics,
+			config.AuthenticationKeyCacheSize,
+			config.AuthenticationTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("error creating authenticator: %w", err)
+		}
 	}
 
 	return &Server{

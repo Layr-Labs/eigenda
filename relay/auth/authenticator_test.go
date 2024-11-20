@@ -57,7 +57,8 @@ func TestValidRequest(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
@@ -119,7 +120,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	// This disables saving of authentication results.
 	timeout := time.Duration(0)
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
@@ -162,7 +164,8 @@ func TestNonExistingClient(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	invalidOperatorID := tu.RandomBytes(32)
 
@@ -191,7 +194,8 @@ func TestBadSignature(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
