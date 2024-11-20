@@ -223,6 +223,48 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_DISABLED"),
 	}
+	GetChunksTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-timeout"),
+		Usage:    "Timeout for GetChunks()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	GetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-blob-timeout"),
+		Usage:    "Timeout for GetBlob()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetMetadataTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-metadata-timeout"),
+		Usage:    "Timeout for internal metadata fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_METADATA_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-blob-timeout"),
+		Usage:    "Timeout for internal blob fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetProofsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-proofs-timeout"),
+		Usage:    "Timeout for internal proofs fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_PROOFS_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetCoefficientsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-coefficients-timeout"),
+		Usage:    "Timeout for internal coefficients fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_COEFFICIENTS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -260,6 +302,12 @@ var optionalFlags = []cli.Flag{
 	GetChunkBytesBurstinessClientFlag,
 	MaxConcurrentGetChunkOpsClientFlag,
 	IndexerPullIntervalFlag,
+	GetChunksTimeoutFlag,
+	GetBlobTimeoutFlag,
+	InternalGetMetadataTimeoutFlag,
+	InternalGetBlobTimeoutFlag,
+	InternalGetProofsTimeoutFlag,
+	InternalGetCoefficientsTimeoutFlag,
 }
 
 var Flags []cli.Flag

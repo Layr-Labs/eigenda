@@ -2,8 +2,6 @@ package relay
 
 import "time"
 
-// TODO flagify
-
 // TimeoutConfig encapsulates the timeout configuration for the relay server.
 type TimeoutConfig struct {
 
