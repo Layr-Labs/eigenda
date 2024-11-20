@@ -312,4 +312,182 @@ func TestConcurrencyLimiter(t *testing.T) {
 	wg.Wait()
 }
 
-// TODO test what happens when the context is cancelled
+func TestOriginalRequesterTimesOut(t *testing.T) {
+	tu.InitializeRandom()
+
+	dataSize := 1024
+
+	baseData := make(map[int]string)
+	for i := 0; i < dataSize; i++ {
+		baseData[i] = tu.RandomString(10)
+	}
+
+	accessorLock := sync.RWMutex{}
+	cacheMissCount := atomic.Uint64{}
+	accessor := func(key int) (*string, error) {
+
+		// Intentionally block if accessorLock is held by the outside scope.
+		// Used to provoke specific race conditions.
+		accessorLock.Lock()
+		defer accessorLock.Unlock()
+
+		cacheMissCount.Add(1)
+
+		str := baseData[key]
+		return &str, nil
+	}
+	cacheSize := rand.Intn(dataSize) + 1
+
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	require.NoError(t, err)
+
+	// Lock the accessor. This will cause all cache misses to block.
+	accessorLock.Lock()
+
+	// Start several goroutines that will attempt to access the same key.
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	errCount := atomic.Uint64{}
+	for i := 0; i < 10; i++ {
+
+		var ctx context.Context
+		if i == 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			defer cancel()
+		} else {
+			ctx = context.Background()
+		}
+
+		go func() {
+			defer wg.Done()
+			value, err := ca.Get(ctx, 0)
+
+			if err != nil {
+				errCount.Add(1)
+			} else {
+				require.Equal(t, baseData[0], *value)
+			}
+		}()
+
+		if i == 0 {
+			// Give the thread with the small timeout a chance to start. Although this sleep statement is
+			// not required for the test to pass, it makes it much more likely for this test to exercise
+			// the intended code pathway.
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// Unlock the accessor. This will allow the goroutines to proceed.
+	accessorLock.Unlock()
+
+	// Wait for the goroutines to finish.
+	wg.Wait()
+
+	// Only one of the goroutines should have called into the accessor.
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// At most, one goroutine should have timed out.
+	require.True(t, errCount.Load() <= 1)
+
+	// Fetching the key again should not result in a cache miss.
+	value, err := ca.Get(context.Background(), 0)
+	require.NoError(t, err)
+	require.Equal(t, baseData[0], *value)
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// The internal lookupsInProgress map should no longer contain the key.
+	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+}
+
+func TestSecondaryRequesterTimesOut(t *testing.T) {
+	tu.InitializeRandom()
+
+	dataSize := 1024
+
+	baseData := make(map[int]string)
+	for i := 0; i < dataSize; i++ {
+		baseData[i] = tu.RandomString(10)
+	}
+
+	accessorLock := sync.RWMutex{}
+	cacheMissCount := atomic.Uint64{}
+	accessor := func(key int) (*string, error) {
+
+		// Intentionally block if accessorLock is held by the outside scope.
+		// Used to provoke specific race conditions.
+		accessorLock.Lock()
+		defer accessorLock.Unlock()
+
+		cacheMissCount.Add(1)
+
+		str := baseData[key]
+		return &str, nil
+	}
+	cacheSize := rand.Intn(dataSize) + 1
+
+	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	require.NoError(t, err)
+
+	// Lock the accessor. This will cause all cache misses to block.
+	accessorLock.Lock()
+
+	// Start several goroutines that will attempt to access the same key.
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	errCount := atomic.Uint64{}
+	for i := 0; i < 10; i++ {
+
+		var ctx context.Context
+		if i == 1 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			defer cancel()
+		} else {
+			ctx = context.Background()
+		}
+
+		go func() {
+			defer wg.Done()
+			value, err := ca.Get(ctx, 0)
+
+			if err != nil {
+				errCount.Add(1)
+			} else {
+				require.Equal(t, baseData[0], *value)
+			}
+		}()
+
+		if i == 0 {
+			// Give the thread with the context that won't time out a chance to start. Although this sleep statement is
+			// not required for the test to pass, it makes it much more likely for this test to exercise
+			// the intended code pathway.
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// Give context a chance to time out. Although this sleep statement is not required for the test to pass, it makes
+	// it much more likely for this test to exercise the intended code pathway.
+	time.Sleep(100 * time.Millisecond)
+
+	// Unlock the accessor. This will allow the goroutines to proceed.
+	accessorLock.Unlock()
+
+	// Wait for the goroutines to finish.
+	wg.Wait()
+
+	// Only one of the goroutines should have called into the accessor.
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// At most, one goroutine should have timed out.
+	require.True(t, errCount.Load() <= 1)
+
+	// Fetching the key again should not result in a cache miss.
+	value, err := ca.Get(context.Background(), 0)
+	require.NoError(t, err)
+	require.Equal(t, baseData[0], *value)
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// The internal lookupsInProgress map should no longer contain the key.
+	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+}
