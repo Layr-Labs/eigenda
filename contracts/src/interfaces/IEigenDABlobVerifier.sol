@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAServiceManager} from "./IEigenDAServiceManager.sol";
-import {EigenDABlobVerificationUtils} from "../libraries/EigenDABlobVerificationUtils.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
