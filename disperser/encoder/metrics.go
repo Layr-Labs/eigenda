@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -107,9 +106,9 @@ func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
 	m.Latency.WithLabelValues(stage).Observe(float64(duration.Milliseconds()))
 }
 
-func (m *Metrics) ObserveQueue(queueStats map[int]int) {
-	for blobSize, num := range queueStats {
-		m.BlobQueue.With(prometheus.Labels{"size_bucket": common.BlobSizeBucket(blobSize)}).Set(float64(num))
+func (m *Metrics) ObserveQueue(queueStats map[string]int) {
+	for bucket, num := range queueStats {
+		m.BlobQueue.With(prometheus.Labels{"size_bucket": bucket}).Set(float64(num))
 	}
 }
 

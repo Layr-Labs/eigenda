@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
@@ -30,7 +31,7 @@ type EncoderServer struct {
 	runningRequests chan struct{}
 	requestPool     chan blobRequest
 
-	queueStats map[int]int
+	queueStats map[string]int
 	queueLock  sync.Mutex
 }
 
@@ -47,7 +48,7 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
-		queueStats:      make(map[int]int),
+		queueStats:      make(map[string]int),
 	}
 }
 
@@ -92,16 +93,15 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 	blobSize := len(req.GetData())
 	select {
 	case s.requestPool <- blobRequest{blobSizeByte: blobSize}:
+		s.queueLock.Lock()
+		s.queueStats[common.BlobSizeBucket(blobSize)]++
+		s.metrics.ObserveQueue(s.queueStats)
+		s.queueLock.Unlock()
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(len(req.GetData()))
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
 	}
-	s.queueLock.Lock()
-	s.queueStats[blobSize]++
-	s.metrics.ObserveQueue(s.queueStats)
-	s.queueLock.Unlock()
-
 	s.runningRequests <- struct{}{}
 	defer s.popRequest()
 
@@ -126,7 +126,7 @@ func (s *EncoderServer) popRequest() {
 	blobRequest := <-s.requestPool
 	<-s.runningRequests
 	s.queueLock.Lock()
-	s.queueStats[blobRequest.blobSizeByte]--
+	s.queueStats[common.BlobSizeBucket(blobRequest.blobSizeByte)]--
 	s.metrics.ObserveQueue(s.queueStats)
 	s.queueLock.Unlock()
 }
