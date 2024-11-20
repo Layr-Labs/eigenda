@@ -403,7 +403,7 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 	}
 
 	// Set KZG Commitments default backend
-	commitmentsBckend := &KzgCommitmentsGnarkBackend{
+	commitmentsBackend := &KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
 		KzgConfig:  p.KzgConfig,
@@ -415,7 +415,7 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 		KzgConfig:             p.KzgConfig,
 		Ks:                    ks,
 		KzgMultiProofBackend:  multiproofBackend,
-		KzgCommitmentsBackend: commitmentsBckend,
+		KzgCommitmentsBackend: commitmentsBackend,
 	}, nil
 }
 

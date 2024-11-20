@@ -1,6 +1,8 @@
 package prover
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -15,14 +17,25 @@ type KzgCommitmentsGnarkBackend struct {
 
 func (p *KzgCommitmentsGnarkBackend) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
 	inputLength := uint64(len(coeffs))
-	shiftedSecret := p.G2Trailing[p.KzgConfig.SRSNumberToLoad-inputLength:]
+	return p.ComputeLengthProofForLength(coeffs, inputLength)
+}
+
+func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLength(coeffs []fr.Element, length uint64) (*bn254.G2Affine, error) {
+	if length < uint64(len(coeffs)) {
+		return nil, fmt.Errorf("length is less than the number of coefficients")
+	}
+
+	start := p.KzgConfig.SRSNumberToLoad - length
+	shiftedSecret := p.G2Trailing[start : start+uint64(len(coeffs))]
 	config := ecc.MultiExpConfig{}
+
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
 	var lengthProof bn254.G2Affine
 	_, err := lengthProof.MultiExp(shiftedSecret, coeffs, config)
 	if err != nil {
 		return nil, err
 	}
+
 	return &lengthProof, nil
 }
 

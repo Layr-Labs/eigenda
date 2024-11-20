@@ -24,10 +24,7 @@ func TestProveAllCosetThreads(t *testing.T) {
 	inputFr, err := rs.ToFrArray(gettysburgAddressBytes)
 	assert.Nil(t, err)
 
-	frames, fIndices, err := enc.GetFrames(inputFr)
-	require.Nil(t, err)
-
-	commit, _, _, err := enc.GetCommitments(inputFr)
+	commit, _, _, frames, fIndices, err := enc.Encode(inputFr)
 	require.Nil(t, err)
 
 	for i := 0; i < len(frames); i++ {
