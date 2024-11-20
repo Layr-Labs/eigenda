@@ -18,7 +18,7 @@ yarn global add @graphprotocol/graph-cli # install if u haven't
 # or install on MacOS
 npm install -g @graphprotocol/graph-cli
 
-graph init ----from-contract <contract_addr> --network {goerli,mainnet} --abi abis/Contract.json 
+graph init --from-contract <contract_addr> --network {goerli,mainnet} --abi abis/Contract.json 
 ```
 
 And go through the dialog.
