@@ -130,9 +130,24 @@ type GetChunksRequest struct {
 	// is an unauthenticated request, this field should be empty. Relays may choose to reject
 	// unauthenticated requests.
 	OperatorId []byte `protobuf:"bytes,2,opt,name=operator_id,json=operatorId,proto3" json:"operator_id,omitempty"`
-	// If this is an authenticated request, this field will hold a signature by the requester
-	// on the hash of this request. Signature should be computed with relay.auth.SignGetChunksRequest()
-	// or an equivalent implementation. Relays may choose to reject unauthenticated requests.
+	// If this is an authenticated request, this field will hold a BLS signature by the requester
+	// on the hash of this request. Relays may choose to reject unauthenticated requests.
+	//
+	// The following describes the schema for computing the hash of this request
+	// This algorithm is implemented in golang using relay.auth.HashGetChunksRequest().
+	//
+	// All integers are encoded as unsigned 4 byte big endian values.
+	//
+	// Perform a keccak256 hash on the following data in the following order:
+	//  1. the operator id
+	//  2. for each chunk request:
+	//     a. if the chunk request is a request by index:
+	//     i. the blob key
+	//     ii. the start index
+	//     iii. the end index
+	//     b. if the chunk request is a request by range:
+	//     i. the blob key
+	//     ii. each requested chunk index, in order
 	OperatorSignature []byte `protobuf:"bytes,3,opt,name=operator_signature,json=operatorSignature,proto3" json:"operator_signature,omitempty"`
 }
 
