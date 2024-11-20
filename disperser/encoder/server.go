@@ -40,6 +40,9 @@ type blobRequest struct {
 }
 
 func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServer {
+	// Set initial queue capacity metric
+	metrics.SetQueueCapacity(config.RequestPoolSize)
+
 	return &EncoderServer{
 		config:  config,
 		logger:  logger.With("component", "EncoderServer"),
@@ -91,10 +94,12 @@ func (s *EncoderServer) Close() {
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	startTime := time.Now()
 	blobSize := len(req.GetData())
+	sizeBucket := common.BlobSizeBucket(blobSize)
+
 	select {
 	case s.requestPool <- blobRequest{blobSizeByte: blobSize}:
 		s.queueLock.Lock()
-		s.queueStats[common.BlobSizeBucket(blobSize)]++
+		s.queueStats[sizeBucket]++
 		s.metrics.ObserveQueue(s.queueStats)
 		s.queueLock.Unlock()
 	default:
@@ -102,6 +107,7 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
 	}
+
 	s.runningRequests <- struct{}{}
 	defer s.popRequest()
 

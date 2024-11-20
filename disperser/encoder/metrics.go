@@ -27,6 +27,8 @@ type Metrics struct {
 	BlobSizeTotal         *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
 	BlobQueue             *prometheus.GaugeVec
+	QueueCapacity         prometheus.Gauge
+	QueueUtilization      prometheus.Gauge
 }
 
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
@@ -71,6 +73,20 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"size_bucket"},
 		),
+		QueueCapacity: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: "eigenda_encoder",
+				Name:      "request_pool_capacity",
+				Help:      "The maximum capacity of the request pool",
+			},
+		),
+		QueueUtilization: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: "eigenda_encoder",
+				Name:      "request_pool_utilization",
+				Help:      "Current utilization of request pool (total across all buckets)",
+			},
+		),
 	}
 }
 
@@ -107,9 +123,16 @@ func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
 }
 
 func (m *Metrics) ObserveQueue(queueStats map[string]int) {
+	total := 0
 	for bucket, num := range queueStats {
 		m.BlobQueue.With(prometheus.Labels{"size_bucket": bucket}).Set(float64(num))
+		total += num
 	}
+	m.QueueUtilization.Set(float64(total))
+}
+
+func (m *Metrics) SetQueueCapacity(capacity int) {
+	m.QueueCapacity.Set(float64(capacity))
 }
 
 func (m *Metrics) Start(ctx context.Context) {
