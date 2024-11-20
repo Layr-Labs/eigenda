@@ -36,7 +36,7 @@ type requestAuthenticator struct {
 	authenticatedClients map[string]struct{}
 
 	// authenticationTimeouts is a list of authentications that have been performed, along with their expiration times.
-	authenticationTimeouts []*authenticationTimeout
+	authenticationTimeouts []*authenticationTimeout // TODO use a queue here why not
 
 	// authenticationTimeoutDuration is the duration for which an auth is valid.
 	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
