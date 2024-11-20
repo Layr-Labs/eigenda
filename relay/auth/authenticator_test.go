@@ -218,14 +218,3 @@ func TestBadSignature(t *testing.T) {
 		now)
 	require.Error(t, err)
 }
-
-func TestNilAuthenticator(t *testing.T) {
-	var authenticator *requestAuthenticator = nil
-
-	request := randomGetChunksRequest()
-	err := authenticator.AuthenticateGetChunksRequest(
-		"foobar",
-		request,
-		time.Now())
-	require.NoError(t, err)
-}

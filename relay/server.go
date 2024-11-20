@@ -225,13 +225,15 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	clientAddress := client.Addr.String()
 
-	err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
-	if err != nil {
-		return nil, fmt.Errorf("auth failed: %w", err)
+	if s.authenticator != nil {
+		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("auth failed: %w", err)
+		}
 	}
 
 	clientID := string(request.RequesterId)
-	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 
 	if err != nil {
 		return nil, err

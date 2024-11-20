@@ -65,11 +65,6 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	request *pb.GetChunksRequest,
 	now time.Time) error {
 
-	if a == nil {
-		// do not enforce auth if the authenticator is nil
-		return nil
-	}
-
 	if a.isAuthenticationStillValid(now, address) {
 		// We've recently authenticated this client. Do not authenticate again for a while.
 		return nil
