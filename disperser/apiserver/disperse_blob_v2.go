@@ -82,8 +82,18 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg("blob header must contain commitments")
 	}
 
+	if len(blobHeaderProto.GetQuorumNumbers()) == 0 {
+		return api.NewErrorInvalidArg("blob header must contain at least one quorum number")
+	}
+
 	if len(blobHeaderProto.GetQuorumNumbers()) > int(s.onchainState.QuorumCount) {
 		return api.NewErrorInvalidArg(fmt.Sprintf("too many quorum numbers specified: maximum is %d", s.onchainState.QuorumCount))
+	}
+
+	for quorum := range blobHeaderProto.GetQuorumNumbers() {
+		if quorum > int(s.onchainState.QuorumCount) {
+			return api.NewErrorInvalidArg(fmt.Sprintf("invalid quorum number %d; maximum is %d", quorum, s.onchainState.QuorumCount))
+		}
 	}
 
 	// validate every 32 bytes is a valid field element
@@ -91,10 +101,6 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
 		return api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
-	}
-
-	if !containsRequiredQuorum(s.onchainState.RequiredQuorums, blobHeaderProto.GetQuorumNumbers()) {
-		return api.NewErrorInvalidArg(fmt.Sprintf("request must contain at least one required quorum: %v does not specify any of %v", blobHeaderProto.GetQuorumNumbers(), s.onchainState.RequiredQuorums))
 	}
 
 	if _, ok := s.onchainState.BlobVersionParameters[corev2.BlobVersion(blobHeaderProto.GetVersion())]; !ok {
@@ -116,15 +122,4 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 	// TODO(ian-shim): validate commitment, length is power of 2 and less than maxNumSymbolsPerBlob, payment metadata
 
 	return nil
-}
-
-func containsRequiredQuorum(requiredQuorums []uint8, quorumNumbers []uint32) bool {
-	for _, required := range requiredQuorums {
-		for _, quorum := range quorumNumbers {
-			if uint8(quorum) == required {
-				return true
-			}
-		}
-	}
-	return false
 }
