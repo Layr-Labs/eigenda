@@ -34,13 +34,15 @@ type EncodingManagerConfig struct {
 	AvailableRelays []corev2.RelayKey
 	// EncoderAddress is the address of the encoder
 	EncoderAddress string
+	// MaxNumBlobsPerIteration is the maximum number of blobs to encode per iteration
+	MaxNumBlobsPerIteration int32
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob
 // metadata store periodically and encoding them. It receives the encoder responses
 // and creates BlobCertificates.
 type EncodingManager struct {
-	EncodingManagerConfig
+	*EncodingManagerConfig
 
 	// components
 	blobMetadataStore *blobstore.BlobMetadataStore
@@ -50,17 +52,22 @@ type EncodingManager struct {
 	logger            logging.Logger
 
 	// state
-	lastUpdatedAt uint64
+	cursor *blobstore.StatusIndexCursor
 }
 
 func NewEncodingManager(
-	config EncodingManagerConfig,
+	config *EncodingManagerConfig,
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	pool common.WorkerPool,
 	encodingClient disperser.EncoderClientV2,
 	chainReader core.Reader,
 	logger logging.Logger,
 ) (*EncodingManager, error) {
+	if config.NumRelayAssignment < 1 ||
+		len(config.AvailableRelays) == 0 ||
+		config.MaxNumBlobsPerIteration < 1 {
+		return nil, fmt.Errorf("invalid encoding manager config")
+	}
 	if int(config.NumRelayAssignment) > len(config.AvailableRelays) {
 		return nil, fmt.Errorf("NumRelayAssignment (%d) cannot be greater than NumRelays (%d)", config.NumRelayAssignment, len(config.AvailableRelays))
 	}
@@ -72,7 +79,7 @@ func NewEncodingManager(
 		chainReader:           chainReader,
 		logger:                logger.With("component", "EncodingManager"),
 
-		lastUpdatedAt: 0,
+		cursor: nil,
 	}, nil
 }
 
@@ -102,7 +109,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Get a batch of blobs to encode
-	blobMetadatas, err := e.blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Queued, e.lastUpdatedAt)
+	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {
 		return err
 	}
@@ -118,7 +125,6 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt, "paymentMetadata", blob.BlobHeader.PaymentMetadata)
 			continue
 		}
-		e.lastUpdatedAt = blob.UpdatedAt
 
 		// Encode the blobs
 		e.pool.Submit(func() {
@@ -171,6 +177,9 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		})
 	}
 
+	if cursor != nil {
+		e.cursor = cursor
+	}
 	return nil
 }
 

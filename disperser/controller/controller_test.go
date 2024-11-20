@@ -2,6 +2,8 @@ package controller_test
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -11,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -19,6 +23,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -147,4 +152,32 @@ func teardown() {
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
+}
+
+func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
+	accountBytes := make([]byte, 32)
+	_, err := rand.Read(accountBytes)
+	require.NoError(t, err)
+	accountID := hex.EncodeToString(accountBytes)
+	binIndex, err := rand.Int(rand.Reader, big.NewInt(256))
+	require.NoError(t, err)
+	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
+	require.NoError(t, err)
+	sig := make([]byte, 32)
+	_, err = rand.Read(sig)
+	require.NoError(t, err)
+	bh := &corev2.BlobHeader{
+		BlobVersion:     0,
+		QuorumNumbers:   []core.QuorumID{0, 1},
+		BlobCommitments: mockCommitment,
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         accountID,
+			BinIndex:          uint32(binIndex.Int64()),
+			CumulativePayment: cumulativePayment,
+		},
+		Signature: sig,
+	}
+	bk, err := bh.BlobKey()
+	require.NoError(t, err)
+	return bk, bh
 }

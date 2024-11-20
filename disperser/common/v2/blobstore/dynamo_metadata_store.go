@@ -50,6 +50,11 @@ var (
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
 
+type StatusIndexCursor struct {
+	BlobKey   *corev2.BlobKey
+	UpdatedAt uint64
+}
+
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
 type BlobMetadataStore struct {
 	dynamoDBClient commondynamodb.Client
@@ -123,6 +128,19 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 	return err
 }
 
+func (s *BlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) error {
+	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: blobMetadataSK,
+		},
+	})
+
+	return err
+}
+
 func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobMetadata, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
@@ -151,6 +169,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 
 // GetBlobMetadataByStatus returns all the metadata with the given status that were updated after lastUpdatedAt
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
+// Results are ordered by UpdatedAt in ascending order.
 func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
 	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
@@ -172,6 +191,110 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	}
 
 	return metadata, nil
+}
+
+// GetBlobMetadataByStatusPaginated returns all the metadata with the given status that were updated after the given cursor.
+// It also returns a new cursor (last evaluated key) to be used for the next page
+// even when there are no more results or there are no results at all.
+// This cursor can be used to get new set of results when they become available.
+// Therefore, it's possible to get an empty result from a request with exclusive start key returned from previous response.
+func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
+	ctx context.Context,
+	status v2.BlobStatus,
+	exclusiveStartKey *StatusIndexCursor,
+	limit int32,
+) ([]*v2.BlobMetadata, *StatusIndexCursor, error) {
+	var cursor map[string]types.AttributeValue
+	if exclusiveStartKey != nil {
+		pk := blobKeyPrefix
+		if exclusiveStartKey.BlobKey != nil && len(exclusiveStartKey.BlobKey) == 32 {
+			pk = blobKeyPrefix + exclusiveStartKey.BlobKey.Hex()
+		}
+		cursor = map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: pk,
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: blobMetadataSK,
+			},
+			"UpdatedAt": &types.AttributeValueMemberN{
+				Value: strconv.FormatUint(exclusiveStartKey.UpdatedAt, 10),
+			},
+			"BlobStatus": &types.AttributeValueMemberN{
+				Value: strconv.Itoa(int(status)),
+			},
+		}
+	} else {
+		cursor = map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: blobKeyPrefix,
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: blobMetadataSK,
+			},
+			"UpdatedAt": &types.AttributeValueMemberN{
+				Value: "0",
+			},
+			"BlobStatus": &types.AttributeValueMemberN{
+				Value: strconv.Itoa(int(status)),
+			},
+		}
+	}
+	res, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+		":status": &types.AttributeValueMemberN{
+			Value: strconv.Itoa(int(status)),
+		},
+	}, limit, cursor)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// No results
+	if len(res.Items) == 0 && res.LastEvaluatedKey == nil {
+		// return the same cursor
+		return nil, exclusiveStartKey, nil
+	}
+
+	metadata := make([]*v2.BlobMetadata, 0, len(res.Items))
+	for _, item := range res.Items {
+		m, err := UnmarshalBlobMetadata(item)
+		// Skip invalid/corrupt items
+		if err != nil {
+			s.logger.Errorf("failed to unmarshal blob metadata: %v", err)
+			continue
+		}
+		metadata = append(metadata, m)
+	}
+
+	lastEvaludatedKey := res.LastEvaluatedKey
+	if lastEvaludatedKey == nil {
+		lastItem := res.Items[len(res.Items)-1]
+		updatedAt, err := strconv.ParseUint(lastItem["UpdatedAt"].(*types.AttributeValueMemberN).Value, 10, 64)
+		if err != nil {
+			return nil, nil, err
+		}
+		bk, err := UnmarshalBlobKey(lastItem)
+		if err != nil {
+			return nil, nil, err
+		}
+		return metadata, &StatusIndexCursor{
+			BlobKey:   &bk,
+			UpdatedAt: updatedAt,
+		}, nil
+	}
+
+	newCursor := StatusIndexCursor{}
+	err = attributevalue.UnmarshalMap(lastEvaludatedKey, &newCursor)
+	if err != nil {
+		return nil, nil, err
+	}
+	bk, err := UnmarshalBlobKey(lastEvaludatedKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	newCursor.BlobKey = &bk
+
+	return metadata, &newCursor, nil
 }
 
 // GetBlobMetadataCountByStatus returns the count of all the metadata with the given status
@@ -199,6 +322,19 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return common.ErrAlreadyExists
 	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) DeleteBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) error {
+	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: blobKeyPrefix + blobKey.Hex(),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: blobCertSK,
+		},
+	})
 
 	return err
 }
@@ -353,6 +489,19 @@ func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *cor
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return common.ErrAlreadyExists
 	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) DeleteBatchHeader(ctx context.Context, batchHeaderHash [32]byte) error {
+	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchHeaderSK,
+		},
+	})
 
 	return err
 }

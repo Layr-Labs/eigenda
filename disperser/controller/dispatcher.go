@@ -25,10 +25,12 @@ type DispatcherConfig struct {
 	FinalizationBlockDelay uint64
 	NodeRequestTimeout     time.Duration
 	NumRequestRetries      int
+	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
+	MaxBatchSize int32
 }
 
 type Dispatcher struct {
-	DispatcherConfig
+	*DispatcherConfig
 
 	blobMetadataStore *blobstore.BlobMetadataStore
 	pool              common.WorkerPool
@@ -37,7 +39,7 @@ type Dispatcher struct {
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
 
-	lastUpdatedAt uint64
+	cursor *blobstore.StatusIndexCursor
 }
 
 type batchData struct {
@@ -48,7 +50,7 @@ type batchData struct {
 }
 
 func NewDispatcher(
-	config DispatcherConfig,
+	config *DispatcherConfig,
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
@@ -56,6 +58,12 @@ func NewDispatcher(
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
 ) (*Dispatcher, error) {
+	if config == nil {
+		return nil, errors.New("config is required")
+	}
+	if config.PullInterval == 0 || config.NodeRequestTimeout == 0 || config.MaxBatchSize == 0 {
+		return nil, errors.New("invalid config")
+	}
 	return &Dispatcher{
 		DispatcherConfig: config,
 
@@ -66,7 +74,7 @@ func NewDispatcher(
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
 
-		lastUpdatedAt: 0,
+		cursor: nil,
 	}, nil
 }
 
@@ -228,7 +236,7 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
 func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) (*batchData, error) {
-	blobMetadatas, err := d.blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Encoded, d.lastUpdatedAt)
+	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, d.cursor, d.MaxBatchSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
@@ -243,7 +251,6 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
-	newLastUpdatedAt := d.lastUpdatedAt
 	for i, metadata := range blobMetadatas {
 		if metadata == nil || metadata.BlobHeader == nil {
 			return nil, fmt.Errorf("invalid blob metadata")
@@ -253,9 +260,6 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			return nil, fmt.Errorf("failed to get blob key: %w", err)
 		}
 		keys[i] = blobKey
-		if metadata.UpdatedAt > newLastUpdatedAt {
-			newLastUpdatedAt = metadata.UpdatedAt
-		}
 	}
 
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
@@ -344,7 +348,10 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put blob verification infos: %w", err)
 	}
 
-	d.lastUpdatedAt = newLastUpdatedAt
+	if cursor != nil {
+		d.cursor = cursor
+	}
+
 	return &batchData{
 		Batch: &corev2.Batch{
 			BatchHeader:      batchHeader,
