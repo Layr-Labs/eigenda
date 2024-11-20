@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 
@@ -216,7 +217,25 @@ func NewNode(
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
 	var relayClient clients.RelayClient
-	// Create a new relay client with relay addresses onchain
+	var storeV2 StoreV2
+	if config.EnableV2 {
+		v2Path := config.DbPath + "/chunk_v2"
+		dbV2, err := tablestore.Start(logger, &tablestore.Config{
+			Type:                       tablestore.LevelDB,
+			Path:                       &v2Path,
+			GarbageCollectionEnabled:   true,
+			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize: 1024,
+			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+		}
+		storeV2 = NewLevelDBStoreV2(dbV2, logger)
+
+		// TODO(ian-shim): Create a new relay client with relay addresses onchain
+	}
+
 	return &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -224,7 +243,7 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
-		StoreV2:                 nil,
+		StoreV2:                 storeV2,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,

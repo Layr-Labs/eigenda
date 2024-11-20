@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"time"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
@@ -15,8 +18,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"time"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -208,6 +209,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
+	// keys might contain duplicate keys
 	keys, err := getKeysFromChunkRequest(request)
 	if err != nil {
 		return nil, err
@@ -273,7 +275,7 @@ func gatherChunkDataToSend(
 	frames map[v2.BlobKey][]*encoding.Frame,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
-	bytesToSend := make([][]byte, 0, len(frames))
+	bytesToSend := make([][]byte, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
 

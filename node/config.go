@@ -88,6 +88,8 @@ type Config struct {
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
+
+	EnableV2 bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -232,5 +234,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSKeyPassword:                 ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
 		BLSSignerTLSCertFilePath:       ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
 		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
+		EnableV2:                       ctx.GlobalBool(flags.EnableV2Flag.Name),
 	}, nil
 }
