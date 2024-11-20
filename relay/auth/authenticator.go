@@ -166,6 +166,7 @@ func (a *requestAuthenticator) isAuthenticationStillValid(now time.Time, address
 }
 
 // removeOldAuthentications removes any authentications that have expired.
+// This method is not thread safe and should be called with the savedAuthLock held.
 func (a *requestAuthenticator) removeOldAuthentications(now time.Time) {
 	index := 0
 	for ; index < len(a.authenticationTimeouts); index++ {

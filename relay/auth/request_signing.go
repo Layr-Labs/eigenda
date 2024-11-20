@@ -7,6 +7,11 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+var (
+	iByte = []byte{0x69}
+	rByte = []byte{0x72}
+)
+
 // HashGetChunksRequest hashes the given GetChunksRequest.
 func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 
@@ -19,6 +24,7 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 	for _, chunkRequest := range request.GetChunkRequests() {
 		if chunkRequest.GetByIndex() != nil {
 			getByIndex := chunkRequest.GetByIndex()
+			hasher.Write(iByte)
 			hasher.Write(getByIndex.BlobKey)
 			for _, index := range getByIndex.ChunkIndices {
 				indexBytes := make([]byte, 4)
@@ -27,6 +33,7 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 			}
 		} else {
 			getByRange := chunkRequest.GetByRange()
+			hasher.Write(rByte)
 			hasher.Write(getByRange.BlobKey)
 
 			startBytes := make([]byte, 4)
