@@ -13,23 +13,18 @@ type Config struct {
 	URL string
 }
 
-// ProxyClient is an interface for communicating with the EigenDA proxy server
-type ProxyClient interface {
-	Health() error
-	GetData(ctx context.Context, cert []byte) ([]byte, error)
-	SetData(ctx context.Context, b []byte) ([]byte, error)
-}
-
-// client is the implementation of ProxyClient
-type client struct {
+// SimpleCommitmentClient implements a simple client for the eigenda-proxy
+// that can put/get simple commitment data and query the health endpoint.
+// It is meant to be used by arbitrum nitro integrations.
+// Optimism has its own client: https://github.com/ethereum-optimism/optimism/blob/develop/op-alt-da/daclient.go
+// so clients wanting to send op commitment mode data should use that client.
+type SimpleCommitmentClient struct {
 	cfg        *Config
 	httpClient *http.Client
 }
 
-var _ ProxyClient = (*client)(nil)
-
-func New(cfg *Config) ProxyClient {
-	return &client{
+func New(cfg *Config) *SimpleCommitmentClient {
+	return &SimpleCommitmentClient{
 		cfg,
 		http.DefaultClient,
 	}
@@ -37,7 +32,7 @@ func New(cfg *Config) ProxyClient {
 
 // Health indicates if the server is operational; useful for event based awaits
 // when integration testing
-func (c *client) Health() error {
+func (c *SimpleCommitmentClient) Health() error {
 	url := c.cfg.URL + "/health"
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
@@ -58,7 +53,7 @@ func (c *client) Health() error {
 }
 
 // GetData fetches blob data associated with a DA certificate
-func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
+func (c *SimpleCommitmentClient) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/get/0x%x?commitment_mode=simple", c.cfg.URL, comm)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -87,7 +82,7 @@ func (c *client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 }
 
 // SetData writes raw byte data to DA and returns the respective certificate
-func (c *client) SetData(ctx context.Context, b []byte) ([]byte, error) {
+func (c *SimpleCommitmentClient) SetData(ctx context.Context, b []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/put?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
