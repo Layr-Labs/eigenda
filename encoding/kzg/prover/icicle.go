@@ -13,6 +13,10 @@ import (
 )
 
 const (
+	// MAX_NTT_SIZE is the maximum NTT domain size needed to compute FFTs for the
+	// largest supported blobs. Assuming a coding ratio of 1/8 and symbol size of 32 bytes:
+	// - Encoded size: 2^{MAX_NTT_SIZE} * 32 bytes ≈ 1 GB
+	// - Original blob size: 2^{MAX_NTT_SIZE} * 32 / 8 = 2^{MAX_NTT_SIZE + 2} ≈ 128 MB
 	MAX_NTT_SIZE = 25
 )
 
