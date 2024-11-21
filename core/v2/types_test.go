@@ -12,7 +12,7 @@ import (
 
 func TestConvertBatchToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 
 func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -31,7 +31,6 @@ type Config struct {
 	IndexerConfig    indexer.Config
 	ChainStateConfig thegraph.Config
 	UseGraph         bool
-	IndexerDataDir   string
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -84,7 +83,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		IndexerConfig:                  indexer.ReadIndexerConfig(ctx),
 		ChainStateConfig:               thegraph.ReadCLIConfig(ctx),
 		UseGraph:                       ctx.GlobalBool(flags.UseGraphFlag.Name),
-		IndexerDataDir:                 ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),

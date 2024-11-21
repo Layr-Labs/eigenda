@@ -7,7 +7,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -19,17 +18,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 
-	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
-	if err != nil {
-		return nil, api.NewErrorInvalidArg(err.Error())
-	}
-
 	data := req.GetData()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
 	}
-	s.logger.Debug("received a new blob dispersal request", "origin", origin, "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
+	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
 	// TODO(ian-shim): handle payments and check rate limits
 

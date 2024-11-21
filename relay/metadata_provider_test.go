@@ -2,14 +2,15 @@ package relay
 
 import (
 	"context"
+	"math/rand"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"math/rand"
-	"testing"
 	"time"
 )
 
@@ -136,10 +137,12 @@ func TestBatchedFetch(t *testing.T) {
 
 	// Write some metadata
 	blobCount := 10
+	blobKeys := make([]v2.BlobKey, blobCount)
 	for i := 0; i < blobCount; i++ {
 		header, _ := randomBlob(t)
 		blobKey, err := header.BlobKey()
 		require.NoError(t, err)
+		blobKeys[i] = blobKey
 
 		totalChunkSizeBytes := uint32(rand.Intn(1024 * 1024 * 1024))
 		fragmentSizeBytes := uint32(rand.Intn(1024 * 1024))
@@ -201,6 +204,11 @@ func TestBatchedFetch(t *testing.T) {
 			require.Equal(t, fragmentSizeMap[key], metadata.fragmentSizeBytes)
 		}
 	}
+
+	// Test fetching with duplicate keys
+	mMap, err := server.GetMetadataForBlobs(context.Background(), []v2.BlobKey{blobKeys[0], blobKeys[0]})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(mMap))
 }
 
 func TestIndividualFetchWithSharding(t *testing.T) {

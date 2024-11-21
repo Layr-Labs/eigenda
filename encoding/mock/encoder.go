@@ -23,7 +23,7 @@ func (e *MockEncoder) EncodeAndProve(data []byte, params encoding.EncodingParams
 	return args.Get(0).(encoding.BlobCommitments), args.Get(1).([]*encoding.Frame), args.Error(2)
 }
 
-func (e *MockEncoder) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
+func (e *MockEncoder) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
 	args := e.Called(data)
 	time.Sleep(e.Delay)
 	return args.Get(0).(encoding.BlobCommitments), args.Error(1)

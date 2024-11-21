@@ -198,7 +198,7 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
-func (e *Prover) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
+func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {
 		return encoding.BlobCommitments{}, err
@@ -214,17 +214,18 @@ func (e *Prover) GetCommitments(data []byte) (encoding.BlobCommitments, error) {
 		return encoding.BlobCommitments{}, err
 	}
 
-	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols)
+	length := encoding.NextPowerOf2(uint64(len(symbols)))
+
+	commit, lengthCommit, lengthProof, err := enc.GetCommitments(symbols, length)
 	if err != nil {
 		return encoding.BlobCommitments{}, err
 	}
 
-	length := uint(len(symbols))
 	commitments := encoding.BlobCommitments{
 		Commitment:       (*encoding.G1Commitment)(commit),
 		LengthCommitment: (*encoding.G2Commitment)(lengthCommit),
 		LengthProof:      (*encoding.G2Commitment)(lengthProof),
-		Length:           length,
+		Length:           uint(length),
 	}
 
 	return commitments, nil

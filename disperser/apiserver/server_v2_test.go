@@ -51,7 +51,7 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitments(data)
+	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	assert.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	assert.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commitments, err := prover.GetCommitments(data)
+	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	assert.NoError(t, err)
 	accountID, err := c.Signer.GetAccountID()
 	assert.NoError(t, err)
@@ -313,7 +313,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 	assert.NoError(t, err)
 
 	data = codec.ConvertByPaddingEmptyByte(data)
-	commit, err := prover.GetCommitments(data)
+	commit, err := prover.GetCommitmentsForPaddedLength(data)
 	require.NoError(t, err)
 	reply, err := c.DispersalServerV2.GetBlobCommitment(context.Background(), &pbv2.BlobCommitmentRequest{
 		Data: data,
