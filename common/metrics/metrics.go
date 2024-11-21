@@ -5,10 +5,10 @@ import "time"
 // Metrics provides a convenient interface for reporting metrics.
 type Metrics interface {
 	// Start starts the metrics server.
-	Start()
+	Start() error
 
 	// Stop stops the metrics server.
-	Stop() // TODO necessary?
+	Stop() error
 
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
 	// Metric name and label may only contain alphanumeric characters and underscores.
@@ -21,6 +21,11 @@ type Metrics interface {
 	// NewGaugeMetric creates a new GaugeMetric instance. Useful for reporting specific values.
 	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewGaugeMetric(name string, label string) (GaugeMetric, error)
+
+	// NewAutoGauge creates a new GaugeMetric instance that is automatically updated by the given source function.
+	// The function is polled at the given period. This produces a gauge type metric internally.
+	// Metric name and label may only contain alphanumeric characters and underscores.
+	NewAutoGauge(name string, label string, pollPeriod time.Duration, source func() float64) error
 }
 
 // Metric represents a metric that can be reported.

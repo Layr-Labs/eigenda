@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/metrics"
 	"math/rand"
+	"sync/atomic"
 	"time"
 )
 
@@ -64,7 +65,18 @@ func main() {
 		panic(err)
 	}
 
-	metricsServer.Start()
+	sum := atomic.Int64{}
+	err = metricsServer.NewAutoGauge("g1", "autoPoll", 1*time.Second, func() float64 {
+		return float64(sum.Load())
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	err = metricsServer.Start()
+	if err != nil {
+		panic(err)
+	}
 
 	prev := time.Now()
 	previousElapsed := time.Duration(0)
@@ -83,8 +95,13 @@ func main() {
 		g1.Set(float64(elapsed.Milliseconds()))
 		g2.Set(float64(previousElapsed.Milliseconds()))
 
+		sum.Store(sum.Load() + elapsed.Milliseconds())
+
 		previousElapsed = elapsed
 	}
 
-	metricsServer.Stop()
+	err = metricsServer.Stop()
+	if err != nil {
+		panic(err)
+	}
 }

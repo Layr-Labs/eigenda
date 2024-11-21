@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var _ Metrics = &metrics{}
@@ -42,8 +45,18 @@ type metrics struct {
 	// already exists, the existing metric will be returned instead of a new one being created.
 	metricMap map[metricID]Metric
 
-	// creationLock is a lock used to ensure that metrics are not created concurrently.
-	creationLock sync.Mutex
+	// autoGaugesToStart is a list of functions that will start auto-gauges. If an auto-gauge is created
+	// before the metrics server is started, we don't actually start the goroutine until the server is started.
+	autoGaugesToStart []func()
+
+	// lock is a lock used to ensure that metrics are not created concurrently.
+	lock sync.Mutex
+
+	// started is true if the metrics server has been started.
+	started bool
+
+	// isAlize is true if the metrics server has not been stopped.
+	isAlive atomic.Bool
 
 	// server is the metrics server
 	server *http.Server
@@ -67,7 +80,7 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 		Handler: mux,
 	}
 
-	return &metrics{
+	m := &metrics{
 		logger:        logger,
 		config:        config,
 		registry:      reg,
@@ -75,8 +88,11 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 		summaryVecMap: make(map[string]*prometheus.SummaryVec),
 		gaugeVecMap:   make(map[string]*prometheus.GaugeVec),
 		metricMap:     make(map[metricID]Metric),
+		isAlive:       atomic.Bool{},
 		server:        server,
 	}
+	m.isAlive.Store(true)
+	return m
 }
 
 // metricID is a unique identifier for a metric.
@@ -110,27 +126,55 @@ func (i *metricID) String() string {
 }
 
 // Start starts the metrics server.
-func (m *metrics) Start() {
+func (m *metrics) Start() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.started {
+		return errors.New("metrics server already started")
+	}
+	m.started = true
+
 	go func() {
 		err := m.server.ListenAndServe()
 		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
 			m.logger.Errorf("metrics server error: %v", err)
 		}
 	}()
+
+	// start the auto-gauges that were created before the server was started
+	for _, autoGauge := range m.autoGaugesToStart {
+		go autoGauge()
+	}
+
+	return nil
 }
 
 // Stop stops the metrics server.
-func (m *metrics) Stop() {
-	err := m.server.Close()
-	if err != nil {
-		m.logger.Errorf("error stopping metrics server: %v", err)
+func (m *metrics) Stop() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.started {
+		return errors.New("metrics server not started")
 	}
+
+	if !m.isAlive.Load() {
+		return errors.New("metrics server already stopped")
+	}
+
+	m.isAlive.Store(false)
+	return m.server.Close()
 }
 
 // NewLatencyMetric creates a new LatencyMetric instance.
 func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error) {
-	m.creationLock.Lock()
-	defer m.creationLock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.isAlive.Load() {
+		return nil, errors.New("metrics server is not alive")
+	}
 
 	id, err := newMetricID(name, label)
 	if err != nil {
@@ -172,8 +216,12 @@ func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quan
 
 // NewCountMetric creates a new CountMetric instance.
 func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error) {
-	m.creationLock.Lock()
-	defer m.creationLock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.isAlive.Load() {
+		return nil, errors.New("metrics server is not alive")
+	}
 
 	id, err := newMetricID(name, label)
 	if err != nil {
@@ -210,8 +258,16 @@ func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error)
 
 // NewGaugeMetric creates a new GaugeMetric instance.
 func (m *metrics) NewGaugeMetric(name string, label string) (GaugeMetric, error) {
-	m.creationLock.Lock()
-	defer m.creationLock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.newGaugeMetricUnsafe(name, label)
+}
+
+// newGaugeMetricUnsafe creates a new GaugeMetric instance without locking.
+func (m *metrics) newGaugeMetricUnsafe(name string, label string) (GaugeMetric, error) {
+	if !m.isAlive.Load() {
+		return nil, errors.New("metrics server is not alive")
+	}
 
 	id, err := newMetricID(name, label)
 	if err != nil {
@@ -265,4 +321,36 @@ func (m *metrics) isBlacklisted(id metricID) bool {
 		}
 	}
 	return false
+}
+
+func (m *metrics) NewAutoGauge(name string, label string, pollPeriod time.Duration, source func() float64) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.isAlive.Load() {
+		return errors.New("metrics server is not alive")
+	}
+
+	gauge, err := m.newGaugeMetricUnsafe(name, label)
+	if err != nil {
+		return err
+	}
+
+	pollingAgent := func() {
+		for m.isAlive.Load() {
+			value := source()
+			gauge.Set(value)
+			time.Sleep(pollPeriod)
+		}
+	}
+
+	if m.started {
+		// start the polling agent immediately
+		go pollingAgent()
+	} else {
+		// the polling agent will be started when the metrics server is started
+		m.autoGaugesToStart = append(m.autoGaugesToStart, pollingAgent)
+	}
+
+	return nil
 }
