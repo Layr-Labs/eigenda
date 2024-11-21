@@ -178,7 +178,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
-	}, logger, p0, metrics, nil)
+	}, logger, p0, metrics, grpcprom.NewServerMetrics())
 
 	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
 	if err != nil {
