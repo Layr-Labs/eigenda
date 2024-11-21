@@ -27,7 +27,7 @@ type countMetric struct {
 func newCountMetric(name string, label string, description string, vec *prometheus.CounterVec) CountMetric {
 	var counter prometheus.Counter
 	if vec != nil {
-		counter = vec.WithLabelValues(label)
+		counter = vec.WithLabelValues(label, "count")
 	}
 
 	return &countMetric{

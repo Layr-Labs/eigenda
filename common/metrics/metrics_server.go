@@ -211,7 +211,7 @@ func (m *metrics) NewLatencyMetric(
 				Name:       name,
 				Objectives: objectives,
 			},
-			[]string{"label"},
+			[]string{"label", "unit"},
 		)
 		m.summaryVecMap[name] = vec
 	}
@@ -256,7 +256,7 @@ func (m *metrics) NewCountMetric(
 				Namespace: m.config.Namespace,
 				Name:      name,
 			},
-			[]string{"label"},
+			[]string{"label", "unit"},
 		)
 		m.counterVecMap[name] = vec
 	}
@@ -312,7 +312,7 @@ func (m *metrics) newGaugeMetricUnsafe(
 				Namespace: m.config.Namespace,
 				Name:      name,
 			},
-			[]string{"label"},
+			[]string{"label", "unit"},
 		)
 		m.gaugeVecMap[name] = vec
 	}

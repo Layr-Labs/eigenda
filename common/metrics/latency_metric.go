@@ -28,7 +28,7 @@ type latencyMetric struct {
 func newLatencyMetric(name string, label string, description string, vec *prometheus.SummaryVec) LatencyMetric {
 	var observer prometheus.Observer
 	if vec != nil {
-		observer = vec.WithLabelValues(label)
+		observer = vec.WithLabelValues(label, "seconds")
 	}
 
 	return &latencyMetric{
