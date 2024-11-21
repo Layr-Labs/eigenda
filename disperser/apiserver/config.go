@@ -26,6 +26,9 @@ const (
 	AllowlistFileFlagName            = "auth.allowlist-file"
 	AllowlistRefreshIntervalFlagName = "auth.allowlist-refresh-interval"
 
+	PprofHttpPortName = "auth.pprof-http-port"
+	EnablePprofName   = "auth.enable-pprof"
+
 	RetrievalBlobRateFlagName   = "auth.retrieval-blob-rate"
 	RetrievalThroughputFlagName = "auth.retrieval-throughput"
 
@@ -67,6 +70,8 @@ type RateConfig struct {
 
 	AllowlistFile            string
 	AllowlistRefreshInterval time.Duration
+
+	PprofConfig PprofConfig
 }
 
 func AllowlistFileFlag(envPrefix string) cli.Flag {
@@ -136,6 +141,19 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "The throughput rate limit for retrieval requests (Bytes/sec)",
 			EnvVar:   common.PrefixEnvVar(envPrefix, "RETRIEVAL_BYTE_RATE"),
 			Required: true,
+		},
+		cli.StringFlag{
+			Name:     PprofHttpPortName,
+			Usage:    "the http port which the pprof server is listening",
+			Required: false,
+			Value:    "6060",
+			EnvVar:   common.PrefixEnvVar(envPrefix, "PPROF_HTTP_PORT"),
+		},
+		cli.BoolFlag{
+			Name:     EnablePprofName,
+			Usage:    "start prrof server",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "ENABLE_PPROF"),
 		},
 	}
 }
@@ -234,6 +252,11 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		}
 	}
 
+	pprofConfig := PprofConfig{
+		HTTPPort:    c.String(PprofHttpPortName),
+		EnablePprof: c.Bool(EnablePprofName),
+	}
+
 	return RateConfig{
 		QuorumRateInfos:          quorumRateInfos,
 		ClientIPHeader:           c.String(ClientIPHeaderFlagName),
@@ -242,5 +265,6 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		RetrievalThroughput:      common.RateParam(c.Int(RetrievalThroughputFlagName)),
 		AllowlistFile:            c.String(AllowlistFileFlagName),
 		AllowlistRefreshInterval: c.Duration(AllowlistRefreshIntervalFlagName),
+		PprofConfig:              pprofConfig,
 	}, nil
 }
