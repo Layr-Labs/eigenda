@@ -32,7 +32,7 @@ To avoid the need for fraud proofs, EigenDA follows the trail blazed by the Ethe
 
 **Chunk Validation**
 
-Blobs sent to EigenDA are identified by their KZG commitment (which can be calculated by the disperser and easily validated by the rollup sequencer). When the disperser generates the encoded blob chunks, it also generates a collection of opening proofs which the DA nodes can use to trustlessly verify that their chunks fall on the blob polynomial the correct indices (note: the indices are jointly derived by the disperser and DA nodes from the chain state using the logic in the Assignment module to ensure that the evaluation indices for each node are unique).
+Blobs sent to EigenDA are identified by their KZG commitment (which can be calculated by the disperser and easily validated by the rollup sequencer). When the disperser generates the encoded blob chunks, it also generates a collection of opening proofs which the DA nodes can use to trustlessly verify that their chunks fall on the blob polynomial at the correct indices (note: the indices are jointly derived by the disperser and DA nodes from the chain state using the logic in the Assignment module to ensure that the evaluation indices for each node are unique).
 
 **Blob Size Verification**
 KZG commitments also can be used to verify the degree of the original polynomial, which in turn corresponds to the size of the original blob. Having a trustlessly verifiable upper bound on the size of the blob is necessary for DA nodes to verify the correctness of the chunk assignment defined by the assignment module.
