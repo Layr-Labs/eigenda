@@ -1,10 +1,14 @@
 package common
 
-type ReadOnlyMap[K comparable, V any] struct {
+import (
+	"maps"
+)
+
+type ReadOnlyMap[K comparable, V comparable] struct {
 	data map[K]V
 }
 
-func NewReadOnlyMap[K comparable, V any](data map[K]V) *ReadOnlyMap[K, V] {
+func NewReadOnlyMap[K comparable, V comparable](data map[K]V) *ReadOnlyMap[K, V] {
 	return &ReadOnlyMap[K, V]{data: data}
 }
 
@@ -23,4 +27,8 @@ func (m *ReadOnlyMap[K, V]) Keys() []K {
 
 func (m *ReadOnlyMap[K, V]) Len() int {
 	return len(m.data)
+}
+
+func (m *ReadOnlyMap[K, V]) Equal(data map[K]V) bool {
+	return maps.Equal(m.data, data)
 }
