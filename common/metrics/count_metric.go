@@ -46,7 +46,6 @@ func (m *countMetric) Enabled() bool {
 	return m.counter != nil
 }
 
-// Increment increments the count of a type of event.
 func (m *countMetric) Increment() {
 	if m.counter == nil {
 		return

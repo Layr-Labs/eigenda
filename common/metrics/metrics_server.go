@@ -44,6 +44,9 @@ type metrics struct {
 
 	// creationLock is a lock used to ensure that metrics are not created concurrently.
 	creationLock sync.Mutex
+
+	// server is the metrics server
+	server *http.Server
 }
 
 // NewMetrics creates a new Metrics instance.
@@ -51,6 +54,18 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
+
+	logger.Infof("Starting metrics server at port %d", config.HTTPPort)
+	addr := fmt.Sprintf(":%d", config.HTTPPort)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(
+		reg,
+		promhttp.HandlerOpts{},
+	))
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
 
 	return &metrics{
 		logger:        logger,
@@ -60,6 +75,7 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 		summaryVecMap: make(map[string]*prometheus.SummaryVec),
 		gaugeVecMap:   make(map[string]*prometheus.GaugeVec),
 		metricMap:     make(map[metricID]Metric),
+		server:        server,
 	}
 }
 
@@ -95,27 +111,20 @@ func (i *metricID) String() string {
 
 // Start starts the metrics server.
 func (m *metrics) Start() {
-	m.creationLock.Lock()
-	defer m.creationLock.Unlock()
-
-	m.logger.Infof("Starting metrics server at port %d", m.config.HTTPPort)
-	addr := fmt.Sprintf(":%d", m.config.HTTPPort)
 	go func() {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(
-			m.registry,
-			promhttp.HandlerOpts{},
-		))
-		err := http.ListenAndServe(addr, mux)
-		panic(fmt.Sprintf("Prometheus server failed: %s", err)) // TODO wrong way to handle this
+		err := m.server.ListenAndServe()
+		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+			m.logger.Errorf("metrics server error: %v", err)
+		}
 	}()
 }
 
 // Stop stops the metrics server.
 func (m *metrics) Stop() {
-	m.creationLock.Lock()
-	defer m.creationLock.Unlock()
-	// TODO
+	err := m.server.Close()
+	if err != nil {
+		m.logger.Errorf("error stopping metrics server: %v", err)
+	}
 }
 
 // NewLatencyMetric creates a new LatencyMetric instance.
@@ -204,8 +213,37 @@ func (m *metrics) NewGaugeMetric(name string, label string) (GaugeMetric, error)
 	m.creationLock.Lock()
 	defer m.creationLock.Unlock()
 
-	// TODO
-	return nil, nil
+	id, err := newMetricID(name, label)
+	if err != nil {
+		return nil, err
+	}
+
+	preExistingMetric, ok := m.metricMap[id]
+	if ok {
+		return preExistingMetric.(GaugeMetric), nil
+	}
+
+	if m.isBlacklisted(id) {
+		metric := newLatencyMetric(name, label, nil)
+		m.metricMap[id] = metric
+	}
+
+	vec, ok := m.gaugeVecMap[name]
+	if !ok {
+		vec = promauto.With(m.registry).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: m.config.Namespace,
+				Name:      name,
+			},
+			[]string{"label"},
+		)
+		m.gaugeVecMap[name] = vec
+	}
+
+	metric := newGaugeMetric(name, label, vec)
+	m.metricMap[id] = metric
+
+	return metric, nil
 }
 
 // isBlacklisted returns true if the metric name is blacklisted.

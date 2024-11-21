@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// TODO don't merge this, this is just a test bed
+// This is a simple test bed for validating the metrics server (since it's not straight forward to unit test).
 
 func main() {
 
@@ -54,10 +54,21 @@ func main() {
 		panic(err)
 	}
 
+	g1, err := metricsServer.NewGaugeMetric("g1", "")
+	if err != nil {
+		panic(err)
+	}
+
+	g2, err := metricsServer.NewGaugeMetric("g1", "previous")
+	if err != nil {
+		panic(err)
+	}
+
 	metricsServer.Start()
 
 	prev := time.Now()
-	for i := 0; i < 100000; i++ {
+	previousElapsed := time.Duration(0)
+	for i := 0; i < 100; i++ {
 		fmt.Printf("Iteration %d\n", i)
 		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 		now := time.Now()
@@ -69,6 +80,11 @@ func main() {
 
 		c1.Increment()
 		c1DOUBLE.Add(2)
+		g1.Set(float64(elapsed.Milliseconds()))
+		g2.Set(float64(previousElapsed.Milliseconds()))
+
+		previousElapsed = elapsed
 	}
 
+	metricsServer.Stop()
 }
