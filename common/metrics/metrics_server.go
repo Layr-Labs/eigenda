@@ -111,7 +111,7 @@ func (m *metrics) Stop() {
 }
 
 // NewLatencyMetric creates a new LatencyMetric instance.
-func (m *metrics) NewLatencyMetric(name string, label string) (LatencyMetric, error) {
+func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error) {
 	m.creationLock.Lock()
 	defer m.creationLock.Unlock()
 
@@ -130,15 +130,20 @@ func (m *metrics) NewLatencyMetric(name string, label string) (LatencyMetric, er
 		m.metricMap[id] = metric
 	}
 
+	objectives := make(map[float64]float64, len(quantiles))
+	for _, q := range quantiles {
+		objectives[q.Quantile] = q.Error
+	}
+
 	vec, ok := m.summaryVecMap[name]
 	if !ok {
 		vec = promauto.With(m.registry).NewSummaryVec(
 			prometheus.SummaryOpts{
 				Namespace:  m.config.Namespace,
 				Name:       name,
-				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001}, // TODO expose this
+				Objectives: objectives,
 			},
-			[]string{"label"}, // TODO what is this?
+			[]string{"label"},
 		)
 		m.summaryVecMap[name] = vec
 	}
@@ -170,14 +175,18 @@ func (m *metrics) NewGaugeMetric(name string, label string) (GaugeMetric, error)
 func (m *metrics) isBlacklisted(id metricID) bool {
 	metric := id.String()
 
-	for _, blacklisted := range m.config.MetricsBlacklist {
-		if metric == blacklisted {
-			return true
+	if m.config.MetricsBlacklist != nil {
+		for _, blacklisted := range m.config.MetricsBlacklist {
+			if metric == blacklisted {
+				return true
+			}
 		}
 	}
-	for _, blacklisted := range m.config.MetricsFuzzyBlacklist {
-		if strings.Contains(metric, blacklisted) {
-			return true
+	if m.config.MetricsFuzzyBlacklist != nil {
+		for _, blacklisted := range m.config.MetricsFuzzyBlacklist {
+			if strings.Contains(metric, blacklisted) {
+				return true
+			}
 		}
 	}
 	return false

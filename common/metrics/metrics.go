@@ -11,7 +11,7 @@ type Metrics interface {
 	Stop() // TODO necessary?
 
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
-	NewLatencyMetric(name string, label string) (LatencyMetric, error)
+	NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
 	NewCountMetric(name string, label string) (CountMetric, error)
@@ -49,6 +49,22 @@ type CountMetric interface {
 
 	// Increment increments the count by 1.
 	Increment()
+}
+
+// Quantile describes a quantile of a latency metric that should be reported. For a description of how
+// to interpret a quantile, see the prometheus documentation
+// https://github.com/prometheus/client_golang/blob/v1.20.5/prometheus/summary.go#L126
+type Quantile struct {
+	Quantile float64
+	Error    float64
+}
+
+// NewQuantile creates a new Quantile instance. Error is set to 1% of the quantile.
+func NewQuantile(quantile float64) *Quantile {
+	return &Quantile{
+		Quantile: quantile,
+		Error:    quantile / 100.0,
+	}
 }
 
 // LatencyMetric allows the latency of an operation to be tracked. Similar to a gauge metric, but specialized for time.
