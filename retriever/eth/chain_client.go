@@ -15,7 +15,7 @@ import (
 )
 
 type ChainClient interface {
-	FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error)
+	FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.BatchHeader, error)
 }
 
 type chainClient struct {
@@ -34,7 +34,7 @@ func NewChainClient(ethClient common.EthClient, logger logging.Logger) ChainClie
 // It filters logs by the batch header hashes which are logged as events by the service manager contract.
 // From those logs, it identifies corresponding confirmBatch transaction and decodes batch header from the calldata.
 // It takes fromBlock and toBlock as arguments to filter logs within a specific block range. This can help with optimizing queries to the chain. nil values for fromBlock and toBlock will default to genesis block and latest block respectively.
-func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.IEigenDAServiceManagerBatchHeader, error) {
+func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddress gcommon.Address, batchHeaderHash []byte, fromBlock *big.Int, toBlock *big.Int) (*binding.BatchHeader, error) {
 	logs, err := c.ethClient.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: fromBlock,
 		ToBlock:   toBlock,
@@ -87,5 +87,5 @@ func (c *chainClient) FetchBatchHeader(ctx context.Context, serviceManagerAddres
 		ReferenceBlockNumber  uint32   "json:\"referenceBlockNumber\""
 	})
 
-	return (*binding.IEigenDAServiceManagerBatchHeader)(&batchHeaderInput), nil
+	return (*binding.BatchHeader)(&batchHeaderInput), nil
 }
