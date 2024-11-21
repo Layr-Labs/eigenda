@@ -10,22 +10,47 @@ type Metrics interface {
 	// Stop stops the metrics server.
 	Stop() error
 
+	// GenerateMetricsDocumentation generates documentation for all currently registered metrics.
+	// Documentation is returned as a string in markdown format.
+	GenerateMetricsDocumentation() string
+
+	// WriteMetricsDocumentation writes documentation for all currently registered metrics to a file.
+	// Documentation is written in markdown format.
+	WriteMetricsDocumentation(fileName string) error
+
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
 	// Metric name and label may only contain alphanumeric characters and underscores.
-	NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error)
+	NewLatencyMetric(
+		name string,
+		label string,
+		description string,
+		quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
 	// Metric name and label may only contain alphanumeric characters and underscores.
-	NewCountMetric(name string, label string) (CountMetric, error)
+	NewCountMetric(
+		name string,
+		label string,
+		description string) (CountMetric, error)
 
 	// NewGaugeMetric creates a new GaugeMetric instance. Useful for reporting specific values.
 	// Metric name and label may only contain alphanumeric characters and underscores.
-	NewGaugeMetric(name string, label string) (GaugeMetric, error)
+	NewGaugeMetric(
+		name string,
+		label string,
+		unit string,
+		description string) (GaugeMetric, error)
 
 	// NewAutoGauge creates a new GaugeMetric instance that is automatically updated by the given source function.
 	// The function is polled at the given period. This produces a gauge type metric internally.
 	// Metric name and label may only contain alphanumeric characters and underscores.
-	NewAutoGauge(name string, label string, pollPeriod time.Duration, source func() float64) error
+	NewAutoGauge(
+		name string,
+		label string,
+		unit string,
+		description string,
+		pollPeriod time.Duration,
+		source func() float64) error
 }
 
 // Metric represents a metric that can be reported.
@@ -37,11 +62,18 @@ type Metric interface {
 	// Label returns the label of the metric. Metrics without a label will return an empty string.
 	Label() string
 
+	// Unit returns the unit of the metric.
+	Unit() string
+
+	// Description returns the description of the metric. Should be a one or two sentence human-readable description.
+	Description() string
+
+	// Type returns the type of the metric.
+	Type() string
+
 	// Enabled returns true if the metric is enabled.
 	Enabled() bool
 }
-
-// TODO can we require units for gauges?
 
 // GaugeMetric allows specific values to be reported.
 type GaugeMetric interface {

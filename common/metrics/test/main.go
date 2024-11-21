@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ func main() {
 	l1, err := metricsServer.NewLatencyMetric(
 		"l1",
 		"",
+		"this metric shows the latency of the sleep cycle",
 		metrics.NewQuantile(0.5),
 		metrics.NewQuantile(0.9),
 		metrics.NewQuantile(0.99))
@@ -39,6 +40,7 @@ func main() {
 	l1HALF, err := metricsServer.NewLatencyMetric(
 		"l1",
 		"HALF",
+		"this metric shows the latency of the sleep cycle, divided by two",
 		metrics.NewQuantile(0.5),
 		metrics.NewQuantile(0.9),
 		metrics.NewQuantile(0.99))
@@ -46,30 +48,55 @@ func main() {
 		panic(err)
 	}
 
-	c1, err := metricsServer.NewCountMetric("c1", "")
+	c1, err := metricsServer.NewCountMetric(
+		"c1",
+		"",
+		"this metric shows the number of times the sleep cycle has been executed")
 	if err != nil {
 		panic(err)
 	}
 
-	c1DOUBLE, err := metricsServer.NewCountMetric("c1", "DOUBLE")
+	c1DOUBLE, err := metricsServer.NewCountMetric(
+		"c1",
+		"DOUBLE",
+		"this metric shows the number of times the sleep cycle has been executed, doubled")
 	if err != nil {
 		panic(err)
 	}
 
-	g1, err := metricsServer.NewGaugeMetric("g1", "")
+	g1, err := metricsServer.NewGaugeMetric(
+		"g1",
+		"",
+		"milliseconds",
+		"this metric shows the duration of the most recent sleep cycle")
 	if err != nil {
 		panic(err)
 	}
 
-	g2, err := metricsServer.NewGaugeMetric("g1", "previous")
+	g2, err := metricsServer.NewGaugeMetric(
+		"g1",
+		"previous",
+		"milliseconds",
+		"this metric shows the duration of the second most recent sleep cycle")
 	if err != nil {
 		panic(err)
 	}
 
 	sum := atomic.Int64{}
-	err = metricsServer.NewAutoGauge("g1", "autoPoll", 1*time.Second, func() float64 {
-		return float64(sum.Load())
-	})
+	err = metricsServer.NewAutoGauge(
+		"g1",
+		"autoPoll",
+		"milliseconds",
+		"this metric shows the sum of all sleep cycles",
+		1*time.Second,
+		func() float64 {
+			return float64(sum.Load())
+		})
+	if err != nil {
+		panic(err)
+	}
+
+	err = metricsServer.WriteMetricsDocumentation("metrics.md")
 	if err != nil {
 		panic(err)
 	}

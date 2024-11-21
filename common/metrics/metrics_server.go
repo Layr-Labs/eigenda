@@ -9,7 +9,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -168,7 +170,12 @@ func (m *metrics) Stop() error {
 }
 
 // NewLatencyMetric creates a new LatencyMetric instance.
-func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error) {
+func (m *metrics) NewLatencyMetric(
+	name string,
+	label string,
+	description string,
+	quantiles ...*Quantile) (LatencyMetric, error) {
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -187,7 +194,7 @@ func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quan
 	}
 
 	if m.isBlacklisted(id) {
-		metric := newLatencyMetric(name, label, nil)
+		metric := newLatencyMetric(name, label, description, nil)
 		m.metricMap[id] = metric
 	}
 
@@ -209,13 +216,17 @@ func (m *metrics) NewLatencyMetric(name string, label string, quantiles ...*Quan
 		m.summaryVecMap[name] = vec
 	}
 
-	metric := newLatencyMetric(name, label, vec)
+	metric := newLatencyMetric(name, label, description, vec)
 	m.metricMap[id] = metric
 	return metric, nil
 }
 
 // NewCountMetric creates a new CountMetric instance.
-func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error) {
+func (m *metrics) NewCountMetric(
+	name string,
+	label string,
+	description string) (CountMetric, error) {
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -234,7 +245,7 @@ func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error)
 	}
 
 	if m.isBlacklisted(id) {
-		metric := newLatencyMetric(name, label, nil)
+		metric := newCountMetric(name, label, description, nil)
 		m.metricMap[id] = metric
 	}
 
@@ -250,21 +261,31 @@ func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error)
 		m.counterVecMap[name] = vec
 	}
 
-	metric := newCountMetric(name, label, vec)
+	metric := newCountMetric(name, label, description, vec)
 	m.metricMap[id] = metric
 
 	return metric, nil
 }
 
 // NewGaugeMetric creates a new GaugeMetric instance.
-func (m *metrics) NewGaugeMetric(name string, label string) (GaugeMetric, error) {
+func (m *metrics) NewGaugeMetric(
+	name string,
+	label string,
+	unit string,
+	description string) (GaugeMetric, error) {
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.newGaugeMetricUnsafe(name, label)
+	return m.newGaugeMetricUnsafe(name, label, unit, description)
 }
 
 // newGaugeMetricUnsafe creates a new GaugeMetric instance without locking.
-func (m *metrics) newGaugeMetricUnsafe(name string, label string) (GaugeMetric, error) {
+func (m *metrics) newGaugeMetricUnsafe(
+	name string,
+	label string,
+	unit string,
+	description string) (GaugeMetric, error) {
+
 	if !m.isAlive.Load() {
 		return nil, errors.New("metrics server is not alive")
 	}
@@ -280,7 +301,7 @@ func (m *metrics) newGaugeMetricUnsafe(name string, label string) (GaugeMetric, 
 	}
 
 	if m.isBlacklisted(id) {
-		metric := newLatencyMetric(name, label, nil)
+		metric := newGaugeMetric(name, label, unit, description, nil)
 		m.metricMap[id] = metric
 	}
 
@@ -296,10 +317,53 @@ func (m *metrics) newGaugeMetricUnsafe(name string, label string) (GaugeMetric, 
 		m.gaugeVecMap[name] = vec
 	}
 
-	metric := newGaugeMetric(name, label, vec)
+	metric := newGaugeMetric(name, label, unit, description, vec)
 	m.metricMap[id] = metric
 
 	return metric, nil
+}
+
+func (m *metrics) NewAutoGauge(
+	name string,
+	label string,
+	unit string,
+	description string,
+	pollPeriod time.Duration,
+	source func() float64) error {
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if !m.isAlive.Load() {
+		return errors.New("metrics server is not alive")
+	}
+
+	gauge, err := m.newGaugeMetricUnsafe(name, label, unit, description)
+	if err != nil {
+		return err
+	}
+
+	if !gauge.Enabled() {
+		return nil
+	}
+
+	pollingAgent := func() {
+		for m.isAlive.Load() {
+			value := source()
+			gauge.Set(value)
+			time.Sleep(pollPeriod)
+		}
+	}
+
+	if m.started {
+		// start the polling agent immediately
+		go pollingAgent()
+	} else {
+		// the polling agent will be started when the metrics server is started
+		m.autoGaugesToStart = append(m.autoGaugesToStart, pollingAgent)
+	}
+
+	return nil
 }
 
 // isBlacklisted returns true if the metric name is blacklisted.
@@ -323,33 +387,73 @@ func (m *metrics) isBlacklisted(id metricID) bool {
 	return false
 }
 
-func (m *metrics) NewAutoGauge(name string, label string, pollPeriod time.Duration, source func() float64) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (m *metrics) GenerateMetricsDocumentation() string {
+	sb := &strings.Builder{}
 
-	if !m.isAlive.Load() {
-		return errors.New("metrics server is not alive")
-	}
-
-	gauge, err := m.newGaugeMetricUnsafe(name, label)
-	if err != nil {
-		return err
-	}
-
-	pollingAgent := func() {
-		for m.isAlive.Load() {
-			value := source()
-			gauge.Set(value)
-			time.Sleep(pollPeriod)
+	enabledCount := 0
+	metricIDs := make([]*metricID, 0, len(m.metricMap))
+	for id, metric := range m.metricMap {
+		if metric.Enabled() {
+			enabledCount++
 		}
+		boundID := id
+		metricIDs = append(metricIDs, &boundID)
 	}
 
-	if m.started {
-		// start the polling agent immediately
-		go pollingAgent()
-	} else {
-		// the polling agent will be started when the metrics server is started
-		m.autoGaugesToStart = append(m.autoGaugesToStart, pollingAgent)
+	// sort the metric IDs alphabetically
+	sortFunc := func(a *metricID, b *metricID) int {
+		if a.name != b.name {
+			return strings.Compare(a.name, b.name)
+		}
+		return strings.Compare(a.label, b.label)
+	}
+	slices.SortFunc(metricIDs, sortFunc)
+
+	sb.Write([]byte(fmt.Sprintf("# Metrics Documentation for namespace '%s'\n\n", m.config.Namespace)))
+	sb.Write([]byte("This documentation is automatically generated. " +
+		"It reflects the metrics that were registered at the time that this document was generated.\n\n"))
+
+	sb.Write([]byte(fmt.Sprintf("There are %d metrics registered. Of these, %d are enabled.\n\n",
+		len(m.metricMap), enabledCount)))
+
+	for _, id := range metricIDs {
+		metric := m.metricMap[*id]
+
+		sb.Write([]byte("---\n\n"))
+		sb.Write([]byte(fmt.Sprintf("## %s\n\n", id.String())))
+		sb.Write([]byte(fmt.Sprintf("%s\n\n", metric.Description())))
+		sb.Write([]byte("| Field | Value |\n"))
+		sb.Write([]byte("|---|---|\n"))
+		sb.Write([]byte(fmt.Sprintf("| **Name** | '%s' |\n", metric.Name())))
+		sb.Write([]byte(fmt.Sprintf("| **Label** | '%s' |\n", metric.Label())))
+		sb.Write([]byte(fmt.Sprintf("| **Type** | %s |\n", metric.Type())))
+		sb.Write([]byte(fmt.Sprintf("| **Unit** | %s |\n", metric.Unit())))
+		enabledString := "enabled"
+		if !metric.Enabled() {
+			enabledString = "disabled"
+		}
+		sb.Write([]byte(fmt.Sprintf("| **Status** | %s |\n\n", enabledString)))
+	}
+
+	return sb.String()
+}
+
+func (m *metrics) WriteMetricsDocumentation(fileName string) error {
+	doc := m.GenerateMetricsDocumentation()
+
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+
+	_, err = file.Write([]byte(doc))
+	if err != nil {
+		return fmt.Errorf("error writing to file: %v", err)
+	}
+
+	err = file.Close()
+	if err != nil {
+		return fmt.Errorf("error closing file: %v", err)
 	}
 
 	return nil
