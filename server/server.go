@@ -115,14 +115,20 @@ func (svr *Server) Port() int {
 
 func parseVersionByte(w http.ResponseWriter, r *http.Request) (byte, error) {
 	vars := mux.Vars(r)
-	// decode version byte
-	versionByteHex, ok := vars[routingVarNameVersionByteHex]
-	if !ok {
-		return 0, fmt.Errorf("version byte not found in path: %s", r.URL.Path)
+	// only GET routes use gorilla parsed vars to separate header bytes from the raw commitment bytes.
+	// POST routes parse them by hand because they neeed to send the entire
+	// request (including the type/version header bytes) to the server.
+	// TODO: perhaps for consistency we should also use gorilla vars for POST routes,
+	// and then just reconstruct the full commitment in the handlers?
+	versionByteHex, isGETRoute := vars[routingVarNameVersionByteHex]
+	if !isGETRoute {
+		// v0 is hardcoded in POST routes for now (see handlers.go that also have this hardcoded)
+		// TODO: change this once we introduce v1/v2 certs
+		return byte(commitments.CertV0), nil
 	}
 	versionByte, err := hex.DecodeString(versionByteHex)
 	if err != nil {
-		return 0, fmt.Errorf("failed to decode version byte %s: %w", versionByteHex, err)
+		return 0, fmt.Errorf("decode version byte %s: %w", versionByteHex, err)
 	}
 	if len(versionByte) != 1 {
 		return 0, fmt.Errorf("version byte is not a single byte: %s", versionByteHex)

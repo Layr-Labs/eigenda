@@ -4,12 +4,37 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+// Used to capture the status code of the response, so that we can use it in middlewares.
+// See https://github.com/golang/go/issues/18997
+// TODO: right now instantiating a separate scw for logging and metrics... is there a better way?
+type statusCaptureWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (scw *statusCaptureWriter) WriteHeader(status int) {
+	scw.status = status
+	scw.ResponseWriter.WriteHeader(status)
+}
+
+func newStatusCaptureWriter(w http.ResponseWriter) *statusCaptureWriter {
+	return &statusCaptureWriter{
+		ResponseWriter: w,
+		// 200 status code is only added to response by outer layer http framework,
+		// since WriteHeader(200) is typically not called by handlers.
+		// So we initialize status as 200, and assume that any other status code
+		// will be set by the handler.
+		status: http.StatusOK,
+	}
+}
 
 // withMetrics is a middleware that records metrics for the route path.
 // It does not write anything to the response, that is the job of the handlers.
@@ -21,24 +46,25 @@ func withMetrics(
 	return func(w http.ResponseWriter, r *http.Request) error {
 		recordDur := m.RecordRPCServerRequest(r.Method)
 
-		err := handleFn(w, r)
+		scw := newStatusCaptureWriter(w)
+		err := handleFn(scw, r)
 		if err != nil {
+			commitMode := "unknown"
+			certVersion := "unknown"
 			var metaErr MetaError
 			if errors.As(err, &metaErr) {
-				recordDur(w.Header().Get("status"), string(metaErr.Meta.Mode), string(metaErr.Meta.CertVersion))
-			} else {
-				recordDur(w.Header().Get("status"), string("unknown"), string("unknown"))
+				commitMode = string(metaErr.Meta.Mode)
+				certVersion = string(metaErr.Meta.CertVersion)
 			}
+			recordDur(strconv.Itoa(scw.status), commitMode, certVersion)
 			return err
 		}
-		// TODO: some routes don't have a version byte, such as /put simple commitments
 		versionByte, err := parseVersionByte(w, r)
 		if err != nil {
-			// we assume that every route will set the status header
-			recordDur(w.Header().Get("status"), string(mode), string(versionByte))
-			return fmt.Errorf("metrics middleware: error parsing version byte: %w", err)
+			recordDur(strconv.Itoa(scw.status), string(mode), "unknown")
+			return fmt.Errorf("metrics middleware: parsing version byte: %w", err)
 		}
-		recordDur(w.Header().Get("status"), string(mode), string(versionByte))
+		recordDur(strconv.Itoa(scw.status), string(mode), string(versionByte))
 		return nil
 	}
 }
@@ -53,17 +79,20 @@ func withLogging(
 ) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		err := handleFn(w, r)
-		var metaErr MetaError
-		//nolint:gocritic // ifElseChain is not a good replacement with errors.As
-		if errors.As(err, &metaErr) {
-			log.Info("request", "method", r.Method, "url", r.URL, "duration", time.Since(start),
-				"err", err, "status", w.Header().Get("status"),
-				"commitment_mode", metaErr.Meta.Mode, "cert_version", metaErr.Meta.CertVersion)
-		} else if err != nil {
-			log.Info("request", "method", r.Method, "url", r.URL, "duration", time.Since(start), "err", err)
-		} else {
-			log.Info("request", "method", r.Method, "url", r.URL, "duration", time.Since(start))
+
+		scw := newStatusCaptureWriter(w)
+		err := handleFn(scw, r)
+
+		args := []any{
+			"method", r.Method, "url", r.URL, "status", scw.status, "duration", time.Since(start),
 		}
+		if err != nil {
+			args = append(args, "err", err)
+		}
+		var metaErr MetaError
+		if errors.As(err, &metaErr) {
+			args = append(args, "commitment_mode", metaErr.Meta.Mode, "cert_version", metaErr.Meta.CertVersion)
+		}
+		log.Info("request", args...)
 	}
 }
