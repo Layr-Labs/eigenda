@@ -132,7 +132,7 @@ func (h BatchHeader) GetBatchHeaderHash() ([32]byte, error) {
 
 // HashBatchHeader returns the hash of the BatchHeader that is used to emit the BatchConfirmed event
 // ref: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/libraries/EigenDAHasher.sol#L57
-func HashBatchHeader(batchHeader binding.IEigenDAServiceManagerBatchHeader) ([32]byte, error) {
+func HashBatchHeader(batchHeader binding.BatchHeader) ([32]byte, error) {
 	// The order here has to match the field ordering of BatchHeader defined in IEigenDAServiceManager.sol
 	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
