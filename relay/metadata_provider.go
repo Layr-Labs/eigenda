@@ -69,8 +69,10 @@ func newMetadataProvider(
 		fetchTimeout:  fetchTimeout,
 	}
 
-	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](
-		metadataCacheSize,
+	c := cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize))
+
+	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
+		c,
 		maxIOConcurrency,
 		server.fetchMetadata)
 	if err != nil {

@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"sync"
 )
 
@@ -44,8 +43,8 @@ type cacheAccessor[K comparable, V any] struct {
 	// to be written into the channel.
 	lookupsInProgress map[K]*accessResult[V]
 
-	// cache is the LRU cache used to store values fetched by the accessor.
-	cache *lru.Cache[K, V]
+	// cache is the underlying cache that this wrapper manages.
+	cache Cache[K, V]
 
 	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
 	concurrencyLimiter chan struct{}
@@ -57,20 +56,15 @@ type cacheAccessor[K comparable, V any] struct {
 	accessor Accessor[K, V]
 }
 
-// NewCachedAccessor creates a new CacheAccessor. The cacheSize parameter specifies the maximum number of items
+// NewCacheAccessor creates a new CacheAccessor. The cacheSize parameter specifies the maximum number of items
 // that can be stored in the cache. The concurrencyLimit parameter specifies the maximum number of concurrent
 // lookups that can be in progress at any given time. If a greater number of lookups are requested, the excess
 // lookups will block until a lookup completes. If concurrencyLimit is zero, then no limits are imposed. The accessor
 // parameter is the function used to fetch values that are not in the cache.
-func NewCachedAccessor[K comparable, V any](
-	cacheSize int,
+func NewCacheAccessor[K comparable, V any](
+	cache Cache[K, V],
 	concurrencyLimit int,
 	accessor Accessor[K, V]) (CacheAccessor[K, V], error) {
-
-	cache, err := lru.New[K, V](cacheSize)
-	if err != nil {
-		return nil, err
-	}
 
 	lookupsInProgress := make(map[K]*accessResult[V])
 
@@ -166,7 +160,7 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 
 		// Update the cache if the fetch was successful.
 		if err == nil {
-			c.cache.Add(key, value)
+			c.cache.Put(key, value)
 		}
 
 		// Provide the result to all other goroutines that may be waiting for it.

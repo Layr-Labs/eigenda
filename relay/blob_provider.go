@@ -31,7 +31,7 @@ func newBlobProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
-	blobCacheSize int,
+	blobCacheSize uint64,
 	maxIOConcurrency int,
 	fetchTimeout time.Duration) (*blobProvider, error) {
 
@@ -42,13 +42,25 @@ func newBlobProvider(
 		fetchTimeout: fetchTimeout,
 	}
 
-	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, maxIOConcurrency, server.fetchBlob)
+	c := cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize)
+	err := c.WithWeightCalculator(computeBlobCacheWeight)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}
-	server.blobCache = c
+
+	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](c, maxIOConcurrency, server.fetchBlob)
+	if err != nil {
+		return nil, fmt.Errorf("error creating blob cache: %w", err)
+	}
+	server.blobCache = cacheAccessor
 
 	return server, nil
+}
+
+// computeChunkCacheWeight computes the 'weight' of the blob for the cache. The weight of a blob
+// is equal to its size, in bytes.
+func computeBlobCacheWeight(key v2.BlobKey, value []byte) uint64 {
+	return uint64(len(value))
 }
 
 // GetBlob retrieves a blob from the blob store.

@@ -47,7 +47,7 @@ func newChunkProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
-	cacheSize int,
+	cacheSize uint64,
 	maxIOConcurrency int,
 	proofFetchTimeout time.Duration,
 	coefficientFetchTimeout time.Duration) (*chunkProvider, error) {
@@ -60,20 +60,32 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		cacheSize,
+	c := cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize)
+	err := c.WithWeightCalculator(computeFramesCacheWeight)
+	if err != nil {
+		return nil, fmt.Errorf("error setting weight calculator: %w", err)
+	}
+
+	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
+		c,
 		maxIOConcurrency,
 		server.fetchFrames)
 	if err != nil {
 		return nil, err
 	}
-	server.frameCache = c
+	server.frameCache = cacheAccessor
 
 	return server, nil
 }
 
 // frameMap is a map of blob keys to frames.
 type frameMap map[v2.BlobKey][]*encoding.Frame
+
+// computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
+// is equal to the size required to store the data, in bytes.
+func computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
+	return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+}
 
 // GetFrames retrieves the frames for a blob.
 func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
