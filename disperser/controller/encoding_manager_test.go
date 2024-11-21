@@ -2,12 +2,11 @@ package controller_test
 
 import (
 	"context"
-	"math/big"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core"
+	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
@@ -19,6 +18,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -30,6 +30,7 @@ type testComponents struct {
 	Pool            common.WorkerPool
 	EncodingClient  *dispmock.MockEncoderClientV2
 	ChainReader     *coremock.MockWriter
+	MockPool        *commonmock.MockWorkerpool
 }
 
 func TestGetRelayKeys(t *testing.T) {
@@ -76,16 +77,16 @@ func TestGetRelayKeys(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := controller.GetRelayKeys(tt.numRelays, tt.availableRelays)
 			if err != nil {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, tt.err)
-				assert.Len(t, got, int(tt.numRelays))
+				require.NoError(t, tt.err)
+				require.Len(t, got, int(tt.numRelays))
 				seen := make(map[corev2.RelayKey]struct{})
 				for _, relay := range got {
-					assert.Contains(t, tt.availableRelays, relay)
+					require.Contains(t, tt.availableRelays, relay)
 					seen[relay] = struct{}{}
 				}
-				assert.Equal(t, len(seen), len(got))
+				require.Equal(t, len(seen), len(got))
 			}
 		})
 	}
@@ -93,18 +94,7 @@ func TestGetRelayKeys(t *testing.T) {
 
 func TestEncodingManagerHandleBatch(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x1234",
-			BinIndex:          0,
-			CumulativePayment: big.NewInt(532),
-		},
-	}
-	blobKey1, err := blobHeader1.BlobKey()
-	assert.NoError(t, err)
+	blobKey1, blobHeader1 := newBlob(t)
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -113,55 +103,106 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.NoError(t, err)
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	require.NoError(t, err)
 
-	c := newTestComponents(t)
+	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
 	err = c.EncodingManager.HandleBatch(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	c.Pool.StopWait()
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
-	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
+	require.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
+	require.NoError(t, err)
+	require.Equal(t, fetchedCert.BlobHeader, blobHeader1)
 	for _, relayKey := range fetchedCert.RelayKeys {
-		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
+		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	assert.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
+	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
+}
+
+func TestEncodingManagerHandleManyBatches(t *testing.T) {
+	ctx := context.Background()
+	numBlobs := 12
+	keys := make([]corev2.BlobKey, numBlobs)
+	headers := make([]*corev2.BlobHeader, numBlobs)
+	metadata := make([]*commonv2.BlobMetadata, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		keys[i], headers[i] = newBlob(t)
+		now := time.Now()
+		metadata[i] = &commonv2.BlobMetadata{
+			BlobHeader: headers[i],
+			BlobStatus: commonv2.Queued,
+			Expiry:     uint64(now.Add(time.Hour).Unix()),
+			NumRetries: 0,
+			UpdatedAt:  uint64(now.UnixNano()),
+		}
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata[i])
+		require.NoError(t, err)
+	}
+
+	c := newTestComponents(t, true)
+	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + 1)
+
+	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
+	expectedNumTasks := 0
+	for i := 0; i < numIterations; i++ {
+		err := c.EncodingManager.HandleBatch(ctx)
+		require.NoError(t, err)
+		if i < numIterations-1 {
+			expectedNumTasks += int(c.EncodingManager.MaxNumBlobsPerIteration)
+			c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks)
+		} else {
+			expectedNumTasks += numBlobs % int(c.EncodingManager.MaxNumBlobsPerIteration)
+			c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks)
+		}
+	}
+	err := c.EncodingManager.HandleBatch(ctx)
+	require.ErrorContains(t, err, "no blobs to encode")
+
+	// new record
+	key, header := newBlob(t)
+	now := time.Now()
+	meta := &commonv2.BlobMetadata{
+		BlobHeader: header,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err = blobMetadataStore.PutBlobMetadata(ctx, meta)
+	require.NoError(t, err)
+	err = c.EncodingManager.HandleBatch(ctx)
+	require.NoError(t, err)
+	c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks+1)
+
+	deleteBlobs(t, blobMetadataStore, keys, nil)
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{key}, nil)
 }
 
 func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 	ctx := context.Background()
-	c := newTestComponents(t)
+	c := newTestComponents(t, false)
+	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	err := c.EncodingManager.HandleBatch(ctx)
-	assert.ErrorContains(t, err, "no blobs to encode")
+	require.ErrorContains(t, err, "no blobs to encode")
 }
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x12345",
-			BinIndex:          0,
-			CumulativePayment: big.NewInt(532),
-		},
-	}
-	blobKey1, err := blobHeader1.BlobKey()
-	assert.NoError(t, err)
+	blobKey1, blobHeader1 := newBlob(t)
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -170,10 +211,10 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.NoError(t, err)
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	require.NoError(t, err)
 
-	c := newTestComponents(t)
+	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
@@ -181,39 +222,30 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	}, nil)
 
 	err = c.EncodingManager.HandleBatch(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	c.Pool.StopWait()
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
-	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
+	require.NoError(t, err)
+	require.Equal(t, commonv2.Encoded, fetchedMetadata.BlobStatus)
+	require.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, fetchedCert.BlobHeader, blobHeader1)
+	require.NoError(t, err)
+	require.Equal(t, fetchedCert.BlobHeader, blobHeader1)
 	for _, relayKey := range fetchedCert.RelayKeys {
-		assert.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
+		require.Contains(t, c.EncodingManager.AvailableRelays, relayKey)
 	}
-	assert.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
-	assert.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
+	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
+	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
+
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
 func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123456",
-			BinIndex:          0,
-			CumulativePayment: big.NewInt(532),
-		},
-	}
-	blobKey1, err := blobHeader1.BlobKey()
-	assert.NoError(t, err)
+	blobKey1, blobHeader1 := newBlob(t)
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -222,50 +254,61 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.NoError(t, err)
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	require.NoError(t, err)
 
-	c := newTestComponents(t)
+	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
 
 	err = c.EncodingManager.HandleBatch(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	c.Pool.StopWait()
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// marked as failed
-	assert.Equal(t, commonv2.Failed, fetchedMetadata.BlobStatus)
-	assert.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
+	require.Equal(t, commonv2.Failed, fetchedMetadata.BlobStatus)
+	require.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
-	assert.ErrorIs(t, err, dispcommon.ErrMetadataNotFound)
-	assert.Nil(t, fetchedCert)
-	assert.Nil(t, fetchedFragmentInfo)
+	require.ErrorIs(t, err, dispcommon.ErrMetadataNotFound)
+	require.Nil(t, fetchedCert)
+	require.Nil(t, fetchedFragmentInfo)
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
+
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
-func newTestComponents(t *testing.T) *testComponents {
+func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	logger := logging.NewNoopLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	// assert.NoError(t, err)
-	pool := workerpool.New(5)
+	// require.NoError(t, err)
+	var pool common.WorkerPool
+	var mockP *commonmock.MockWorkerpool
+	if mockPool {
+		mockP = &commonmock.MockWorkerpool{}
+		pool = mockP
+	} else {
+		pool = workerpool.New(5)
+	}
 	encodingClient := dispmock.NewMockEncoderClientV2()
 	chainReader := &coremock.MockWriter{}
 	chainReader.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	em, err := controller.NewEncodingManager(controller.EncodingManagerConfig{
-		PullInterval:           1 * time.Second,
-		EncodingRequestTimeout: 5 * time.Second,
-		StoreTimeout:           5 * time.Second,
-		NumEncodingRetries:     1,
-		NumRelayAssignment:     2,
-		AvailableRelays:        []corev2.RelayKey{0, 1, 2, 3},
+	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
+		PullInterval:            1 * time.Second,
+		EncodingRequestTimeout:  5 * time.Second,
+		StoreTimeout:            5 * time.Second,
+		NumEncodingRetries:      1,
+		NumRelayAssignment:      2,
+		AvailableRelays:         []corev2.RelayKey{0, 1, 2, 3},
+		MaxNumBlobsPerIteration: 5,
 	}, blobMetadataStore, pool, encodingClient, chainReader, logger)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	return &testComponents{
 		EncodingManager: em,
 		Pool:            pool,
 		EncodingClient:  encodingClient,
 		ChainReader:     chainReader,
+		MockPool:        mockP,
 	}
 }

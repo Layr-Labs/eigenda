@@ -102,6 +102,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_CONCURRENT_ENCODING_REQUESTS"),
 		Value:    250,
 	}
+	MaxNumBlobsPerIterationFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-num-blobs-per-iteration"),
+		Usage:    "Max number of blobs to encode in a single iteration",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_BLOBS_PER_ITERATION"),
+		Value:    128,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -150,6 +157,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NODE_CLIENT_CACHE_NUM_ENTRIES"),
 		Value:    400,
 	}
+	MaxBatchSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-batch-size"),
+		Usage:    "Max number of blobs to disperse in a batch",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BATCH_SIZE"),
+		Value:    128,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -160,6 +174,7 @@ var requiredFlags = []cli.Flag{
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,
 	EncoderAddressFlag,
+
 	DispatcherPullIntervalFlag,
 	NodeRequestTimeoutFlag,
 	NumConnectionsToNodesFlag,
@@ -172,10 +187,13 @@ var optionalFlags = []cli.Flag{
 	NumEncodingRetriesFlag,
 	NumRelayAssignmentFlag,
 	NumConcurrentEncodingRequestsFlag,
+	MaxNumBlobsPerIterationFlag,
+
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
 	NumConcurrentDispersalRequestsFlag,
 	NodeClientCacheNumEntriesFlag,
+	MaxBatchSizeFlag,
 }
 
 var Flags []cli.Flag
