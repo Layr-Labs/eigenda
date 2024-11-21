@@ -24,6 +24,7 @@ func main() {
 	}
 
 	metricsServer := metrics.NewMetrics(logger, metricsConfig)
+	//metricsServer := metrics.NewMockMetrics()
 
 	l1, err := metricsServer.NewLatencyMetric(
 		"l1",
