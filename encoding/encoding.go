@@ -24,15 +24,15 @@ type Prover interface {
 type Verifier interface {
 	Decoder
 
-	// VerifyChunks takes in the chunks, indices, commitments, and encoding parameters and returns an error if the chunks are invalid.
+	// VerifyFrames takes in the chunks, indices, commitments, and encoding parameters and returns an error if the chunks are invalid.
 	VerifyFrames(chunks []*Frame, indices []ChunkNumber, commitments BlobCommitments, params EncodingParams) error
 
-	// VerifyBatch takes in the encoding parameters, samples and the number of blobs and returns an error if a chunk in any sample is invalid.
+	// UniversalVerifySubBatch takes in the encoding parameters, samples and the number of blobs and returns an error if a chunk in any sample is invalid.
 	UniversalVerifySubBatch(params EncodingParams, samples []Sample, numBlobs int) error
 
 	// VerifyBlobLength takes in the commitments and returns an error if the blob length is invalid.
 	VerifyBlobLength(commitments BlobCommitments) error
 
-	// VerifyCommitEquivalence takes in a list of commitments and returns an error if the commitment of G1 and G2 are inconsistent
+	// VerifyCommitEquivalenceBatch takes in a list of commitments and returns an error if the commitment of G1 and G2 are inconsistent
 	VerifyCommitEquivalenceBatch(commitments []BlobCommitments) error
 }
