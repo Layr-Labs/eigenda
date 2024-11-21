@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
@@ -150,7 +151,7 @@ var (
 	MaxNumSymbolsPerBlob = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),
 		Usage:    "max number of symbols per blob. This flag is only relevant in v2",
-		Value:    65_536,
+		Value:    16 * 1024 * 1024 / encoding.BYTES_PER_SYMBOL, // this should allow for 16MiB blobs
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_SYMBOLS_PER_BLOB"),
 		Required: false,
 	}

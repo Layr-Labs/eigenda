@@ -64,11 +64,12 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest) error {
 	data := req.GetData()
 	blobSize := len(data)
-	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
-	}
 	if blobSize == 0 {
 		return api.NewErrorInvalidArg("blob size must be greater than 0")
+	}
+	blobLength := encoding.GetBlobLengthPowerOf2(uint(blobSize))
+	if blobLength > uint(s.maxNumSymbolsPerBlob) {
+		return api.NewErrorInvalidArg("blob size too big")
 	}
 
 	blobHeaderProto := req.GetBlobHeader()
@@ -76,8 +77,18 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg("blob header must contain commitments")
 	}
 
+	if len(blobHeaderProto.GetQuorumNumbers()) == 0 {
+		return api.NewErrorInvalidArg("blob header must contain at least one quorum number")
+	}
+
 	if len(blobHeaderProto.GetQuorumNumbers()) > int(s.onchainState.QuorumCount) {
 		return api.NewErrorInvalidArg(fmt.Sprintf("too many quorum numbers specified: maximum is %d", s.onchainState.QuorumCount))
+	}
+
+	for _, quorum := range blobHeaderProto.GetQuorumNumbers() {
+		if quorum > corev2.MaxQuorumID || uint8(quorum) >= s.onchainState.QuorumCount {
+			return api.NewErrorInvalidArg(fmt.Sprintf("invalid quorum number %d; maximum is %d", quorum, s.onchainState.QuorumCount))
+		}
 	}
 
 	// validate every 32 bytes is a valid field element
@@ -85,10 +96,6 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
 		return api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
-	}
-
-	if !containsRequiredQuorum(s.onchainState.RequiredQuorums, blobHeaderProto.GetQuorumNumbers()) {
-		return api.NewErrorInvalidArg(fmt.Sprintf("request must contain at least one required quorum: %v does not specify any of %v", blobHeaderProto.GetQuorumNumbers(), s.onchainState.RequiredQuorums))
 	}
 
 	if _, ok := s.onchainState.BlobVersionParameters[corev2.BlobVersion(blobHeaderProto.GetVersion())]; !ok {
@@ -107,18 +114,17 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	// TODO(ian-shim): validate commitment, length is power of 2 and less than maxNumSymbolsPerBlob, payment metadata
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+		return api.NewErrorInvalidArg("invalid payment metadata")
+	}
+
+	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)
+	if err != nil {
+		return api.NewErrorInternal(fmt.Sprintf("failed to get commitments: %v", err))
+	}
+	if !commitments.Equal(&blobHeader.BlobCommitments) {
+		return api.NewErrorInvalidArg("invalid blob commitment")
+	}
 
 	return nil
-}
-
-func containsRequiredQuorum(requiredQuorums []uint8, quorumNumbers []uint32) bool {
-	for _, required := range requiredQuorums {
-		for _, quorum := range quorumNumbers {
-			if uint8(quorum) == required {
-				return true
-			}
-		}
-	}
-	return false
 }
