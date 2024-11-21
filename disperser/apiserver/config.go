@@ -70,8 +70,6 @@ type RateConfig struct {
 
 	AllowlistFile            string
 	AllowlistRefreshInterval time.Duration
-
-	PprofConfig PprofConfig
 }
 
 func AllowlistFileFlag(envPrefix string) cli.Flag {
@@ -252,11 +250,6 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		}
 	}
 
-	pprofConfig := PprofConfig{
-		HTTPPort:    c.String(PprofHttpPortName),
-		EnablePprof: c.Bool(EnablePprofName),
-	}
-
 	return RateConfig{
 		QuorumRateInfos:          quorumRateInfos,
 		ClientIPHeader:           c.String(ClientIPHeaderFlagName),
@@ -265,6 +258,5 @@ func ReadCLIConfig(c *cli.Context) (RateConfig, error) {
 		RetrievalThroughput:      common.RateParam(c.Int(RetrievalThroughputFlagName)),
 		AllowlistFile:            c.String(AllowlistFileFlagName),
 		AllowlistRefreshInterval: c.Duration(AllowlistRefreshIntervalFlagName),
-		PprofConfig:              pprofConfig,
 	}, nil
 }

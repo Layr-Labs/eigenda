@@ -9,11 +9,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-type PprofConfig struct {
-	HTTPPort    string
-	EnablePprof bool
-}
-
 type PprofProfiler struct {
 	logger   logging.Logger
 	httpPort string
@@ -27,10 +22,10 @@ func NewPprofProfiler(httpPort string, logger logging.Logger) *PprofProfiler {
 }
 
 // Start the pprof server
-func (p *PprofProfiler) Start(port string, logger logging.Logger) {
-	pprofAddr := fmt.Sprintf("%s:%s", "0.0.0.0", port)
+func (p *PprofProfiler) Start(logger logging.Logger) {
+	pprofAddr := fmt.Sprintf("%s:%s", "0.0.0.0", p.httpPort)
 
 	if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-		p.logger.Error("pprof server failed", "error", err)
+		p.logger.Error("pprof server failed", "error", err, "pprofAddr", pprofAddr)
 	}
 }

@@ -97,6 +97,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ServerConfig: disperser.ServerConfig{
 			GrpcPort:    ctx.GlobalString(flags.GrpcPortFlag.Name),
 			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
+
+			PprofHttpPort: ctx.GlobalString(flags.PprofHttpPort.Name),
+			EnablePprof:   ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
@@ -107,6 +110,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
+
 		RatelimiterConfig:           ratelimiterConfig,
 		RateConfig:                  rateConfig,
 		EncodingConfig:              encodingConfig,
