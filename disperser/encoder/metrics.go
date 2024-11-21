@@ -29,10 +29,10 @@ type Metrics struct {
 	BlobQueue             *prometheus.GaugeVec
 	QueueCapacity         prometheus.Gauge
 	QueueUtilization      prometheus.Gauge
+	IncomingRequestRate *prometheus.GaugeVec
 }
 
-func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
-	reg := prometheus.NewRegistry()
+func NewMetrics(reg *prometheus.Registry, httpPort string, logger logging.Logger) *Metrics {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
@@ -86,6 +86,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Name:      "request_pool_utilization",
 				Help:      "Current utilization of request pool (total across all buckets)",
 			},
+		),
+		IncomingRequestRate: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: "eigenda_encoder",
+				Name:      "incoming_request_rate",
+				Help:      "The rate of incoming requests per second, categorized by size bucket",
+			},
+			[]string{"size_bucket"},
 		),
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -26,6 +27,7 @@ type EncoderServer struct {
 	logger  logging.Logger
 	prover  encoding.Prover
 	metrics *Metrics
+	grpcMetrics *grpcprom.ServerMetrics
 	close   func()
 
 	runningRequests chan struct{}
@@ -39,7 +41,7 @@ type blobRequest struct {
 	blobSizeByte int
 }
 
-func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServer {
+func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encoding.Prover, metrics *Metrics, grpcMetrics *grpcprom.ServerMetrics) *EncoderServer {
 	// Set initial queue capacity metric
 	metrics.SetQueueCapacity(config.RequestPoolSize)
 
@@ -48,6 +50,7 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 		logger:  logger.With("component", "EncoderServer"),
 		prover:  prover,
 		metrics: metrics,
+		grpcMetrics: grpcMetrics,
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan blobRequest, config.RequestPoolSize),
@@ -64,9 +67,14 @@ func (s *EncoderServer) Start() error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer(opt,
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		),
+	)
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Encoder_ServiceDesc.ServiceName
@@ -95,6 +103,8 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 	startTime := time.Now()
 	blobSize := len(req.GetData())
 	sizeBucket := common.BlobSizeBucket(blobSize)
+
+
 
 	select {
 	case s.requestPool <- blobRequest{blobSizeByte: blobSize}:
