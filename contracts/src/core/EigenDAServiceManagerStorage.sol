@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
  * @author Layr Labs, Inc.
@@ -13,6 +12,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     // CONSTANTS
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
+    //TODO: mechanism to change any of these values?
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
     uint32 public constant STORE_DURATION_BLOCKS = 2 weeks / 12 seconds;
 
@@ -36,16 +36,26 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 300;
 
-    IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
-    IEigenDARelayRegistry public immutable eigenDARelayRegistry;
+    /**
+     * @notice The quorum adversary threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
+     */
+    bytes public constant quorumAdversaryThresholdPercentages = hex"212121";
 
-    constructor(
-        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
-        IEigenDARelayRegistry _eigenDARelayRegistry
-    ) {
-        eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
-        eigenDARelayRegistry = _eigenDARelayRegistry;
-    }
+    /**
+     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
+     * this is the percentage of the total stake needed to confirm a blob.
+     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
+     */
+    bytes public constant quorumConfirmationThresholdPercentages = hex"373737";
+
+    /**
+     * @notice The quorum numbers required for confirmation stored as an ordered bytes array
+     * these quorum numbers have respective canonical thresholds in the
+     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
+     */
+    bytes public constant quorumNumbersRequired = hex"0001";
 
     /// @notice The current batchId
     uint32 public batchId;

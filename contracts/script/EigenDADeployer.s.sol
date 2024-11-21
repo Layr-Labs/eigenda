@@ -17,8 +17,6 @@ import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {ISocketRegistry, SocketRegistry} from "eigenlayer-middleware/SocketRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
 
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
@@ -204,9 +202,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             avsDirectory,
             rewardsCoordinator,
             registryCoordinator,
-            stakeRegistry,
-            IEigenDAThresholdRegistry(address(0)),
-            IEigenDARelayRegistry(address(0))
+            stakeRegistry
         );
 
         address[] memory confirmers = new address[](1);

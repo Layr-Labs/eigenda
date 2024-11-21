@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
 import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
@@ -8,11 +8,9 @@ import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager}
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
-import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title Primary entrypoint for procuring services from EigenDA.
@@ -38,13 +36,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IAVSDirectory __avsDirectory,
         IRewardsCoordinator __rewardsCoordinator,
         IRegistryCoordinator __registryCoordinator,
-        IStakeRegistry __stakeRegistry,
-        IEigenDAThresholdRegistry __eigenDAThresholdRegistry,
-        IEigenDARelayRegistry __eigenDARelayRegistry
+        IStakeRegistry __stakeRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
-        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry, __eigenDARelayRegistry)
     {
         _disableInitializers();
     }
@@ -115,7 +110,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             // signed stake > total stake
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
-                quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
+                    quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
                 "EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"
             );
         }
@@ -152,48 +147,4 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
-    /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
-        return eigenDAThresholdRegistry.getBlobParams(version);
-    }
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
-        return hex"212121";
-    }
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
-        return hex"373737";
-    }
-
-    /// @notice Returns the bytes array of quorumsNumbersRequired
-    function quorumNumbersRequired() external view returns (bytes memory) {
-        return hex"0001";
-    }
-
-    function getQuorumAdversaryThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8){
-        return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
-    }
-
-    /// @notice Gets the confirmation threshold percentage for a quorum
-    function getQuorumConfirmationThresholdPercentage(
-        uint8 quorumNumber
-    ) external view returns (uint8){
-        return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
-    }
-
-    /// @notice Checks if a quorum is required
-    function getIsQuorumRequired(
-        uint8 quorumNumber
-    ) external view returns (bool){
-        return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
-    }
-
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
-        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
-    }
 }
