@@ -59,7 +59,7 @@ func TestExpirationOrder(t *testing.T) {
 		require.Equal(t, int(maxWeight), c.Size())
 
 		// verify that the purged value is specifically not present
-		value, ok = c.Get(i)
+		_, ok = c.Get(i)
 		require.False(t, ok)
 
 		// verify that only the expected values have been purged. Has the added benefit of randomly
@@ -111,7 +111,7 @@ func TestWeightedValues(t *testing.T) {
 		require.Equal(t, len(expectedValues), c.Size())
 
 		// Update a random existing key. Shouldn't affect the weight or removal order.
-		for k, _ := range expectedValues {
+		for k := range expectedValues {
 			value = rand.Int()
 			c.Put(k, value)
 			expectedValues[k] = value

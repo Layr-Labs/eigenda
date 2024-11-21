@@ -20,7 +20,7 @@ type blobProvider struct {
 	blobStore *blobstore.BlobStore
 
 	// blobCache is an LRU cache of blobs.
-	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
+	blobCache cache.CacheAccessor[v2.BlobKey, []byte]
 
 	// fetchTimeout is the maximum time to wait for a blob fetch operation to complete.
 	fetchTimeout time.Duration

@@ -20,7 +20,7 @@ type chunkProvider struct {
 
 	// metadataCache is an LRU cache of blob metadata. Each relay is authorized to serve data assigned to one or more
 	// relay IDs. Blobs that do not belong to one of the relay IDs assigned to this server will not be in the cache.
-	frameCache cache.CachedAccessor[blobKeyWithMetadata, []*encoding.Frame]
+	frameCache cache.CacheAccessor[blobKeyWithMetadata, []*encoding.Frame]
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
