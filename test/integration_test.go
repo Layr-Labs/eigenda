@@ -173,12 +173,12 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	p0, _ := mustMakeTestComponents()
-	metrics := encoder.NewMetrics("9000", logger)
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	grpcEncoder := encoder.NewEncoderServer(encoder.ServerConfig{
 		GrpcPort:              encoderPort,
 		MaxConcurrentRequests: 16,
 		RequestPoolSize:       32,
-	}, logger, p0, metrics)
+	}, logger, p0, metrics, nil)
 
 	encoderClient, err := encoder.NewEncoderClient(batcherConfig.EncoderSocket, 10*time.Second)
 	if err != nil {
