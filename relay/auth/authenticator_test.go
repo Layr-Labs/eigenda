@@ -54,20 +54,22 @@ func TestValidRequest(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.OperatorSignature
+	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = signature
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -82,12 +84,14 @@ func TestValidRequest(t *testing.T) {
 	start := now
 	for now.Before(start.Add(timeout)) {
 		err = authenticator.AuthenticateGetChunksRequest(
+			context.Background(),
 			"foobar",
 			invalidRequest,
 			now)
 		require.NoError(t, err)
 
 		err = authenticator.AuthenticateGetChunksRequest(
+			context.Background(),
 			"baz",
 			invalidRequest,
 			now)
@@ -98,6 +102,7 @@ func TestValidRequest(t *testing.T) {
 
 	// After the timeout elapses, new requests should trigger authentication.
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		invalidRequest,
 		now)
@@ -115,21 +120,23 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	// This disables saving of authentication results.
 	timeout := time.Duration(0)
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
-	signature := request.OperatorSignature
+	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = signature
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -142,6 +149,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	invalidRequest.OperatorSignature = signature // the previous signature is invalid here
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		invalidRequest,
 		now)
@@ -159,18 +167,20 @@ func TestNonExistingClient(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	invalidOperatorID := tu.RandomBytes(32)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = invalidOperatorID
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		time.Now())
@@ -188,19 +198,21 @@ func TestBadSignature(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
-	authenticator := NewRequestAuthenticator(ics, timeout)
+	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature = SignGetChunksRequest(ics.KeyPairs[operatorID], request)
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -213,6 +225,7 @@ func TestBadSignature(t *testing.T) {
 	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)

@@ -26,6 +26,7 @@ type Metrics struct {
 	NumEncodeBlobRequests *prometheus.CounterVec
 	BlobSizeTotal         *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
+	BlobQueue             *prometheus.GaugeVec
 }
 
 func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
@@ -62,6 +63,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"time"}, // time is either encoding or total
 		),
+		BlobQueue: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: "eigenda_encoder",
+				Name:      "blob_queue",
+				Help:      "the number of blobs in the queue for encoding",
+			},
+			[]string{"size_bucket"},
+		),
 	}
 }
 
@@ -95,6 +104,12 @@ func (m *Metrics) IncrementCanceledBlobRequestNum(blobSize int) {
 
 func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
 	m.Latency.WithLabelValues(stage).Observe(float64(duration.Milliseconds()))
+}
+
+func (m *Metrics) ObserveQueue(queueStats map[string]int) {
+	for bucket, num := range queueStats {
+		m.BlobQueue.With(prometheus.Labels{"size_bucket": bucket}).Set(float64(num))
+	}
 }
 
 func (m *Metrics) Start(ctx context.Context) {

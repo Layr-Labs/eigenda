@@ -41,6 +41,13 @@ func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger) *storeV2 {
 }
 
 func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, error) {
+	if len(rawBundles) == 0 {
+		return nil, fmt.Errorf("no raw bundles")
+	}
+	if len(rawBundles) != len(batch.BlobCertificates) {
+		return nil, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)", len(rawBundles), len(batch.BlobCertificates))
+	}
+
 	dbBatch := s.db.NewTTLBatch()
 	keys := make([]kvstore.Key, 0)
 

@@ -218,6 +218,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
+	EnableV2Flag = cli.BoolFlag{
+		Name:     "enable-v2",
+		Usage:    "Enable V2 features",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
+	}
 
 	// Test only, DO NOT USE the following flags in production
 
@@ -346,6 +352,7 @@ var optionalFlags = []cli.Flag{
 	BLSRemoteSignerUrlFlag,
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
+	EnableV2Flag,
 }
 
 func init() {

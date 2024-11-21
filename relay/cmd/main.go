@@ -6,11 +6,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/indexer"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"log"
 	"os"
 
@@ -98,11 +96,6 @@ func RunRelay(ctx *cli.Context) error {
 }
 
 func buildICS(logger logging.Logger, config *Config) (core.IndexedChainState, error) {
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
-	if err != nil {
-		return nil, fmt.Errorf("failed to create rpc client: %w", err)
-	}
-
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -114,24 +107,8 @@ func buildICS(logger logging.Logger, config *Config) (core.IndexedChainState, er
 		return nil, fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	idx, err := coreindexer.CreateNewIndexer(
-		&indexer.Config{
-			PullInterval: config.IndexerPullInterval,
-		},
-		client,
-		rpcClient,
-		config.EigenDAServiceManagerAddr,
-		logger,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create indexer: %w", err)
-	}
-
 	cs := coreeth.NewChainState(tx, client)
-	ics, err := coreindexer.NewIndexedChainState(cs, idx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create indexed chain state: %w", err)
-	}
+	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
 	return ics, nil
 }

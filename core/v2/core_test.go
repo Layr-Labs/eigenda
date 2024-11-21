@@ -94,7 +94,7 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, l
 
 	data = codec.ConvertByPaddingEmptyByte(data)
 
-	commitments, err := p.GetCommitments(data)
+	commitments, err := p.GetCommitmentsForPaddedLength(data)
 	if err != nil {
 		t.Fatal(err)
 	}

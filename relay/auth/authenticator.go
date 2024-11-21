@@ -6,6 +6,7 @@ import (
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/core"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"sync"
 	"time"
 )
@@ -13,17 +14,18 @@ import (
 // RequestAuthenticator authenticates requests to the relay service. This object is thread safe.
 type RequestAuthenticator interface {
 	// AuthenticateGetChunksRequest authenticates a GetChunksRequest, returning an error if the request is invalid.
-	// The address is the address of the peer that sent the request. This may be used to cache auth results
+	// The origin is the address of the peer that sent the request. This may be used to cache auth results
 	// in order to save server resources.
 	AuthenticateGetChunksRequest(
-		address string,
+		ctx context.Context,
+		origin string,
 		request *pb.GetChunksRequest,
 		now time.Time) error
 }
 
 // authenticationTimeout is used to track the expiration of an auth.
 type authenticationTimeout struct {
-	clientID   string
+	origin     string
 	expiration time.Time
 }
 
@@ -47,34 +49,65 @@ type requestAuthenticator struct {
 	savedAuthLock sync.Mutex
 
 	// keyCache is used to cache the public keys of operators. Operator keys are assumed to never change.
-	keyCache sync.Map
+	keyCache *lru.Cache[core.OperatorID, *core.G2Point]
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
 func NewRequestAuthenticator(
 	ics core.IndexedChainState,
-	authenticationTimeoutDuration time.Duration) RequestAuthenticator {
+	keyCacheSize int,
+	authenticationTimeoutDuration time.Duration) (RequestAuthenticator, error) {
 
-	return &requestAuthenticator{
+	keyCache, err := lru.New[core.OperatorID, *core.G2Point](keyCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create key cache: %w", err)
+	}
+
+	authenticator := &requestAuthenticator{
 		ics:                           ics,
 		authenticatedClients:          make(map[string]struct{}),
 		authenticationTimeouts:        make([]*authenticationTimeout, 0),
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
-		keyCache:                      sync.Map{},
+		keyCache:                      keyCache,
 	}
+
+	err = authenticator.preloadCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to preload cache: %w", err)
+	}
+
+	return authenticator, nil
+}
+
+func (a *requestAuthenticator) preloadCache() error {
+	blockNumber, err := a.ics.GetCurrentBlockNumber()
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get operators: %w", err)
+	}
+
+	for operatorID, operator := range operators {
+		a.keyCache.Add(operatorID, operator.PubkeyG2)
+	}
+
+	return nil
 }
 
 func (a *requestAuthenticator) AuthenticateGetChunksRequest(
-	address string,
+	ctx context.Context,
+	origin string,
 	request *pb.GetChunksRequest,
 	now time.Time) error {
 
-	if a.isAuthenticationStillValid(now, address) {
+	if a.isAuthenticationStillValid(now, origin) {
 		// We've recently authenticated this client. Do not authenticate again for a while.
 		return nil
 	}
 
-	key, err := a.getOperatorKey(core.OperatorID(request.OperatorId))
+	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}
@@ -95,15 +128,14 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		return errors.New("signature verification failed")
 	}
 
-	a.saveAuthenticationResult(now, address)
+	a.saveAuthenticationResult(now, origin)
 	return nil
 }
 
 // getOperatorKey returns the public key of the operator with the given ID, caching the result.
-func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core.G2Point, error) {
-	untypedKey, ok := a.keyCache.Load(operatorID)
+func (a *requestAuthenticator) getOperatorKey(ctx context.Context, operatorID core.OperatorID) (*core.G2Point, error) {
+	key, ok := a.keyCache.Get(operatorID)
 	if ok {
-		key := untypedKey.(*core.G2Point)
 		return key, nil
 	}
 
@@ -111,7 +143,7 @@ func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
-	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	operators, err := a.ics.GetIndexedOperators(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operators: %w", err)
 	}
@@ -120,14 +152,14 @@ func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core
 	if !ok {
 		return nil, errors.New("operator not found")
 	}
-	key := operator.PubkeyG2
+	key = operator.PubkeyG2
 
-	a.keyCache.Store(operatorID, key)
+	a.keyCache.Add(operatorID, key)
 	return key, nil
 }
 
 // saveAuthenticationResult saves the result of an auth.
-func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, address string) {
+func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, origin string) {
 	if a.authenticationTimeoutDuration == 0 {
 		// Authentication saving is disabled.
 		return
@@ -136,10 +168,10 @@ func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, address s
 	a.savedAuthLock.Lock()
 	defer a.savedAuthLock.Unlock()
 
-	a.authenticatedClients[address] = struct{}{}
+	a.authenticatedClients[origin] = struct{}{}
 	a.authenticationTimeouts = append(a.authenticationTimeouts,
 		&authenticationTimeout{
-			clientID:   address,
+			origin:     origin,
 			expiration: now.Add(a.authenticationTimeoutDuration),
 		})
 }
@@ -160,13 +192,14 @@ func (a *requestAuthenticator) isAuthenticationStillValid(now time.Time, address
 }
 
 // removeOldAuthentications removes any authentications that have expired.
+// This method is not thread safe and should be called with the savedAuthLock held.
 func (a *requestAuthenticator) removeOldAuthentications(now time.Time) {
 	index := 0
 	for ; index < len(a.authenticationTimeouts); index++ {
 		if a.authenticationTimeouts[index].expiration.After(now) {
 			break
 		}
-		delete(a.authenticatedClients, a.authenticationTimeouts[index].clientID)
+		delete(a.authenticatedClients, a.authenticationTimeouts[index].origin)
 	}
 	if index > 0 {
 		a.authenticationTimeouts = a.authenticationTimeouts[index:]

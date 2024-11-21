@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"time"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
@@ -17,8 +20,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"time"
 )
 
 var _ pb.RelayServer = &Server{}
@@ -93,6 +94,9 @@ type Config struct {
 	// RateLimits contains configuration for rate limiting.
 	RateLimits limiter.Config
 
+	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
+	AuthenticationKeyCacheSize int
+
 	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
 	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
 	// will be authenticated independently, regardless of timing.
@@ -152,7 +156,13 @@ func NewServer(
 
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
-		authenticator = auth.NewRequestAuthenticator(ics, config.AuthenticationTimeout)
+		authenticator, err = auth.NewRequestAuthenticator(
+			ics,
+			config.AuthenticationKeyCacheSize,
+			config.AuthenticationTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("error creating authenticator: %w", err)
+		}
 	}
 
 	return &Server{
@@ -169,7 +179,7 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-	if s.config.Timeouts.GetChunksTimeout > 0 {
+	if s.config.Timeouts.GetBlobTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetBlobTimeout)
 		defer cancel()
@@ -216,6 +226,11 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	if s.config.Timeouts.GetChunksTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
+		defer cancel()
+	}
 
 	if len(request.ChunkRequests) <= 0 {
 		return nil, fmt.Errorf("no chunk requests provided")
@@ -225,14 +240,14 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
 
-	client, ok := peer.FromContext(ctx)
-	if !ok {
-		return nil, errors.New("could not get peer information")
-	}
-	clientAddress := client.Addr.String()
-
 	if s.authenticator != nil {
-		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+		client, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("could not get peer information")
+		}
+		clientAddress := client.Addr.String()
+
+		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("auth failed: %w", err)
 		}
@@ -246,6 +261,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
+	// keys might contain duplicate keys
 	keys, err := getKeysFromChunkRequest(request)
 	if err != nil {
 		return nil, err
@@ -311,7 +327,7 @@ func gatherChunkDataToSend(
 	frames map[v2.BlobKey][]*encoding.Frame,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
-	bytesToSend := make([][]byte, 0, len(frames))
+	bytesToSend := make([][]byte, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
 

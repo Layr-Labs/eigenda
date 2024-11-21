@@ -12,7 +12,7 @@ type Prover interface {
 	// reconstruct the blob.
 	EncodeAndProve(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
 
-	GetCommitments(data []byte) (BlobCommitments, error)
+	GetCommitmentsForPaddedLength(data []byte) (BlobCommitments, error)
 
 	GetFrames(data []byte, params EncodingParams) ([]*Frame, error)
 

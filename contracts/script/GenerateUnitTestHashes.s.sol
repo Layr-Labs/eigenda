@@ -5,7 +5,7 @@ import "../src/interfaces/IEigenDAServiceManager.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-
+import "../src/interfaces/IEigenDAStructs.sol";
 
 // # To generate the hashes needed for core/serialization_test.go:
 // forge script script/GenerateUnitTestHashes.s.sol  -v
@@ -18,9 +18,9 @@ contract GenerateHashes is Script {
     function run() external {
         
 
-        IEigenDAServiceManager.QuorumBlobParam[] memory quorumBlobParam = new IEigenDAServiceManager.QuorumBlobParam[](1);
+        QuorumBlobParam[] memory quorumBlobParam = new QuorumBlobParam[](1);
         
-        quorumBlobParam[0] = IEigenDAServiceManager.QuorumBlobParam({
+        quorumBlobParam[0] = QuorumBlobParam({
             quorumNumber: 0,
             adversaryThresholdPercentage: 80,
             confirmationThresholdPercentage: 100,
@@ -37,14 +37,14 @@ contract GenerateHashes is Script {
         });
 
 
-        quorumBlobParam[0] = IEigenDAServiceManager.QuorumBlobParam({
+        quorumBlobParam[0] = QuorumBlobParam({
             quorumNumber: 1,
             adversaryThresholdPercentage: 80,
             confirmationThresholdPercentage: 100,
             chunkLength: 10
         });
 
-        IEigenDAServiceManager.BlobHeader memory header = IEigenDAServiceManager.BlobHeader({
+        BlobHeader memory header = BlobHeader({
             commitment: commitment,
             dataLength: 10, 
             quorumBlobParams: quorumBlobParam

@@ -210,6 +210,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INDEXER_PULL_INTERVAL"),
 		Value:    5 * time.Minute,
 	}
+	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
+		Usage:    "Max number of items in the authentication key cache",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_KEY_CACHE_SIZE"),
+		Value:    1024 * 1024,
+	}
 	AuthenticationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-timeout"),
 		Usage:    "Duration to keep authentication results",
@@ -302,6 +309,9 @@ var optionalFlags = []cli.Flag{
 	GetChunkBytesBurstinessClientFlag,
 	MaxConcurrentGetChunkOpsClientFlag,
 	IndexerPullIntervalFlag,
+	AuthenticationKeyCacheSizeFlag,
+	AuthenticationTimeoutFlag,
+	AuthenticationDisabledFlag,
 	GetChunksTimeoutFlag,
 	GetBlobTimeoutFlag,
 	InternalGetMetadataTimeoutFlag,
