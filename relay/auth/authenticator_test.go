@@ -69,6 +69,7 @@ func TestValidRequest(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -83,12 +84,14 @@ func TestValidRequest(t *testing.T) {
 	start := now
 	for now.Before(start.Add(timeout)) {
 		err = authenticator.AuthenticateGetChunksRequest(
+			context.Background(),
 			"foobar",
 			invalidRequest,
 			now)
 		require.NoError(t, err)
 
 		err = authenticator.AuthenticateGetChunksRequest(
+			context.Background(),
 			"baz",
 			invalidRequest,
 			now)
@@ -99,6 +102,7 @@ func TestValidRequest(t *testing.T) {
 
 	// After the timeout elapses, new requests should trigger authentication.
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		invalidRequest,
 		now)
@@ -132,6 +136,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -144,6 +149,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	invalidRequest.OperatorSignature = signature // the previous signature is invalid here
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		invalidRequest,
 		now)
@@ -174,6 +180,7 @@ func TestNonExistingClient(t *testing.T) {
 	request.OperatorId = invalidOperatorID
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		time.Now())
@@ -205,6 +212,7 @@ func TestBadSignature(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
@@ -217,6 +225,7 @@ func TestBadSignature(t *testing.T) {
 	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
 
 	err = authenticator.AuthenticateGetChunksRequest(
+		context.Background(),
 		"foobar",
 		request,
 		now)
