@@ -142,12 +142,14 @@ type GetChunksRequest struct {
 	//  1. the operator id
 	//  2. for each chunk request:
 	//     a. if the chunk request is a request by index:
-	//     i. the blob key
-	//     ii. the start index
-	//     iii. the end index
+	//     i.   a one byte ASCII representation of the character "i" (aka Ox69)
+	//     ii.  the blob key
+	//     iii. the start index
+	//     iv.  the end index
 	//     b. if the chunk request is a request by range:
-	//     i. the blob key
-	//     ii. each requested chunk index, in order
+	//     i.   a one byte ASCII representation of the character "r" (aka Ox72)
+	//     ii.  the blob key
+	//     iii. each requested chunk index, in order
 	OperatorSignature []byte `protobuf:"bytes,3,opt,name=operator_signature,json=operatorSignature,proto3" json:"operator_signature,omitempty"`
 }
 

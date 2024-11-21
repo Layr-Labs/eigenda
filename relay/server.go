@@ -155,11 +155,6 @@ func NewServer(
 		if err != nil {
 			return nil, fmt.Errorf("error creating authenticator: %w", err)
 		}
-
-		err = authenticator.PreloadCache()
-		if err != nil {
-			return nil, fmt.Errorf("error preloading operator key cache: %w", err)
-		}
 	}
 
 	return &Server{

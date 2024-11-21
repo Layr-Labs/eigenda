@@ -20,9 +20,6 @@ type RequestAuthenticator interface {
 		origin string,
 		request *pb.GetChunksRequest,
 		now time.Time) error
-
-	// PreloadCache preloads the key cache with the public keys of all operators that are currently indexed.
-	PreloadCache() error
 }
 
 // authenticationTimeout is used to track the expiration of an auth.
@@ -65,16 +62,23 @@ func NewRequestAuthenticator(
 		return nil, fmt.Errorf("failed to create key cache: %w", err)
 	}
 
-	return &requestAuthenticator{
+	authenticator := &requestAuthenticator{
 		ics:                           ics,
 		authenticatedClients:          make(map[string]struct{}),
 		authenticationTimeouts:        make([]*authenticationTimeout, 0),
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
 		keyCache:                      keyCache,
-	}, nil
+	}
+
+	err = authenticator.preloadCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to preload cache: %w", err)
+	}
+
+	return authenticator, nil
 }
 
-func (a *requestAuthenticator) PreloadCache() error {
+func (a *requestAuthenticator) preloadCache() error {
 	blockNumber, err := a.ics.GetCurrentBlockNumber()
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)

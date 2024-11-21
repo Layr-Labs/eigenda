@@ -5,12 +5,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/cmd/flags"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/urfave/cli"
-	"time"
 )
 
 // Config is the configuration for the relay Server.
@@ -31,10 +31,11 @@ type Config struct {
 	// RelayConfig is the configuration for the relay.
 	RelayConfig relay.Config
 
+	// Configuration for the graph indexer.
 	EthClientConfig               geth.EthClientConfig
-	IndexerPullInterval           time.Duration
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	ChainStateConfig              thegraph.Config
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -84,9 +85,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			AuthenticationDisabled:     ctx.Bool(flags.AuthenticationDisabledFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
-		IndexerPullInterval:           ctx.Duration(flags.IndexerPullIntervalFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
+		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 	}
 	for i, id := range relayIDs {
 		config.RelayConfig.RelayIDs[i] = core.RelayKey(id)

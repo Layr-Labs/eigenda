@@ -54,6 +54,7 @@ func TestValidRequest(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
@@ -67,7 +68,6 @@ func TestValidRequest(t *testing.T) {
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
 		request,
@@ -116,6 +116,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	// This disables saving of authentication results.
 	timeout := time.Duration(0)
@@ -130,7 +131,6 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
 		request,
@@ -161,6 +161,7 @@ func TestNonExistingClient(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
@@ -172,7 +173,6 @@ func TestNonExistingClient(t *testing.T) {
 	request := randomGetChunksRequest()
 	request.OperatorId = invalidOperatorID
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
 		request,
@@ -191,6 +191,7 @@ func TestBadSignature(t *testing.T) {
 	}
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 
 	timeout := 10 * time.Second
 
@@ -203,7 +204,6 @@ func TestBadSignature(t *testing.T) {
 
 	now := time.Now()
 
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
 	err = authenticator.AuthenticateGetChunksRequest(
 		"foobar",
 		request,
