@@ -8,11 +8,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-func GetAssignments(state *core.OperatorState, blobVersion BlobVersion, quorum uint8) (map[core.OperatorID]Assignment, error) {
-
-	params, ok := ParametersMap[blobVersion]
-	if !ok {
-		return nil, fmt.Errorf("blob version %d not found", blobVersion)
+func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum uint8) (map[core.OperatorID]Assignment, error) {
+	if blobParams == nil {
+		return nil, fmt.Errorf("blob params cannot be nil")
 	}
 
 	ops, ok := state.Operators[quorum]
@@ -20,12 +18,12 @@ func GetAssignments(state *core.OperatorState, blobVersion BlobVersion, quorum u
 		return nil, fmt.Errorf("no operators found for quorum %d", quorum)
 	}
 
-	if len(ops) > int(params.MaxNumOperators()) {
-		return nil, fmt.Errorf("too many operators for blob version %d", blobVersion)
+	if uint32(len(ops)) > blobParams.MaxNumOperators {
+		return nil, fmt.Errorf("too many operators (%d) to get assignments: max number of operators is %d", len(ops), blobParams.MaxNumOperators)
 	}
 
 	numOperators := big.NewInt(int64(len(ops)))
-	numChunks := big.NewInt(int64(params.NumChunks))
+	numChunks := big.NewInt(int64(blobParams.NumChunks))
 
 	type assignment struct {
 		id     core.OperatorID
@@ -58,9 +56,9 @@ func GetAssignments(state *core.OperatorState, blobVersion BlobVersion, quorum u
 		mp += int(a.chunks)
 	}
 
-	delta := int(params.NumChunks) - mp
+	delta := int(blobParams.NumChunks) - mp
 	if delta < 0 {
-		return nil, fmt.Errorf("total chunks %d exceeds maximum %d", mp, params.NumChunks)
+		return nil, fmt.Errorf("total chunks %d exceeds maximum %d", mp, blobParams.NumChunks)
 	}
 
 	assignments := make(map[core.OperatorID]Assignment, len(chunkAssignments))
@@ -81,9 +79,11 @@ func GetAssignments(state *core.OperatorState, blobVersion BlobVersion, quorum u
 
 }
 
-func GetAssignment(state *core.OperatorState, blobVersion BlobVersion, quorum core.QuorumID, id core.OperatorID) (Assignment, error) {
-
-	assignments, err := GetAssignments(state, blobVersion, quorum)
+func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID, id core.OperatorID) (Assignment, error) {
+	if blobParams == nil {
+		return Assignment{}, fmt.Errorf("blob params cannot be nil")
+	}
+	assignments, err := GetAssignments(state, blobParams, quorum)
 	if err != nil {
 		return Assignment{}, err
 	}
@@ -96,10 +96,13 @@ func GetAssignment(state *core.OperatorState, blobVersion BlobVersion, quorum co
 	return assignment, nil
 }
 
-func GetChunkLength(blobVersion BlobVersion, blobLength uint32) (uint32, error) {
-
+func GetChunkLength(blobLength uint32, blobParams *core.BlobVersionParameters) (uint32, error) {
 	if blobLength == 0 {
 		return 0, fmt.Errorf("blob length must be greater than 0")
+	}
+
+	if blobParams == nil {
+		return 0, fmt.Errorf("blob params cannot be nil")
 	}
 
 	// Check that the blob length is a power of 2
@@ -107,11 +110,7 @@ func GetChunkLength(blobVersion BlobVersion, blobLength uint32) (uint32, error) 
 		return 0, fmt.Errorf("blob length %d is not a power of 2", blobLength)
 	}
 
-	if _, ok := ParametersMap[blobVersion]; !ok {
-		return 0, fmt.Errorf("blob version %d not found", blobVersion)
-	}
-
-	chunkLength := blobLength * ParametersMap[blobVersion].CodingRate / ParametersMap[blobVersion].NumChunks
+	chunkLength := blobLength * blobParams.CodingRate / blobParams.NumChunks
 	if chunkLength == 0 {
 		chunkLength = 1
 	}

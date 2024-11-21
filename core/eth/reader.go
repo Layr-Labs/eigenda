@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
@@ -578,6 +579,41 @@ func (t *Reader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint3
 		return nil, err
 	}
 	return requiredQuorums, nil
+}
+
+func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+	params, err := t.bindings.EigenDAServiceManager.GetBlobParams(&bind.CallOpts{
+		Context: ctx,
+	}, uint16(blobVersion))
+	if err != nil {
+		return nil, err
+	}
+	return &core.BlobVersionParameters{
+		CodingRate:      uint32(params.CodingRate),
+		NumChunks:       uint32(params.NumChunks),
+		MaxNumOperators: uint32(params.MaxNumOperators),
+	}, nil
+}
+
+func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+	res := make(map[uint8]*core.BlobVersionParameters)
+	version := uint8(0)
+	for {
+		params, err := t.GetVersionedBlobParams(ctx, version)
+		if err != nil && strings.Contains(err.Error(), "execution reverted") {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		res[version] = params
+		version++
+	}
+
+	if len(res) == 0 {
+		return nil, errors.New("no blob version parameters found")
+	}
+
+	return res, nil
 }
 
 func (t *Reader) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {

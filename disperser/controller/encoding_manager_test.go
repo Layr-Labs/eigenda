@@ -7,8 +7,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -294,16 +296,30 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	encodingClient := dispmock.NewMockEncoderClientV2()
 	chainReader := &coremock.MockWriter{}
 	chainReader.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	chainReader.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: {
+			NumChunks:       8192,
+			CodingRate:      8,
+			MaxNumOperators: 3537,
+		},
+	}, nil)
+	onchainRefreshInterval := 1 * time.Millisecond
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
-		PullInterval:            1 * time.Second,
-		EncodingRequestTimeout:  5 * time.Second,
-		StoreTimeout:            5 * time.Second,
-		NumEncodingRetries:      1,
-		NumRelayAssignment:      2,
-		AvailableRelays:         []corev2.RelayKey{0, 1, 2, 3},
-		MaxNumBlobsPerIteration: 5,
+		PullInterval:                1 * time.Second,
+		EncodingRequestTimeout:      5 * time.Second,
+		StoreTimeout:                5 * time.Second,
+		NumEncodingRetries:          1,
+		NumRelayAssignment:          2,
+		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
+		MaxNumBlobsPerIteration:     5,
+		OnchainStateRefreshInterval: onchainRefreshInterval,
 	}, blobMetadataStore, pool, encodingClient, chainReader, logger)
-	require.NoError(t, err)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
+	defer cancel()
+	// Start the encoding manager to fetch the onchain state
+	_ = em.Start(ctx)
 	return &testComponents{
 		EncodingManager: em,
 		Pool:            pool,

@@ -109,6 +109,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_BLOBS_PER_ITERATION"),
 		Value:    128,
 	}
+	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "Interval at which to refresh the onchain state",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 
 	// Dispatcher Flags
 	DispatcherPullIntervalFlag = cli.DurationFlag{
@@ -188,6 +195,7 @@ var optionalFlags = []cli.Flag{
 	NumRelayAssignmentFlag,
 	NumConcurrentEncodingRequestsFlag,
 	MaxNumBlobsPerIterationFlag,
+	OnchainStateRefreshIntervalFlag,
 
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
