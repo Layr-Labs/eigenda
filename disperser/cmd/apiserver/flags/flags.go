@@ -154,6 +154,19 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_NUM_SYMBOLS_PER_BLOB"),
 		Required: false,
 	}
+	PprofHttpPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
+		Usage:    "the http port which the pprof server is listening",
+		Required: false,
+		Value:    "6060",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_HTTP_PORT"),
+	}
+	EnablePprof = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "start prrof server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -246,6 +259,8 @@ var optionalFlags = []cli.Flag{
 	GlobalRateTableName,
 	OnchainStateRefreshInterval,
 	MaxNumSymbolsPerBlob,
+	PprofHttpPort,
+	EnablePprof,
 }
 
 // Flags contains the list of configuration options available to the binary.
