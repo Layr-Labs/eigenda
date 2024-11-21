@@ -179,7 +179,7 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-	if s.config.Timeouts.GetChunksTimeout > 0 {
+	if s.config.Timeouts.GetBlobTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetBlobTimeout)
 		defer cancel()
@@ -226,6 +226,11 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	if s.config.Timeouts.GetChunksTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
+		defer cancel()
+	}
 
 	if len(request.ChunkRequests) <= 0 {
 		return nil, fmt.Errorf("no chunk requests provided")
@@ -242,7 +247,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		clientAddress := client.Addr.String()
 
-		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("auth failed: %w", err)
 		}
