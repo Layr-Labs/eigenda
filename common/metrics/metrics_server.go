@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -68,9 +69,16 @@ type metricID struct {
 	label string
 }
 
+var legalCharactersRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
 // newMetricID creates a new metricID instance.
 func newMetricID(name string, label string) (metricID, error) {
-	// TODO check for illegal characters
+	if !legalCharactersRegex.MatchString(name) {
+		return metricID{}, fmt.Errorf("invalid metric name: %s", name)
+	}
+	if label != "" && !legalCharactersRegex.MatchString(label) {
+		return metricID{}, fmt.Errorf("invalid metric label: %s", label)
+	}
 	return metricID{
 		name:  name,
 		label: label,
@@ -158,8 +166,37 @@ func (m *metrics) NewCountMetric(name string, label string) (CountMetric, error)
 	m.creationLock.Lock()
 	defer m.creationLock.Unlock()
 
-	// TODO
-	return nil, nil
+	id, err := newMetricID(name, label)
+	if err != nil {
+		return nil, err
+	}
+
+	preExistingMetric, ok := m.metricMap[id]
+	if ok {
+		return preExistingMetric.(CountMetric), nil
+	}
+
+	if m.isBlacklisted(id) {
+		metric := newLatencyMetric(name, label, nil)
+		m.metricMap[id] = metric
+	}
+
+	vec, ok := m.counterVecMap[name]
+	if !ok {
+		vec = promauto.With(m.registry).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: m.config.Namespace,
+				Name:      name,
+			},
+			[]string{"label"},
+		)
+		m.counterVecMap[name] = vec
+	}
+
+	metric := newCountMetric(name, label, vec)
+	m.metricMap[id] = metric
+
+	return metric, nil
 }
 
 // NewGaugeMetric creates a new GaugeMetric instance.

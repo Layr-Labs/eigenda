@@ -11,12 +11,15 @@ type Metrics interface {
 	Stop() // TODO necessary?
 
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
+	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewLatencyMetric(name string, label string, quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
+	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewCountMetric(name string, label string) (CountMetric, error)
 
 	// NewGaugeMetric creates a new GaugeMetric instance. Useful for reporting specific values.
+	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewGaugeMetric(name string, label string) (GaugeMetric, error)
 }
 
@@ -49,6 +52,9 @@ type CountMetric interface {
 
 	// Increment increments the count by 1.
 	Increment()
+
+	// Add increments the count by the given value.
+	Add(value float64)
 }
 
 // Quantile describes a quantile of a latency metric that should be reported. For a description of how
