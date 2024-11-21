@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -196,7 +197,7 @@ func createTestComponents(t *testing.T) *testComponents {
 	t.Helper()
 	prover, err := makeTestProver(300000)
 	require.NoError(t, err, "Failed to create prover")
-	metrics := encoder.NewMetrics("9000", logger)
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	s3Client := mock.NewS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
