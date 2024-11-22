@@ -3,7 +3,6 @@ package meterer
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"time"
 
@@ -72,7 +71,6 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
-	log.Println(m)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
 		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, header.AccountID)
