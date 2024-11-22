@@ -80,6 +80,7 @@ func (c *MockDisperserClient) DisperseBlob(ctx context.Context, data []byte, quo
 
 	return status, key, err
 }
+
 func (c *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
 	args := c.Called(key)
 	var reply *disperser_rpc.BlobStatusReply
