@@ -246,6 +246,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         uint16[] memory versions = new uint16[](0);
         VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
+        SecurityThresholds memory defaultSecurityThresholds = SecurityThresholds(33, 55);
 
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
@@ -257,7 +258,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 hex"373737",
                 hex"0001",
                 versions,
-                versionedBlobParams
+                versionedBlobParams,
+                defaultSecurityThresholds
             )
         );
 
