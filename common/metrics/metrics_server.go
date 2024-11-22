@@ -348,10 +348,11 @@ func (m *metrics) NewAutoGauge(
 	}
 
 	pollingAgent := func() {
+		ticker := time.NewTicker(pollPeriod)
 		for m.isAlive.Load() {
 			value := source()
 			gauge.Set(value)
-			time.Sleep(pollPeriod)
+			<-ticker.C
 		}
 	}
 
