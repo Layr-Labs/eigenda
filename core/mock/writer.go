@@ -221,25 +221,25 @@ func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.O
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
+func (t *MockWriter) GetActiveReservations(ctx context.Context, accountIDs []string) (map[string]core.ActiveReservation, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(map[string]core.ActiveReservation), args.Error(1)
 }
 
-func (t *MockWriter) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
+func (t *MockWriter) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.ActiveReservation), args.Error(1)
 }
 
-func (t *MockWriter) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []string) (map[string]core.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(map[string]core.OnDemandPayment), args.Error(1)
 }
 
-func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
 	return result.(core.OnDemandPayment), args.Error(1)

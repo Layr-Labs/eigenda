@@ -77,7 +77,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 	relativeBinRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
-	binLimit := a.reservation.SymbolsPerSec * uint64(a.reservationWindow)
+	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativeBinRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
