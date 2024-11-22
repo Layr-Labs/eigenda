@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -213,10 +212,9 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	// validate the signature
-	if !auth.VerifyAccountSignature(req.AccountId, req.Signature) {
-		return nil, api.NewErrorInvalidArg("invalid signature")
+	if err := s.authenticator.AuthenticatePaymentStateRequest(req); err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
-
 	// on-chain global payment parameters
 	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()

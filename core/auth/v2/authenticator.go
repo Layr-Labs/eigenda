@@ -2,11 +2,12 @@ package v2
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -40,11 +41,44 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader) error {
 	// Decode public key
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", header.PaymentMetadata.AccountID, err)
+		return fmt.Errorf("failed to convert bytes to public key (%v): %v", header.PaymentMetadata.AccountID, err)
 	}
 
 	// Verify the signature
 	sigPublicKeyECDSA, err := crypto.SigToPub(blobKey[:], sig)
+	if err != nil {
+		return fmt.Errorf("failed to recover public key from signature: %v", err)
+	}
+
+	if !bytes.Equal(pubKey.X.Bytes(), sigPublicKeyECDSA.X.Bytes()) || !bytes.Equal(pubKey.Y.Bytes(), sigPublicKeyECDSA.Y.Bytes()) {
+		return errors.New("signature doesn't match with provided public key")
+	}
+
+	return nil
+}
+
+func (*authenticator) AuthenticatePaymentStateRequest(request *pb.GetPaymentStateRequest) error {
+	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
+	sig := request.GetSignature()
+	if len(sig) != 65 {
+		return fmt.Errorf("signature length is unexpected: %d", len(sig))
+	}
+
+	// Decode public key
+	publicKeyBytes, err := hexutil.Decode(request.GetAccountId())
+	if err != nil {
+		return fmt.Errorf("failed to decode public key (%v): %v", request.GetAccountId(), err)
+	}
+
+	// Convert bytes to public key
+	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to convert bytes to public key (%v): %v", request.GetAccountId(), err)
+	}
+
+	// Verify the signature
+	hash := sha256.Sum256([]byte(request.GetAccountId()))
+	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}

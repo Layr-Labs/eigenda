@@ -1,14 +1,17 @@
 package v2_test
 
 import (
+	"crypto/sha256"
 	"math/big"
 	"testing"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -113,4 +116,97 @@ func testHeader(t *testing.T, accountID string) *corev2.BlobHeader {
 		},
 		Signature: []byte{},
 	}
+}
+
+func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	authenticator := auth.NewAuthenticator()
+
+	signature, err := signer.SignPaymentStateRequest()
+	assert.NoError(t, err)
+
+	accountId, err := signer.GetAccountID()
+
+	assert.NoError(t, err)
+
+	request := &pb.GetPaymentStateRequest{
+		AccountId: accountId,
+		Signature: signature,
+	}
+
+	err = authenticator.AuthenticatePaymentStateRequest(request)
+	assert.NoError(t, err)
+}
+
+func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
+	authenticator := auth.NewAuthenticator()
+
+	request := &pb.GetPaymentStateRequest{
+		AccountId: "0x123",
+		Signature: []byte{1, 2, 3}, // Invalid length
+	}
+
+	err := authenticator.AuthenticatePaymentStateRequest(request)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "signature length is unexpected")
+}
+
+func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
+	authenticator := auth.NewAuthenticator()
+
+	request := &pb.GetPaymentStateRequest{
+		AccountId: "not-hex-encoded",
+		Signature: make([]byte, 65),
+	}
+
+	err := authenticator.AuthenticatePaymentStateRequest(request)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to decode public key")
+}
+
+func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	authenticator := auth.NewAuthenticator()
+
+	// Create a different signer with wrong private key
+	wrongSigner := auth.NewLocalBlobRequestSigner("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded")
+
+	// Sign with wrong key
+	accountId, err := signer.GetAccountID()
+	assert.NoError(t, err)
+
+	signature, err := wrongSigner.SignPaymentStateRequest()
+	assert.NoError(t, err)
+
+	request := &pb.GetPaymentStateRequest{
+		AccountId: accountId,
+		Signature: signature,
+	}
+
+	err = authenticator.AuthenticatePaymentStateRequest(request)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "signature doesn't match with provided public key")
+}
+
+func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	authenticator := auth.NewAuthenticator()
+
+	accountId, err := signer.GetAccountID()
+	assert.NoError(t, err)
+
+	hash := sha256.Sum256([]byte(accountId))
+	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
+	assert.NoError(t, err)
+
+	// Corrupt the signature
+	signature[0] ^= 0x01
+
+	request := &pb.GetPaymentStateRequest{
+		AccountId: accountId,
+		Signature: signature,
+	}
+
+	err = authenticator.AuthenticatePaymentStateRequest(request)
+	assert.Error(t, err)
 }
