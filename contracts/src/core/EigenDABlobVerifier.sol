@@ -34,6 +34,8 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         registryCoordinator = _registryCoordinator;
     }
 
+    ///////////////////////// V1 ///////////////////////////////
+
     /**
      * @notice Verifies a the blob is valid for the required quorums
      * @param blobHeader The blob header to verify
@@ -61,7 +63,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     function verifyBlobV1(
         BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof,
-        bytes calldata additionalQuorumNumbersRequired
+        bytes calldata additionalQuorumNumbersRequired 
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV1ForQuorums(
             eigenDAThresholdRegistry,
@@ -110,8 +112,10 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         );
     }
 
+    ///////////////////////// V2 ///////////////////////////////
+
     /**
-     * @notice Verifies a blob for the required quorums and the default security thresholds
+     * @notice Verifies a blob for the base required quorums and the default security thresholds
      * @param batchHeader The batch header of the blob
      * @param blobVerificationProof The blob verification proof for the blob
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
@@ -133,17 +137,17 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     }
 
     /**
-     * @notice Verifies a blob for the required quorums and additional quorums and the default security thresholds
+     * @notice Verifies a blob for a defined set of quorums and the default security thresholds
      * @param batchHeader The batch header of the blob
      * @param blobVerificationProof The blob verification proof for the blob
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
-     * @param additionalQuorumNumbersRequired The additional required quorum numbers
+     * @param quorumNumbersRequired The required quorum numbers
      */
     function verifyBlobV2(
         BatchHeaderV2 calldata batchHeader,
         BlobVerificationProofV2 calldata blobVerificationProof,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
-        bytes calldata additionalQuorumNumbersRequired
+        bytes calldata quorumNumbersRequired 
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
             eigenDAThresholdRegistry,
@@ -152,24 +156,24 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobVerificationProof,
             nonSignerStakesAndSignature,
             getDefaultSecurityThresholdsV2(),
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
+            quorumNumbersRequired
         );
     }
 
     /**
-     * @notice Verifies a blob for the required quorums and additional quorums and a custom security threshold
+     * @notice Verifies a blob for a defined set of quorums and a custom security threshold
      * @param batchHeader The batch header of the blob
      * @param blobVerificationProof The blob verification proof for the blob
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
      * @param securityThreshold The custom security threshold to verify the blob against
-     * @param additionalQuorumNumbersRequired The additional required quorum numbers
+     * @param quorumNumbersRequired The required quorum numbers
      */
     function verifyBlobV2(
         BatchHeaderV2 calldata batchHeader,
         BlobVerificationProofV2 calldata blobVerificationProof,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         SecurityThresholds memory securityThreshold,
-        bytes calldata additionalQuorumNumbersRequired
+        bytes calldata quorumNumbersRequired
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
             eigenDAThresholdRegistry,
@@ -178,24 +182,24 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobVerificationProof,
             nonSignerStakesAndSignature,
             securityThreshold,
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
+            quorumNumbersRequired
         );
     }
 
     /**
-     * @notice Verifies a blob for the required quorums and additional quorums and a set of custom security thresholds
+     * @notice Verifies a blob for a defined set of quorums and a set of custom security thresholds
      * @param batchHeader The batch header of the blob
      * @param blobVerificationProof The blob verification proof for the blob
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
      * @param securityThresholds The set of custom security thresholds to verify the blob against
-     * @param additionalQuorumNumbersRequired The additional required quorum numbers
+     * @param quorumNumbersRequired The required quorum numbers
      */
     function verifyBlobV2(
         BatchHeaderV2 calldata batchHeader,
         BlobVerificationProofV2 calldata blobVerificationProof,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         SecurityThresholds[] memory securityThresholds,
-        bytes calldata additionalQuorumNumbersRequired
+        bytes calldata quorumNumbersRequired
     ) external view {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsForThresholds(
             eigenDAThresholdRegistry,
@@ -204,9 +208,11 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobVerificationProof,
             nonSignerStakesAndSignature,
             securityThresholds,
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
+            quorumNumbersRequired
         );
     }
+
+    ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob and signed batch
@@ -249,11 +255,6 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         EigenDABlobVerificationUtils._verifyBlobSecurityParams(getBlobParams(version), securityThresholds);
     }
 
-    /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
-        return eigenDAThresholdRegistry.getBlobParams(version);
-    }
-
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
@@ -288,6 +289,11 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     ) external view returns (bool){
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }   
+
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
+        return eigenDAThresholdRegistry.getBlobParams(version);
+    }
 
     /// @notice Gets the default security thresholds for V2
     function getDefaultSecurityThresholdsV2() public view returns (SecurityThresholds memory) {

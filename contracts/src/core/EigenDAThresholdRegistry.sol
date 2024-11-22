@@ -55,10 +55,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
     }
 
-    /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
-        return versionedBlobParams[version];
-    }
+    ///////////////////////// V1 ///////////////////////////////
 
     /// @notice Gets the adversary threshold percentage for a quorum
     function getQuorumAdversaryThresholdPercentage(
@@ -86,9 +83,15 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         return (quorumBitmap & BitmapUtils.orderedBytesArrayToBitmap(quorumNumbersRequired) == quorumBitmap);
     }
 
+    ///////////////////////// V2 ///////////////////////////////
+
     /// @notice Gets the default security thresholds for V2
     function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
         return defaultSecurityThresholdsV2;
     }
 
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+        return versionedBlobParams[version];
+    }
 }
