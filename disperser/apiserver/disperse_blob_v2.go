@@ -36,9 +36,10 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if req.GetBlobHeader().GetPaymentHeader() != nil {
 		binIndex := req.GetBlobHeader().GetPaymentHeader().GetBinIndex()
 		cumulativePayment := new(big.Int).SetBytes(req.GetBlobHeader().GetPaymentHeader().GetCumulativePayment())
+		accountID := req.GetBlobHeader().GetPaymentHeader().GetAccountId()
 
 		paymentHeader := core.PaymentMetadata{
-			AccountID:         req.GetBlobHeader().GetPaymentHeader().GetAccountId(),
+			AccountID:         accountID,
 			BinIndex:          binIndex,
 			CumulativePayment: cumulativePayment,
 		}

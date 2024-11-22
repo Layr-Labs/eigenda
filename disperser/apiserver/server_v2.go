@@ -59,6 +59,7 @@ func NewDispersalServerV2(
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	chainReader core.Reader,
 	ratelimiter common.RateLimiter,
+	meterer *meterer.Meterer,
 	authenticator corev2.BlobRequestAuthenticator,
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
@@ -74,6 +75,7 @@ func NewDispersalServerV2(
 
 		chainReader:   chainReader,
 		authenticator: authenticator,
+		meterer:       meterer,
 		prover:        prover,
 		logger:        logger,
 
