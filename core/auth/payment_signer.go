@@ -2,7 +2,9 @@ package auth
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"log"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
@@ -88,6 +90,26 @@ func VerifyPaymentSignature(paymentHeader *core.PaymentMetadata, paymentSignatur
 	}
 
 	return nil
+}
+
+// VerifyAccountSignature verifies the signature against an account ID
+func VerifyAccountSignature(accountID string, paymentSignature []byte) bool {
+	pubKeyBytes, err := hex.DecodeString(accountID)
+	if err != nil {
+		log.Printf("Failed to decode AccountId: %v\n", err)
+		return false
+	}
+	accountPubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+	if err != nil {
+		log.Printf("Failed to unmarshal public key: %v\n", err)
+		return false
+	}
+
+	return crypto.VerifySignature(
+		crypto.FromECDSAPub(accountPubKey),
+		[]byte(accountID),
+		paymentSignature[:len(paymentSignature)-1], // Remove recovery ID
+	)
 }
 
 // GetAccountID returns the Ethereum address of the signer
