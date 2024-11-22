@@ -602,7 +602,7 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 // corresponding to a particular quorum
 type ActiveReservation struct {
 	SymbolsPerSec uint64 // reserve number of symbols per second
-	//TODO: we are not using start and end timestamp, should remove
+	//TODO: we are not using start and end timestamp, add check or remove
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
 	EndTimestamp   uint64
 

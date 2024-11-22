@@ -76,9 +76,8 @@ type disperserClient struct {
 	// TODO: we should refactor or make a new constructor which allows setting conn and/or client
 	//       via dependency injection. This would allow for testing via https://pkg.go.dev/google.golang.org/grpc/test/bufconn
 	//       instead of a real network connection for eg.
-	conn       *grpc.ClientConn
-	client     disperser_rpc.DisperserClient
-	accountant Accountant
+	conn   *grpc.ClientConn
+	client disperser_rpc.DisperserClient
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -103,16 +102,13 @@ var _ DisperserClient = &disperserClient{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, requestId2, err := client.DisperseBlob(ctx, otherData, otherQuorums)
-func NewDisperserClient(config *Config, signer core.BlobRequestSigner, paymentSigner core.PaymentSigner) (*disperserClient, error) {
+func NewDisperserClient(config *Config, signer core.BlobRequestSigner) (*disperserClient, error) {
 	if err := checkConfigAndSetDefaults(config); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	// initialize an empty accountant; update payment state after initialization
-	accountant := NewAccountant(&core.ActiveReservation{}, &core.OnDemandPayment{}, 0, 0, 0, paymentSigner, 0)
 	return &disperserClient{
-		config:     config,
-		signer:     signer,
-		accountant: accountant,
+		config: config,
+		signer: signer,
 		// conn and client are initialized lazily
 	}, nil
 }

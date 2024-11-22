@@ -60,10 +60,6 @@ type EigenDAClientConfig struct {
 	// that can retrieve blobs but cannot disperse blobs.
 	SignerPrivateKeyHex string
 
-	// Payment signer private key in hex encoded format. This key connect to the wallet with payment registered on-chain
-	// if set to "", will result in a non-paying client and cannot disperse paid blobs.
-	PaymentSignerPrivateKeyHex string
-
 	// Whether to disable TLS for an insecure connection when connecting to a local EigenDA disperser instance.
 	DisableTLS bool
 
@@ -115,9 +111,6 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 
 	if len(c.SignerPrivateKeyHex) > 0 && len(c.SignerPrivateKeyHex) != 64 {
 		return fmt.Errorf("a valid length SignerPrivateKeyHex needs to have 64 bytes")
-	}
-	if len(c.PaymentSignerPrivateKeyHex) > 0 && len(c.PaymentSignerPrivateKeyHex) != 64 {
-		return fmt.Errorf("a valid length PaymentSignerPrivateKeyHex needs to have 64 bytes")
 	}
 
 	if len(c.RPC) == 0 {

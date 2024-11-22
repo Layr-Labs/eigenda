@@ -89,7 +89,7 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
 
 	// TODO: create a dedicated reservation for traffic generator and create a payment signer
-	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil)
+	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("new disperser-client: %w", err)

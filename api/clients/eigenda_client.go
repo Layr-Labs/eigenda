@@ -99,32 +99,21 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	}
 
 	var signer core.BlobRequestSigner
-	var paymentSigner core.PaymentSigner
 	if len(config.SignerPrivateKeyHex) == 64 {
 		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKeyHex)
-		paymentSigner, err = auth.NewPaymentSigner(hex.EncodeToString([]byte(config.SignerPrivateKeyHex)))
-		if err != nil {
-			return nil, fmt.Errorf("new payment signer: %w", err)
-		}
 	} else if len(config.SignerPrivateKeyHex) == 0 {
 		// noop signer is used when we need a read-only eigenda client
 		signer = auth.NewLocalNoopSigner()
-		paymentSigner = auth.NewNoopPaymentSigner()
 	} else {
 		return nil, fmt.Errorf("invalid length for signer private key")
 	}
 
 	disperserConfig := NewConfig(host, port, config.ResponseTimeout, !config.DisableTLS)
 
-	disperserClient, err := NewDisperserClient(disperserConfig, signer, paymentSigner)
+	disperserClient, err := NewDisperserClient(disperserConfig, signer)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
-	// TODO: uncomment this when we are using disperser client v2
-	// err = disperserClient.InitializePaymentState(context.Background())
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error setting payment state: %w", err)
-	// }
 
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {

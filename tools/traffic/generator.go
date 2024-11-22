@@ -31,7 +31,7 @@ func NewTrafficGenerator(config *Config, signer core.BlobRequestSigner) (*Traffi
 		return nil, fmt.Errorf("new logger: %w", err)
 	}
 
-	dispserserClient, err := clients.NewDisperserClient(&config.Config, signer, nil)
+	dispserserClient, err := clients.NewDisperserClient(&config.Config, signer)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}

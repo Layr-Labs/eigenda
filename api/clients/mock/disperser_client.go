@@ -80,28 +80,6 @@ func (c *MockDisperserClient) DisperseBlob(ctx context.Context, data []byte, quo
 
 	return status, key, err
 }
-
-func (c *MockDisperserClient) DispersePaidBlob(ctx context.Context, data []byte, quorums []uint8) (*disperser.BlobStatus, []byte, error) {
-	args := c.Called(data, quorums)
-	var status *disperser.BlobStatus
-	if args.Get(0) != nil {
-		status = (args.Get(0)).(*disperser.BlobStatus)
-	}
-	var key []byte
-	if args.Get(1) != nil {
-		key = (args.Get(1)).([]byte)
-	}
-	var err error
-	if args.Get(2) != nil {
-		err = (args.Get(2)).(error)
-	}
-
-	keyStr := base64.StdEncoding.EncodeToString(key)
-	c.mockRequestIDStore[keyStr] = data
-
-	return status, key, err
-}
-
 func (c *MockDisperserClient) GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error) {
 	args := c.Called(key)
 	var reply *disperser_rpc.BlobStatusReply
@@ -136,11 +114,6 @@ func (c *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash 
 		err = (args.Get(1)).(error)
 	}
 	return blob, err
-}
-
-func (c *MockDisperserClient) InitializePaymentState(ctx context.Context) error {
-	args := c.Called()
-	return args.Error(0)
 }
 
 func (c *MockDisperserClient) Close() error {

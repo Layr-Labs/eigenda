@@ -35,14 +35,12 @@ var _ = Describe("Inabox Integration", func() {
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
-		paymentSigner, err := auth.NewPaymentSigner(privateKeyHex)
-		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
-		}, signer, paymentSigner)
+		}, signer)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 
