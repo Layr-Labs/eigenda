@@ -40,7 +40,7 @@ func TestBatchHeaderEncoding(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, hexutil.Encode(hash[:]), reducedBatchHeaderHash)
 
-	onchainBatchHeader := binding.IEigenDAServiceManagerBatchHeader{
+	onchainBatchHeader := binding.BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         []byte{0},
 		SignedStakeForQuorums: []byte{100},

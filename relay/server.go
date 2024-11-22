@@ -13,10 +13,12 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -49,6 +51,9 @@ type Server struct {
 
 	// grpcServer is the gRPC server.
 	grpcServer *grpc.Server
+
+	// authenticator is used to authenticate requests to the relay service.
+	authenticator auth.RequestAuthenticator
 }
 
 type Config struct {
@@ -88,6 +93,17 @@ type Config struct {
 
 	// RateLimits contains configuration for rate limiting.
 	RateLimits limiter.Config
+
+	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
+	AuthenticationKeyCacheSize int
+
+	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
+	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
+	// will be authenticated independently, regardless of timing.
+	AuthenticationTimeout time.Duration
+
+	// AuthenticationDisabled will disable authentication if set to true.
+	AuthenticationDisabled bool
 }
 
 // NewServer creates a new relay Server.
@@ -97,7 +113,8 @@ func NewServer(
 	config *Config,
 	metadataStore *blobstore.BlobMetadataStore,
 	blobStore *blobstore.BlobStore,
-	chunkReader chunkstore.ChunkReader) (*Server, error) {
+	chunkReader chunkstore.ChunkReader,
+	ics core.IndexedChainState) (*Server, error) {
 
 	mp, err := newMetadataProvider(
 		ctx,
@@ -130,6 +147,17 @@ func NewServer(
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
 
+	var authenticator auth.RequestAuthenticator
+	if !config.AuthenticationDisabled {
+		authenticator, err = auth.NewRequestAuthenticator(
+			ics,
+			config.AuthenticationKeyCacheSize,
+			config.AuthenticationTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("error creating authenticator: %w", err)
+		}
+	}
+
 	return &Server{
 		config:           config,
 		logger:           logger,
@@ -138,6 +166,7 @@ func NewServer(
 		chunkProvider:    cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits),
+		authenticator:    authenticator,
 	}, nil
 }
 
@@ -190,7 +219,6 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 
 	// TODO(cody-littley):
-	//  - authentication
 	//  - timeouts
 
 	if len(request.ChunkRequests) <= 0 {
@@ -201,9 +229,22 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
 
-	// Future work: client IDs will be fixed when authentication is implemented
-	clientID := fmt.Sprintf("%d", request.RequesterId)
+	if s.authenticator != nil {
+		client, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("could not get peer information")
+		}
+		clientAddress := client.Addr.String()
+
+		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("auth failed: %w", err)
+		}
+	}
+
+	clientID := string(request.OperatorId)
 	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+
 	if err != nil {
 		return nil, err
 	}
