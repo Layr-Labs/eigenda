@@ -94,6 +94,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	// These are used to write data to S3/dynamoDB
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
+	chainReader := newMockChainReader()
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -104,11 +105,12 @@ func TestReadWriteBlobs(t *testing.T) {
 		metadataStore,
 		blobStore,
 		nil, /* not used in this test*/
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -175,6 +177,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -182,11 +185,12 @@ func TestReadNonExistentBlob(t *testing.T) {
 		metadataStore,
 		blobStore,
 		nil, /* not used in this test */
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -228,6 +232,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -235,11 +240,12 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		metadataStore,
 		blobStore,
 		nil, /* not used in this test*/
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -346,6 +352,7 @@ func TestReadWriteChunks(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -353,11 +360,12 @@ func TestReadWriteChunks(t *testing.T) {
 		metadataStore,
 		nil, /* not used in this test*/
 		chunkReader,
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -542,6 +550,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -549,11 +558,12 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		metadataStore,
 		nil, /* not used in this test */
 		chunkReader,
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -668,6 +678,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -675,11 +686,12 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		metadataStore,
 		nil, /* not used in this test*/
 		chunkReader,
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()
@@ -943,6 +955,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
 	config.RateLimits.GetChunkOpsBurstinessClient = 1000
+	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
 		logger,
@@ -950,11 +963,12 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		metadataStore,
 		nil, /* not used in this test */
 		chunkReader,
+		chainReader,
 		nil /* not used in this test*/)
 	require.NoError(t, err)
 
 	go func() {
-		err = server.Start()
+		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
 	defer server.Stop()

@@ -29,6 +29,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var (
+	blobParams = &core.BlobVersionParameters{
+		NumChunks:       8192,
+		CodingRate:      8,
+		MaxNumOperators: 3537,
+	}
+	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: blobParams,
+	}
+)
+
 type testComponents struct {
 	server      *grpc.ServerV2
 	node        *node.Node
@@ -67,6 +78,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		ValidatorV2: val,
 		RelayClient: relay,
 	}
+	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	server := grpc.NewServerV2(config, node, logger, ratelimiter)
 	return &testComponents{
 		server:      server,

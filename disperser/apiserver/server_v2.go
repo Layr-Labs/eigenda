@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -14,6 +15,7 @@ import (
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -25,7 +27,7 @@ import (
 type OnchainState struct {
 	QuorumCount           uint8
 	RequiredQuorums       []core.QuorumID
-	BlobVersionParameters map[corev2.BlobVersion]corev2.BlobVersionParameters
+	BlobVersionParameters *corev2.BlobVersionParameterMap
 	TTL                   time.Duration
 }
 
@@ -42,7 +44,7 @@ type DispersalServerV2 struct {
 	logger        logging.Logger
 
 	// state
-	onchainState                OnchainState
+	onchainState                atomic.Pointer[OnchainState]
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
 }
@@ -73,7 +75,6 @@ func NewDispersalServerV2(
 		prover:        prover,
 		logger:        logger,
 
-		onchainState:                OnchainState{},
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 	}
@@ -190,12 +191,19 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	if err != nil || storeDurationBlocks == 0 {
 		return fmt.Errorf("failed to get STORE_DURATION_BLOCKS: %w", err)
 	}
-	s.onchainState = OnchainState{
-		QuorumCount:     quorumCount,
-		RequiredQuorums: requiredQuorums,
-		// TODO(ian-shim): this should be fetched from chain
-		BlobVersionParameters: corev2.ParametersMap,
+
+	blobParams, err := s.chainReader.GetAllVersionedBlobParams(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get blob version parameters: %w", err)
+	}
+	onchainState := &OnchainState{
+		QuorumCount:           quorumCount,
+		RequiredQuorums:       requiredQuorums,
+		BlobVersionParameters: v2.NewBlobVersionParameterMap(blobParams),
 		TTL:                   time.Duration((storeDurationBlocks+blockStaleMeasure)*12) * time.Second,
 	}
+
+	s.onchainState.Store(onchainState)
+
 	return nil
 }

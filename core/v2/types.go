@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 
@@ -16,15 +15,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-var (
-	// TODO(mooselumph): Put these parameters on chain and add on-chain checks to ensure that the number of operators does not
-	// conflict with the existing on-chain limits
-	ParametersMap = map[BlobVersion]BlobVersionParameters{
-		0: {CodingRate: 8, ReconstructionThreshold: 0.22, NumChunks: 8192},
-	}
-)
-
-type BlobVersion uint8
+type BlobVersion = uint8
 
 // Assignment contains information about the set of chunks that a specific node will receive
 type Assignment struct {
@@ -158,16 +149,14 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 	}, nil
 }
 
-func (b *BlobHeader) GetEncodingParams() (encoding.EncodingParams, error) {
-	params := ParametersMap[b.BlobVersion]
-
-	length, err := GetChunkLength(b.BlobVersion, uint32(b.BlobCommitments.Length))
+func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := GetChunkLength(uint32(b.BlobCommitments.Length), blobParams)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}
 
 	return encoding.EncodingParams{
-		NumChunks:   uint64(params.NumChunks),
+		NumChunks:   uint64(blobParams.NumChunks),
 		ChunkLength: uint64(length),
 	}, nil
 }
@@ -378,16 +367,6 @@ func (v *BlobVerificationInfo) ToProtobuf(blobCert *BlobCertificate) (*disperser
 		BlobIndex:       v.BlobIndex,
 		InclusionProof:  v.InclusionProof,
 	}, nil
-}
-
-type BlobVersionParameters struct {
-	CodingRate              uint32
-	ReconstructionThreshold float64
-	NumChunks               uint32
-}
-
-func (p BlobVersionParameters) MaxNumOperators() uint32 {
-	return uint32(math.Floor(float64(p.NumChunks) * (1 - 1/(p.ReconstructionThreshold*float64(p.CodingRate)))))
 }
 
 // DispersalRequest is a request to disperse a batch to a specific operator
