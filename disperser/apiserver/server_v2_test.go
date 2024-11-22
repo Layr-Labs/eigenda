@@ -494,7 +494,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	s := apiserver.NewDispersalServerV2(disperser.ServerConfig{
 		GrpcPort:    "51002",
 		GrpcTimeout: 1 * time.Second,
-	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, meterer, auth.NewAuthenticator(), prover, 100, time.Hour, logger)
+	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, meterer, auth.NewAuthenticator(), prover, 10, time.Hour, logger)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
