@@ -22,7 +22,7 @@ func NewPprofProfiler(httpPort string, logger logging.Logger) *PprofProfiler {
 }
 
 // Start the pprof server
-func (p *PprofProfiler) Start(logger logging.Logger) {
+func (p *PprofProfiler) Start() {
 	pprofAddr := fmt.Sprintf("%s:%s", "0.0.0.0", p.httpPort)
 
 	if err := http.ListenAndServe(pprofAddr, nil); err != nil {
