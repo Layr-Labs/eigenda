@@ -15,6 +15,8 @@ import (
 func TestMockSigning(t *testing.T) {
 	tu.InitializeRandom()
 
+	ctx := context.Background()
+
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		core.QuorumID(0): {
@@ -24,7 +26,7 @@ func TestMockSigning(t *testing.T) {
 	ics, err := mock.NewChainDataMock(stakes)
 	require.NoError(t, err)
 
-	operators, err := ics.GetIndexedOperators(context.Background(), 0)
+	operators, err := ics.GetIndexedOperators(ctx, 0)
 	require.NoError(t, err)
 
 	operator, ok := operators[operatorID]
@@ -46,6 +48,8 @@ func TestMockSigning(t *testing.T) {
 func TestValidRequest(t *testing.T) {
 	tu.InitializeRandom()
 
+	ctx := context.Background()
+
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		core.QuorumID(0): {
@@ -58,7 +62,7 @@ func TestValidRequest(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024, timeout)
 	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
@@ -69,7 +73,7 @@ func TestValidRequest(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		request,
 		now)
@@ -84,14 +88,14 @@ func TestValidRequest(t *testing.T) {
 	start := now
 	for now.Before(start.Add(timeout)) {
 		err = authenticator.AuthenticateGetChunksRequest(
-			context.Background(),
+			ctx,
 			"foobar",
 			invalidRequest,
 			now)
 		require.NoError(t, err)
 
 		err = authenticator.AuthenticateGetChunksRequest(
-			context.Background(),
+			ctx,
 			"baz",
 			invalidRequest,
 			now)
@@ -102,7 +106,7 @@ func TestValidRequest(t *testing.T) {
 
 	// After the timeout elapses, new requests should trigger authentication.
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		invalidRequest,
 		now)
@@ -111,6 +115,8 @@ func TestValidRequest(t *testing.T) {
 
 func TestAuthenticationSavingDisabled(t *testing.T) {
 	tu.InitializeRandom()
+
+	ctx := context.Background()
 
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
@@ -125,7 +131,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	// This disables saving of authentication results.
 	timeout := time.Duration(0)
 
-	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024, timeout)
 	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
@@ -136,7 +142,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		request,
 		now)
@@ -149,7 +155,7 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 	invalidRequest.OperatorSignature = signature // the previous signature is invalid here
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		invalidRequest,
 		now)
@@ -159,6 +165,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 func TestNonExistingClient(t *testing.T) {
 	tu.InitializeRandom()
 
+	ctx := context.Background()
+
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		core.QuorumID(0): {
@@ -171,7 +179,7 @@ func TestNonExistingClient(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024, timeout)
 	require.NoError(t, err)
 
 	invalidOperatorID := tu.RandomBytes(32)
@@ -180,7 +188,7 @@ func TestNonExistingClient(t *testing.T) {
 	request.OperatorId = invalidOperatorID
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		request,
 		time.Now())
@@ -190,6 +198,8 @@ func TestNonExistingClient(t *testing.T) {
 func TestBadSignature(t *testing.T) {
 	tu.InitializeRandom()
 
+	ctx := context.Background()
+
 	operatorID := mock.MakeOperatorId(0)
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		core.QuorumID(0): {
@@ -202,7 +212,7 @@ func TestBadSignature(t *testing.T) {
 
 	timeout := 10 * time.Second
 
-	authenticator, err := NewRequestAuthenticator(ics, 1024, timeout)
+	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024, timeout)
 	require.NoError(t, err)
 
 	request := randomGetChunksRequest()
@@ -212,7 +222,7 @@ func TestBadSignature(t *testing.T) {
 	now := time.Now()
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		request,
 		now)
@@ -225,7 +235,7 @@ func TestBadSignature(t *testing.T) {
 	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
 
 	err = authenticator.AuthenticateGetChunksRequest(
-		context.Background(),
+		ctx,
 		"foobar",
 		request,
 		now)

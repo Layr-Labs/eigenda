@@ -157,6 +157,7 @@ func NewServer(
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
 		authenticator, err = auth.NewRequestAuthenticator(
+			ctx,
 			ics,
 			config.AuthenticationKeyCacheSize,
 			config.AuthenticationTimeout)
