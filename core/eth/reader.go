@@ -724,23 +724,53 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID stri
 }
 
 func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
-	// contract is not implemented yet
-	return 0, nil
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return globalSymbolsPerSecond.Uint64(), nil
+}
+
+func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
+	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return globalRateBinInterval.Uint64(), nil
 }
 
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	minNumSymbols, err := t.bindings.PaymentVault.MinNumSymbols(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(minNumSymbols.Uint64()), nil
 }
 
 func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	pricePerSymbol, err := t.bindings.PaymentVault.PricePerSymbol(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(pricePerSymbol.Uint64()), nil
 }
 
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	reservationWindow, err := t.bindings.PaymentVault.ReservationBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(reservationWindow.Uint64()), nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
