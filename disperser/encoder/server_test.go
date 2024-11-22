@@ -12,6 +12,7 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -109,8 +110,8 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 }
 
 func newEncoderTestServer(t *testing.T) *EncoderServer {
-	metrics := NewMetrics("9000", logger)
-	return NewEncoderServer(testServerConfig, logger, testProver, metrics)
+	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	return NewEncoderServer(testServerConfig, logger, testProver, metrics, nil)
 }
 
 func TestEncodeBlob(t *testing.T) {
@@ -179,7 +180,7 @@ func TestThrottling(t *testing.T) {
 
 	lengthCommitment = lengthProof
 
-	metrics := NewMetrics("9000", logger)
+	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	concurrentRequests := 2
 	requestPoolSize := 4
 	encoder := &encmock.MockEncoder{
@@ -202,7 +203,7 @@ func TestThrottling(t *testing.T) {
 		MaxConcurrentRequests: concurrentRequests,
 		RequestPoolSize:       requestPoolSize,
 	}
-	s := NewEncoderServer(encoderServerConfig, logger, encoder, metrics)
+	s := NewEncoderServer(encoderServerConfig, logger, encoder, metrics, nil)
 	testBlobData, testEncodingParams := getTestData()
 
 	testEncodingParamsProto := &pb.EncodingParams{
@@ -254,8 +255,8 @@ func TestThrottling(t *testing.T) {
 func TestEncoderPointsLoading(t *testing.T) {
 	// encoder 1 only loads 1500 points
 	prover1, config1 := makeTestProver(1500)
-	metrics := NewMetrics("9000", logger)
-	server1 := NewEncoderServer(config1, logger, prover1, metrics)
+	metrics := NewMetrics(prometheus.NewRegistry(), "9000", logger)
+	server1 := NewEncoderServer(config1, logger, prover1, metrics, nil)
 
 	testBlobData, testEncodingParams := getTestData()
 
@@ -299,7 +300,7 @@ func TestEncoderPointsLoading(t *testing.T) {
 
 	// encoder 2 only loads 2900 points
 	encoder2, config2 := makeTestProver(2900)
-	server2 := NewEncoderServer(config2, logger, encoder2, metrics)
+	server2 := NewEncoderServer(config2, logger, encoder2, metrics, nil)
 
 	reply2, err := server2.EncodeBlob(context.Background(), encodeBlobRequestProto)
 	assert.NoError(t, err)

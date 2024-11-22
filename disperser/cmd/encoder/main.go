@@ -10,8 +10,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/urfave/cli"
 )
@@ -56,11 +58,15 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return err
 	}
 
-	metrics := encoder.NewMetrics(config.MetricsConfig.HTTPPort, logger)
+	reg := prometheus.NewRegistry()
+	metrics := encoder.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
+	grpcMetrics := grpcprom.NewServerMetrics()
 	if config.MetricsConfig.EnableMetrics {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Encoder", "socket", httpSocket)
+
+		reg.MustRegister(grpcMetrics)
 	}
 
 	if config.EncoderVersion == V2 {
@@ -100,7 +106,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
 
-	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics)
+	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
 	return server.Start()
 
