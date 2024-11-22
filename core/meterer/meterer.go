@@ -281,5 +281,5 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
-	return reservation.SymbolsPerSec * uint64(m.ChainPaymentState.GetReservationWindow())
+	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }

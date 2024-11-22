@@ -9,6 +9,7 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -600,15 +601,7 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
-type ActiveReservation struct {
-	SymbolsPerSec uint64 // reserve number of symbols per second
-	//TODO: we are not using start and end timestamp, add check or remove
-	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
-	EndTimestamp   uint64
-
-	QuorumNumbers []uint8 // allowed quorums
-	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-}
+type ActiveReservation = paymentvault.IPaymentVaultReservation
 
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user

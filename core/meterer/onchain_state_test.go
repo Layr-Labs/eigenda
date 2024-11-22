@@ -14,10 +14,10 @@ import (
 
 var (
 	dummyActiveReservation = core.ActiveReservation{
-		SymbolsPerSec:  100,
-		StartTimestamp: 1000,
-		EndTimestamp:   2000,
-		QuorumSplit:    []byte{50, 50},
+		SymbolsPerSecond: 100,
+		StartTimestamp:   1000,
+		EndTimestamp:     2000,
+		QuorumSplits:     []byte{50, 50},
 	}
 	dummyOnDemandPayment = core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),

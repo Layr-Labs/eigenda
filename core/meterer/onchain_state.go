@@ -107,6 +107,33 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	}
 	// These parameters should be rarely updated, but we refresh them anyway
 	pcs.PaymentVaultParams = paymentVaultParams
+
+	pcs.ReservationsLock.Lock()
+	accountIDs := make([]string, 0, len(pcs.ActiveReservations))
+	for accountID := range pcs.ActiveReservations {
+		accountIDs = append(accountIDs, accountID)
+	}
+
+	activeReservations, err := tx.GetActiveReservations(ctx, accountIDs)
+	if err != nil {
+		return err
+	}
+	pcs.ActiveReservations = activeReservations
+	pcs.ReservationsLock.Unlock()
+
+	pcs.OnDemandLocks.Lock()
+	accountIDs = make([]string, 0, len(pcs.OnDemandPayments))
+	for accountID := range pcs.OnDemandPayments {
+		accountIDs = append(accountIDs, accountID)
+	}
+
+	onDemandPayments, err := tx.GetOnDemandPayments(ctx, accountIDs)
+	if err != nil {
+		return err
+	}
+	pcs.OnDemandPayments = onDemandPayments
+	pcs.OnDemandLocks.Unlock()
+
 	return nil
 }
 
@@ -115,7 +142,8 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Contex
 	if reservation, ok := pcs.ActiveReservations[accountID]; ok {
 		return reservation, nil
 	}
-	res, err := pcs.GetActiveReservationByAccountOnChain(ctx, accountID)
+	// pulls the chain state
+	res, err := pcs.tx.GetActiveReservationByAccount(ctx, accountID)
 	if err != nil {
 		return core.ActiveReservation{}, err
 	}
@@ -128,11 +156,7 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Contex
 
 // GetActiveReservationByAccountOnChain returns on-chain reservation for the given account ID
 func (pcs *OnchainPaymentState) GetActiveReservationByAccountOnChain(ctx context.Context, accountID string) (core.ActiveReservation, error) {
-	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return core.ActiveReservation{}, err
-	}
-	res, err := pcs.tx.GetActiveReservationByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.tx.GetActiveReservationByAccount(ctx, accountID)
 	if err != nil {
 		return core.ActiveReservation{}, fmt.Errorf("reservation account not found on-chain: %w", err)
 	}
@@ -144,7 +168,8 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	if payment, ok := pcs.OnDemandPayments[accountID]; ok {
 		return payment, nil
 	}
-	res, err := pcs.GetOnDemandPaymentByAccountOnChain(ctx, accountID)
+	// pulls the chain state
+	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return core.OnDemandPayment{}, err
 	}
@@ -156,11 +181,7 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccountOnChain(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
-	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return core.OnDemandPayment{}, err
-	}
-	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, blockNumber, accountID)
+	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return core.OnDemandPayment{}, fmt.Errorf("on-demand not found on-chain: %w", err)
 	}
