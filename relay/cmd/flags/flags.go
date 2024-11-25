@@ -1,11 +1,12 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/urfave/cli"
-	"time"
 )
 
 const (
@@ -272,6 +273,13 @@ var (
 		Required: false,
 		Value:    20 * time.Second,
 	}
+	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -318,6 +326,7 @@ var optionalFlags = []cli.Flag{
 	InternalGetBlobTimeoutFlag,
 	InternalGetProofsTimeoutFlag,
 	InternalGetCoefficientsTimeoutFlag,
+	OnchainStateRefreshIntervalFlag,
 }
 
 var Flags []cli.Flag

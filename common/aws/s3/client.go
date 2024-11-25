@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 
@@ -105,15 +106,32 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 	return ref, err
 }
 
+func PeekObjectSize(ctx context.Context, s3Client *s3.Client, bucket, key string) (int64, error) {
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+	result, err := s3Client.HeadObject(ctx, input)
+	if err != nil {
+		return 0, fmt.Errorf("failed to head object: %w", err)
+	}
+	return *result.ContentLength, nil
+}
+
 func (s *client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+	size, err := PeekObjectSize(ctx, s.s3Client, bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, size))
+
 	var partMiBs int64 = 10
 	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {
 		d.PartSize = partMiBs * 1024 * 1024 // 10MB per part
 		d.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to Upload when sending parts
 	})
 
-	buffer := manager.NewWriteAtBuffer([]byte{})
-	_, err := downloader.Download(ctx, buffer, &s3.GetObjectInput{
+	_, err = downloader.Download(ctx, buffer, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})

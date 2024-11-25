@@ -197,6 +197,21 @@ func (t *MockWriter) GetRequiredQuorumNumbers(ctx context.Context, blockNumber u
 	return result.([]uint8), args.Error(1)
 }
 
+func (t *MockWriter) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+	args := t.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	result := args.Get(0)
+	return result.(*core.BlobVersionParameters), args.Error(1)
+}
+
+func (t *MockWriter) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(map[uint8]*core.BlobVersionParameters), args.Error(1)
+}
+
 func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)

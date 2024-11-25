@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core"
@@ -120,6 +121,38 @@ func TestDownloadBundlesFail(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, blobShards)
 	require.Nil(t, rawBundles)
+}
+
+func TestRefreshOnchainState(t *testing.T) {
+	c := newComponents(t)
+	c.node.Config.EnableV2 = true
+	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
+	ctx := context.Background()
+	bp, ok := c.node.BlobVersionParams.Load().Get(0)
+	require.True(t, ok)
+	require.Equal(t, bp, blobParams)
+	_, ok = c.node.BlobVersionParams.Load().Get(1)
+	require.False(t, ok)
+
+	newCtx, cancel := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel()
+	blobParams2 := &core.BlobVersionParameters{
+		NumChunks:       111,
+		CodingRate:      1,
+		MaxNumOperators: 222,
+	}
+	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: blobParams,
+		1: blobParams2,
+	}, nil)
+	err := c.node.RefreshOnchainState(newCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	bp, ok = c.node.BlobVersionParams.Load().Get(0)
+	require.True(t, ok)
+	require.Equal(t, bp, blobParams)
+	bp, ok = c.node.BlobVersionParams.Load().Get(1)
+	require.True(t, ok)
+	require.Equal(t, bp, blobParams2)
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {

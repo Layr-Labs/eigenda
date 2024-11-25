@@ -44,6 +44,9 @@ type metadataProvider struct {
 
 	// fetchTimeout is the maximum time to wait for a metadata fetch operation to complete.
 	fetchTimeout time.Duration
+
+	// blobParamsMap is a map of blob version to blob version parameters.
+	blobParamsMap atomic.Pointer[v2.BlobVersionParameterMap]
 }
 
 // newMetadataProvider creates a new metadataProvider.
@@ -54,7 +57,8 @@ func newMetadataProvider(
 	metadataCacheSize int,
 	maxIOConcurrency int,
 	relayIDs []v2.RelayKey,
-	fetchTimeout time.Duration) (*metadataProvider, error) {
+	fetchTimeout time.Duration,
+	blobParamsMap *v2.BlobVersionParameterMap) (*metadataProvider, error) {
 
 	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
 	for _, id := range relayIDs {
@@ -68,6 +72,7 @@ func newMetadataProvider(
 		relayIDSet:    relayIDSet,
 		fetchTimeout:  fetchTimeout,
 	}
+	server.blobParamsMap.Store(blobParamsMap)
 
 	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](
 		metadataCacheSize,
@@ -148,11 +153,19 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 	return mMap, nil
 }
 
+func (m *metadataProvider) UpdateBlobVersionParameters(blobParamsMap *v2.BlobVersionParameterMap) {
+	m.blobParamsMap.Store(blobParamsMap)
+}
+
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
-
 	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
 	defer cancel()
+
+	blobParamsMap := m.blobParamsMap.Load()
+	if blobParamsMap == nil {
+		return nil, fmt.Errorf("blob version parameters is nil")
+	}
 
 	// Retrieve the metadata from the store.
 	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(ctx, key)
@@ -176,7 +189,11 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
-	chunkSize, err := v2.GetChunkLength(cert.BlobHeader.BlobVersion, blobSize)
+	blobParams, ok := blobParamsMap.Get(cert.BlobHeader.BlobVersion)
+	if !ok {
+		return nil, fmt.Errorf("blob version %d not found in blob params map", cert.BlobHeader.BlobVersion)
+	}
+	chunkSize, err := v2.GetChunkLength(blobSize, blobParams)
 	chunkSize *= encoding.BYTES_PER_SYMBOL
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk length: %w", err)

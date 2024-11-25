@@ -2,6 +2,7 @@ package blobstore_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -20,35 +21,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
 	ctx := context.Background()
-	blobHeader1 := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
-			BinIndex:          0,
-			CumulativePayment: big.NewInt(532),
-		},
-	}
-	blobKey1, err := blobHeader1.BlobKey()
-	assert.NoError(t, err)
-	blobHeader2 := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{1},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x456",
-			BinIndex:          2,
-			CumulativePayment: big.NewInt(999),
-		},
-	}
-	blobKey2, err := blobHeader2.BlobKey()
-	assert.NoError(t, err)
-
+	blobKey1, blobHeader1 := newBlob(t)
+	blobKey2, blobHeader2 := newBlob(t)
 	now := time.Now()
 	metadata1 := &v2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -64,7 +43,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	assert.NoError(t, err)
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata2)
 	assert.NoError(t, err)
@@ -110,21 +89,90 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
+	ctx := context.Background()
+	numBlobs := 103
+	pageSize := 10
+	keys := make([]corev2.BlobKey, numBlobs)
+	headers := make([]*corev2.BlobHeader, numBlobs)
+	metadataList := make([]*v2.BlobMetadata, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	expectedCursors := make([]*blobstore.StatusIndexCursor, 0)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader: blobHeader,
+			BlobStatus: v2.Encoded,
+			Expiry:     uint64(now.Add(time.Hour).Unix()),
+			NumRetries: 0,
+			UpdatedAt:  uint64(now.UnixNano()),
+		}
+
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		headers[i] = blobHeader
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+		metadataList[i] = metadata
+		if (i+1)%pageSize == 0 {
+			expectedCursors = append(expectedCursors, &blobstore.StatusIndexCursor{
+				BlobKey:   &blobKey,
+				UpdatedAt: metadata.UpdatedAt,
+			})
+		}
+	}
+
+	// Querying blobs in Queued status should return 0 results
+	cursor := &blobstore.StatusIndexCursor{
+		BlobKey:   nil,
+		UpdatedAt: 0,
+	}
+	metadata, newCursor, err := blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, cursor, 10)
+	require.NoError(t, err)
+	require.Len(t, metadata, 0)
+	require.Equal(t, cursor, newCursor)
+
+	// Querying blobs in Encoded status should return results
+	cursor = &blobstore.StatusIndexCursor{
+		BlobKey:   nil,
+		UpdatedAt: 0,
+	}
+	i := 0
+	numIterations := (numBlobs + pageSize - 1) / pageSize
+	for i < numIterations {
+		metadata, cursor, err = blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, cursor, int32(pageSize))
+		require.NoError(t, err)
+		if i < len(expectedCursors) {
+			require.Len(t, metadata, pageSize)
+			require.NotNil(t, cursor)
+			require.Equal(t, cursor.BlobKey, expectedCursors[i].BlobKey)
+			require.Equal(t, cursor.UpdatedAt, expectedCursors[i].UpdatedAt)
+		} else {
+			require.Len(t, metadata, numBlobs%pageSize)
+			require.Equal(t, cursor.BlobKey, &keys[numBlobs-1])
+			require.Equal(t, cursor.UpdatedAt, metadataList[numBlobs-1].UpdatedAt)
+		}
+		i++
+	}
+	lastCursor := cursor
+	metadata, cursor, err = blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, cursor, int32(pageSize))
+	require.NoError(t, err)
+	require.Len(t, metadata, 0)
+	require.Equal(t, cursor, lastCursor)
+
+	deleteItems(t, dynamoKeys)
+}
+
 func TestBlobMetadataStoreCerts(t *testing.T) {
 	ctx := context.Background()
+	blobKey, blobHeader := newBlob(t)
 	blobCert := &corev2.BlobCertificate{
-		BlobHeader: &corev2.BlobHeader{
-			BlobVersion:     0,
-			QuorumNumbers:   []core.QuorumID{0},
-			BlobCommitments: mockCommitment,
-			PaymentMetadata: core.PaymentMetadata{
-				AccountID:         "0x123",
-				BinIndex:          0,
-				CumulativePayment: big.NewInt(532),
-			},
-			Signature: []byte("signature"),
-		},
-		RelayKeys: []corev2.RelayKey{0, 2, 4},
+		BlobHeader: blobHeader,
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
@@ -133,8 +181,6 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	err := blobMetadataStore.PutBlobCertificate(ctx, blobCert, fragmentInfo)
 	assert.NoError(t, err)
 
-	blobKey, err := blobCert.BlobHeader.BlobKey()
-	assert.NoError(t, err)
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	assert.NoError(t, err)
 	assert.Equal(t, blobCert, fetchedCert)
@@ -142,18 +188,8 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 
 	// blob cert with the same key should fail
 	blobCert1 := &corev2.BlobCertificate{
-		BlobHeader: &corev2.BlobHeader{
-			BlobVersion:     0,
-			QuorumNumbers:   []core.QuorumID{0},
-			BlobCommitments: mockCommitment,
-			PaymentMetadata: core.PaymentMetadata{
-				AccountID:         "0x123",
-				BinIndex:          0,
-				CumulativePayment: big.NewInt(532),
-			},
-			Signature: []byte("signature"),
-		},
-		RelayKeys: []corev2.RelayKey{0},
+		BlobHeader: blobHeader,
+		RelayKeys:  []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
@@ -207,18 +243,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 
 func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	ctx := context.Background()
-	blobHeader := &corev2.BlobHeader{
-		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0},
-		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
-			BinIndex:          0,
-			CumulativePayment: big.NewInt(532),
-		},
-	}
-	blobKey, err := blobHeader.BlobKey()
-	assert.NoError(t, err)
+	blobKey, blobHeader := newBlob(t)
 
 	now := time.Now()
 	metadata := &v2.BlobMetadata{
@@ -228,7 +253,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
 	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
 	assert.NoError(t, err)
 
 	// Update the blob status to invalid status
@@ -470,4 +495,32 @@ func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)
+}
+
+func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
+	accountBytes := make([]byte, 32)
+	_, err := rand.Read(accountBytes)
+	require.NoError(t, err)
+	accountID := hex.EncodeToString(accountBytes)
+	binIndex, err := rand.Int(rand.Reader, big.NewInt(256))
+	require.NoError(t, err)
+	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
+	require.NoError(t, err)
+	sig := make([]byte, 32)
+	_, err = rand.Read(sig)
+	require.NoError(t, err)
+	bh := &corev2.BlobHeader{
+		BlobVersion:     0,
+		QuorumNumbers:   []core.QuorumID{0},
+		BlobCommitments: mockCommitment,
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         accountID,
+			BinIndex:          uint32(binIndex.Int64()),
+			CumulativePayment: cumulativePayment,
+		},
+		Signature: sig,
+	}
+	bk, err := bh.BlobKey()
+	require.NoError(t, err)
+	return bk, bh
 }

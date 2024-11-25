@@ -819,6 +819,12 @@ func (s *DispersalServer) GetRateConfig() *RateConfig {
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
+	pprofProfiler := NewPprofProfiler(s.serverConfig.PprofHttpPort, s.logger)
+	if s.serverConfig.EnablePprof {
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for disperser apiserver", "port", s.serverConfig.PprofHttpPort)
+	}
+
 	go func() {
 		t := time.NewTicker(s.rateConfig.AllowlistRefreshInterval)
 		defer t.Stop()

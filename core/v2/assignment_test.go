@@ -11,18 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	maxNumOperators = 3537
-)
-
 func TestOperatorAssignmentsV2(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 	operatorState := state.OperatorState
 
-	blobVersion := corev2.BlobVersion(0)
-
-	assignments, err := corev2.GetAssignments(operatorState, blobVersion, 0)
+	assignments, err := corev2.GetAssignments(operatorState, blobParams, 0)
 	assert.NoError(t, err)
 	expectedAssignments := map[core.OperatorID]corev2.Assignment{
 		mock.MakeOperatorId(0): {
@@ -55,7 +49,7 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
-		assignment, err := corev2.GetAssignment(operatorState, blobVersion, 0, operatorID)
+		assignment, err := corev2.GetAssignment(operatorState, blobParams, 0, operatorID)
 		assert.NoError(t, err)
 
 		assert.Equal(t, assignment, expectedAssignments[operatorID])
@@ -64,20 +58,14 @@ func TestOperatorAssignmentsV2(t *testing.T) {
 
 }
 
-func TestMaxNumOperators(t *testing.T) {
-
-	assert.Equal(t, corev2.ParametersMap[0].MaxNumOperators(), uint32(maxNumOperators))
-
-}
-
 func TestAssignmentWithTooManyOperators(t *testing.T) {
 
-	numOperators := maxNumOperators + 1
+	numOperators := blobParams.MaxNumOperators + 1
 
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		0: {},
 	}
-	for i := 0; i < numOperators; i++ {
+	for i := 0; i < int(numOperators); i++ {
 		stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
 	}
 
@@ -88,11 +76,9 @@ func TestAssignmentWithTooManyOperators(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assert.Equal(t, len(state.Operators[0]), numOperators)
+	assert.Equal(t, len(state.Operators[0]), int(numOperators))
 
-	blobVersion := corev2.BlobVersion(0)
-
-	_, err = corev2.GetAssignments(state.OperatorState, blobVersion, 0)
+	_, err = corev2.GetAssignments(state.OperatorState, blobParams, 0)
 	assert.Error(t, err)
 
 }
@@ -110,7 +96,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 	}
 
 	for i := 0; i < 5; i++ {
-		f.Add(maxNumOperators)
+		f.Add(int(blobParams.MaxNumOperators))
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int) {
@@ -131,9 +117,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		state := dat.GetTotalOperatorState(context.Background(), 0)
 
-		blobVersion := corev2.BlobVersion(0)
-
-		assignments, err := corev2.GetAssignments(state.OperatorState, blobVersion, 0)
+		assignments, err := corev2.GetAssignments(state.OperatorState, blobParams, 0)
 		assert.NoError(t, err)
 
 		// Check that the total number of chunks is correct
@@ -141,7 +125,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		for _, assignment := range assignments {
 			totalChunks += assignment.NumChunks
 		}
-		assert.Equal(t, totalChunks, corev2.ParametersMap[blobVersion].NumChunks)
+		assert.Equal(t, totalChunks, blobParams.NumChunks)
 
 		// Check that each operator's assignment satisfies the security requirement
 		for operatorID, assignment := range assignments {
@@ -149,21 +133,16 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 			totalStake := uint32(state.Totals[0].Stake.Uint64())
 			myStake := uint32(state.Operators[0][operatorID].Stake.Uint64())
 
-			LHS := assignment.NumChunks * totalStake * corev2.ParametersMap[blobVersion].CodingRate * uint32(corev2.ParametersMap[blobVersion].ReconstructionThreshold*100)
-			RHS := 100 * myStake * corev2.ParametersMap[blobVersion].NumChunks
+			reconstructionThreshold := 0.22
+			LHS := assignment.NumChunks * totalStake * blobParams.CodingRate * uint32(reconstructionThreshold*100)
+			RHS := 100 * myStake * blobParams.NumChunks
 
 			assert.GreaterOrEqual(t, LHS, RHS)
-
 		}
-
 	})
-
 }
 
 func TestChunkLength(t *testing.T) {
-
-	blobVersion := corev2.BlobVersion(0)
-
 	pairs := []struct {
 		blobLength  uint32
 		chunkLength uint32
@@ -176,20 +155,13 @@ func TestChunkLength(t *testing.T) {
 	}
 
 	for _, pair := range pairs {
-
-		chunkLength, err := corev2.GetChunkLength(blobVersion, pair.blobLength)
-
+		chunkLength, err := corev2.GetChunkLength(pair.blobLength, blobParams)
 		assert.NoError(t, err)
-
 		assert.Equal(t, pair.chunkLength, chunkLength)
 	}
-
 }
 
 func TestInvalidChunkLength(t *testing.T) {
-
-	blobVersion := corev2.BlobVersion(0)
-
 	invalidLengths := []uint32{
 		0,
 		3,
@@ -212,9 +184,7 @@ func TestInvalidChunkLength(t *testing.T) {
 	}
 
 	for _, length := range invalidLengths {
-
-		_, err := corev2.GetChunkLength(blobVersion, length)
+		_, err := corev2.GetChunkLength(length, blobParams)
 		assert.Error(t, err)
 	}
-
 }

@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
@@ -36,6 +37,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
@@ -79,6 +81,10 @@ type Node struct {
 
 	mu            sync.Mutex
 	CurrentSocket string
+
+	// BlobVersionParams is a map of blob version parameters loaded from the chain.
+	// It is used to determine blob parameters based on the version number.
+	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
 }
 
 // NewNode creates a new Node with the provided config.
@@ -177,7 +183,7 @@ func NewNode(
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
-	validatorV2 := corev2.NewShardValidator(v, config.ID)
+	validatorV2 := corev2.NewShardValidator(v, config.ID, logger)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
@@ -217,7 +223,31 @@ func NewNode(
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
 	var relayClient clients.RelayClient
+
+	n := &Node{
+		Config:                  config,
+		Logger:                  nodeLogger,
+		KeyPair:                 keyPair,
+		Metrics:                 metrics,
+		NodeApi:                 nodeApi,
+		Store:                   store,
+		ChainState:              cst,
+		Transactor:              tx,
+		Validator:               validator,
+		ValidatorV2:             validatorV2,
+		PubIPProvider:           pubIPProvider,
+		OperatorSocketsFilterer: socketsFilterer,
+		ChainID:                 chainID,
+		RelayClient:             relayClient,
+		BLSSigner:               blsClient,
+	}
+
+	if !config.EnableV2 {
+		return n, nil
+	}
+
 	var storeV2 StoreV2
+	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
 		v2Path := config.DbPath + "/chunk_v2"
 		dbV2, err := tablestore.Start(logger, &tablestore.Config{
@@ -233,27 +263,18 @@ func NewNode(
 		}
 		storeV2 = NewLevelDBStoreV2(dbV2, logger)
 
+		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
+		}
+		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
+
 		// TODO(ian-shim): Create a new relay client with relay addresses onchain
 	}
 
-	return &Node{
-		Config:                  config,
-		Logger:                  nodeLogger,
-		KeyPair:                 keyPair,
-		Metrics:                 metrics,
-		NodeApi:                 nodeApi,
-		Store:                   store,
-		StoreV2:                 storeV2,
-		ChainState:              cst,
-		Transactor:              tx,
-		Validator:               validator,
-		ValidatorV2:             validatorV2,
-		PubIPProvider:           pubIPProvider,
-		OperatorSocketsFilterer: socketsFilterer,
-		ChainID:                 chainID,
-		RelayClient:             relayClient,
-		BLSSigner:               blsClient,
-	}, nil
+	n.StoreV2 = storeV2
+	n.BlobVersionParams.Store(blobVersionParams)
+	return n, nil
 }
 
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just
@@ -270,6 +291,12 @@ func (n *Node) Start(ctx context.Context) error {
 
 	go n.expireLoop()
 	go n.checkNodeReachability()
+
+	if n.Config.EnableV2 {
+		go func() {
+			_ = n.RefreshOnchainState(ctx)
+		}()
+	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
 	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
@@ -350,6 +377,30 @@ func (n *Node) expireLoop() {
 			} else {
 				n.Logger.Error("Expiration cycle encountered error when removing expired batches, which will be retried in next cycle", "err", err)
 			}
+		}
+	}
+}
+
+func (n *Node) RefreshOnchainState(ctx context.Context) error {
+	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
+		return nil
+	}
+	ticker := time.NewTicker(n.Config.OnchainStateRefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			n.Logger.Info("Refreshing onchain state")
+			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
+			if err != nil {
+				n.Logger.Error("error fetching blob params", "err", err)
+				continue
+			}
+
+			n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParams))
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 }
