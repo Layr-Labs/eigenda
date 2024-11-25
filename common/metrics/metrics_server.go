@@ -423,7 +423,7 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		sb.Write([]byte(fmt.Sprintf("| **Name** | `%s` |\n", metric.Name())))
 		sb.Write([]byte(fmt.Sprintf("| **Unit** | `%s` |\n", metric.Unit())))
 		if id.label == "" {
-			sb.Write([]byte(fmt.Sprintf("| **Label** | - |\n")))
+			sb.Write([]byte("| **Label** | - |\n"))
 		} else {
 			sb.Write([]byte(fmt.Sprintf("| **Label** | `%s` |\n", metric.Label())))
 		}
