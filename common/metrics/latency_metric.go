@@ -56,7 +56,7 @@ func (m *latencyMetric) Type() string {
 	return "latency"
 }
 
-func (m *latencyMetric) ReportLatency(latency time.Duration, label ...*struct{}) error {
+func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error {
 	if m.vec == nil {
 		// metric is not enabled
 		return nil
@@ -66,7 +66,7 @@ func (m *latencyMetric) ReportLatency(latency time.Duration, label ...*struct{})
 		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
 	}
 
-	var l *struct{}
+	var l any
 	if len(label) == 1 {
 		l = label[0]
 	}

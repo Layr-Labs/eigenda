@@ -23,7 +23,7 @@ type Metrics interface {
 	NewLatencyMetric(
 		name string,
 		description string,
-		templateLabel *struct{}, // TODO
+		templateLabel any, // TODO
 		quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
@@ -109,5 +109,5 @@ type LatencyMetric interface {
 	Metric
 
 	// ReportLatency reports a latency value.
-	ReportLatency(latency time.Duration, label ...*struct{}) error
+	ReportLatency(latency time.Duration, label ...any) error
 }

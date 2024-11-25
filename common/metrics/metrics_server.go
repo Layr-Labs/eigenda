@@ -179,7 +179,7 @@ func (m *metrics) Stop() error {
 func (m *metrics) NewLatencyMetric(
 	name string,
 	description string,
-	templateLabel *struct{},
+	templateLabel any,
 	quantiles ...*Quantile) (LatencyMetric, error) {
 
 	m.lock.Lock()
@@ -211,7 +211,10 @@ func (m *metrics) NewLatencyMetric(
 	}
 	m.quantilesMap[id] = quantilesString
 
-	labeler := newLabelMaker(templateLabel)
+	labeler, err := newLabelMaker(templateLabel)
+	if err != nil {
+		return nil, err
+	}
 
 	vec, ok := m.summaryVecMap[name]
 	if !ok {

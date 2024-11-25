@@ -13,14 +13,14 @@ import (
 
 type LabelType1 struct {
 	Foo string
-	Bar int
-	Baz bool
+	Bar string
+	Baz string
 }
 
 type LabelType2 struct {
 	X string
-	Y int
-	Z bool
+	Y string
+	Z string
 }
 
 func main() {
@@ -41,7 +41,7 @@ func main() {
 	l1, err := metricsServer.NewLatencyMetric(
 		"l1",
 		"this metric shows the latency of the sleep cycle",
-		nil,
+		LabelType1{},
 		metrics.NewQuantile(0.5),
 		metrics.NewQuantile(0.9),
 		metrics.NewQuantile(0.99))
@@ -96,7 +96,17 @@ func main() {
 		elapsed := now.Sub(prev)
 		prev = now
 
-		l1.ReportLatency(elapsed)
+		err = l1.ReportLatency(elapsed)
+		if err != nil {
+			panic(err)
+		}
+
+		err = l1.ReportLatency(elapsed/2,
+			LabelType1{
+				Foo: "half of the normal value",
+				Bar: "42",
+				Baz: "true",
+			})
 		//l1HALF.ReportLatency(elapsed / 2)
 
 		c1.Increment()

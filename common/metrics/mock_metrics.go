@@ -35,7 +35,7 @@ func (m *mockMetrics) Stop() error {
 func (m *mockMetrics) NewLatencyMetric(
 	name string,
 	description string,
-	templateLabel *struct{},
+	templateLabel any,
 	quantiles ...*Quantile) (LatencyMetric, error) {
 	return newLatencyMetric(name, description, nil, nil), nil
 }
