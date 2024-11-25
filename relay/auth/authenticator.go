@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/common/queue"
 	"github.com/Layr-Labs/eigenda/core"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"sync"
@@ -38,7 +39,7 @@ type requestAuthenticator struct {
 	authenticatedClients map[string]struct{}
 
 	// authenticationTimeouts is a list of authentications that have been performed, along with their expiration times.
-	authenticationTimeouts []*authenticationTimeout // TODO use a queue here why not
+	authenticationTimeouts queue.Queue[*authenticationTimeout]
 
 	// authenticationTimeoutDuration is the duration for which an auth is valid.
 	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
@@ -67,7 +68,7 @@ func NewRequestAuthenticator(
 	authenticator := &requestAuthenticator{
 		ics:                           ics,
 		authenticatedClients:          make(map[string]struct{}),
-		authenticationTimeouts:        make([]*authenticationTimeout, 0),
+		authenticationTimeouts:        &queue.LinkedQueue[*authenticationTimeout]{},
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
 		keyCache:                      keyCache,
 	}
@@ -170,7 +171,7 @@ func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, origin st
 	defer a.savedAuthLock.Unlock()
 
 	a.authenticatedClients[origin] = struct{}{}
-	a.authenticationTimeouts = append(a.authenticationTimeouts,
+	a.authenticationTimeouts.Push(
 		&authenticationTimeout{
 			origin:     origin,
 			expiration: now.Add(a.authenticationTimeoutDuration),
@@ -195,14 +196,12 @@ func (a *requestAuthenticator) isAuthenticationStillValid(now time.Time, address
 // removeOldAuthentications removes any authentications that have expired.
 // This method is not thread safe and should be called with the savedAuthLock held.
 func (a *requestAuthenticator) removeOldAuthentications(now time.Time) {
-	index := 0
-	for ; index < len(a.authenticationTimeouts); index++ {
-		if a.authenticationTimeouts[index].expiration.After(now) {
+	for a.authenticationTimeouts.Size() > 0 {
+		next, _ := a.authenticationTimeouts.Peek()
+		if next.expiration.After(now) {
 			break
 		}
-		delete(a.authenticatedClients, a.authenticationTimeouts[index].origin)
-	}
-	if index > 0 {
-		a.authenticationTimeouts = a.authenticationTimeouts[index:]
+		delete(a.authenticatedClients, next.origin)
+		a.authenticationTimeouts.Pop()
 	}
 }
