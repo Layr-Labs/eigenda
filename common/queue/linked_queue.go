@@ -16,13 +16,13 @@ type node[T any] struct {
 }
 
 func (l *LinkedQueue[T]) Push(value T) {
+	newNode := &node[T]{value: value}
 	if l.size == 0 {
-		l.front = &node[T]{value: value}
+		l.front = newNode
 		l.back = l.front
 	} else {
-		n := &node[T]{value: value}
-		l.back.next = n
-		l.back = n
+		l.back.next = newNode
+		l.back = newNode
 	}
 	l.size++
 }
@@ -36,6 +36,10 @@ func (l *LinkedQueue[T]) Pop() (T, bool) {
 	value := l.front.value
 	l.front = l.front.next
 	l.size--
+
+	if l.size == 0 {
+		l.back = nil
+	}
 	return value, true
 }
 
