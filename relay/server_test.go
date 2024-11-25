@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 
@@ -47,6 +48,14 @@ func defaultConfig() *Config {
 			MaxConcurrentGetChunkOpsClient:  1,
 		},
 		AuthenticationDisabled: true,
+		Timeouts: TimeoutConfig{
+			GetBlobTimeout:                 10 * time.Second,
+			GetChunksTimeout:               10 * time.Second,
+			InternalGetMetadataTimeout:     10 * time.Second,
+			InternalGetBlobTimeout:         10 * time.Second,
+			InternalGetProofsTimeout:       10 * time.Second,
+			InternalGetCoefficientsTimeout: 10 * time.Second,
+		},
 	}
 }
 

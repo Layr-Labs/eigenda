@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"time"
 )
 
 // blobProvider encapsulates logic for fetching blobs. Utilized by the relay Server.
@@ -20,6 +21,9 @@ type blobProvider struct {
 
 	// blobCache is an LRU cache of blobs.
 	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
+
+	// fetchTimeout is the maximum time to wait for a blob fetch operation to complete.
+	fetchTimeout time.Duration
 }
 
 // newBlobProvider creates a new blobProvider.
@@ -28,12 +32,14 @@ func newBlobProvider(
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
 	blobCacheSize int,
-	maxIOConcurrency int) (*blobProvider, error) {
+	maxIOConcurrency int,
+	fetchTimeout time.Duration) (*blobProvider, error) {
 
 	server := &blobProvider{
-		ctx:       ctx,
-		logger:    logger,
-		blobStore: blobStore,
+		ctx:          ctx,
+		logger:       logger,
+		blobStore:    blobStore,
+		fetchTimeout: fetchTimeout,
 	}
 
 	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, maxIOConcurrency, server.fetchBlob)
@@ -46,9 +52,8 @@ func newBlobProvider(
 }
 
 // GetBlob retrieves a blob from the blob store.
-func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
-
-	data, err := s.blobCache.Get(blobKey)
+func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte, error) {
+	data, err := s.blobCache.Get(ctx, blobKey)
 
 	if err != nil {
 		// It should not be possible for external users to force an error here since we won't
@@ -62,7 +67,10 @@ func (s *blobProvider) GetBlob(blobKey v2.BlobKey) ([]byte, error) {
 
 // fetchBlob retrieves a single blob from the blob store.
 func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
-	data, err := s.blobStore.GetBlob(s.ctx, blobKey)
+	ctx, cancel := context.WithTimeout(s.ctx, s.fetchTimeout)
+	defer cancel()
+
+	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {
 		s.logger.Errorf("Failed to fetch blob: %v", err)
 		return nil, err

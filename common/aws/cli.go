@@ -37,12 +37,6 @@ type ClientConfig struct {
 	// FragmentParallelismConstant helps determine the size of the pool of workers to help upload/download files.
 	// A non-zero value for this parameter adds a constant number of workers. Default is 0.
 	FragmentParallelismConstant int
-	// FragmentReadTimeout is used to bound the maximum time to wait for a single fragmented read.
-	// Default is 30 seconds.
-	FragmentReadTimeout time.Duration
-	// FragmentWriteTimeout is used to bound the maximum time to wait for a single fragmented write.
-	// Default is 30 seconds.
-	FragmentWriteTimeout time.Duration
 }
 
 func ClientFlags(envPrefix string, flagPrefix string) []cli.Flag {
@@ -120,8 +114,6 @@ func ReadClientConfig(ctx *cli.Context, flagPrefix string) ClientConfig {
 		EndpointURL:                 ctx.GlobalString(common.PrefixFlag(flagPrefix, EndpointURLFlagName)),
 		FragmentParallelismFactor:   ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismFactorFlagName)),
 		FragmentParallelismConstant: ctx.GlobalInt(common.PrefixFlag(flagPrefix, FragmentParallelismConstantFlagName)),
-		FragmentReadTimeout:         ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentReadTimeoutFlagName)),
-		FragmentWriteTimeout:        ctx.GlobalDuration(common.PrefixFlag(flagPrefix, FragmentWriteTimeoutFlagName)),
 	}
 }
 
@@ -131,7 +123,5 @@ func DefaultClientConfig() *ClientConfig {
 		Region:                      "us-east-2",
 		FragmentParallelismFactor:   8,
 		FragmentParallelismConstant: 0,
-		FragmentReadTimeout:         30 * time.Second,
-		FragmentWriteTimeout:        30 * time.Second,
 	}
 }
