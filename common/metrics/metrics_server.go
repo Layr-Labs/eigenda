@@ -315,6 +315,11 @@ func (m *metrics) newGaugeMetricUnsafe(
 		return preExistingMetric.(GaugeMetric), nil
 	}
 
+	labeler, err := newLabelMaker(labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
 	vec, ok := m.gaugeVecMap[name]
 	if !ok {
 		vec = promauto.With(m.registry).NewGaugeVec(
@@ -322,12 +327,12 @@ func (m *metrics) newGaugeMetricUnsafe(
 				Namespace: m.config.Namespace,
 				Name:      id.NameWithUnit(),
 			},
-			[]string{},
+			labeler.getKeys(),
 		)
 		m.gaugeVecMap[name] = vec
 	}
 
-	metric := newGaugeMetric(name, unit, description, vec)
+	metric := newGaugeMetric(name, unit, description, vec, labeler)
 	m.metricMap[id] = metric
 
 	return metric, nil
@@ -338,7 +343,8 @@ func (m *metrics) NewAutoGauge(
 	unit string,
 	description string,
 	pollPeriod time.Duration,
-	source func() float64) error {
+	source func() float64,
+	label ...any) error {
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -347,20 +353,25 @@ func (m *metrics) NewAutoGauge(
 		return errors.New("metrics server is not alive")
 	}
 
-	gauge, err := m.newGaugeMetricUnsafe(name, unit, description, nil) // TODO labels
-	if err != nil {
-		return err
+	if len(label) > 1 {
+		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
+	}
+	var l any
+	if len(label) == 1 {
+		l = label[0]
 	}
 
-	if !gauge.Enabled() {
-		return nil
+	gauge, err := m.newGaugeMetricUnsafe(name, unit, description, l)
+	if err != nil {
+		return err
 	}
 
 	pollingAgent := func() {
 		ticker := time.NewTicker(pollPeriod)
 		for m.isAlive.Load() {
 			value := source()
-			gauge.Set(value)
+
+			_ = gauge.Set(value, l)
 			<-ticker.C
 		}
 	}

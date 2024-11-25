@@ -36,7 +36,6 @@ func main() {
 	}
 
 	metricsServer := metrics.NewMetrics(logger, metricsConfig)
-	//metricsServer := metrics.NewMockMetrics()
 
 	l1, err := metricsServer.NewLatencyMetric(
 		"l1",
@@ -57,11 +56,19 @@ func main() {
 		panic(err)
 	}
 
+	c2, err := metricsServer.NewCountMetric(
+		"c2",
+		"the purpose of this counter is to test what happens if we don't provide a label template",
+		nil)
+	if err != nil {
+		panic(err)
+	}
+
 	g1, err := metricsServer.NewGaugeMetric(
 		"g1",
 		"milliseconds",
 		"this metric shows the duration of the most recent sleep cycle",
-		nil)
+		LabelType1{})
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +81,8 @@ func main() {
 		1*time.Second,
 		func() float64 {
 			return float64(sum.Load())
-		})
+		},
+		LabelType2{X: "sum"})
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +98,6 @@ func main() {
 	}
 
 	prev := time.Now()
-	//previousElapsed := time.Duration(0)
 	for i := 0; i < 100; i++ {
 		fmt.Printf("Iteration %d\n", i)
 		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
@@ -112,7 +119,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		//l1HALF.ReportLatency(elapsed / 2)
 
 		err = c1.Increment()
 		if err != nil {
@@ -124,13 +130,22 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		
-		g1.Set(float64(elapsed.Milliseconds()))
-		//g2.Set(float64(previousElapsed.Milliseconds()))
+		err = c2.Increment()
+		if err != nil {
+			panic(err)
+		}
+
+		err = g1.Set(float64(elapsed.Milliseconds()),
+			LabelType1{
+				foo: "bar",
+				bar: "baz",
+				baz: "foo",
+			})
+		if err != nil {
+			panic(err)
+		}
 
 		sum.Store(sum.Load() + elapsed.Milliseconds())
-
-		//previousElapsed = elapsed
 	}
 
 	err = metricsServer.Stop()

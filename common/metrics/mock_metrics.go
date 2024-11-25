@@ -48,8 +48,8 @@ func (m *mockMetrics) NewGaugeMetric(
 	name string,
 	unit string,
 	description string,
-	templateLabel any) (GaugeMetric, error) {
-	return newGaugeMetric(name, unit, description, nil), nil
+	labelTemplate any) (GaugeMetric, error) {
+	return newGaugeMetric(name, unit, description, nil, nil), nil
 }
 
 func (m *mockMetrics) NewAutoGauge(
@@ -57,6 +57,7 @@ func (m *mockMetrics) NewAutoGauge(
 	unit string,
 	description string,
 	pollPeriod time.Duration,
-	source func() float64) error {
+	source func() float64,
+	label ...any) error {
 	return nil
 }

@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -20,7 +21,10 @@ type gaugeMetric struct {
 	description string
 
 	// gauge is the prometheus gauge used to report this metric.
-	gauge prometheus.Gauge
+	vec *prometheus.GaugeVec
+
+	// labeler is the label maker used to create labels for this metric.
+	labeler *labelMaker
 }
 
 // newGaugeMetric creates a new GaugeMetric instance.
@@ -28,18 +32,15 @@ func newGaugeMetric(
 	name string,
 	unit string,
 	description string,
-	vec *prometheus.GaugeVec) GaugeMetric {
-
-	var gauge prometheus.Gauge
-	if vec != nil {
-		gauge = vec.WithLabelValues() // TODO
-	}
+	vec *prometheus.GaugeVec,
+	labeler *labelMaker) GaugeMetric {
 
 	return &gaugeMetric{
 		name:        name,
 		unit:        unit,
 		description: description,
-		gauge:       gauge,
+		vec:         vec,
+		labeler:     labeler,
 	}
 }
 
@@ -59,13 +60,28 @@ func (m *gaugeMetric) Type() string {
 	return "gauge"
 }
 
-func (m *gaugeMetric) Enabled() bool {
-	return m.gauge != nil
-}
-
-func (m *gaugeMetric) Set(value float64) {
-	if m.gauge == nil {
-		return
+func (m *gaugeMetric) Set(value float64, label ...any) error {
+	if m.vec == nil {
+		// metric is not enabled
+		return nil
 	}
-	m.gauge.Set(value)
+
+	if len(label) > 1 {
+		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
+	}
+
+	var l any
+	if len(label) == 1 {
+		l = label[0]
+	}
+
+	values, err := m.labeler.extractValues(l)
+	if err != nil {
+		return fmt.Errorf("error extracting values from label for metric %s: %v", m.name, err)
+	}
+
+	observer := m.vec.WithLabelValues(values...)
+
+	observer.Set(value)
+	return nil
 }

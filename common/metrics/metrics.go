@@ -50,16 +50,18 @@ type Metrics interface {
 		description string,
 		labelTemplate any) (GaugeMetric, error)
 
-	// TODO labels
 	// NewAutoGauge creates a new GaugeMetric instance that is automatically updated by the given source function.
 	// The function is polled at the given period. This produces a gauge type metric internally.
 	// Metric name and label may only contain alphanumeric characters and underscores.
+	//
+	// The label parameter accepts zero or one label.
 	NewAutoGauge(
 		name string,
 		unit string,
 		description string,
 		pollPeriod time.Duration,
-		source func() float64) error
+		source func() float64,
+		label ...any) error
 }
 
 // Metric represents a metric that can be reported.
@@ -76,9 +78,6 @@ type Metric interface {
 
 	// Type returns the type of the metric.
 	Type() string
-
-	// Enabled returns true if the metric is enabled.
-	Enabled() bool
 }
 
 // GaugeMetric allows specific values to be reported.
@@ -86,7 +85,10 @@ type GaugeMetric interface {
 	Metric
 
 	// Set sets the value of a gauge metric.
-	Set(value float64)
+	//
+	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
+	// when creating the metric, an error will be returned.
+	Set(value float64, label ...any) error
 }
 
 // CountMetric allows the count of a type of event to be tracked.
@@ -130,5 +132,8 @@ type LatencyMetric interface {
 	Metric
 
 	// ReportLatency reports a latency value.
+	//
+	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
+	// when creating the metric, an error will be returned.
 	ReportLatency(latency time.Duration, label ...any) error
 }
