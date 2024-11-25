@@ -13,9 +13,6 @@ type countMetric struct {
 	// name is the name of the metric.
 	name string
 
-	// label is the label of the metric.
-	label string
-
 	// description is the description of the metric.
 	description string
 
@@ -24,15 +21,14 @@ type countMetric struct {
 }
 
 // newCountMetric creates a new CountMetric instance.
-func newCountMetric(name string, label string, description string, vec *prometheus.CounterVec) CountMetric {
+func newCountMetric(name string, description string, vec *prometheus.CounterVec) CountMetric {
 	var counter prometheus.Counter
 	if vec != nil {
-		counter = vec.WithLabelValues(label)
+		counter = vec.WithLabelValues() // TODO
 	}
 
 	return &countMetric{
 		name:        name,
-		label:       label,
 		description: description,
 		counter:     counter,
 	}
@@ -40,10 +36,6 @@ func newCountMetric(name string, label string, description string, vec *promethe
 
 func (m *countMetric) Name() string {
 	return m.name
-}
-
-func (m *countMetric) Label() string {
-	return m.label
 }
 
 func (m *countMetric) Unit() string {

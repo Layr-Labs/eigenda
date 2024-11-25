@@ -22,22 +22,20 @@ type Metrics interface {
 	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewLatencyMetric(
 		name string,
-		label string,
 		description string,
+		templateLabel *struct{}, // TODO
 		quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
 	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewCountMetric(
 		name string,
-		label string,
 		description string) (CountMetric, error)
 
 	// NewGaugeMetric creates a new GaugeMetric instance. Useful for reporting specific values.
 	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewGaugeMetric(
 		name string,
-		label string,
 		unit string,
 		description string) (GaugeMetric, error)
 
@@ -46,7 +44,6 @@ type Metrics interface {
 	// Metric name and label may only contain alphanumeric characters and underscores.
 	NewAutoGauge(
 		name string,
-		label string,
 		unit string,
 		description string,
 		pollPeriod time.Duration,
@@ -58,9 +55,6 @@ type Metric interface {
 
 	// Name returns the name of the metric.
 	Name() string
-
-	// Label returns the label of the metric. Metrics without a label will return an empty string.
-	Label() string
 
 	// Unit returns the unit of the metric.
 	Unit() string
@@ -115,5 +109,5 @@ type LatencyMetric interface {
 	Metric
 
 	// ReportLatency reports a latency value.
-	ReportLatency(latency time.Duration)
+	ReportLatency(latency time.Duration, label ...*struct{}) error
 }

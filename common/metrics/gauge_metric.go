@@ -13,9 +13,6 @@ type gaugeMetric struct {
 	// name is the name of the metric.
 	name string
 
-	// label is the label of the metric.
-	label string
-
 	// unit is the unit of the metric.
 	unit string
 
@@ -29,19 +26,17 @@ type gaugeMetric struct {
 // newGaugeMetric creates a new GaugeMetric instance.
 func newGaugeMetric(
 	name string,
-	label string,
 	unit string,
 	description string,
 	vec *prometheus.GaugeVec) GaugeMetric {
 
 	var gauge prometheus.Gauge
 	if vec != nil {
-		gauge = vec.WithLabelValues(label)
+		gauge = vec.WithLabelValues() // TODO
 	}
 
 	return &gaugeMetric{
 		name:        name,
-		label:       label,
 		unit:        unit,
 		description: description,
 		gauge:       gauge,
@@ -50,10 +45,6 @@ func newGaugeMetric(
 
 func (m *gaugeMetric) Name() string {
 	return m.name
-}
-
-func (m *gaugeMetric) Label() string {
-	return m.label
 }
 
 func (m *gaugeMetric) Unit() string {

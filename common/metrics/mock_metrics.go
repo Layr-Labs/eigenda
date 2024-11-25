@@ -34,23 +34,22 @@ func (m *mockMetrics) Stop() error {
 
 func (m *mockMetrics) NewLatencyMetric(
 	name string,
-	label string,
 	description string,
+	templateLabel *struct{},
 	quantiles ...*Quantile) (LatencyMetric, error) {
-	return newLatencyMetric(name, label, description, nil), nil
+	return newLatencyMetric(name, description, nil, nil), nil
 }
 
-func (m *mockMetrics) NewCountMetric(name string, label string, description string) (CountMetric, error) {
-	return newCountMetric(name, label, description, nil), nil
+func (m *mockMetrics) NewCountMetric(name string, description string) (CountMetric, error) {
+	return newCountMetric(name, description, nil), nil
 }
 
-func (m *mockMetrics) NewGaugeMetric(name string, label string, unit string, description string) (GaugeMetric, error) {
-	return newGaugeMetric(name, label, unit, description, nil), nil
+func (m *mockMetrics) NewGaugeMetric(name string, unit string, description string) (GaugeMetric, error) {
+	return newGaugeMetric(name, unit, description, nil), nil
 }
 
 func (m *mockMetrics) NewAutoGauge(
 	name string,
-	label string,
 	unit string,
 	description string,
 	pollPeriod time.Duration,

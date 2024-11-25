@@ -103,9 +103,8 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 
 // metricID is a unique identifier for a metric.
 type metricID struct {
-	name  string
-	unit  string
-	label string
+	name string
+	unit string
 }
 
 var legalCharactersRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -116,29 +115,17 @@ func containsLegalCharacters(s string) bool {
 }
 
 // newMetricID creates a new metricID instance.
-func newMetricID(name string, unit string, label string) (metricID, error) {
+func newMetricID(name string, unit string) (metricID, error) {
 	if !containsLegalCharacters(name) {
 		return metricID{}, fmt.Errorf("invalid metric name: %s", name)
 	}
 	if !containsLegalCharacters(unit) {
 		return metricID{}, fmt.Errorf("invalid metric unit: %s", unit)
 	}
-	if label != "" && !containsLegalCharacters(label) {
-		return metricID{}, fmt.Errorf("invalid metric label: %s", label)
-	}
 	return metricID{
-		name:  name,
-		unit:  unit,
-		label: label,
+		name: name,
+		unit: unit,
 	}, nil
-}
-
-// String returns a string representation of the metricID.
-func (i *metricID) String() string {
-	if i.label != "" {
-		return fmt.Sprintf("%s:%s", i.NameWithUnit(), i.label)
-	}
-	return i.NameWithUnit()
 }
 
 // NameWithUnit returns the name of the metric with the unit appended.
@@ -191,8 +178,8 @@ func (m *metrics) Stop() error {
 // NewLatencyMetric creates a new LatencyMetric instance.
 func (m *metrics) NewLatencyMetric(
 	name string,
-	label string,
 	description string,
+	templateLabel *struct{},
 	quantiles ...*Quantile) (LatencyMetric, error) {
 
 	m.lock.Lock()
@@ -202,7 +189,7 @@ func (m *metrics) NewLatencyMetric(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, "ms", label)
+	id, err := newMetricID(name, "ms")
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +200,6 @@ func (m *metrics) NewLatencyMetric(
 	}
 
 	quantilesString := ""
-
 	objectives := make(map[float64]float64, len(quantiles))
 	for i, q := range quantiles {
 		objectives[q.Quantile] = q.Error
@@ -223,8 +209,9 @@ func (m *metrics) NewLatencyMetric(
 			quantilesString += ", "
 		}
 	}
-
 	m.quantilesMap[id] = quantilesString
+
+	labeler := newLabelMaker(templateLabel)
 
 	vec, ok := m.summaryVecMap[name]
 	if !ok {
@@ -234,12 +221,12 @@ func (m *metrics) NewLatencyMetric(
 				Name:       id.NameWithUnit(),
 				Objectives: objectives,
 			},
-			[]string{"label"},
+			labeler.getKeys(),
 		)
 		m.summaryVecMap[name] = vec
 	}
 
-	metric := newLatencyMetric(name, label, description, vec)
+	metric := newLatencyMetric(name, description, vec, labeler)
 	m.metricMap[id] = metric
 	return metric, nil
 }
@@ -247,7 +234,6 @@ func (m *metrics) NewLatencyMetric(
 // NewCountMetric creates a new CountMetric instance.
 func (m *metrics) NewCountMetric(
 	name string,
-	label string,
 	description string) (CountMetric, error) {
 
 	m.lock.Lock()
@@ -257,7 +243,7 @@ func (m *metrics) NewCountMetric(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, "count", label)
+	id, err := newMetricID(name, "count")
 	if err != nil {
 		return nil, err
 	}
@@ -274,12 +260,12 @@ func (m *metrics) NewCountMetric(
 				Namespace: m.config.Namespace,
 				Name:      id.NameWithUnit(),
 			},
-			[]string{"label"},
+			[]string{},
 		)
 		m.counterVecMap[name] = vec
 	}
 
-	metric := newCountMetric(name, label, description, vec)
+	metric := newCountMetric(name, description, vec)
 	m.metricMap[id] = metric
 
 	return metric, nil
@@ -288,19 +274,17 @@ func (m *metrics) NewCountMetric(
 // NewGaugeMetric creates a new GaugeMetric instance.
 func (m *metrics) NewGaugeMetric(
 	name string,
-	label string,
 	unit string,
 	description string) (GaugeMetric, error) {
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.newGaugeMetricUnsafe(name, label, unit, description)
+	return m.newGaugeMetricUnsafe(name, unit, description)
 }
 
 // newGaugeMetricUnsafe creates a new GaugeMetric instance without locking.
 func (m *metrics) newGaugeMetricUnsafe(
 	name string,
-	label string,
 	unit string,
 	description string) (GaugeMetric, error) {
 
@@ -308,7 +292,7 @@ func (m *metrics) newGaugeMetricUnsafe(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, unit, label)
+	id, err := newMetricID(name, unit)
 	if err != nil {
 		return nil, err
 	}
@@ -325,12 +309,12 @@ func (m *metrics) newGaugeMetricUnsafe(
 				Namespace: m.config.Namespace,
 				Name:      id.NameWithUnit(),
 			},
-			[]string{"label"},
+			[]string{},
 		)
 		m.gaugeVecMap[name] = vec
 	}
 
-	metric := newGaugeMetric(name, label, unit, description, vec)
+	metric := newGaugeMetric(name, unit, description, vec)
 	m.metricMap[id] = metric
 
 	return metric, nil
@@ -338,7 +322,6 @@ func (m *metrics) newGaugeMetricUnsafe(
 
 func (m *metrics) NewAutoGauge(
 	name string,
-	label string,
 	unit string,
 	description string,
 	pollPeriod time.Duration,
@@ -351,7 +334,7 @@ func (m *metrics) NewAutoGauge(
 		return errors.New("metrics server is not alive")
 	}
 
-	gauge, err := m.newGaugeMetricUnsafe(name, label, unit, description)
+	gauge, err := m.newGaugeMetricUnsafe(name, unit, description)
 	if err != nil {
 		return err
 	}
@@ -394,10 +377,7 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		if a.name != b.name {
 			return strings.Compare(a.name, b.name)
 		}
-		if a.unit != b.unit {
-			return strings.Compare(a.unit, b.unit)
-		}
-		return strings.Compare(a.label, b.label)
+		return strings.Compare(a.unit, b.unit)
 	}
 	slices.SortFunc(metricIDs, sortFunc)
 
@@ -411,22 +391,14 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		metric := m.metricMap[*id]
 
 		sb.Write([]byte("---\n\n"))
+		sb.Write([]byte(fmt.Sprintf("## %s\n\n", id.NameWithUnit())))
 
-		if id.label == "" {
-			sb.Write([]byte(fmt.Sprintf("## %s\n\n", id.NameWithUnit())))
-		} else {
-			sb.Write([]byte(fmt.Sprintf("## %s: %s\n\n", id.NameWithUnit(), id.label)))
-		}
 		sb.Write([]byte(fmt.Sprintf("%s\n\n", metric.Description())))
+
 		sb.Write([]byte("|   |   |\n"))
 		sb.Write([]byte("|---|---|\n"))
 		sb.Write([]byte(fmt.Sprintf("| **Name** | `%s` |\n", metric.Name())))
 		sb.Write([]byte(fmt.Sprintf("| **Unit** | `%s` |\n", metric.Unit())))
-		if id.label == "" {
-			sb.Write([]byte("| **Label** | - |\n"))
-		} else {
-			sb.Write([]byte(fmt.Sprintf("| **Label** | `%s` |\n", metric.Label())))
-		}
 		sb.Write([]byte(fmt.Sprintf("| **Type** | `%s` |\n", metric.Type())))
 		if metric.Type() == "latency" {
 			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
