@@ -100,6 +100,12 @@ type Reader interface {
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
 
+	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
+	GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*BlobVersionParameters, error)
+
+	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
+	GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*BlobVersionParameters, error)
+
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
 	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
 

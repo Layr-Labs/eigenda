@@ -83,7 +83,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 func TestRetrieveBlob(t *testing.T) {
 	server := newTestServer(t)
-	chainClient.On("FetchBatchHeader").Return(&binding.IEigenDAServiceManagerBatchHeader{
+	chainClient.On("FetchBatchHeader").Return(&binding.BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         []byte{0},
 		SignedStakeForQuorums: []byte{90},

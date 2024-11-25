@@ -1,6 +1,8 @@
 package encoding
 
 import (
+	"bytes"
+
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -52,6 +54,51 @@ func (c *BlobCommitments) ToProtobuf() (*pbcommon.BlobCommitment, error) {
 		LengthProof:      lengthProofData,
 		Length:           uint32(c.Length),
 	}, nil
+}
+
+// Equal checks if two BlobCommitments are equal
+func (c *BlobCommitments) Equal(c1 *BlobCommitments) bool {
+	if c.Length != c1.Length {
+		return false
+	}
+
+	cCommitment, err := c.Commitment.Serialize()
+	if err != nil {
+		return false
+	}
+	c1Commitment, err := c1.Commitment.Serialize()
+	if err != nil {
+		return false
+	}
+	if !bytes.Equal(cCommitment, c1Commitment) {
+		return false
+	}
+
+	cLengthCommitment, err := c.LengthCommitment.Serialize()
+	if err != nil {
+		return false
+	}
+	c1LengthCommitment, err := c1.LengthCommitment.Serialize()
+	if err != nil {
+		return false
+	}
+	if !bytes.Equal(cLengthCommitment, c1LengthCommitment) {
+		return false
+	}
+
+	cLengthProof, err := c.LengthProof.Serialize()
+	if err != nil {
+		return false
+	}
+	c1LengthProof, err := c1.LengthProof.Serialize()
+	if err != nil {
+		return false
+	}
+	if !bytes.Equal(cLengthProof, c1LengthProof) {
+		return false
+	}
+
+	return true
 }
 
 func BlobCommitmentsFromProtobuf(c *pbcommon.BlobCommitment) (*BlobCommitments, error) {

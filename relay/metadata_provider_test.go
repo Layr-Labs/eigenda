@@ -31,7 +31,8 @@ func TestGetNonExistentBlob(t *testing.T) {
 		1024*1024,
 		32,
 		nil,
-		10*time.Second)
+		10*time.Second,
+		v2.NewBlobVersionParameterMap(mockBlobParamsMap()))
 	require.NoError(t, err)
 
 	// Try to fetch a non-existent blobs
@@ -96,7 +97,9 @@ func TestFetchingIndividualMetadata(t *testing.T) {
 		1024*1024,
 		32,
 		nil,
-		10*time.Second)
+		10*time.Second,
+		v2.NewBlobVersionParameterMap(mockBlobParamsMap()))
+
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
@@ -179,7 +182,8 @@ func TestBatchedFetch(t *testing.T) {
 		1024*1024,
 		32,
 		nil,
-		10*time.Second)
+		10*time.Second,
+		v2.NewBlobVersionParameterMap(mockBlobParamsMap()))
 	require.NoError(t, err)
 
 	// Each iteration, choose a random subset of the keys to fetch
@@ -284,7 +288,8 @@ func TestIndividualFetchWithSharding(t *testing.T) {
 		1024*1024,
 		32,
 		shardList,
-		10*time.Second)
+		10*time.Second,
+		v2.NewBlobVersionParameterMap(mockBlobParamsMap()))
 	require.NoError(t, err)
 
 	// Fetch the metadata from the server.
@@ -415,7 +420,8 @@ func TestBatchedFetchWithSharding(t *testing.T) {
 		1024*1024,
 		32,
 		shardList,
-		10*time.Second)
+		10*time.Second,
+		v2.NewBlobVersionParameterMap(mockBlobParamsMap()))
 	require.NoError(t, err)
 
 	// Each iteration, choose two random keys to fetch. There will be a 25% chance that both blobs map to valid shards.

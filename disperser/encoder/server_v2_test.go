@@ -18,10 +18,17 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 )
+
+var blobParams = &core.BlobVersionParameters{
+	NumChunks:       8192,
+	CodingRate:      8,
+	MaxNumOperators: 3537,
+}
 
 type testComponents struct {
 	encoderServer    *encoder.EncoderServerV2
@@ -57,8 +64,8 @@ func TestEncodeBlob(t *testing.T) {
 	)
 
 	var (
-		codingRatio = corev2.ParametersMap[0].CodingRate
-		numChunks   = corev2.ParametersMap[0].NumChunks
+		codingRatio = blobParams.CodingRate
+		numChunks   = blobParams.NumChunks
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutSeconds*time.Second)
@@ -84,7 +91,7 @@ func TestEncodeBlob(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := corev2.GetChunkLength(0, core.NextPowerOf2(uint32(blobLength)))
+	chunkLength, err := corev2.GetChunkLength(core.NextPowerOf2(uint32(blobLength)), blobParams)
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}
@@ -196,7 +203,7 @@ func createTestComponents(t *testing.T) *testComponents {
 	t.Helper()
 	prover, err := makeTestProver(300000)
 	require.NoError(t, err, "Failed to create prover")
-	metrics := encoder.NewMetrics("9000", logger)
+	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
 	s3Client := mock.NewS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)

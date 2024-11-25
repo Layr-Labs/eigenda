@@ -54,6 +54,7 @@ type requestAuthenticator struct {
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
 func NewRequestAuthenticator(
+	ctx context.Context,
 	ics core.IndexedChainState,
 	keyCacheSize int,
 	authenticationTimeoutDuration time.Duration) (RequestAuthenticator, error) {
@@ -71,7 +72,7 @@ func NewRequestAuthenticator(
 		keyCache:                      keyCache,
 	}
 
-	err = authenticator.preloadCache()
+	err = authenticator.preloadCache(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload cache: %w", err)
 	}
@@ -79,12 +80,12 @@ func NewRequestAuthenticator(
 	return authenticator, nil
 }
 
-func (a *requestAuthenticator) preloadCache() error {
+func (a *requestAuthenticator) preloadCache(ctx context.Context) error {
 	blockNumber, err := a.ics.GetCurrentBlockNumber()
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	operators, err := a.ics.GetIndexedOperators(ctx, blockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get operators: %w", err)
 	}

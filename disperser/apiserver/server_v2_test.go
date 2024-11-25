@@ -16,6 +16,7 @@ import (
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -109,7 +110,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
-
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	assert.NoError(t, err)
@@ -150,10 +151,10 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	})
 	assert.ErrorContains(t, err, "too many quorum numbers specified")
 
-	// request without required quorums
+	// request with invalid quorum
 	invalidReqProto = &pbcommonv2.BlobHeader{
 		Version:       0,
-		QuorumNumbers: []uint32{2},
+		QuorumNumbers: []uint32{2, 54},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
@@ -165,7 +166,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	assert.ErrorContains(t, err, "request must contain at least one required quorum")
+	assert.ErrorContains(t, err, "invalid quorum")
 
 	// request with invalid blob version
 	invalidReqProto = &pbcommonv2.BlobHeader{
@@ -201,6 +202,83 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: invalidReqProto,
 	})
 	assert.ErrorContains(t, err, "authentication failed")
+
+	// request with invalid payment metadata
+	invalidReqProto = &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommon.PaymentHeader{
+			AccountId:         accountID,
+			BinIndex:          0,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(invalidReqProto)
+	assert.NoError(t, err)
+	sig, err := signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+	invalidReqProto.Signature = sig
+
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: invalidReqProto,
+	})
+	assert.ErrorContains(t, err, "invalid payment metadata")
+
+	// request with invalid commitment
+	invalidCommitment := commitmentProto
+	invalidCommitment.Length = commitmentProto.Length - 1
+	invalidReqProto = &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    invalidCommitment,
+		PaymentHeader: &pbcommon.PaymentHeader{
+			AccountId:         accountID,
+			BinIndex:          5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader, err = corev2.BlobHeaderFromProtobuf(invalidReqProto)
+	assert.NoError(t, err)
+	sig, err = signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+	invalidReqProto.Signature = sig
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: invalidReqProto,
+	})
+	assert.ErrorContains(t, err, "invalid blob commitment")
+
+	// request with blob size exceeding the limit
+	data = make([]byte, 321)
+	_, err = rand.Read(data)
+	assert.NoError(t, err)
+	data = codec.ConvertByPaddingEmptyByte(data)
+	commitments, err = prover.GetCommitmentsForPaddedLength(data)
+	assert.NoError(t, err)
+	commitmentProto, err = commitments.ToProtobuf()
+	assert.NoError(t, err)
+	validHeader := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommon.PaymentHeader{
+			AccountId:         accountID,
+			BinIndex:          5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader, err = corev2.BlobHeaderFromProtobuf(validHeader)
+	assert.NoError(t, err)
+	sig, err = signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+	validHeader.Signature = sig
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: validHeader,
+	})
+	assert.ErrorContains(t, err, "blob size too big")
 }
 
 func TestV2GetBlobStatus(t *testing.T) {
@@ -358,11 +436,18 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 	chainReader.On("GetBlockStaleMeasure", tmock.Anything).Return(uint32(10), nil)
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
+	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: {
+			NumChunks:       8192,
+			CodingRate:      8,
+			MaxNumOperators: 3537,
+		},
+	}, nil)
 
 	s := apiserver.NewDispersalServerV2(disperser.ServerConfig{
 		GrpcPort:    "51002",
 		GrpcTimeout: 1 * time.Second,
-	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, auth.NewAuthenticator(), prover, 100, time.Hour, logger)
+	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, auth.NewAuthenticator(), prover, 10, time.Hour, logger)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

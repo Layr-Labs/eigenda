@@ -9,4 +9,7 @@ const (
 type ServerConfig struct {
 	GrpcPort    string
 	GrpcTimeout time.Duration
+
+	PprofHttpPort string
+	EnablePprof   bool
 }

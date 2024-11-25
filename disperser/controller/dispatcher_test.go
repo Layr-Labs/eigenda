@@ -2,8 +2,6 @@ package controller_test
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -39,6 +37,7 @@ var (
 		},
 	})
 	finalizationBlockDelay = uint64(10)
+	maxBatchSize           = int32(5)
 )
 
 type dispatcherComponents struct {
@@ -111,6 +110,29 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	require.Len(t, att.QuorumAPKs, 2)
 	require.NotNil(t, att.Sigma)
 	require.ElementsMatch(t, att.QuorumNumbers, []core.QuorumID{0, 1})
+
+	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
+}
+
+func TestDispatcherMaxBatchSize(t *testing.T) {
+	components := newDispatcherComponents(t)
+	numBlobs := 12
+	objs := setupBlobCerts(t, components.BlobMetadataStore, numBlobs)
+	ctx := context.Background()
+	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
+	for i := 0; i < expectedNumBatches; i++ {
+		batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+		require.NoError(t, err)
+		if i < expectedNumBatches-1 {
+			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
+		} else {
+			require.Len(t, batchData.Batch.BlobCertificates, numBlobs%int(maxBatchSize))
+		}
+	}
+	_, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	require.ErrorContains(t, err, "no blobs to dispatch")
+
+	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
 func TestDispatcherNewBatch(t *testing.T) {
@@ -167,6 +189,8 @@ func TestDispatcherNewBatch(t *testing.T) {
 	// Attempt to create a batch with the same blobs
 	_, err = components.Dispatcher.NewBatch(ctx, blockNumber)
 	require.ErrorContains(t, err, "no blobs to dispatch")
+
+	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
 }
 
 func TestDispatcherBuildMerkleTree(t *testing.T) {
@@ -238,25 +262,7 @@ func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore
 	metadatas := make([]*v2.BlobMetadata, numObjects)
 	certs := make([]*corev2.BlobCertificate, numObjects)
 	for i := 0; i < numObjects; i++ {
-		randomBytes := make([]byte, 16)
-		_, err := rand.Read(randomBytes)
-		require.NoError(t, err)
-		randomBinIndex, err := rand.Int(rand.Reader, big.NewInt(1000))
-		require.NoError(t, err)
-		binIndex := uint32(randomBinIndex.Uint64())
-		headers[i] = &corev2.BlobHeader{
-			BlobVersion:     0,
-			QuorumNumbers:   []core.QuorumID{0, 1},
-			BlobCommitments: mockCommitment,
-			PaymentMetadata: core.PaymentMetadata{
-				AccountID:         hex.EncodeToString(randomBytes),
-				BinIndex:          binIndex,
-				CumulativePayment: big.NewInt(532),
-			},
-		}
-		key, err := headers[i].BlobKey()
-		require.NoError(t, err)
-		keys[i] = key
+		keys[i], headers[i] = newBlob(t)
 		now := time.Now()
 		metadatas[i] = &v2.BlobMetadata{
 			BlobHeader: headers[i],
@@ -265,7 +271,7 @@ func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore
 			NumRetries: 0,
 			UpdatedAt:  uint64(now.UnixNano()) - uint64(i),
 		}
-		err = blobMetadataStore.PutBlobMetadata(ctx, metadatas[i])
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadatas[i])
 		require.NoError(t, err)
 
 		certs[i] = &corev2.BlobCertificate{
@@ -284,6 +290,21 @@ func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore
 	}
 }
 
+func deleteBlobs(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, keys []corev2.BlobKey, batchHeaderHashes [][32]byte) {
+	ctx := context.Background()
+	for _, key := range keys {
+		err := blobMetadataStore.DeleteBlobMetadata(ctx, key)
+		require.NoError(t, err)
+		err = blobMetadataStore.DeleteBlobCertificate(ctx, key)
+		require.NoError(t, err)
+	}
+
+	for _, bhh := range batchHeaderHashes {
+		err := blobMetadataStore.DeleteBatchHeader(ctx, bhh)
+		require.NoError(t, err)
+	}
+}
+
 func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	// logger := logging.NewNoopLogger()
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
@@ -296,11 +317,12 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	require.NoError(t, err)
 	nodeClientManager := &controller.MockClientManager{}
 	mockChainState.On("GetCurrentBlockNumber").Return(uint(blockNumber), nil)
-	d, err := controller.NewDispatcher(controller.DispatcherConfig{
+	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
 		PullInterval:           1 * time.Second,
 		FinalizationBlockDelay: finalizationBlockDelay,
 		NodeRequestTimeout:     1 * time.Second,
 		NumRequestRetries:      3,
+		MaxBatchSize:           maxBatchSize,
 	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger)
 	require.NoError(t, err)
 	return &dispatcherComponents{

@@ -82,7 +82,7 @@ func RunController(ctx *cli.Context) error {
 	}
 	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
 	encodingManager, err := controller.NewEncodingManager(
-		config.EncodingManagerConfig,
+		&config.EncodingManagerConfig,
 		blobMetadataStore,
 		encodingPool,
 		encoderClient,
@@ -131,7 +131,7 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
 	dispatcher, err := controller.NewDispatcher(
-		config.DispatcherConfig,
+		&config.DispatcherConfig,
 		blobMetadataStore,
 		dispatcherPool,
 		ics,

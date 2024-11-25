@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"golang.org/x/sync/semaphore"
 	"sync"
 )
 
@@ -19,8 +20,8 @@ type Accessor[K comparable, V any] func(key K) (V, error)
 
 // accessResult is a struct that holds the result of an Accessor call.
 type accessResult[V any] struct {
-	// wg.Wait() will block until the value is fetched.
-	wg sync.WaitGroup
+	// sem is a semaphore used to signal that the value has been fetched.
+	sem *semaphore.Weighted
 	// value is the value fetched by the Accessor, or nil if there was an error.
 	value V
 	// err is the error returned by the Accessor, or nil if the fetch was successful.
@@ -83,9 +84,9 @@ func NewCacheAccessor[K comparable, V any](
 
 func newAccessResult[V any]() *accessResult[V] {
 	result := &accessResult[V]{
-		wg: sync.WaitGroup{},
+		sem: semaphore.NewWeighted(1),
 	}
-	result.wg.Add(1)
+	_ = result.sem.Acquire(context.Background(), 1)
 	return result
 }
 
@@ -121,21 +122,14 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 // when it becomes is available. This method will return quickly if the provided context is cancelled.
 // Doing so does not disrupt the other requesters that are also waiting for this result.
 func (c *cacheAccessor[K, V]) waitForResult(ctx context.Context, result *accessResult[V]) (V, error) {
-	wgChan := make(chan struct{}, 1)
-	go func() {
-		// Wait inside this goroutine for select statement compatibility.
-		result.wg.Wait()
-		wgChan <- struct{}{}
-	}()
-
-	select {
-	case <-ctx.Done():
-		// The context was cancelled before the value was fetched, possibly due to a timeout.
+	err := result.sem.Acquire(ctx, 1)
+	if err != nil {
 		var zeroValue V
-		return zeroValue, ctx.Err()
-	case <-wgChan:
-		return result.value, result.err
+		return zeroValue, err
 	}
+
+	result.sem.Release(1)
+	return result.value, result.err
 }
 
 // fetchResult fetches the value for the given key and returns it. If the context is cancelled before the value
@@ -166,7 +160,7 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 		// Provide the result to all other goroutines that may be waiting for it.
 		result.err = err
 		result.value = value
-		result.wg.Done()
+		result.sem.Release(1)
 
 		// Clean up the lookupInProgress map.
 		delete(c.lookupsInProgress, key)

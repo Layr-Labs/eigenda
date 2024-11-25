@@ -59,7 +59,7 @@ func newBlobProvider(
 
 // computeChunkCacheWeight computes the 'weight' of the blob for the cache. The weight of a blob
 // is equal to its size, in bytes.
-func computeBlobCacheWeight(key v2.BlobKey, value []byte) uint64 {
+func computeBlobCacheWeight(_ v2.BlobKey, value []byte) uint64 {
 	return uint64(len(value))
 }
 

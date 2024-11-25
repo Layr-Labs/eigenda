@@ -48,7 +48,7 @@ func TestFetchBatchHeader(t *testing.T) {
 			Index:       0,
 		},
 	}, nil)
-	expectedHeader := binding.IEigenDAServiceManagerBatchHeader{
+	expectedHeader := binding.BatchHeader{
 		BlobHeadersRoot:       [32]byte{0},
 		QuorumNumbers:         []byte{0},
 		SignedStakeForQuorums: []byte{100},
