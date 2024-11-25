@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -17,20 +18,19 @@ type countMetric struct {
 	description string
 
 	// counter is the prometheus counter used to report this metric.
-	counter prometheus.Counter
+	vec *prometheus.CounterVec
+
+	// labeler is the label maker used to create labels for this metric.
+	labeler *labelMaker
 }
 
 // newCountMetric creates a new CountMetric instance.
-func newCountMetric(name string, description string, vec *prometheus.CounterVec) CountMetric {
-	var counter prometheus.Counter
-	if vec != nil {
-		counter = vec.WithLabelValues() // TODO
-	}
-
+func newCountMetric(name string, description string, vec *prometheus.CounterVec, labeler *labelMaker) CountMetric {
 	return &countMetric{
 		name:        name,
 		description: description,
-		counter:     counter,
+		vec:         vec,
+		labeler:     labeler,
 	}
 }
 
@@ -50,20 +50,31 @@ func (m *countMetric) Type() string {
 	return "counter"
 }
 
-func (m *countMetric) Enabled() bool {
-	return m.counter != nil
+func (m *countMetric) Increment(label ...any) error {
+	return m.Add(1, label...)
 }
 
-func (m *countMetric) Increment() {
-	if m.counter == nil {
-		return
+func (m *countMetric) Add(value float64, label ...any) error {
+	if m.vec == nil {
+		return nil
 	}
-	m.counter.Inc()
-}
 
-func (m *countMetric) Add(value float64) {
-	if m.counter == nil {
-		return
+	if len(label) > 1 {
+		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
 	}
-	m.counter.Add(value)
+
+	var l any
+	if len(label) == 1 {
+		l = label[0]
+	}
+
+	values, err := m.labeler.extractValues(l)
+	if err != nil {
+		return fmt.Errorf("error extracting values from label for metric %s: %v", m.name, err)
+	}
+
+	observer := m.vec.WithLabelValues(values...)
+	observer.Add(value)
+
+	return nil
 }

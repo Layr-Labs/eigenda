@@ -31,6 +31,8 @@ type metrics struct {
 	// registry is the prometheus registry used to report metrics.
 	registry *prometheus.Registry
 
+	// TODO these maps are not needed any more!
+
 	// counterVecMap is a map of metric names to prometheus counter vectors.
 	// These are used to create new counter metrics.
 	counterVecMap map[string]*prometheus.CounterVec
@@ -179,7 +181,7 @@ func (m *metrics) Stop() error {
 func (m *metrics) NewLatencyMetric(
 	name string,
 	description string,
-	templateLabel any,
+	labelTemplate any,
 	quantiles ...*Quantile) (LatencyMetric, error) {
 
 	m.lock.Lock()
@@ -211,7 +213,7 @@ func (m *metrics) NewLatencyMetric(
 	}
 	m.quantilesMap[id] = quantilesString
 
-	labeler, err := newLabelMaker(templateLabel)
+	labeler, err := newLabelMaker(labelTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +239,8 @@ func (m *metrics) NewLatencyMetric(
 // NewCountMetric creates a new CountMetric instance.
 func (m *metrics) NewCountMetric(
 	name string,
-	description string) (CountMetric, error) {
+	description string,
+	labelTemplate any) (CountMetric, error) {
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -256,6 +259,11 @@ func (m *metrics) NewCountMetric(
 		return preExistingMetric.(CountMetric), nil
 	}
 
+	labeler, err := newLabelMaker(labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
 	vec, ok := m.counterVecMap[name]
 	if !ok {
 		vec = promauto.With(m.registry).NewCounterVec(
@@ -263,12 +271,12 @@ func (m *metrics) NewCountMetric(
 				Namespace: m.config.Namespace,
 				Name:      id.NameWithUnit(),
 			},
-			[]string{},
+			labeler.getKeys(),
 		)
 		m.counterVecMap[name] = vec
 	}
 
-	metric := newCountMetric(name, description, vec)
+	metric := newCountMetric(name, description, vec, labeler)
 	m.metricMap[id] = metric
 
 	return metric, nil
@@ -278,18 +286,20 @@ func (m *metrics) NewCountMetric(
 func (m *metrics) NewGaugeMetric(
 	name string,
 	unit string,
-	description string) (GaugeMetric, error) {
+	description string,
+	labelTemplate any) (GaugeMetric, error) {
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
-	return m.newGaugeMetricUnsafe(name, unit, description)
+	return m.newGaugeMetricUnsafe(name, unit, description, labelTemplate)
 }
 
 // newGaugeMetricUnsafe creates a new GaugeMetric instance without locking.
 func (m *metrics) newGaugeMetricUnsafe(
 	name string,
 	unit string,
-	description string) (GaugeMetric, error) {
+	description string,
+	labelTemplate any) (GaugeMetric, error) {
 
 	if !m.isAlive.Load() {
 		return nil, errors.New("metrics server is not alive")
@@ -337,7 +347,7 @@ func (m *metrics) NewAutoGauge(
 		return errors.New("metrics server is not alive")
 	}
 
-	gauge, err := m.newGaugeMetricUnsafe(name, unit, description)
+	gauge, err := m.newGaugeMetricUnsafe(name, unit, description, nil) // TODO labels
 	if err != nil {
 		return err
 	}

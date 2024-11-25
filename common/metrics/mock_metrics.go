@@ -40,11 +40,15 @@ func (m *mockMetrics) NewLatencyMetric(
 	return newLatencyMetric(name, description, nil, nil), nil
 }
 
-func (m *mockMetrics) NewCountMetric(name string, description string) (CountMetric, error) {
-	return newCountMetric(name, description, nil), nil
+func (m *mockMetrics) NewCountMetric(name string, description string, templateLabel any) (CountMetric, error) {
+	return newCountMetric(name, description, nil, nil), nil
 }
 
-func (m *mockMetrics) NewGaugeMetric(name string, unit string, description string) (GaugeMetric, error) {
+func (m *mockMetrics) NewGaugeMetric(
+	name string,
+	unit string,
+	description string,
+	templateLabel any) (GaugeMetric, error) {
 	return newGaugeMetric(name, unit, description, nil), nil
 }
 

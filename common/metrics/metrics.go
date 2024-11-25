@@ -20,25 +20,37 @@ type Metrics interface {
 
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
 	// Metric name and label may only contain alphanumeric characters and underscores.
+	//
+	// The labelTemplate parameter is the label type that will be used for this metric. Each field becomes a label for
+	// the metric. Each field type must be a string. If no labels are needed, pass nil.
 	NewLatencyMetric(
 		name string,
 		description string,
-		templateLabel any, // TODO
+		labelTemplate any,
 		quantiles ...*Quantile) (LatencyMetric, error)
 
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
 	// Metric name and label may only contain alphanumeric characters and underscores.
+	//
+	// The labelTemplate parameter is the label type that will be used for this metric. Each field becomes a label for
+	// the metric. Each field type must be a string. If no labels are needed, pass nil.
 	NewCountMetric(
 		name string,
-		description string) (CountMetric, error)
+		description string,
+		labelTemplate any) (CountMetric, error)
 
 	// NewGaugeMetric creates a new GaugeMetric instance. Useful for reporting specific values.
 	// Metric name and label may only contain alphanumeric characters and underscores.
+	//
+	// The labelTemplate parameter is the label type that will be used for this metric. Each field becomes a label for
+	// the metric. Each field type must be a string. If no labels are needed, pass nil.
 	NewGaugeMetric(
 		name string,
 		unit string,
-		description string) (GaugeMetric, error)
+		description string,
+		labelTemplate any) (GaugeMetric, error)
 
+	// TODO labels
 	// NewAutoGauge creates a new GaugeMetric instance that is automatically updated by the given source function.
 	// The function is polled at the given period. This produces a gauge type metric internally.
 	// Metric name and label may only contain alphanumeric characters and underscores.
@@ -82,10 +94,16 @@ type CountMetric interface {
 	Metric
 
 	// Increment increments the count by 1.
-	Increment()
+	//
+	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
+	// when creating the metric, an error will be returned.
+	Increment(label ...any) error
 
 	// Add increments the count by the given value.
-	Add(value float64)
+	//
+	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
+	// when creating the metric, an error will be returned.
+	Add(value float64, label ...any) error
 }
 
 // Quantile describes a quantile of a latency metric that should be reported. For a description of how
@@ -105,6 +123,9 @@ func NewQuantile(quantile float64) *Quantile {
 }
 
 // LatencyMetric allows the latency of an operation to be tracked. Similar to a gauge metric, but specialized for time.
+//
+// The label parameter accepts zero or one label. If the label type does not match the template label type provided
+// when creating the metric, an error will be returned.
 type LatencyMetric interface {
 	Metric
 

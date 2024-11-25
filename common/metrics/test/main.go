@@ -12,9 +12,9 @@ import (
 // This is a simple test bed for validating the metrics server (since it's not straight forward to unit test).
 
 type LabelType1 struct {
-	Foo string
-	Bar string
-	Baz string
+	foo string
+	bar string
+	baz string
 }
 
 type LabelType2 struct {
@@ -51,7 +51,8 @@ func main() {
 
 	c1, err := metricsServer.NewCountMetric(
 		"c1",
-		"this metric shows the number of times the sleep cycle has been executed")
+		"this metric shows the number of times the sleep cycle has been executed",
+		LabelType2{})
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +60,8 @@ func main() {
 	g1, err := metricsServer.NewGaugeMetric(
 		"g1",
 		"milliseconds",
-		"this metric shows the duration of the most recent sleep cycle")
+		"this metric shows the duration of the most recent sleep cycle",
+		nil)
 	if err != nil {
 		panic(err)
 	}
@@ -103,14 +105,26 @@ func main() {
 
 		err = l1.ReportLatency(elapsed/2,
 			LabelType1{
-				Foo: "half of the normal value",
-				Bar: "42",
-				Baz: "true",
+				foo: "half of the normal value",
+				bar: "42",
+				baz: "true",
 			})
+		if err != nil {
+			panic(err)
+		}
 		//l1HALF.ReportLatency(elapsed / 2)
 
-		c1.Increment()
-		//c1DOUBLE.Add(2)
+		err = c1.Increment()
+		if err != nil {
+			panic(err)
+		}
+		err = c1.Add(2, LabelType2{
+			X: "2x",
+		})
+		if err != nil {
+			panic(err)
+		}
+		
 		g1.Set(float64(elapsed.Milliseconds()))
 		//g2.Set(float64(previousElapsed.Milliseconds()))
 
