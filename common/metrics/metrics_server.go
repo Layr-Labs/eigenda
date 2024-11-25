@@ -62,6 +62,9 @@ type metrics struct {
 
 	// server is the metrics server
 	server *http.Server
+
+	// quantilesMap contains a string describing the quantiles for each latency metric. Used to generate documentation.
+	quantilesMap map[metricID]string
 }
 
 // NewMetrics creates a new Metrics instance.
@@ -92,6 +95,7 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 		metricMap:     make(map[metricID]Metric),
 		isAlive:       atomic.Bool{},
 		server:        server,
+		quantilesMap:  make(map[metricID]string),
 	}
 	m.isAlive.Store(true)
 	return m
@@ -208,10 +212,19 @@ func (m *metrics) NewLatencyMetric(
 		return preExistingMetric.(LatencyMetric), nil
 	}
 
+	quantilesString := ""
+
 	objectives := make(map[float64]float64, len(quantiles))
-	for _, q := range quantiles {
+	for i, q := range quantiles {
 		objectives[q.Quantile] = q.Error
+
+		quantilesString += fmt.Sprintf("`%.3f`", q.Quantile)
+		if i < len(quantiles)-1 {
+			quantilesString += ", "
+		}
 	}
+
+	m.quantilesMap[id] = quantilesString
 
 	vec, ok := m.summaryVecMap[name]
 	if !ok {
@@ -370,12 +383,8 @@ func (m *metrics) NewAutoGauge(
 func (m *metrics) GenerateMetricsDocumentation() string {
 	sb := &strings.Builder{}
 
-	enabledCount := 0
 	metricIDs := make([]*metricID, 0, len(m.metricMap))
-	for id, metric := range m.metricMap {
-		if metric.Enabled() {
-			enabledCount++
-		}
+	for id := range m.metricMap {
 		boundID := id
 		metricIDs = append(metricIDs, &boundID)
 	}
@@ -393,11 +402,10 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 	slices.SortFunc(metricIDs, sortFunc)
 
 	sb.Write([]byte(fmt.Sprintf("# Metrics Documentation for namespace '%s'\n\n", m.config.Namespace)))
-	sb.Write([]byte("This documentation is automatically generated. " +
-		"It reflects the metrics that were registered at the time that this document was generated.\n\n"))
+	sb.Write([]byte(fmt.Sprintf("This documentation was automatically generated at time `%s`\n\n",
+		time.Now().Format(time.RFC3339))))
 
-	sb.Write([]byte(fmt.Sprintf("There are %d metrics registered. Of these, %d are enabled.\n\n",
-		len(m.metricMap), enabledCount)))
+	sb.Write([]byte(fmt.Sprintf("There are a total of `%d` registered metrics.\n\n", len(m.metricMap))))
 
 	for _, id := range metricIDs {
 		metric := m.metricMap[*id]
@@ -412,21 +420,19 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		sb.Write([]byte(fmt.Sprintf("%s\n\n", metric.Description())))
 		sb.Write([]byte("|   |   |\n"))
 		sb.Write([]byte("|---|---|\n"))
-		sb.Write([]byte(fmt.Sprintf("| **Name** | %s |\n", metric.Name())))
-		sb.Write([]byte(fmt.Sprintf("| **Unit** | %s |\n", metric.Unit())))
+		sb.Write([]byte(fmt.Sprintf("| **Name** | `%s` |\n", metric.Name())))
+		sb.Write([]byte(fmt.Sprintf("| **Unit** | `%s` |\n", metric.Unit())))
 		if id.label == "" {
 			sb.Write([]byte(fmt.Sprintf("| **Label** | - |\n")))
 		} else {
-			sb.Write([]byte(fmt.Sprintf("| **Label** | %s |\n", metric.Label())))
+			sb.Write([]byte(fmt.Sprintf("| **Label** | `%s` |\n", metric.Label())))
 		}
-		sb.Write([]byte(fmt.Sprintf("| **Type** | %s |\n", metric.Type())))
-		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | %s_%s_%s |\n",
+		sb.Write([]byte(fmt.Sprintf("| **Type** | `%s` |\n", metric.Type())))
+		if metric.Type() == "latency" {
+			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
+		}
+		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | `%s_%s_%s` |\n",
 			m.config.Namespace, id.name, id.unit)))
-		enabledString := "enabled"
-		if !metric.Enabled() {
-			enabledString = "disabled"
-		}
-		sb.Write([]byte(fmt.Sprintf("| **Status** | %s |\n\n", enabledString)))
 	}
 
 	return sb.String()
