@@ -18,6 +18,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	defaultBlobBufferSizeByte = 128 * 1024
+)
+
 var (
 	once              sync.Once
 	ref               *client
@@ -106,7 +110,7 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 }
 
 func (s *client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
-	objectSize := 128 * 1024
+	objectSize := defaultBlobBufferSizeByte
 	size, err := s.HeadObject(ctx, bucket, key)
 	if err == nil {
 		objectSize = int(*size)
