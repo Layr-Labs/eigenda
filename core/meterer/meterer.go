@@ -268,6 +268,7 @@ func (m *Meterer) ValidateGlobalBinIndex(header core.PaymentMetadata) (uint32, e
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
+	//TODO: edit globalIndex based on bin interval in a subsequent PR
 	globalIndex := uint64(time.Now().Unix())
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, symbolsCharged)
 	if err != nil {

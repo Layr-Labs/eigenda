@@ -61,6 +61,11 @@ func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	return args.Get(0).(uint64)
 }
 
+func (m *MockOnchainPaymentState) GetGlobalRateBinInterval() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
 func (m *MockOnchainPaymentState) GetMinNumSymbols() uint32 {
 	args := m.Called()
 	return args.Get(0).(uint32)
