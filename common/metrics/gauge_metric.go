@@ -36,7 +36,7 @@ func newGaugeMetric(
 
 	var gauge prometheus.Gauge
 	if vec != nil {
-		gauge = vec.WithLabelValues(label, unit)
+		gauge = vec.WithLabelValues(label)
 	}
 
 	return &gaugeMetric{

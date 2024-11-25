@@ -100,21 +100,31 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 // metricID is a unique identifier for a metric.
 type metricID struct {
 	name  string
+	unit  string
 	label string
 }
 
 var legalCharactersRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
+// containsLegalCharacters returns true if the string contains only legal characters (alphanumeric and underscore).
+func containsLegalCharacters(s string) bool {
+	return legalCharactersRegex.MatchString(s)
+}
+
 // newMetricID creates a new metricID instance.
-func newMetricID(name string, label string) (metricID, error) {
-	if !legalCharactersRegex.MatchString(name) {
+func newMetricID(name string, unit string, label string) (metricID, error) {
+	if !containsLegalCharacters(name) {
 		return metricID{}, fmt.Errorf("invalid metric name: %s", name)
 	}
-	if label != "" && !legalCharactersRegex.MatchString(label) {
+	if !containsLegalCharacters(unit) {
+		return metricID{}, fmt.Errorf("invalid metric unit: %s", unit)
+	}
+	if label != "" && !containsLegalCharacters(label) {
 		return metricID{}, fmt.Errorf("invalid metric label: %s", label)
 	}
 	return metricID{
 		name:  name,
+		unit:  unit,
 		label: label,
 	}, nil
 }
@@ -122,9 +132,14 @@ func newMetricID(name string, label string) (metricID, error) {
 // String returns a string representation of the metricID.
 func (i *metricID) String() string {
 	if i.label != "" {
-		return fmt.Sprintf("%s:%s", i.name, i.label)
+		return fmt.Sprintf("%s:%s", i.NameWithUnit(), i.label)
 	}
-	return i.name
+	return i.NameWithUnit()
+}
+
+// NameWithUnit returns the name of the metric with the unit appended.
+func (i *metricID) NameWithUnit() string {
+	return fmt.Sprintf("%s_%s", i.name, i.unit)
 }
 
 // Start starts the metrics server.
@@ -183,7 +198,7 @@ func (m *metrics) NewLatencyMetric(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, label)
+	id, err := newMetricID(name, "ms", label)
 	if err != nil {
 		return nil, err
 	}
@@ -191,11 +206,6 @@ func (m *metrics) NewLatencyMetric(
 	preExistingMetric, ok := m.metricMap[id]
 	if ok {
 		return preExistingMetric.(LatencyMetric), nil
-	}
-
-	if m.isBlacklisted(id) {
-		metric := newLatencyMetric(name, label, description, nil)
-		m.metricMap[id] = metric
 	}
 
 	objectives := make(map[float64]float64, len(quantiles))
@@ -208,10 +218,10 @@ func (m *metrics) NewLatencyMetric(
 		vec = promauto.With(m.registry).NewSummaryVec(
 			prometheus.SummaryOpts{
 				Namespace:  m.config.Namespace,
-				Name:       name,
+				Name:       id.NameWithUnit(),
 				Objectives: objectives,
 			},
-			[]string{"label", "unit"},
+			[]string{"label"},
 		)
 		m.summaryVecMap[name] = vec
 	}
@@ -234,7 +244,7 @@ func (m *metrics) NewCountMetric(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, label)
+	id, err := newMetricID(name, "count", label)
 	if err != nil {
 		return nil, err
 	}
@@ -244,19 +254,14 @@ func (m *metrics) NewCountMetric(
 		return preExistingMetric.(CountMetric), nil
 	}
 
-	if m.isBlacklisted(id) {
-		metric := newCountMetric(name, label, description, nil)
-		m.metricMap[id] = metric
-	}
-
 	vec, ok := m.counterVecMap[name]
 	if !ok {
 		vec = promauto.With(m.registry).NewCounterVec(
 			prometheus.CounterOpts{
 				Namespace: m.config.Namespace,
-				Name:      name,
+				Name:      id.NameWithUnit(),
 			},
-			[]string{"label", "unit"},
+			[]string{"label"},
 		)
 		m.counterVecMap[name] = vec
 	}
@@ -290,7 +295,7 @@ func (m *metrics) newGaugeMetricUnsafe(
 		return nil, errors.New("metrics server is not alive")
 	}
 
-	id, err := newMetricID(name, label)
+	id, err := newMetricID(name, unit, label)
 	if err != nil {
 		return nil, err
 	}
@@ -300,19 +305,14 @@ func (m *metrics) newGaugeMetricUnsafe(
 		return preExistingMetric.(GaugeMetric), nil
 	}
 
-	if m.isBlacklisted(id) {
-		metric := newGaugeMetric(name, label, unit, description, nil)
-		m.metricMap[id] = metric
-	}
-
 	vec, ok := m.gaugeVecMap[name]
 	if !ok {
 		vec = promauto.With(m.registry).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: m.config.Namespace,
-				Name:      name,
+				Name:      id.NameWithUnit(),
 			},
-			[]string{"label", "unit"},
+			[]string{"label"},
 		)
 		m.gaugeVecMap[name] = vec
 	}
@@ -367,27 +367,6 @@ func (m *metrics) NewAutoGauge(
 	return nil
 }
 
-// isBlacklisted returns true if the metric name is blacklisted.
-func (m *metrics) isBlacklisted(id metricID) bool {
-	metric := id.String()
-
-	if m.config.MetricsBlacklist != nil {
-		for _, blacklisted := range m.config.MetricsBlacklist {
-			if metric == blacklisted {
-				return true
-			}
-		}
-	}
-	if m.config.MetricsFuzzyBlacklist != nil {
-		for _, blacklisted := range m.config.MetricsFuzzyBlacklist {
-			if strings.Contains(metric, blacklisted) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (m *metrics) GenerateMetricsDocumentation() string {
 	sb := &strings.Builder{}
 
@@ -406,6 +385,9 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		if a.name != b.name {
 			return strings.Compare(a.name, b.name)
 		}
+		if a.unit != b.unit {
+			return strings.Compare(a.unit, b.unit)
+		}
 		return strings.Compare(a.label, b.label)
 	}
 	slices.SortFunc(metricIDs, sortFunc)
@@ -421,14 +403,25 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		metric := m.metricMap[*id]
 
 		sb.Write([]byte("---\n\n"))
-		sb.Write([]byte(fmt.Sprintf("## %s\n\n", id.String())))
+
+		if id.label == "" {
+			sb.Write([]byte(fmt.Sprintf("## %s\n\n", id.NameWithUnit())))
+		} else {
+			sb.Write([]byte(fmt.Sprintf("## %s: %s\n\n", id.NameWithUnit(), id.label)))
+		}
 		sb.Write([]byte(fmt.Sprintf("%s\n\n", metric.Description())))
-		sb.Write([]byte("| Field | Value |\n"))
+		sb.Write([]byte("|   |   |\n"))
 		sb.Write([]byte("|---|---|\n"))
-		sb.Write([]byte(fmt.Sprintf("| **Name** | '%s' |\n", metric.Name())))
-		sb.Write([]byte(fmt.Sprintf("| **Label** | '%s' |\n", metric.Label())))
-		sb.Write([]byte(fmt.Sprintf("| **Type** | %s |\n", metric.Type())))
+		sb.Write([]byte(fmt.Sprintf("| **Name** | %s |\n", metric.Name())))
 		sb.Write([]byte(fmt.Sprintf("| **Unit** | %s |\n", metric.Unit())))
+		if id.label == "" {
+			sb.Write([]byte(fmt.Sprintf("| **Label** | - |\n")))
+		} else {
+			sb.Write([]byte(fmt.Sprintf("| **Label** | %s |\n", metric.Label())))
+		}
+		sb.Write([]byte(fmt.Sprintf("| **Type** | %s |\n", metric.Type())))
+		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | %s_%s_%s |\n",
+			m.config.Namespace, id.name, id.unit)))
 		enabledString := "enabled"
 		if !metric.Enabled() {
 			enabledString = "disabled"
