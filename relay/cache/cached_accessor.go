@@ -91,7 +91,7 @@ func newAccessResult[V any]() *accessResult[V] {
 	result := &accessResult[V]{
 		sem: semaphore.NewWeighted(1),
 	}
-	result.sem.TryAcquire(1)
+	_ = result.sem.Acquire(context.Background(), 1)
 	return result
 }
 
