@@ -71,7 +71,7 @@ func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 	})
 
 	numRequests, err := metricsServer.NewCountMetric(
-		"requests",
+		"request",
 		"the number of requests",
 		numRequestsLabel{})
 	if err != nil {
