@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
 )
 
@@ -27,17 +28,33 @@ type latencyMetric struct {
 
 // newLatencyMetric creates a new LatencyMetric instance.
 func newLatencyMetric(
+	registry *prometheus.Registry,
+	namespace string,
 	name string,
 	description string,
-	vec *prometheus.SummaryVec,
-	labeler *labelMaker) LatencyMetric {
+	objectives map[float64]float64,
+	labelTemplate any) (LatencyMetric, error) {
+
+	labeler, err := newLabelMaker(labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	vec := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  namespace,
+			Name:       fmt.Sprintf("%s_ms", name),
+			Objectives: objectives,
+		},
+		labeler.getKeys(),
+	)
 
 	return &latencyMetric{
 		name:        name,
 		description: description,
 		vec:         vec,
 		labeler:     labeler,
-	}
+	}, nil
 }
 
 func (m *latencyMetric) Name() string {
@@ -61,11 +78,6 @@ func (m *latencyMetric) LabelFields() []string {
 }
 
 func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error {
-	if m.vec == nil {
-		// metric is not enabled
-		return nil
-	}
-
 	if len(label) > 1 {
 		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
 	}

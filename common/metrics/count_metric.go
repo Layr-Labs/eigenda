@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var _ CountMetric = &countMetric{}
@@ -25,13 +26,32 @@ type countMetric struct {
 }
 
 // newCountMetric creates a new CountMetric instance.
-func newCountMetric(name string, description string, vec *prometheus.CounterVec, labeler *labelMaker) CountMetric {
+func newCountMetric(
+	registry *prometheus.Registry,
+	namespace string,
+	name string,
+	description string,
+	labelTemplate any) (CountMetric, error) {
+
+	labeler, err := newLabelMaker(labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	vec := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_count", name),
+		},
+		labeler.getKeys(),
+	)
+
 	return &countMetric{
 		name:        name,
 		description: description,
 		vec:         vec,
 		labeler:     labeler,
-	}
+	}, nil
 }
 
 func (m *countMetric) Name() string {
@@ -59,10 +79,6 @@ func (m *countMetric) Increment(label ...any) error {
 }
 
 func (m *countMetric) Add(value float64, label ...any) error {
-	if m.vec == nil {
-		return nil
-	}
-
 	if len(label) > 1 {
 		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
@@ -30,20 +29,6 @@ type metrics struct {
 
 	// registry is the prometheus registry used to report metrics.
 	registry *prometheus.Registry
-
-	// TODO these maps are not needed any more!
-
-	// counterVecMap is a map of metric names to prometheus counter vectors.
-	// These are used to create new counter metrics.
-	counterVecMap map[string]*prometheus.CounterVec
-
-	// summaryVecMap is a map of metric names to prometheus summary vectors.
-	// These are used to create new latency metrics.
-	summaryVecMap map[string]*prometheus.SummaryVec
-
-	// gaugeVecMap is a map of metric names to prometheus gauge vectors.
-	// These are used to create new gauge metrics.
-	gaugeVecMap map[string]*prometheus.GaugeVec
 
 	// A map from metricID to Metric instance. If a metric is requested but that metric
 	// already exists, the existing metric will be returned instead of a new one being created.
@@ -88,16 +73,13 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 	}
 
 	m := &metrics{
-		logger:        logger,
-		config:        config,
-		registry:      reg,
-		counterVecMap: make(map[string]*prometheus.CounterVec),
-		summaryVecMap: make(map[string]*prometheus.SummaryVec),
-		gaugeVecMap:   make(map[string]*prometheus.GaugeVec),
-		metricMap:     make(map[metricID]Metric),
-		isAlive:       atomic.Bool{},
-		server:        server,
-		quantilesMap:  make(map[metricID]string),
+		logger:       logger,
+		config:       config,
+		registry:     reg,
+		metricMap:    make(map[metricID]Metric),
+		isAlive:      atomic.Bool{},
+		server:       server,
+		quantilesMap: make(map[metricID]string),
 	}
 	m.isAlive.Store(true)
 	return m
@@ -213,25 +195,18 @@ func (m *metrics) NewLatencyMetric(
 	}
 	m.quantilesMap[id] = quantilesString
 
-	labeler, err := newLabelMaker(labelTemplate)
+	metric, err := newLatencyMetric(
+		m.registry,
+		m.config.Namespace,
+		name,
+		description,
+		objectives,
+		labelTemplate)
+
 	if err != nil {
 		return nil, err
 	}
 
-	vec, ok := m.summaryVecMap[name]
-	if !ok {
-		vec = promauto.With(m.registry).NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace:  m.config.Namespace,
-				Name:       id.NameWithUnit(),
-				Objectives: objectives,
-			},
-			labeler.getKeys(),
-		)
-		m.summaryVecMap[name] = vec
-	}
-
-	metric := newLatencyMetric(name, description, vec, labeler)
 	m.metricMap[id] = metric
 	return metric, nil
 }
@@ -259,24 +234,16 @@ func (m *metrics) NewCountMetric(
 		return preExistingMetric.(CountMetric), nil
 	}
 
-	labeler, err := newLabelMaker(labelTemplate)
+	metric, err := newCountMetric(
+		m.registry,
+		m.config.Namespace,
+		name, description,
+		labelTemplate)
+
 	if err != nil {
 		return nil, err
 	}
 
-	vec, ok := m.counterVecMap[name]
-	if !ok {
-		vec = promauto.With(m.registry).NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: m.config.Namespace,
-				Name:      id.NameWithUnit(),
-			},
-			labeler.getKeys(),
-		)
-		m.counterVecMap[name] = vec
-	}
-
-	metric := newCountMetric(name, description, vec, labeler)
 	m.metricMap[id] = metric
 
 	return metric, nil
@@ -315,26 +282,19 @@ func (m *metrics) newGaugeMetricUnsafe(
 		return preExistingMetric.(GaugeMetric), nil
 	}
 
-	labeler, err := newLabelMaker(labelTemplate)
+	metric, err := newGaugeMetric(
+		m.registry,
+		m.config.Namespace,
+		name,
+		unit,
+		description,
+		labelTemplate)
+
 	if err != nil {
 		return nil, err
 	}
 
-	vec, ok := m.gaugeVecMap[name]
-	if !ok {
-		vec = promauto.With(m.registry).NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: m.config.Namespace,
-				Name:      id.NameWithUnit(),
-			},
-			labeler.getKeys(),
-		)
-		m.gaugeVecMap[name] = vec
-	}
-
-	metric := newGaugeMetric(name, unit, description, vec, labeler)
 	m.metricMap[id] = metric
-
 	return metric, nil
 }
 

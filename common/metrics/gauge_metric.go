@@ -3,6 +3,7 @@ package metrics
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var _ GaugeMetric = &gaugeMetric{}
@@ -29,11 +30,25 @@ type gaugeMetric struct {
 
 // newGaugeMetric creates a new GaugeMetric instance.
 func newGaugeMetric(
+	registry *prometheus.Registry,
+	namespace string,
 	name string,
 	unit string,
 	description string,
-	vec *prometheus.GaugeVec,
-	labeler *labelMaker) GaugeMetric {
+	labelTemplate any) (GaugeMetric, error) {
+
+	labeler, err := newLabelMaker(labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	vec := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_%s", name, unit),
+		},
+		labeler.getKeys(),
+	)
 
 	return &gaugeMetric{
 		name:        name,
@@ -41,7 +56,7 @@ func newGaugeMetric(
 		description: description,
 		vec:         vec,
 		labeler:     labeler,
-	}
+	}, nil
 }
 
 func (m *gaugeMetric) Name() string {
@@ -65,11 +80,6 @@ func (m *gaugeMetric) LabelFields() []string {
 }
 
 func (m *gaugeMetric) Set(value float64, label ...any) error {
-	if m.vec == nil {
-		// metric is not enabled
-		return nil
-	}
-
 	if len(label) > 1 {
 		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
 	}
