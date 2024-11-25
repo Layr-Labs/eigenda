@@ -60,6 +60,10 @@ func (m *gaugeMetric) Type() string {
 	return "gauge"
 }
 
+func (m *gaugeMetric) LabelFields() []string {
+	return m.labeler.getKeys()
+}
+
 func (m *gaugeMetric) Set(value float64, label ...any) error {
 	if m.vec == nil {
 		// metric is not enabled

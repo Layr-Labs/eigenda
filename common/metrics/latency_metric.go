@@ -45,7 +45,7 @@ func (m *latencyMetric) Name() string {
 }
 
 func (m *latencyMetric) Unit() string {
-	return "seconds"
+	return "ms"
 }
 
 func (m *latencyMetric) Description() string {
@@ -54,6 +54,10 @@ func (m *latencyMetric) Description() string {
 
 func (m *latencyMetric) Type() string {
 	return "latency"
+}
+
+func (m *latencyMetric) LabelFields() []string {
+	return m.labeler.getKeys()
 }
 
 func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error {

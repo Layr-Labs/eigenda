@@ -78,6 +78,9 @@ type Metric interface {
 
 	// Type returns the type of the metric.
 	Type() string
+
+	// LabelFields returns the fields of the label template.
+	LabelFields() []string
 }
 
 // GaugeMetric allows specific values to be reported.

@@ -50,6 +50,10 @@ func (m *countMetric) Type() string {
 	return "counter"
 }
 
+func (m *countMetric) LabelFields() []string {
+	return m.labeler.getKeys()
+}
+
 func (m *countMetric) Increment(label ...any) error {
 	return m.Add(1, label...)
 }

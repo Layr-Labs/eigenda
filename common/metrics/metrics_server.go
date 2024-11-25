@@ -423,6 +423,17 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		sb.Write([]byte("|---|---|\n"))
 		sb.Write([]byte(fmt.Sprintf("| **Name** | `%s` |\n", metric.Name())))
 		sb.Write([]byte(fmt.Sprintf("| **Unit** | `%s` |\n", metric.Unit())))
+		labels := metric.LabelFields()
+		if len(labels) > 0 {
+			sb.Write([]byte("| **Labels** | "))
+			for i, label := range labels {
+				sb.Write([]byte(fmt.Sprintf("`%s`", label)))
+				if i < len(labels)-1 {
+					sb.Write([]byte(", "))
+				}
+			}
+			sb.Write([]byte(" |\n"))
+		}
 		sb.Write([]byte(fmt.Sprintf("| **Type** | `%s` |\n", metric.Type())))
 		if metric.Type() == "latency" {
 			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
