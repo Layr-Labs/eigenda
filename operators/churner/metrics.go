@@ -1,15 +1,12 @@
 package churner
 
 import (
-	"context"
-	"fmt"
-	"net/http"
+	"github.com/Layr-Labs/eigenda/common/metrics"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc/codes"
 )
 
@@ -28,7 +25,7 @@ const (
 )
 
 // Note: statusCodeMap must be maintained in sync with failure reason constants.
-var statusCodeMap map[FailReason]string = map[FailReason]string{
+var statusCodeMap = map[FailReason]string{
 	FailReasonRateLimitExceeded:           codes.ResourceExhausted.String(),
 	FailReasonInsufficientStakeToRegister: codes.InvalidArgument.String(),
 	FailReasonInsufficientStakeToChurn:    codes.InvalidArgument.String(),
@@ -40,67 +37,79 @@ var statusCodeMap map[FailReason]string = map[FailReason]string{
 }
 
 type MetricsConfig struct {
-	HTTPPort      string
+	HTTPPort      int
 	EnableMetrics bool
 }
 
 type Metrics struct {
-	registry *prometheus.Registry
+	metricsServer metrics.Metrics
 
-	NumRequests *prometheus.CounterVec
-	Latency     *prometheus.SummaryVec
+	numRequests metrics.CountMetric
+	latency     metrics.LatencyMetric
 
-	httpPort string
-	logger   logging.Logger
+	logger logging.Logger
 }
 
-func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
-	namespace := "eigenda_churner"
+type latencyLabel struct {
+	method string
+}
+
+type numRequestsLabel struct {
+	status string
+	method string
+	reason string
+}
+
+func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
-	metrics := &Metrics{
-		NumRequests: promauto.With(reg).NewCounterVec(
-			prometheus.CounterOpts{
-				Namespace: namespace,
-				Name:      "requests",
-				Help:      "the number of requests",
-			},
-			[]string{"status", "reason", "method"},
-		),
-		Latency: promauto.With(reg).NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace:  namespace,
-				Name:       "latency_ms",
-				Help:       "latency summary in milliseconds",
-				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
-			},
-			[]string{"method"},
-		),
-		registry: reg,
-		httpPort: httpPort,
-		logger:   logger.With("component", "ChurnerMetrics"),
+	metricsServer := metrics.NewMetrics(logger, &metrics.Config{
+		Namespace: "eigenda_churner",
+		HTTPPort:  httpPort,
+	})
+
+	numRequests, err := metricsServer.NewCountMetric(
+		"requests",
+		"the number of requests",
+		numRequestsLabel{})
+	if err != nil {
+		return nil, err
 	}
-	return metrics
+
+	latency, err := metricsServer.NewLatencyMetric(
+		"latency",
+		"latency summary in milliseconds",
+		latencyLabel{},
+		&metrics.Quantile{Quantile: 0.5, Error: 0.05},
+		&metrics.Quantile{Quantile: 0.9, Error: 0.01},
+		&metrics.Quantile{Quantile: 0.95, Error: 0.01},
+		&metrics.Quantile{Quantile: 0.99, Error: 0.001})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Metrics{
+		metricsServer: metricsServer,
+		numRequests:   numRequests,
+		latency:       latency,
+		logger:        logger.With("component", "ChurnerMetrics"),
+	}, nil
 }
 
-// ObserveLatency observes the latency of a stage in 'stage
-func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
-	g.Latency.WithLabelValues(method).Observe(latencyMs)
+// ObserveLatency observes the latency of a stage
+func (g *Metrics) ObserveLatency(method string, latency time.Duration) error {
+	return g.latency.ReportLatency(latency, latencyLabel{method: method})
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests
-func (g *Metrics) IncrementSuccessfulRequestNum(method string) {
-	g.NumRequests.With(prometheus.Labels{
-		"status": "success",
-		"method": method,
-		"reason": "",
-	}).Inc()
+func (g *Metrics) IncrementSuccessfulRequestNum(method string) error {
+	return g.numRequests.Increment(numRequestsLabel{status: "success", method: method})
 }
 
 // IncrementFailedRequestNum increments the number of failed requests
-func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
+func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) error {
 	code, ok := statusCodeMap[reason]
 	if !ok {
 		g.logger.Error("cannot map failure reason to status code", "failure reason", reason)
@@ -108,25 +117,11 @@ func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
 		// handle a negligence of mapping from failure reason to status code.
 		code = codes.Internal.String()
 	}
-	g.NumRequests.With(prometheus.Labels{
-		"status": code,
-		"reason": string(reason),
-		"method": method,
-	}).Inc()
+
+	return g.numRequests.Increment(numRequestsLabel{status: code, reason: string(reason), method: method})
 }
 
 // Start starts the metrics server
-func (g *Metrics) Start(ctx context.Context) {
-	g.logger.Info("Starting metrics server at ", "port", g.httpPort)
-	addr := fmt.Sprintf(":%s", g.httpPort)
-	go func() {
-		log := g.logger
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(
-			g.registry,
-			promhttp.HandlerOpts{},
-		))
-		err := http.ListenAndServe(addr, mux)
-		log.Error("Prometheus server failed", "err", err)
-	}()
+func (g *Metrics) Start() error {
+	return g.metricsServer.Start()
 }

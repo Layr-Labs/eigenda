@@ -145,6 +145,8 @@ func (m *metrics) Start() error {
 	}
 	m.started = true
 
+	m.logger.Infof("Starting metrics server at port %d", m.config.HTTPPort)
+
 	go func() {
 		err := m.server.ListenAndServe()
 		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {

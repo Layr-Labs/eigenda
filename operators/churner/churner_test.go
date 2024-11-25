@@ -28,7 +28,8 @@ func TestProcessChurnRequest(t *testing.T) {
 			NumRetries:       numRetries,
 		},
 	}
-	metrics := churner.NewMetrics("9001", logger)
+	metrics, err := churner.NewMetrics(9001, logger)
+	assert.NoError(t, err)
 	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)
 	assert.NoError(t, err)
 	assert.NotNil(t, cn)

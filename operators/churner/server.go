@@ -47,8 +47,12 @@ func NewServer(
 func (s *Server) Start(metricsConfig MetricsConfig) error {
 	// Enable Metrics Block
 	if metricsConfig.EnableMetrics {
-		httpSocket := fmt.Sprintf(":%s", metricsConfig.HTTPPort)
-		s.metrics.Start(context.Background())
+		httpSocket := fmt.Sprintf(":%d", metricsConfig.HTTPPort)
+		err := s.metrics.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start metrics server: %w", err)
+		}
+
 		s.logger.Info("Enabled metrics for Churner", "socket", httpSocket)
 	}
 	return nil
@@ -57,12 +61,18 @@ func (s *Server) Start(metricsConfig MetricsConfig) error {
 func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnReply, error) {
 	err := s.validateChurnRequest(ctx, req)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid request: %s", err.Error()))
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("Churn", f*1000) // make milliseconds
+		e := s.metrics.ObserveLatency("Churn", time.Duration(f*float64(time.Second)))
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 	}))
 	defer timer.ObserveDuration()
 	s.logger.Info("Received request: ", "QuorumIds", req.GetQuorumIds())
@@ -70,26 +80,38 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	now := time.Now()
 	// Global rate limiting: check that we are after the previous approval's expiry
 	if now.Unix() < s.latestExpiry {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonPrevApprovalNotExpired)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("previous approval not expired, retry in %d seconds", s.latestExpiry-now.Unix()))
 	}
 
 	request, err := createChurnRequest(req)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidRequest)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
 	operatorToRegisterAddress, err := s.churner.VerifyRequestSignature(ctx, request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonInvalidSignature)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request signature: %s", err.Error()))
 	}
 
 	// Per-operator rate limiting: check if the request should be rate limited
 	err = s.checkShouldBeRateLimited(now, *request)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonRateLimitExceeded)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limiter error: %s", err.Error()))
 	}
 
@@ -98,7 +120,10 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
-		s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
+		e := s.metrics.IncrementFailedRequestNum("Churn", FailReasonProcessChurnRequestFailed)
+		if e != nil {
+			s.logger.Error("Failed to increment failed request num", "error", e)
+		}
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to process churn request: %s", err.Error()))
 	}
 
@@ -107,7 +132,10 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 
 	operatorsToChurn := convertToOperatorsToChurnGrpc(response.OperatorsToChurn)
 
-	s.metrics.IncrementSuccessfulRequestNum("Churn")
+	e := s.metrics.IncrementSuccessfulRequestNum("Churn")
+	if e != nil {
+		s.logger.Error("Failed to increment failed request num", "error", e)
+	}
 	return &pb.ChurnReply{
 		SignatureWithSaltAndExpiry: &pb.SignatureWithSaltAndExpiry{
 			Signature: response.SignatureWithSaltAndExpiry.Signature,

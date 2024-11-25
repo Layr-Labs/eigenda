@@ -232,7 +232,10 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// For example, when churnBIPsOfOperatorStake=11000, the operator trying to
 		// register needs to have 1.1 times the stake of the lowest-stake operator.
 		if new(big.Int).Mul(lowestStake, churnBIPsOfOperatorStake).Cmp(new(big.Int).Mul(operatorToRegisterStake, bipMultiplier)) >= 0 {
-			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
+			e := c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToRegister)
+			if e != nil {
+				c.logger.Error("Failed to increment failed request num", "error", e)
+			}
 			msg := "registering operator must have %f%% more than the stake of the " +
 				"lowest-stake operator. Block number used for this decision: %d, " +
 				"registering operator address: %s, registering operator stake: %d, " +
@@ -249,7 +252,10 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		// (i.e. the lowest-stake operator) needs to have less than 10.01% of the total
 		// stake.
 		if new(big.Int).Mul(lowestStake, bipMultiplier).Cmp(new(big.Int).Mul(totalStake, churnBIPsOfTotalStake)) >= 0 {
-			c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
+			e := c.metrics.IncrementFailedRequestNum("getOperatorsToChurn", FailReasonInsufficientStakeToChurn)
+			if e != nil {
+				c.logger.Error("Failed to increment failed request num", "error", e)
+			}
 			msg := "operator to churn out must have less than %f%% of the total stake. " +
 				"Block number used for this decision: %d, operatorId of the operator " +
 				"to churn: %x, stake of the operator to churn: %d, total stake in " +
