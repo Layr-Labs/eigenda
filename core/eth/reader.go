@@ -646,9 +646,9 @@ func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	return 0, nil
 }
 
-func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
+func (t *Reader) GetPricePerSymbol(ctx context.Context) (*big.Int, error) {
 	// contract is not implemented yet
-	return 0, nil
+	return big.NewInt(0), nil
 }
 
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {

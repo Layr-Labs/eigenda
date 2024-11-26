@@ -3,6 +3,7 @@ package meterer
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"slices"
 	"time"
 
@@ -228,11 +229,11 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt+m.PaymentCharged(numSymbols) > header.CumulativePayment.Uint64() {
+	if prevPmt.Add(prevPmt, m.PaymentCharged(numSymbols)).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt != 0 && header.CumulativePayment.Uint64()+m.PaymentCharged(uint(nextPmtnumSymbols)) > nextPmt {
+	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint(nextPmtnumSymbols))).Cmp(nextPmt) > 0 {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
@@ -240,8 +241,8 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 }
 
 // PaymentCharged returns the chargeable price for a given data length
-func (m *Meterer) PaymentCharged(numSymbols uint) uint64 {
-	return uint64(m.SymbolsCharged(numSymbols)) * uint64(m.ChainPaymentState.GetPricePerSymbol())
+func (m *Meterer) PaymentCharged(numSymbols uint) *big.Int {
+	return new(big.Int).Mul(big.NewInt(int64(m.SymbolsCharged(numSymbols))), m.ChainPaymentState.GetPricePerSymbol())
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length

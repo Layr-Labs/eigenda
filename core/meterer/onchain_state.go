@@ -3,6 +3,7 @@ package meterer
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -19,7 +20,7 @@ type OnchainPayment interface {
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetGlobalSymbolsPerSecond() uint64
 	GetMinNumSymbols() uint32
-	GetPricePerSymbol() uint32
+	GetPricePerSymbol() *big.Int
 	GetReservationWindow() uint32
 }
 
@@ -40,7 +41,7 @@ type OnchainPaymentState struct {
 type PaymentVaultParams struct {
 	GlobalSymbolsPerSecond uint64
 	MinNumSymbols          uint32
-	PricePerSymbol         uint32
+	PricePerSymbol         *big.Int
 	ReservationWindow      uint32
 	OnDemandQuorumNumbers  []uint8
 }
@@ -183,7 +184,7 @@ func (pcs *OnchainPaymentState) GetMinNumSymbols() uint32 {
 	return pcs.PaymentVaultParams.MinNumSymbols
 }
 
-func (pcs *OnchainPaymentState) GetPricePerSymbol() uint32 {
+func (pcs *OnchainPaymentState) GetPricePerSymbol() *big.Int {
 	return pcs.PaymentVaultParams.PricePerSymbol
 }
 

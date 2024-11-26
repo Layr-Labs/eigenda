@@ -185,7 +185,7 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 
 // GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, blob size of next payment
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (uint64, uint64, uint32, error) {
+func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (*big.Int, *big.Int, uint32, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),
@@ -199,13 +199,14 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 	smallerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
 	}
-	var prevPayment uint64
+	var prevPayment *big.Int = new(big.Int)
 	if len(smallerResult) > 0 {
-		prevPayment, err = strconv.ParseUint(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
-		if err != nil {
-			return 0, 0, 0, fmt.Errorf("failed to parse previous payment: %w", err)
+		var ok bool
+		prevPayment, ok = prevPayment.SetString(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
 	}
 
@@ -222,18 +223,19 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 	largerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
 	}
-	var nextPayment uint64
+	var nextPayment *big.Int
 	var nextDataLength uint32
 	if len(largerResult) > 0 {
-		nextPayment, err = strconv.ParseUint(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
-		if err != nil {
-			return 0, 0, 0, fmt.Errorf("failed to parse next payment: %w", err)
+		var ok bool
+		nextPayment, ok = new(big.Int).SetString(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("failed to parse next payment: %w", err)
 		}
 		dataLength, err := strconv.ParseUint(largerResult[0]["DataLength"].(*types.AttributeValueMemberN).Value, 10, 32)
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("failed to parse blob size: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse blob size: %w", err)
 		}
 		nextDataLength = uint32(dataLength)
 	}
