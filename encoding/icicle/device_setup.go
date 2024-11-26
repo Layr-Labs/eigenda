@@ -46,6 +46,7 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+
 	var (
 		nttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 		msmCfg         core.MSMConfig

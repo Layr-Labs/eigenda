@@ -5,7 +5,6 @@ package icicle
 import (
 	"fmt"
 	"log/slog"
-	"runtime"
 	"sync"
 	"time"
 
@@ -54,61 +53,61 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	preprocessDone := time.Now()
 
 	// Prepare data before GPU operations
-	flattenCoeffStoreFr := make([]fr.Element, 0, len(coeffStore)*len(coeffStore[0]))
+	flattenCoeffStoreFr := make([]fr.Element, len(coeffStore)*len(coeffStore[0]))
+	idx := 0
 	for i := 0; i < len(coeffStore); i++ {
-		flattenCoeffStoreFr = append(flattenCoeffStoreFr, coeffStore[i]...)
+		copy(flattenCoeffStoreFr[idx:], coeffStore[i])
+		idx += len(coeffStore[i])
 	}
 
 	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
 
-	// Lock the OS thread for operations
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	// Lock the GPU for operations
-	p.GpuLock.Lock()
-	defer p.GpuLock.Unlock()
-
-	// Set device
-	if err := icicleRuntime.SetDevice(&p.Device); err != icicleRuntime.Success {
-		return nil, fmt.Errorf("failed to set device: %v", err)
-	}
-
-	// Copy data to device
-	var flattenStoreCopyToDevice core.DeviceSlice
-	flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
-	defer flattenStoreCopyToDevice.Free()
-
-	// 1. MSM Batch Operation
-	sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
-	if err != nil {
-		return nil, fmt.Errorf("msm error: %v", err)
-	}
-	defer sumVec.Free()
-	msmDone := time.Now()
-
-	// 2. First ECNtt
-	p.NttCfg.BatchSize = int32(numPoly)
-	sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
-	if err != nil {
-		return nil, fmt.Errorf("first ECNtt error: %v", err)
-	}
-	defer sumVecInv.Free()
-	fft1Done := time.Now()
-
-	// 3. Prune and Second ECNtt
-	prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
-	flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
-	if err != nil {
-		return nil, fmt.Errorf("second ECNtt error: %v", err)
-	}
-	defer flatProofsBatch.Free()
-	fft2Done := time.Now()
-
-	// 4. Copy results back to host
+	var msmDone, fft1Done, fft2Done time.Time
 	flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
-	flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	icicleRuntime.RunOnDevice(&p.Device, func(args ...any) {
+		defer wg.Done()
+
+		// Copy data to device
+		var flattenStoreCopyToDevice core.DeviceSlice
+		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
+
+		// 1. MSM Batch Operation
+		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+		if err != nil {
+			panic(fmt.Errorf("msm batch error: %v", err))
+		}
+		msmDone = time.Now()
+
+		// 2. First ECNtt
+		p.NttCfg.BatchSize = int32(numPoly)
+		sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
+		if err != nil {
+			panic(fmt.Errorf("first ECNtt error: %v", err))
+		}
+		fft1Done = time.Now()
+
+		// 3. Prune and Second ECNtt
+		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
+		flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
+		if err != nil {
+			panic(fmt.Errorf("second ECNtt error: %v", err))
+		}
+		fft2Done = time.Now()
+
+		// 4. Copy results back to host
+		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
+
+		// Free memory
+		flatProofsBatch.Free()
+		sumVecInv.Free()
+		sumVec.Free()
+		flattenStoreCopyToDevice.Free()
+	})
+
+	wg.Wait()
 
 	// Convert to final format
 	icicleFFTBatch := icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
