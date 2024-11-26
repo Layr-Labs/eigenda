@@ -196,6 +196,7 @@ func (m *metrics) NewLatencyMetric(
 	m.quantilesMap[id] = quantilesString
 
 	metric, err := newLatencyMetric(
+		m.logger,
 		m.registry,
 		m.config.Namespace,
 		name,
@@ -235,6 +236,7 @@ func (m *metrics) NewCountMetric(
 	}
 
 	metric, err := newCountMetric(
+		m.logger,
 		m.registry,
 		m.config.Namespace,
 		name, description,
@@ -283,6 +285,7 @@ func (m *metrics) newGaugeMetricUnsafe(
 	}
 
 	metric, err := newGaugeMetric(
+		m.logger,
 		m.registry,
 		m.config.Namespace,
 		name,
@@ -331,7 +334,7 @@ func (m *metrics) NewAutoGauge(
 		for m.isAlive.Load() {
 			value := source()
 
-			_ = gauge.Set(value, l)
+			gauge.Set(value, l)
 			<-ticker.C
 		}
 	}

@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -11,6 +12,9 @@ var _ CountMetric = &countMetric{}
 // countMetric a standard implementation of the CountMetric.
 type countMetric struct {
 	Metric
+
+	// logger is the logger used to log errors.
+	logger logging.Logger
 
 	// name is the name of the metric.
 	name string
@@ -27,6 +31,7 @@ type countMetric struct {
 
 // newCountMetric creates a new CountMetric instance.
 func newCountMetric(
+	logger logging.Logger,
 	registry *prometheus.Registry,
 	namespace string,
 	name string,
@@ -47,6 +52,7 @@ func newCountMetric(
 	)
 
 	return &countMetric{
+		logger:      logger,
 		name:        name,
 		description: description,
 		vec:         vec,
@@ -74,27 +80,22 @@ func (m *countMetric) LabelFields() []string {
 	return m.labeler.getKeys()
 }
 
-func (m *countMetric) Increment(label ...any) error {
-	return m.Add(1, label...)
+func (m *countMetric) Increment(label ...any) {
+	m.Add(1, label...)
 }
 
-func (m *countMetric) Add(value float64, label ...any) error {
-	if len(label) > 1 {
-		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
-	}
-
+func (m *countMetric) Add(value float64, label ...any) {
 	var l any
-	if len(label) == 1 {
+	if len(label) > 0 {
 		l = label[0]
 	}
 
 	values, err := m.labeler.extractValues(l)
 	if err != nil {
-		return fmt.Errorf("error extracting values from label for metric %s: %v", m.name, err)
+		m.logger.Errorf("error extracting values from label for metric %s: %v", m.name, err)
+		return
 	}
 
 	observer := m.vec.WithLabelValues(values...)
 	observer.Add(value)
-
-	return nil
 }

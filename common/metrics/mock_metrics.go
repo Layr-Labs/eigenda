@@ -87,12 +87,12 @@ func (m *mockCountMetric) LabelFields() []string {
 	return make([]string, 0)
 }
 
-func (m *mockCountMetric) Increment(label ...any) error {
-	return nil
+func (m *mockCountMetric) Increment(label ...any) {
+
 }
 
-func (m *mockCountMetric) Add(value float64, label ...any) error {
-	return nil
+func (m *mockCountMetric) Add(value float64, label ...any) {
+
 }
 
 var _ GaugeMetric = &mockGaugeMetric{}
@@ -120,8 +120,8 @@ func (m *mockGaugeMetric) LabelFields() []string {
 	return make([]string, 0)
 }
 
-func (m *mockGaugeMetric) Set(value float64, label ...any) error {
-	return nil
+func (m *mockGaugeMetric) Set(value float64, label ...any) {
+
 }
 
 var _ LatencyMetric = &mockLatencyMetric{}
@@ -149,6 +149,6 @@ func (m *mockLatencyMetric) LabelFields() []string {
 	return make([]string, 0)
 }
 
-func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) error {
-	return nil
+func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) {
+
 }

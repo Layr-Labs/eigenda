@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
@@ -12,6 +13,9 @@ var _ LatencyMetric = &latencyMetric{}
 // latencyMetric is a standard implementation of the LatencyMetric interface via prometheus.
 type latencyMetric struct {
 	Metric
+
+	// logger is the logger used to log errors.
+	logger logging.Logger
 
 	// name is the name of the metric.
 	name string
@@ -28,6 +32,7 @@ type latencyMetric struct {
 
 // newLatencyMetric creates a new LatencyMetric instance.
 func newLatencyMetric(
+	logger logging.Logger,
 	registry *prometheus.Registry,
 	namespace string,
 	name string,
@@ -50,6 +55,7 @@ func newLatencyMetric(
 	)
 
 	return &latencyMetric{
+		logger:      logger,
 		name:        name,
 		description: description,
 		vec:         vec,
@@ -77,19 +83,15 @@ func (m *latencyMetric) LabelFields() []string {
 	return m.labeler.getKeys()
 }
 
-func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error {
-	if len(label) > 1 {
-		return fmt.Errorf("too many labels provided, expected 1, got %d", len(label))
-	}
-
+func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) {
 	var l any
-	if len(label) == 1 {
+	if len(label) > 0 {
 		l = label[0]
 	}
 
 	values, err := m.labeler.extractValues(l)
 	if err != nil {
-		return fmt.Errorf("error extracting values from label for metric %s: %v", m.name, err)
+		m.logger.Errorf("error extracting values from label: %v", err)
 	}
 
 	observer := m.vec.WithLabelValues(values...)
@@ -97,6 +99,4 @@ func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error
 	nanoseconds := float64(latency.Nanoseconds())
 	milliseconds := nanoseconds / float64(time.Millisecond)
 	observer.Observe(milliseconds)
-
-	return nil
 }
