@@ -74,7 +74,6 @@ message BlobCommitmentReply {
 // Terminal states are states that will not be updated to a different state:
 // - CERTIFIED
 // - FAILED
-// - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
   UNKNOWN = 0;
 
@@ -90,10 +89,6 @@ enum BlobStatus {
   // FAILED means that the blob has failed permanently (for reasons other than insufficient
   // signatures, which is a separate state)
   FAILED = 4;
-
-  // INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
-  // for at least one quorum.
-  INSUFFICIENT_SIGNATURES = 5;
 }
 
 // SignedBatch is a batch of blobs with a signature.

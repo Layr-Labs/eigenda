@@ -15,7 +15,6 @@ const (
 	Encoded
 	Certified
 	Failed
-	InsufficientSignatures
 )
 
 func (s BlobStatus) String() string {
@@ -28,8 +27,6 @@ func (s BlobStatus) String() string {
 		return "Certified"
 	case Failed:
 		return "Failed"
-	case InsufficientSignatures:
-		return "InsufficientSignatures"
 	default:
 		return "Unknown"
 	}
@@ -45,8 +42,6 @@ func (s BlobStatus) ToProfobuf() pb.BlobStatus {
 		return pb.BlobStatus_CERTIFIED
 	case Failed:
 		return pb.BlobStatus_FAILED
-	case InsufficientSignatures:
-		return pb.BlobStatus_INSUFFICIENT_SIGNATURES
 	default:
 		return pb.BlobStatus_UNKNOWN
 	}
@@ -62,8 +57,6 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 		return Certified, nil
 	case pb.BlobStatus_FAILED:
 		return Failed, nil
-	case pb.BlobStatus_INSUFFICIENT_SIGNATURES:
-		return InsufficientSignatures, nil
 	default:
 		return 0, fmt.Errorf("unknown blob status: %v", s)
 	}
