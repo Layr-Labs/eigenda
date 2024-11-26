@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 
@@ -280,6 +281,11 @@ func NewNode(
 // Start starts the Node. If the node is not registered, register it on chain, otherwise just
 // update its socket on chain.
 func (n *Node) Start(ctx context.Context) error {
+	pprofProfiler := pprof.NewPprofProfiler(n.Config.PprofHttpPort, n.Logger)
+	if n.Config.EnablePprof {
+		go pprofProfiler.Start()
+		n.Logger.Info("Enabled pprof for Node", "port", n.Config.PprofHttpPort)
+	}
 	if n.Config.EnableMetrics {
 		n.Metrics.Start()
 		n.Logger.Info("Enabled metrics", "socket", n.Metrics.socketAddr)
