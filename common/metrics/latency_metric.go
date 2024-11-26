@@ -95,7 +95,7 @@ func (m *latencyMetric) ReportLatency(latency time.Duration, label ...any) error
 	observer := m.vec.WithLabelValues(values...)
 
 	nanoseconds := float64(latency.Nanoseconds())
-	milliseconds := nanoseconds / 1e6
+	milliseconds := nanoseconds / float64(time.Millisecond)
 	observer.Observe(milliseconds)
 
 	return nil
