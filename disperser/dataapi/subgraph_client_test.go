@@ -73,33 +73,6 @@ var (
 		},
 	}
 
-	subgraphThreeOperatorsDeregistered = []*subgraph.Operator{
-		{
-			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
-			OperatorId:      "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311",
-			Operator:        "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
-			BlockTimestamp:  "1702666046",
-			BlockNumber:     "22",
-			TransactionHash: "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f211",
-		},
-		{
-			Id:              "0x000763bb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f224",
-			OperatorId:      "0xe23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312",
-			Operator:        "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f213",
-			BlockTimestamp:  "1702666070",
-			BlockNumber:     "24",
-			TransactionHash: "0x000224fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f213",
-		},
-		{
-			Id:              "0x000763bb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f226",
-			OperatorId:      "0xe24cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313",
-			Operator:        "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f217",
-			BlockTimestamp:  "1702666070",
-			BlockNumber:     "24",
-			TransactionHash: "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f217",
-		},
-	}
-
 	subgraphOperatorDeregisteredInvalidTimeStamp = []*subgraph.Operator{
 		{
 			Id:              "0x000763fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
@@ -335,25 +308,6 @@ var (
 		},
 	}
 
-	subgraphIndexedOperatorInfo3 = &subgraph.IndexedOperatorInfo{
-		Id:         "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
-		PubkeyG1_X: "3336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "15195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"21597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"11405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"9416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"13612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "localhost:32010;32011",
-			},
-		},
-	}
-
 	subgraphIndexedOperatorInfoNoSocketInfo = &subgraph.IndexedOperatorInfo{
 		Id:         "0x000223fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f222",
 		PubkeyG1_X: "3336192159512049190945679273141887248666932624338963482128432381981287252980",
@@ -391,19 +345,6 @@ var (
 			BlockTimestamp:  "1702666070",
 			BlockNumber:     "24",
 			TransactionHash: "0x000224fb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f213",
-		},
-	}
-
-	subgraphDeregisteredOperatorInfo3 = &subgraph.OperatorInfo{
-		IndexedOperatorInfo: subgraphIndexedOperatorInfo2,
-		BlockNumber:         24,
-		Metadata: &subgraph.Operator{
-			Id:              "0x000763bb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f226",
-			OperatorId:      "0xe24cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568313",
-			Operator:        "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f217",
-			BlockTimestamp:  "1702666070",
-			BlockNumber:     "24",
-			TransactionHash: "0x000224cb86a79eda47c891d8826474d80b6a935ad2a2b5de921933e05c67f320f217",
 		},
 	}
 

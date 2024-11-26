@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	v2blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
@@ -89,15 +90,16 @@ func RunDataApi(ctx *cli.Context) error {
 	}
 
 	var (
-		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
-		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
-		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
-		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
-		chainState        = coreeth.NewChainState(tx, client)
-		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
-		server            = dataapi.NewServer(
+		promClient          = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
+		blobMetadataStore   = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
+		sharedStorage       = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
+		blobMetadataStoreV2 = v2blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobMetadataStoreV2)
+		subgraphApi         = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
+		subgraphClient      = dataapi.NewSubgraphClient(subgraphApi, logger)
+		chainState          = coreeth.NewChainState(tx, client)
+		indexedChainState   = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		metrics             = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		server              = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,
@@ -107,6 +109,7 @@ func RunDataApi(ctx *cli.Context) error {
 				BatcherHealthEndpt: config.BatcherHealthEndpt,
 			},
 			sharedStorage,
+			blobMetadataStoreV2,
 			promClient,
 			subgraphClient,
 			tx,

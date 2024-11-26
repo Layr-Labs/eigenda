@@ -46,6 +46,16 @@ func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.L
 	}
 }
 
+func NewBlobMetadataStoreV2(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string, ttl time.Duration) *BlobMetadataStore {
+	logger.Debugf("creating blob metadata store v2 with table %s with TTL: %s", tableName, ttl)
+	return &BlobMetadataStore{
+		dynamoDBClient: dynamoDBClient,
+		logger:         logger.With("component", "BlobMetadataStoreV2"),
+		tableName:      tableName,
+		ttl:            ttl,
+	}
+}
+
 func (s *BlobMetadataStore) QueueNewBlobMetadata(ctx context.Context, blobMetadata *disperser.BlobMetadata) error {
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {

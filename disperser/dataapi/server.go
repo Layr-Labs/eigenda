@@ -24,6 +24,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	v2blobstore "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -196,6 +197,7 @@ type (
 		allowOrigins      []string
 		logger            logging.Logger
 		blobstore         disperser.BlobStore
+		blobstoreV2       *v2blobstore.BlobMetadataStore
 		promClient        PrometheusClient
 		subgraphClient    SubgraphClient
 		transactor        core.Reader
@@ -214,6 +216,7 @@ type (
 func NewServer(
 	config Config,
 	blobstore disperser.BlobStore,
+	blobstoreV2 *v2blobstore.BlobMetadataStore,
 	promClient PrometheusClient,
 	subgraphClient SubgraphClient,
 	transactor core.Reader,
@@ -245,6 +248,7 @@ func NewServer(
 		socketAddr:                config.SocketAddr,
 		allowOrigins:              config.AllowOrigins,
 		blobstore:                 blobstore,
+		blobstoreV2:               blobstoreV2,
 		promClient:                promClient,
 		subgraphClient:            subgraphClient,
 		transactor:                transactor,
