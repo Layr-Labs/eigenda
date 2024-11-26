@@ -313,6 +313,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
 	}
+	PprofHttpPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
+		Usage:    "the http port which the pprof server is listening",
+		Required: false,
+		Value:    "6060",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PPROF_HTTP_PORT"),
+	}
+	EnablePprof = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "start prrof server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -361,6 +374,8 @@ var optionalFlags = []cli.Flag{
 	BLSSignerCertFileFlag,
 	EnableV2Flag,
 	OnchainStateRefreshIntervalFlag,
+	PprofHttpPort,
+	EnablePprof,
 }
 
 func init() {
