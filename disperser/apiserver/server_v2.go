@@ -226,7 +226,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
-	currentBinUsage, nextBinUsage, overflowBinUsage, err := s.meterer.OffchainStore.GetBinUsages(ctx, req.AccountId, currentBinIndex)
+	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentBinIndex)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}
@@ -258,20 +258,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams: &paymentGlobalParams,
-		BinRecords: []*pb.BinRecord{
-			{
-				Index: uint32(currentBinIndex),
-				Usage: uint64(currentBinUsage),
-			},
-			{
-				Index: uint32(currentBinIndex + 1),
-				Usage: uint64(nextBinUsage),
-			},
-			{
-				Index: uint32(currentBinIndex + 2),
-				Usage: uint64(overflowBinUsage),
-			},
-		},
+		BinRecords:          binRecords[:],
 		Reservation: &pb.Reservation{
 			SymbolsPerSecond: reservation.SymbolsPerSec,
 			StartTimestamp:   uint32(reservation.StartTimestamp),
