@@ -3,6 +3,7 @@
 package icicle
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
@@ -31,10 +32,21 @@ func (g *RsIcicleBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, err
 	scalars := core.HostSliceFromElements[iciclebn254.ScalarField](scalarsSF)
 	outputDevice := make(core.HostSlice[iciclebn254.ScalarField], len(coeffs))
 
+	// Set device
+	err := icicleRuntime.SetDevice(&g.Device)
+	if err != icicleRuntime.Success {
+		return nil, fmt.Errorf("failed to set device: %v", err.AsString())
+	}
+
 	// Perform NTT
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	icicleRuntime.RunOnDevice(&g.Device, func(args ...any) {
+		defer wg.Done()
 		ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
 	})
+
+	wg.Wait()
 
 	// Convert back to fr.Element
 	evals := icicle.ConvertScalarFieldsToFrBytes(outputDevice)

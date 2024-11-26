@@ -65,6 +65,13 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 
 	var msmDone, fft1Done, fft2Done time.Time
 	flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
+
+	// Set device
+	icicleErr := icicleRuntime.SetDevice(&p.Device)
+	if icicleErr != icicleRuntime.Success {
+		return nil, fmt.Errorf("failed to set device: %v", icicleErr.AsString())
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	icicleRuntime.RunOnDevice(&p.Device, func(args ...any) {
