@@ -67,7 +67,11 @@ func (s *EncoderServer) Start() error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer(opt,
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		),
+	)
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
 	s.grpcMetrics.InitializeMetrics(gs)
