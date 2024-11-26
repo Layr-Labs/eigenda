@@ -678,7 +678,14 @@ func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
-	return t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
+	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
 		Context: ctx,
 	}, [32]byte(operatorId))
+	if err != nil {
+		return "", err
+	}
+	if socket == "" {
+		return "", errors.New("operator socket string is empty, check operator with id: " + operatorId.Hex())
+	}
+	return socket, nil
 }
