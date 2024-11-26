@@ -70,6 +70,7 @@ func (s *EncoderServer) Start() error {
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Encoder_ServiceDesc.ServiceName
