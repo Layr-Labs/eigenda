@@ -70,7 +70,7 @@ var (
 	}
 	GPUEnableFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "gpu-enable"),
-		Usage:    "Enable GPU",
+		Usage:    "Enable GPU, falls back to CPU if not available",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GPU_ENABLE"),
 	}

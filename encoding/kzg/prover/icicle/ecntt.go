@@ -25,20 +25,19 @@ func (c *KzgMultiProofIcicleBackend) ECNttOnDevice(batchPoints core.DeviceSlice,
 	var out core.DeviceSlice
 
 	output, err := out.Malloc(p.Size(), totalSize)
-
 	if err != runtime.Success {
-		return out, fmt.Errorf("%v", "Allocating bytes on device for Projective results failed")
+		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
 	if isInverse {
 		err := ecntt.ECNtt(batchPoints, core.KInverse, &c.NttCfg, output)
 		if err != runtime.Success {
-			return out, fmt.Errorf("inverse ecntt failed")
+			return out, fmt.Errorf("inverse ecntt failed: %v", err.AsString())
 		}
 	} else {
 		err := ecntt.ECNtt(batchPoints, core.KForward, &c.NttCfg, output)
 		if err != runtime.Success {
-			return out, fmt.Errorf("forward ecntt failed")
+			return out, fmt.Errorf("forward ecntt failed: %v", err.AsString())
 		}
 	}
 

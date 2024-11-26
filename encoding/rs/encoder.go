@@ -1,14 +1,15 @@
 package rs
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
+	gnarkencoder "github.com/Layr-Labs/eigenda/encoding/rs/gnark"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-
 	_ "go.uber.org/automaxprocs"
 )
 
@@ -90,14 +91,14 @@ func (e *Encoder) CreateFFTSettings(params encoding.EncodingParams) *fft.FFTSett
 
 func (e *Encoder) createGnarkBackendEncoder(params encoding.EncodingParams, fs *fft.FFTSettings) (*ParametrizedEncoder, error) {
 	if e.Config.GPUEnable {
-		return nil, fmt.Errorf("GPU is not supported in default backend")
+		return nil, errors.New("GPU is not supported in gnark backend")
 	}
 
 	return &ParametrizedEncoder{
 		Config:            e.Config,
 		EncodingParams:    params,
 		Fs:                fs,
-		RSEncoderComputer: &RsDefaultComputeDevice{Fs: fs},
+		RSEncoderComputer: &gnarkencoder.RsGnarkBackend{Fs: fs},
 	}, nil
 }
 

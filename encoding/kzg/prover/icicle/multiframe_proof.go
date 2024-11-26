@@ -5,7 +5,7 @@ package icicle
 import (
 	"fmt"
 	"log/slog"
-	"sync"
+	"runtime"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -16,7 +16,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	iciclebn254 "github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
-	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
+	icicleRuntime "github.com/ingonyama-zk/icicle/v3/wrappers/golang/runtime"
 )
 
 type KzgMultiProofIcicleBackend struct {
@@ -28,7 +28,7 @@ type KzgMultiProofIcicleBackend struct {
 	Srs            *kzg.SRS
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
-	Device         runtime.Device
+	Device         icicleRuntime.Device
 }
 
 type WorkerResult struct {
@@ -40,45 +40,19 @@ type WorkerResult struct {
 func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element, numChunks, chunkLen, numWorker uint64) ([]bn254.G1Affine, error) {
 	begin := time.Now()
 
-	// Robert: Standardizing this to use the same math used in precomputeSRS
 	dimE := numChunks
 	l := chunkLen
 	numPoly := uint64(len(polyFr)) / dimE / chunkLen
 
-	jobChan := make(chan uint64, numWorker)
-	results := make(chan WorkerResult, numWorker)
-
-	// create storage for intermediate fft outputs
-	coeffStore := make([][]fr.Element, dimE*2)
-	for i := range coeffStore {
-		coeffStore[i] = make([]fr.Element, l)
-	}
-
-	for w := uint64(0); w < numWorker; w++ {
-		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
-	}
-
-	for j := uint64(0); j < l; j++ {
-		jobChan <- j
-	}
-	close(jobChan)
-
-	// return last error
-	var err error
-	for w := uint64(0); w < numWorker; w++ {
-		wr := <-results
-		if wr.err != nil {
-			err = wr.err
-		}
-	}
-
+	// Pre-processing stage - CPU computations
+	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {
-		return nil, fmt.Errorf("proof worker error: %v", err)
+		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
-
 	preprocessDone := time.Now()
 
-	flattenCoeffStoreFr := make([]fr.Element, 0)
+	// Prepare data before GPU operations
+	flattenCoeffStoreFr := make([]fr.Element, 0, len(coeffStore)*len(coeffStore[0]))
 	for i := 0; i < len(coeffStore); i++ {
 		flattenCoeffStoreFr = append(flattenCoeffStoreFr, coeffStore[i]...)
 	}
@@ -86,75 +60,103 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
 
-	var icicleFFTBatch []bn254.G1Affine
-	var icicleErr error
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	// Lock the OS thread for GPU operations
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
-	var msmDone, firstECNttDone, secondECNttDone time.Time
-	runtime.RunOnDevice(&p.Device, func(args ...any) {
-		defer wg.Done()
+	// Set device
+	originalDevice, icicleErr := icicleRuntime.GetActiveDevice()
+	if icicleErr != icicleRuntime.Success {
+		return nil, fmt.Errorf("failed to get active device: %v", err)
+	}
+	defer icicleRuntime.SetDevice(originalDevice)
 
-		// Copy the flatten coeff to device
-		var flattenStoreCopyToDevice core.DeviceSlice
-		flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
-
-		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
-		if err != nil {
-			icicleErr = fmt.Errorf("msm error: %w", err)
-		}
-
-		// Free the flatten coeff store
-		flattenStoreCopyToDevice.Free()
-
-		msmDone = time.Now()
-
-		// Compute the first ecntt, and set new batch size for ntt
-		p.NttCfg.BatchSize = int32(numPoly)
-		sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
-		if err != nil {
-			icicleErr = fmt.Errorf("first ECNtt error: %w", err)
-		}
-
-		sumVec.Free()
-
-		firstECNttDone = time.Now()
-
-		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
-
-		// Compute the second ecntt on the reduced size array
-		flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
-		if err != nil {
-			icicleErr = fmt.Errorf("second ECNtt error: %w", err)
-		}
-
-		prunedSumVecInv.Free()
-
-		secondECNttDone = time.Now()
-
-		flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
-		flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
-		flatProofsBatch.Free()
-		icicleFFTBatch = icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
-	})
-
-	wg.Wait()
-
-	if icicleErr != nil {
-		return nil, icicleErr
+	if err := icicleRuntime.SetDevice(&p.Device); err != icicleRuntime.Success {
+		return nil, fmt.Errorf("failed to set device: %v", err)
 	}
 
-	end := time.Now()
+	// Copy data to device
+	var flattenStoreCopyToDevice core.DeviceSlice
+	flattenCoeffStoreCopy.CopyToDevice(&flattenStoreCopyToDevice, true)
+	defer flattenStoreCopyToDevice.Free()
+
+	// 1. MSM Batch Operation
+	sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
+	if err != nil {
+		return nil, fmt.Errorf("msm error: %v", err)
+	}
+	defer sumVec.Free()
+	msmDone := time.Now()
+
+	// 2. First ECNtt
+	p.NttCfg.BatchSize = int32(numPoly)
+	sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
+	if err != nil {
+		return nil, fmt.Errorf("first ECNtt error: %v", err)
+	}
+	defer sumVecInv.Free()
+	fft1Done := time.Now()
+
+	// 3. Prune and Second ECNtt
+	prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
+	flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
+	if err != nil {
+		return nil, fmt.Errorf("second ECNtt error: %v", err)
+	}
+	defer flatProofsBatch.Free()
+	fft2Done := time.Now()
+
+	// 4. Copy results back to host
+	flatProofsBatchHost := make(core.HostSlice[iciclebn254.Projective], int(numPoly)*int(dimE))
+	flatProofsBatchHost.CopyFromDevice(&flatProofsBatch)
+
+	// Convert to final format
+	icicleFFTBatch := icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
 
 	slog.Info("Multiproof Time Decomp",
-		"total", end.Sub(begin),
 		"preproc", preprocessDone.Sub(begin),
 		"msm", msmDone.Sub(preprocessDone),
-		"fft1", firstECNttDone.Sub(msmDone),
-		"fft2", secondECNttDone.Sub(firstECNttDone),
+		"fft1", fft1Done.Sub(msmDone),
+		"fft2", fft2Done.Sub(fft1Done),
 	)
 
 	return icicleFFTBatch, nil
+}
+
+// Helper function to handle coefficient computation
+func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([][]fr.Element, error) {
+	jobChan := make(chan uint64, numWorker)
+	results := make(chan WorkerResult, numWorker)
+
+	coeffStore := make([][]fr.Element, dimE*2)
+	for i := range coeffStore {
+		coeffStore[i] = make([]fr.Element, l)
+	}
+
+	// Start workers
+	for w := uint64(0); w < numWorker; w++ {
+		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
+	}
+
+	// Send jobs
+	for j := uint64(0); j < l; j++ {
+		jobChan <- j
+	}
+	close(jobChan)
+
+	// Collect results
+	var lastErr error
+	for w := uint64(0); w < numWorker; w++ {
+		if wr := <-results; wr.err != nil {
+			lastErr = wr.err
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("proof worker error: %v", lastErr)
+	}
+
+	return coeffStore, nil
 }
 
 func (p *KzgMultiProofIcicleBackend) proofWorker(

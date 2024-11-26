@@ -2,7 +2,7 @@ package rs
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -44,19 +44,17 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 	if err != nil {
 		return nil, nil, err
 	}
+	paddingDuration := time.Since(intermediate)
 
-	if g.Config.Verbose {
-		log.Printf("    Padding takes  %v\n", time.Since(intermediate))
-	}
+	intermediate = time.Now()
 
 	polyEvals, err := encoder.RSEncoderComputer.ExtendPolyEval(pdCoeffs)
 	if err != nil {
 		return nil, nil, err
 	}
+	extensionDuration := time.Since(intermediate)
 
-	if g.Config.Verbose {
-		log.Printf("    Extending evaluation takes  %v\n", time.Since(intermediate))
-	}
+	intermediate = time.Now()
 
 	// create frames to group relevant info
 	frames, indices, err := encoder.MakeFrames(polyEvals)
@@ -64,8 +62,16 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 		return nil, nil, err
 	}
 
-	log.Printf("  SUMMARY: RSEncode %v byte among %v numChunks with chunkLength %v takes %v\n",
-		len(inputFr)*encoding.BYTES_PER_SYMBOL, encoder.NumChunks, encoder.ChunkLength, time.Since(start))
+	framesDuration := time.Since(intermediate)
+
+	slog.Info("RSEncode details",
+		"input_size_bytes", len(inputFr)*encoding.BYTES_PER_SYMBOL,
+		"num_chunks", encoder.NumChunks,
+		"chunk_length", encoder.ChunkLength,
+		"padding_duration", paddingDuration,
+		"extension_duration", extensionDuration,
+		"frames_duration", framesDuration,
+		"total_duration", time.Since(start))
 
 	return frames, indices, nil
 }

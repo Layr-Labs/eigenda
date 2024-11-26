@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	gnarkprover "github.com/Layr-Labs/eigenda/encoding/kzg/prover/gnark"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	_ "go.uber.org/automaxprocs"
@@ -382,7 +383,7 @@ func (p *Prover) newProver(params encoding.EncodingParams) (*ParametrizedProver,
 
 func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *fft.FFTSettings, ks *kzg.KZGSettings) (*ParametrizedProver, error) {
 	if p.Config.GPUEnable {
-		return nil, fmt.Errorf("GPU is not supported in default backend")
+		return nil, errors.New("GPU is not supported in gnark backend")
 	}
 
 	_, fftPointsT, err := p.SetupFFTPoints(params)
@@ -394,16 +395,16 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 	t := uint8(math.Log2(float64(2 * params.NumChunks)))
 	sfs := fft.NewFFTSettings(t)
 
-	// Set KZG Prover default backend
-	multiproofBackend := &KzgMultiProofGnarkBackend{
+	// Set KZG Prover gnark backend
+	multiproofBackend := &gnarkprover.KzgMultiProofGnarkBackend{
 		Fs:         fs,
 		FFTPointsT: fftPointsT,
 		SFs:        sfs,
 		KzgConfig:  p.KzgConfig,
 	}
 
-	// Set KZG Commitments default backend
-	commitmentsBackend := &KzgCommitmentsGnarkBackend{
+	// Set KZG Commitments gnark backend
+	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
 		Srs:        p.Srs,
 		G2Trailing: p.G2Trailing,
 		KzgConfig:  p.KzgConfig,

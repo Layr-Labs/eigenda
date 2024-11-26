@@ -1,4 +1,4 @@
-package prover
+package gnark
 
 import (
 	"fmt"

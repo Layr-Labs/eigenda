@@ -27,7 +27,7 @@ func CreateIcicleBackendEncoder(e *Encoder, params encoding.EncodingParams, fs *
 		Config:         e.Config,
 		EncodingParams: params,
 		Fs:             fs,
-		RSEncoderComputer: &rsicicle.RsIcicleComputeDevice{
+		RSEncoderComputer: &rsicicle.RsIcicleBackend{
 			NttCfg: icicleDevice.NttCfg,
 			Device: icicleDevice.Device,
 		},

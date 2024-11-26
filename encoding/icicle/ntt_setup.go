@@ -3,8 +3,6 @@
 package icicle
 
 import (
-	"log"
-
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/core"
 	"github.com/ingonyama-zk/icicle/v3/wrappers/golang/curves/bn254"
@@ -16,15 +14,14 @@ import (
 // It returns the NTT configuration and an error if the initialization fails.
 func SetupNTT(maxScale uint8) (core.NTTConfig[[bn254.SCALAR_LIMBS]uint32], runtime.EIcicleError) {
 	cfg := core.GetDefaultNTTInitDomainConfig()
-
-	e := initDomain(int(maxScale), cfg)
-	if e != runtime.Success {
-		log.Println("Error")
-	}
-
 	cfgBn254 := ntt.GetDefaultNttConfig()
 	cfgBn254.IsAsync = true
 	cfgBn254.Ordering = core.KNN
+
+	err := initDomain(int(maxScale), cfg)
+	if err != runtime.Success {
+		return cfgBn254, err
+	}
 
 	streamBn254, err := runtime.CreateStream()
 	if err != runtime.Success {

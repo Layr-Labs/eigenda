@@ -1,4 +1,4 @@
-package prover
+package gnark
 
 import (
 	"fmt"
@@ -31,42 +31,15 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, 
 	dimE := numChunks
 	l := chunkLen
 
-	sumVec := make([]bn254.G1Affine, dimE*2)
-
-	jobChan := make(chan uint64, numWorker)
-	results := make(chan WorkerResult, numWorker)
-
-	// create storage for intermediate fft outputs
-	coeffStore := make([][]fr.Element, dimE*2)
-	for i := range coeffStore {
-		coeffStore[i] = make([]fr.Element, l)
-	}
-
-	for w := uint64(0); w < numWorker; w++ {
-		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
-	}
-
-	for j := uint64(0); j < l; j++ {
-		jobChan <- j
-	}
-	close(jobChan)
-
-	// return last error
-	var err error
-	for w := uint64(0); w < numWorker; w++ {
-		wr := <-results
-		if wr.err != nil {
-			err = wr.err
-		}
-	}
-
+	// Pre-processing stage
+	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {
-		return nil, fmt.Errorf("proof worker error: %v", err)
+		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
-
 	preprocessDone := time.Now()
 
 	// compute proof by multi scaler multiplication
+	sumVec := make([]bn254.G1Affine, dimE*2)
 	msmErrors := make(chan error, dimE*2)
 	for i := uint64(0); i < dimE*2; i++ {
 
@@ -112,6 +85,42 @@ func (p *KzgMultiProofGnarkBackend) ComputeMultiFrameProof(polyFr []fr.Element, 
 	)
 
 	return proofs, nil
+}
+
+// Helper function to handle coefficient computation
+func (p *KzgMultiProofGnarkBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([][]fr.Element, error) {
+	jobChan := make(chan uint64, numWorker)
+	results := make(chan WorkerResult, numWorker)
+
+	coeffStore := make([][]fr.Element, dimE*2)
+	for i := range coeffStore {
+		coeffStore[i] = make([]fr.Element, l)
+	}
+
+	// Start workers
+	for w := uint64(0); w < numWorker; w++ {
+		go p.proofWorker(polyFr, jobChan, l, dimE, coeffStore, results)
+	}
+
+	// Send jobs
+	for j := uint64(0); j < l; j++ {
+		jobChan <- j
+	}
+	close(jobChan)
+
+	// Collect results
+	var lastErr error
+	for w := uint64(0); w < numWorker; w++ {
+		if wr := <-results; wr.err != nil {
+			lastErr = wr.err
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("proof worker error: %v", lastErr)
+	}
+
+	return coeffStore, nil
 }
 
 func (p *KzgMultiProofGnarkBackend) proofWorker(

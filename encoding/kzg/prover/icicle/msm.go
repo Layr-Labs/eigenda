@@ -20,14 +20,13 @@ func (c *KzgMultiProofIcicleBackend) MsmBatchOnDevice(rowsFrIcicleCopy core.Devi
 	var out core.DeviceSlice
 
 	_, err := out.Malloc(p.Size(), totalSize)
-
 	if err != runtime.Success {
-		return out, fmt.Errorf("%v", "Allocating bytes on device for Projective results failed")
+		return out, fmt.Errorf("allocating bytes on device failed: %v", err.AsString())
 	}
 
 	err = msm.Msm(rowsFrIcicleCopy, rowsG1IcicleCopy, &c.MsmCfg, out)
 	if err != runtime.Success {
-		return out, fmt.Errorf("%v", "Msm failed")
+		return out, fmt.Errorf("msm error: %v", err.AsString())
 	}
 
 	return out, nil
