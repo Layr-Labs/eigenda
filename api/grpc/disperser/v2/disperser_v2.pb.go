@@ -431,7 +431,7 @@ type GetPaymentStateRequest struct {
 
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Signature over the account ID
-	// TODO: sign over a bin index to mitigate signature replay attacks
+	// TODO: sign over a bin index or a nonce to mitigate signature replay attacks
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
@@ -932,8 +932,8 @@ func (x *Reservation) GetQuorumSplit() []uint32 {
 	return nil
 }
 
-// BinRecord is the usage record of an account in a bin. The API should return
-// the active bin record and the subsequent two records to include potential overflows.
+// BinRecord is the usage record of an account in a bin. The API should return the active bin
+// record and the subsequent two records that contains potential overflows.
 type BinRecord struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
