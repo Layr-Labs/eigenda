@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"time"
 )
 
@@ -60,6 +61,10 @@ func (m *mockMetrics) NewAutoGauge(
 	source func() float64,
 	label ...any) error {
 	return nil
+}
+
+func (m *mockMetrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
+
 }
 
 var _ CountMetric = &mockCountMetric{}

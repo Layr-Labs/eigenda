@@ -428,3 +428,7 @@ func (m *metrics) WriteMetricsDocumentation(fileName string) error {
 
 	return nil
 }
+
+func (m *metrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
+	m.registry.MustRegister(collectors...)
+}

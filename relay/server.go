@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"net"
 	"time"
 
@@ -57,6 +58,9 @@ type Server struct {
 
 	// chainReader is the core.Reader used to fetch blob parameters.
 	chainReader core.Reader
+
+	// metrics encapsulates the metrics for the relay server.
+	relayMetrics *metrics.RelayMetrics
 }
 
 type Config struct {
@@ -124,8 +128,8 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
-	ics core.IndexedChainState,
-) (*Server, error) {
+	ics core.IndexedChainState) (*Server, error) {
+
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
 	}
@@ -184,6 +188,11 @@ func NewServer(
 		}
 	}
 
+	relayMetrics, err := metrics.NewRelayMetrics(logger, nil) // TODO config
+	if err != nil {
+		return nil, fmt.Errorf("error creating metrics: %w", err)
+	}
+
 	return &Server{
 		config:           config,
 		logger:           logger,
@@ -193,6 +202,7 @@ func NewServer(
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits),
 		authenticator:    authenticator,
+		relayMetrics:     relayMetrics,
 	}, nil
 }
 
@@ -445,7 +455,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
 
-	s.grpcServer = grpc.NewServer(opt)
+	s.grpcServer = grpc.NewServer(opt, s.relayMetrics.GetGRPCServerOption())
 	reflection.Register(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 

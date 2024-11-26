@@ -1,6 +1,9 @@
 package metrics
 
-import "time"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"time"
+)
 
 // Metrics provides a convenient interface for reporting metrics.
 type Metrics interface {
@@ -62,6 +65,9 @@ type Metrics interface {
 		pollPeriod time.Duration,
 		source func() float64,
 		label ...any) error
+
+	// RegisterExternalMetrics registers prometheus collectors created outside the metrics framework.
+	RegisterExternalMetrics(collectors ...prometheus.Collector)
 }
 
 // Metric represents a metric that can be reported.
