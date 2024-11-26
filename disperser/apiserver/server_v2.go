@@ -279,7 +279,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			QuorumNumbers:    quorumNumbers,
 		},
 		CumulativePayment:        largestCumulativePayment.Bytes(),
-		OnChainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
 	}
 	return reply, nil
 }
