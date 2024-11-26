@@ -98,6 +98,11 @@ func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 	}, nil
 }
 
+// WriteMetricsDocumentation writes the metrics for the churner to a markdown file.
+func (g *Metrics) WriteMetricsDocumentation() error {
+	return g.metricsServer.WriteMetricsDocumentation("operators/churner/churner-metrics.md")
+}
+
 // ObserveLatency observes the latency of a stage
 func (g *Metrics) ObserveLatency(method string, latency time.Duration) {
 	g.latency.ReportLatency(latency, latencyLabel{method: method})

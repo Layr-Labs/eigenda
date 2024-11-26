@@ -85,3 +85,8 @@ func TestProcessChurnRequest(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []dacore.QuorumID{0, 1}, actualQuorums)
 }
+
+// Uncomment and run this to generate the metrics documentation
+func TestGenerateMetricsDoc(t *testing.T) {
+
+}
