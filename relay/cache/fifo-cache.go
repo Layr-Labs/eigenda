@@ -2,7 +2,8 @@ package cache
 
 import (
 	"errors"
-	"github.com/Layr-Labs/eigenda/common/queue"
+	"github.com/emirpasic/gods/queues"
+	"github.com/emirpasic/gods/queues/linkedlistqueue"
 )
 
 var _ Cache[string, string] = &FIFOCache[string, string]{}
@@ -15,7 +16,7 @@ type FIFOCache[K comparable, V any] struct {
 	currentWeight   uint64
 	maxWeight       uint64
 	data            map[K]V
-	expirationQueue queue.Queue[K]
+	expirationQueue queues.Queue
 }
 
 // NewFIFOCache creates a new FIFOCache.
@@ -28,7 +29,7 @@ func NewFIFOCache[K comparable, V any](maxWeight uint64) *FIFOCache[K, V] {
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: defaultWeightCalculator,
-		expirationQueue:  &queue.LinkedQueue[K]{},
+		expirationQueue:  linkedlistqueue.New(),
 	}
 }
 
@@ -51,7 +52,7 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		oldWeight := f.weightCalculator(key, old)
 		f.currentWeight -= oldWeight
 	} else {
-		f.expirationQueue.Push(key)
+		f.expirationQueue.Enqueue(key)
 	}
 
 	if f.currentWeight < f.maxWeight {
@@ -60,7 +61,8 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 	}
 
 	for f.currentWeight > f.maxWeight {
-		keyToEvict, _ := f.expirationQueue.Pop()
+		val, _ := f.expirationQueue.Dequeue()
+		keyToEvict := val.(K)
 		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
 		delete(f.data, keyToEvict)
 		f.currentWeight -= weightToEvict
