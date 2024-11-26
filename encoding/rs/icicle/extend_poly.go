@@ -38,18 +38,31 @@ func (g *RsIcicleBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, err
 		return nil, fmt.Errorf("failed to set device: %v", err.AsString())
 	}
 
+	// Channel to receive any errors from the GPU operation
+	errChan := make(chan error, 1)
+
 	// Perform NTT
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	icicleRuntime.RunOnDevice(&g.Device, func(args ...any) {
 		defer wg.Done()
+		defer close(errChan)
+		defer func() {
+			if r := recover(); r != nil {
+				errChan <- fmt.Errorf("GPU operation panic: %v", r)
+			}
+		}()
+
 		ntt.Ntt(scalars, core.KForward, &g.NttCfg, outputDevice)
 	})
 
 	wg.Wait()
 
-	// Convert back to fr.Element
-	evals := icicle.ConvertScalarFieldsToFrBytes(outputDevice)
+	// Check if there was a panic
+	if err := <-errChan; err != nil {
+		return nil, err
+	}
 
+	evals := icicle.ConvertScalarFieldsToFrBytes(outputDevice)
 	return evals, nil
 }

@@ -72,10 +72,20 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		return nil, fmt.Errorf("failed to set device: %v", icicleErr.AsString())
 	}
 
+	// Channel just for error handling
+	errChan := make(chan error, 1)
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+
 	icicleRuntime.RunOnDevice(&p.Device, func(args ...any) {
 		defer wg.Done()
+		defer close(errChan)
+		defer func() {
+			if r := recover(); r != nil {
+				errChan <- fmt.Errorf("panic in GPU operations: %v", r)
+			}
+		}()
 
 		// Copy data to device
 		var flattenStoreCopyToDevice core.DeviceSlice
@@ -84,7 +94,8 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		// 1. MSM Batch Operation
 		sumVec, err := p.MsmBatchOnDevice(flattenStoreCopyToDevice, p.FlatFFTPointsT, int(numPoly)*int(dimE)*2)
 		if err != nil {
-			panic(fmt.Errorf("msm batch error: %v", err))
+			errChan <- fmt.Errorf("msm batch error: %v", err)
+			return
 		}
 		msmDone = time.Now()
 
@@ -92,7 +103,8 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		p.NttCfg.BatchSize = int32(numPoly)
 		sumVecInv, err := p.ECNttOnDevice(sumVec, true, int(dimE)*2*int(numPoly))
 		if err != nil {
-			panic(fmt.Errorf("first ECNtt error: %v", err))
+			errChan <- fmt.Errorf("first ECNtt error: %v", err)
+			return
 		}
 		fft1Done = time.Now()
 
@@ -100,7 +112,8 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 		prunedSumVecInv := sumVecInv.Range(0, int(dimE), false)
 		flatProofsBatch, err := p.ECNttToGnarkOnDevice(prunedSumVecInv, false, int(numPoly)*int(dimE))
 		if err != nil {
-			panic(fmt.Errorf("second ECNtt error: %v", err))
+			errChan <- fmt.Errorf("second ECNtt error: %v", err)
+			return
 		}
 		fft2Done = time.Now()
 
@@ -115,6 +128,11 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	})
 
 	wg.Wait()
+
+	// Check for errors
+	if err := <-errChan; err != nil {
+		return nil, err
+	}
 
 	// Convert to final format
 	icicleFFTBatch := icicle.HostSliceIcicleProjectiveToGnarkAffine(flatProofsBatchHost, int(p.NumWorker))
