@@ -305,7 +305,6 @@ func (n *Node) Start(ctx context.Context) error {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
 			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
-		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
@@ -326,6 +325,15 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
+		registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
+		// Error out if registration on-chain is a requirement
+		if err != nil {
+			n.Logger.Warnf("failed to get operator socket: %w", err)
+		}
+		if registeredSocket != socket {
+			n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
+		}
+
 		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
 		if ok {
 			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
