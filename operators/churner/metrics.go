@@ -99,17 +99,17 @@ func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 }
 
 // ObserveLatency observes the latency of a stage
-func (g *Metrics) ObserveLatency(method string, latency time.Duration) error {
-	return g.latency.ReportLatency(latency, latencyLabel{method: method})
+func (g *Metrics) ObserveLatency(method string, latency time.Duration) {
+	g.latency.ReportLatency(latency, latencyLabel{method: method})
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests
-func (g *Metrics) IncrementSuccessfulRequestNum(method string) error {
-	return g.numRequests.Increment(numRequestsLabel{status: "success", method: method})
+func (g *Metrics) IncrementSuccessfulRequestNum(method string) {
+	g.numRequests.Increment(numRequestsLabel{status: "success", method: method})
 }
 
 // IncrementFailedRequestNum increments the number of failed requests
-func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) error {
+func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) {
 	code, ok := statusCodeMap[reason]
 	if !ok {
 		g.logger.Error("cannot map failure reason to status code", "failure reason", reason)
@@ -118,7 +118,7 @@ func (g *Metrics) IncrementFailedRequestNum(method string, reason FailReason) er
 		code = codes.Internal.String()
 	}
 
-	return g.numRequests.Increment(numRequestsLabel{status: code, reason: string(reason), method: method})
+	g.numRequests.Increment(numRequestsLabel{status: code, reason: string(reason), method: method})
 }
 
 // Start starts the metrics server

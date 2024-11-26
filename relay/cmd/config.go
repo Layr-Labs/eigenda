@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -80,9 +81,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				GetChunkBytesBurstinessClient:   ctx.Int(flags.GetChunkBytesBurstinessClientFlag.Name),
 				MaxConcurrentGetChunkOpsClient:  ctx.Int(flags.MaxConcurrentGetChunkOpsClientFlag.Name),
 			},
-			AuthenticationKeyCacheSize: ctx.Int(flags.AuthenticationKeyCacheSizeFlag.Name),
-			AuthenticationTimeout:      ctx.Duration(flags.AuthenticationTimeoutFlag.Name),
-			AuthenticationDisabled:     ctx.Bool(flags.AuthenticationDisabledFlag.Name),
+			AuthenticationKeyCacheSize:  ctx.Int(flags.AuthenticationKeyCacheSizeFlag.Name),
+			AuthenticationTimeout:       ctx.Duration(flags.AuthenticationTimeoutFlag.Name),
+			AuthenticationDisabled:      ctx.Bool(flags.AuthenticationDisabledFlag.Name),
+			OnchainStateRefreshInterval: ctx.Duration(flags.OnchainStateRefreshIntervalFlag.Name),
+			Timeouts: relay.TimeoutConfig{
+				GetChunksTimeout:               ctx.Duration(flags.GetChunksTimeoutFlag.Name),
+				GetBlobTimeout:                 ctx.Duration(flags.GetBlobTimeoutFlag.Name),
+				InternalGetMetadataTimeout:     ctx.Duration(flags.InternalGetMetadataTimeoutFlag.Name),
+				InternalGetBlobTimeout:         ctx.Duration(flags.InternalGetBlobTimeoutFlag.Name),
+				InternalGetProofsTimeout:       ctx.Duration(flags.InternalGetProofsTimeoutFlag.Name),
+				InternalGetCoefficientsTimeout: ctx.Duration(flags.InternalGetCoefficientsTimeoutFlag.Name),
+			},
 		},
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),

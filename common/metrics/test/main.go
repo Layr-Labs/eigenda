@@ -105,45 +105,27 @@ func main() {
 		elapsed := now.Sub(prev)
 		prev = now
 
-		err = l1.ReportLatency(elapsed)
-		if err != nil {
-			panic(err)
-		}
+		l1.ReportLatency(elapsed)
 
-		err = l1.ReportLatency(elapsed/2,
+		l1.ReportLatency(elapsed/2,
 			LabelType1{
 				foo: "half of the normal value",
 				bar: "42",
 				baz: "true",
 			})
-		if err != nil {
-			panic(err)
-		}
 
-		err = c1.Increment()
-		if err != nil {
-			panic(err)
-		}
-		err = c1.Add(2, LabelType2{
+		c1.Increment()
+		c1.Add(2, LabelType2{
 			X: "2x",
 		})
-		if err != nil {
-			panic(err)
-		}
-		err = c2.Increment()
-		if err != nil {
-			panic(err)
-		}
+		c2.Increment()
 
-		err = g1.Set(float64(elapsed.Milliseconds()),
+		g1.Set(float64(elapsed.Milliseconds()),
 			LabelType1{
 				foo: "bar",
 				bar: "baz",
 				baz: "foo",
 			})
-		if err != nil {
-			panic(err)
-		}
 
 		sum.Store(sum.Load() + elapsed.Milliseconds())
 	}

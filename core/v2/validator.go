@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 
 type ShardValidator interface {
 	ValidateBatchHeader(ctx context.Context, header *BatchHeader, blobCerts []*BlobCertificate) error
-	ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, state *core.OperatorState) error
+	ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error
 }
 
 type BlobShard struct {
@@ -30,18 +31,20 @@ type BlobShard struct {
 type shardValidator struct {
 	verifier   encoding.Verifier
 	operatorID core.OperatorID
+	logger     logging.Logger
 }
 
 var _ ShardValidator = (*shardValidator)(nil)
 
-func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID) *shardValidator {
+func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID, logger logging.Logger) *shardValidator {
 	return &shardValidator{
 		verifier:   v,
 		operatorID: operatorID,
+		logger:     logger,
 	}
 }
 
-func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShard, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
+func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
 
 	// Check if the operator is a member of the quorum
 	if _, ok := operatorState.Operators[quorum]; !ok {
@@ -49,7 +52,7 @@ func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Get the assignments for the quorum
-	assignment, err := GetAssignment(operatorState, blob.BlobHeader.BlobVersion, quorum, v.operatorID)
+	assignment, err := GetAssignment(operatorState, blobParams, quorum, v.operatorID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -63,7 +66,7 @@ func (v *shardValidator) validateBlobQuorum(quorum core.QuorumID, blob *BlobShar
 	}
 
 	// Get the chunk length
-	chunkLength, err := GetChunkLength(blob.BlobHeader.BlobVersion, uint32(blob.BlobHeader.BlobCommitments.Length))
+	chunkLength, err := GetChunkLength(uint32(blob.BlobHeader.BlobCommitments.Length), blobParams)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
@@ -99,7 +102,15 @@ func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchH
 	return nil
 }
 
-func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, pool common.WorkerPool, state *core.OperatorState) error {
+func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
+	if len(blobs) == 0 {
+		return fmt.Errorf("no blobs")
+	}
+
+	if blobVersionParams == nil {
+		return fmt.Errorf("blob version params is nil")
+	}
+
 	var err error
 	subBatchMap := make(map[encoding.EncodingParams]*encoding.SubBatch)
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
@@ -114,49 +125,55 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 		// for each quorum
 		for _, quorum := range blob.BlobHeader.QuorumNumbers {
-			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, state)
-			if err != nil {
-				return err
+			blobParams, ok := blobVersionParams.Get(blob.BlobHeader.BlobVersion)
+			if !ok {
+				return fmt.Errorf("blob version %d not found", blob.BlobHeader.BlobVersion)
 			}
-			// TODO: Define params for the blob
-			params, err := blob.BlobHeader.GetEncodingParams()
-			if err != nil {
-				return err
-			}
-
+			chunks, assignment, err := v.validateBlobQuorum(quorum, blob, blobParams, state)
 			if errors.Is(err, ErrBlobQuorumSkip) {
+				v.logger.Warn("Skipping blob for quorum", "quorum", quorum, "err", err)
 				continue
 			} else if err != nil {
 				return err
+			}
+
+			// TODO: Define params for the blob
+			params, err := blob.BlobHeader.GetEncodingParams(blobParams)
+			if err != nil {
+				return err
+			}
+
+			if err != nil {
+				return err
+			}
+
+			// Check the received chunks against the commitment
+			blobIndex := 0
+			subBatch, ok := subBatchMap[params]
+			if ok {
+				blobIndex = subBatch.NumBlobs
+			}
+
+			indices := assignment.GetIndices()
+			samples := make([]encoding.Sample, len(chunks))
+			for ind := range chunks {
+				samples[ind] = encoding.Sample{
+					Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
+					Chunk:           chunks[ind],
+					AssignmentIndex: uint(indices[ind]),
+					BlobIndex:       blobIndex,
+				}
+			}
+
+			// update subBatch
+			if !ok {
+				subBatchMap[params] = &encoding.SubBatch{
+					Samples:  samples,
+					NumBlobs: 1,
+				}
 			} else {
-				// Check the received chunks against the commitment
-				blobIndex := 0
-				subBatch, ok := subBatchMap[params]
-				if ok {
-					blobIndex = subBatch.NumBlobs
-				}
-
-				indices := assignment.GetIndices()
-				samples := make([]encoding.Sample, len(chunks))
-				for ind := range chunks {
-					samples[ind] = encoding.Sample{
-						Commitment:      blob.BlobHeader.BlobCommitments.Commitment,
-						Chunk:           chunks[ind],
-						AssignmentIndex: uint(indices[ind]),
-						BlobIndex:       blobIndex,
-					}
-				}
-
-				// update subBatch
-				if !ok {
-					subBatchMap[params] = &encoding.SubBatch{
-						Samples:  samples,
-						NumBlobs: 1,
-					}
-				} else {
-					subBatch.Samples = append(subBatch.Samples, samples...)
-					subBatch.NumBlobs += 1
-				}
+				subBatch.Samples = append(subBatch.Samples, samples...)
+				subBatch.NumBlobs += 1
 			}
 		}
 	}

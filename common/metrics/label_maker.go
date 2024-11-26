@@ -10,6 +10,7 @@ type labelMaker struct {
 	keys         []string
 	emptyValues  []string
 	templateType reflect.Type
+	labelCount   int
 }
 
 // newLabelMaker creates a new labelMaker instance given a label template. The label template may be nil.
@@ -23,6 +24,10 @@ func newLabelMaker(labelTemplate any) (*labelMaker, error) {
 	}
 
 	v := reflect.ValueOf(labelTemplate)
+	if v.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("label template must be a struct")
+	}
+
 	t := v.Type()
 	labeler.templateType = t
 	for i := 0; i < t.NumField(); i++ {
@@ -37,6 +42,7 @@ func newLabelMaker(labelTemplate any) (*labelMaker, error) {
 	}
 
 	labeler.emptyValues = make([]string, len(labeler.keys))
+	labeler.labelCount = len(labeler.keys)
 
 	return labeler, nil
 }
@@ -48,13 +54,7 @@ func (l *labelMaker) getKeys() []string {
 
 // extractValues extracts the values from the given label struct.
 func (l *labelMaker) extractValues(label any) ([]string, error) {
-	values := make([]string, 0)
-
-	if l.templateType == nil {
-		return values, nil
-	}
-
-	if label == nil {
+	if l.templateType == nil || label == nil {
 		return l.emptyValues, nil
 	}
 
@@ -63,7 +63,8 @@ func (l *labelMaker) extractValues(label any) ([]string, error) {
 			"label type mismatch, expected %v, got %v", l.templateType, reflect.TypeOf(label))
 	}
 
-	for i := 0; i < l.templateType.NumField(); i++ {
+	values := make([]string, 0, l.labelCount)
+	for i := 0; i < l.labelCount; i++ {
 		v := reflect.ValueOf(label)
 		values = append(values, v.Field(i).String())
 	}

@@ -1,7 +1,9 @@
 package cache
 
 import (
+	"context"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"golang.org/x/sync/semaphore"
 	"sync"
 )
 
@@ -9,7 +11,9 @@ import (
 // are expensive, and prevents multiple concurrent cache misses for the same key.
 type CachedAccessor[K comparable, V any] interface {
 	// Get returns the value for the given key. If the value is not in the cache, it will be fetched using the Accessor.
-	Get(key K) (V, error)
+	// If the context is cancelled, the function may abort early. If multiple goroutines request the same key,
+	// cancellation of one request will not affect the others.
+	Get(ctx context.Context, key K) (V, error)
 }
 
 // Accessor is function capable of fetching a value from a resource. Used by CachedAccessor when there is a cache miss.
@@ -17,8 +21,8 @@ type Accessor[K comparable, V any] func(key K) (V, error)
 
 // accessResult is a struct that holds the result of an Accessor call.
 type accessResult[V any] struct {
-	// wg.Wait() will block until the value is fetched.
-	wg sync.WaitGroup
+	// sem is a semaphore used to signal that the value has been fetched.
+	sem *semaphore.Weighted
 	// value is the value fetched by the Accessor, or nil if there was an error.
 	value V
 	// err is the error returned by the Accessor, or nil if the fetch was successful.
@@ -34,7 +38,6 @@ var _ CachedAccessor[string, string] = &cachedAccessor[string, string]{}
 
 // cachedAccessor is an implementation of CachedAccessor.
 type cachedAccessor[K comparable, V any] struct {
-
 	// lookupsInProgress has an entry for each key that is currently being looked up via the accessor. The value
 	// is written into the channel when it is eventually fetched. If a key is requested more than once while a
 	// lookup in progress, the second (and following) requests will wait for the result of the first lookup
@@ -86,14 +89,13 @@ func NewCachedAccessor[K comparable, V any](
 
 func newAccessResult[V any]() *accessResult[V] {
 	result := &accessResult[V]{
-		wg: sync.WaitGroup{},
+		sem: semaphore.NewWeighted(1),
 	}
-	result.wg.Add(1)
+	_ = result.sem.Acquire(context.Background(), 1)
 	return result
 }
 
-func (c *cachedAccessor[K, V]) Get(key K) (V, error) {
-
+func (c *cachedAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 	c.cacheLock.Lock()
 
 	// first, attempt to get the value from the cache
@@ -114,11 +116,35 @@ func (c *cachedAccessor[K, V]) Get(key K) (V, error) {
 
 	if alreadyLoading {
 		// The result is being fetched on another goroutine. Wait for it to finish.
-		result.wg.Wait()
-		return result.value, result.err
+		return c.waitForResult(ctx, result)
 	} else {
 		// We are the first goroutine to request this key.
+		return c.fetchResult(ctx, key, result)
+	}
+}
 
+// waitForResult waits for the result of a lookup that was initiated by another requester and returns it
+// when it becomes is available. This method will return quickly if the provided context is cancelled.
+// Doing so does not disrupt the other requesters that are also waiting for this result.
+func (c *cachedAccessor[K, V]) waitForResult(ctx context.Context, result *accessResult[V]) (V, error) {
+	err := result.sem.Acquire(ctx, 1)
+	if err != nil {
+		var zeroValue V
+		return zeroValue, err
+	}
+
+	result.sem.Release(1)
+	return result.value, result.err
+}
+
+// fetchResult fetches the value for the given key and returns it. If the context is cancelled before the value
+// is fetched, the function will return early. If the fetch is successful, the value will be added to the cache.
+func (c *cachedAccessor[K, V]) fetchResult(ctx context.Context, key K, result *accessResult[V]) (V, error) {
+
+	// Perform the work in a background goroutine. This allows us to return early if the context is cancelled
+	// without disrupting the fetch operation that other requesters may be waiting for.
+	waitChan := make(chan struct{}, 1)
+	go func() {
 		if c.concurrencyLimiter != nil {
 			c.concurrencyLimiter <- struct{}{}
 		}
@@ -139,13 +165,22 @@ func (c *cachedAccessor[K, V]) Get(key K) (V, error) {
 		// Provide the result to all other goroutines that may be waiting for it.
 		result.err = err
 		result.value = value
-		result.wg.Done()
+		result.sem.Release(1)
 
 		// Clean up the lookupInProgress map.
 		delete(c.lookupsInProgress, key)
 
 		c.cacheLock.Unlock()
 
-		return value, err
+		waitChan <- struct{}{}
+	}()
+
+	select {
+	case <-ctx.Done():
+		// The context was cancelled before the value was fetched, possibly due to a timeout.
+		var zeroValue V
+		return zeroValue, ctx.Err()
+	case <-waitChan:
+		return result.value, result.err
 	}
 }

@@ -1,11 +1,12 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/urfave/cli"
-	"time"
 )
 
 const (
@@ -230,6 +231,55 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_DISABLED"),
 	}
+	GetChunksTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-timeout"),
+		Usage:    "Timeout for GetChunks()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	GetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-blob-timeout"),
+		Usage:    "Timeout for GetBlob()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetMetadataTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-metadata-timeout"),
+		Usage:    "Timeout for internal metadata fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_METADATA_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-blob-timeout"),
+		Usage:    "Timeout for internal blob fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetProofsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-proofs-timeout"),
+		Usage:    "Timeout for internal proofs fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_PROOFS_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetCoefficientsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-coefficients-timeout"),
+		Usage:    "Timeout for internal coefficients fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_COEFFICIENTS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -239,6 +289,8 @@ var requiredFlags = []cli.Flag{
 	RelayIDsFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	AuthenticationTimeoutFlag,
+	AuthenticationDisabledFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -268,6 +320,13 @@ var optionalFlags = []cli.Flag{
 	AuthenticationKeyCacheSizeFlag,
 	AuthenticationTimeoutFlag,
 	AuthenticationDisabledFlag,
+	GetChunksTimeoutFlag,
+	GetBlobTimeoutFlag,
+	InternalGetMetadataTimeoutFlag,
+	InternalGetBlobTimeoutFlag,
+	InternalGetProofsTimeoutFlag,
+	InternalGetCoefficientsTimeoutFlag,
+	OnchainStateRefreshIntervalFlag,
 }
 
 var Flags []cli.Flag

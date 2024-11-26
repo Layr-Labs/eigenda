@@ -17,6 +17,7 @@ type RequestAuthenticator interface {
 	// The origin is the address of the peer that sent the request. This may be used to cache auth results
 	// in order to save server resources.
 	AuthenticateGetChunksRequest(
+		ctx context.Context,
 		origin string,
 		request *pb.GetChunksRequest,
 		now time.Time) error
@@ -53,6 +54,7 @@ type requestAuthenticator struct {
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
 func NewRequestAuthenticator(
+	ctx context.Context,
 	ics core.IndexedChainState,
 	keyCacheSize int,
 	authenticationTimeoutDuration time.Duration) (RequestAuthenticator, error) {
@@ -70,7 +72,7 @@ func NewRequestAuthenticator(
 		keyCache:                      keyCache,
 	}
 
-	err = authenticator.preloadCache()
+	err = authenticator.preloadCache(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload cache: %w", err)
 	}
@@ -78,12 +80,12 @@ func NewRequestAuthenticator(
 	return authenticator, nil
 }
 
-func (a *requestAuthenticator) preloadCache() error {
+func (a *requestAuthenticator) preloadCache(ctx context.Context) error {
 	blockNumber, err := a.ics.GetCurrentBlockNumber()
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	operators, err := a.ics.GetIndexedOperators(ctx, blockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get operators: %w", err)
 	}
@@ -96,6 +98,7 @@ func (a *requestAuthenticator) preloadCache() error {
 }
 
 func (a *requestAuthenticator) AuthenticateGetChunksRequest(
+	ctx context.Context,
 	origin string,
 	request *pb.GetChunksRequest,
 	now time.Time) error {
@@ -105,7 +108,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		return nil
 	}
 
-	key, err := a.getOperatorKey(core.OperatorID(request.OperatorId))
+	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}
@@ -131,7 +134,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 }
 
 // getOperatorKey returns the public key of the operator with the given ID, caching the result.
-func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core.G2Point, error) {
+func (a *requestAuthenticator) getOperatorKey(ctx context.Context, operatorID core.OperatorID) (*core.G2Point, error) {
 	key, ok := a.keyCache.Get(operatorID)
 	if ok {
 		return key, nil
@@ -141,7 +144,7 @@ func (a *requestAuthenticator) getOperatorKey(operatorID core.OperatorID) (*core
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
-	operators, err := a.ics.GetIndexedOperators(context.Background(), blockNumber)
+	operators, err := a.ics.GetIndexedOperators(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operators: %w", err)
 	}

@@ -25,7 +25,7 @@ func (v *MockShardValidator) ValidateBatchHeader(ctx context.Context, header *co
 	return args.Error(0)
 }
 
-func (v *MockShardValidator) ValidateBlobs(ctx context.Context, blobs []*corev2.BlobShard, pool common.WorkerPool, state *core.OperatorState) error {
+func (v *MockShardValidator) ValidateBlobs(ctx context.Context, blobs []*corev2.BlobShard, blobVersionParams *corev2.BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
 	args := v.Called()
 	return args.Error(0)
 }

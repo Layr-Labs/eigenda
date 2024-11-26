@@ -54,6 +54,9 @@ type Server struct {
 
 	// authenticator is used to authenticate requests to the relay service.
 	authenticator auth.RequestAuthenticator
+
+	// chainReader is the core.Reader used to fetch blob parameters.
+	chainReader core.Reader
 }
 
 type Config struct {
@@ -104,6 +107,12 @@ type Config struct {
 
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
+
+	// Timeouts contains configuration for relay timeouts.
+	Timeouts TimeoutConfig
+
+	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed.
+	OnchainStateRefreshInterval time.Duration
 }
 
 // NewServer creates a new relay Server.
@@ -114,7 +123,17 @@ func NewServer(
 	metadataStore *blobstore.BlobMetadataStore,
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader,
-	ics core.IndexedChainState) (*Server, error) {
+	chainReader core.Reader,
+	ics core.IndexedChainState,
+) (*Server, error) {
+	if chainReader == nil {
+		return nil, errors.New("chainReader is required")
+	}
+
+	blobParams, err := chainReader.GetAllVersionedBlobParams(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching blob params: %w", err)
+	}
 
 	mp, err := newMetadataProvider(
 		ctx,
@@ -122,7 +141,10 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataMaxConcurrency,
-		config.RelayIDs)
+		config.RelayIDs,
+		config.Timeouts.InternalGetMetadataTimeout,
+		v2.NewBlobVersionParameterMap(blobParams))
+
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata provider: %w", err)
 	}
@@ -132,7 +154,8 @@ func NewServer(
 		logger,
 		blobStore,
 		config.BlobCacheSize,
-		config.BlobMaxConcurrency)
+		config.BlobMaxConcurrency,
+		config.Timeouts.InternalGetBlobTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
@@ -142,7 +165,9 @@ func NewServer(
 		logger,
 		chunkReader,
 		config.ChunkCacheSize,
-		config.ChunkMaxConcurrency)
+		config.ChunkMaxConcurrency,
+		config.Timeouts.InternalGetProofsTimeout,
+		config.Timeouts.InternalGetCoefficientsTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
@@ -150,6 +175,7 @@ func NewServer(
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
 		authenticator, err = auth.NewRequestAuthenticator(
+			ctx,
 			ics,
 			config.AuthenticationKeyCacheSize,
 			config.AuthenticationTimeout)
@@ -172,9 +198,11 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-
-	// TODO(cody-littley):
-	//  - timeouts
+	if s.config.Timeouts.GetBlobTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetBlobTimeout)
+		defer cancel()
+	}
 
 	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
 	if err != nil {
@@ -188,7 +216,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 
 	keys := []v2.BlobKey{key}
-	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
@@ -203,7 +231,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, err
 	}
 
-	data, err := s.blobProvider.GetBlob(key)
+	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
@@ -217,9 +245,11 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-
-	// TODO(cody-littley):
-	//  - timeouts
+	if s.config.Timeouts.GetChunksTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
+		defer cancel()
+	}
 
 	if len(request.ChunkRequests) <= 0 {
 		return nil, fmt.Errorf("no chunk requests provided")
@@ -236,7 +266,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		clientAddress := client.Addr.String()
 
-		err := s.authenticator.AuthenticateGetChunksRequest(clientAddress, request, time.Now())
+		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("auth failed: %w", err)
 		}
@@ -256,7 +286,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, err
 	}
 
-	mMap, err := s.metadataProvider.GetMetadataForBlobs(keys)
+	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
@@ -399,7 +429,13 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
+	if s.chainReader != nil && s.metadataProvider != nil {
+		go func() {
+			_ = s.RefreshOnchainState(ctx)
+		}()
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("0.0.0.0:%d", s.config.GRPCPort)
 	listener, err := net.Listen("tcp", addr)
@@ -424,6 +460,26 @@ func (s *Server) Start() error {
 	}
 
 	return nil
+}
+
+func (s *Server) RefreshOnchainState(ctx context.Context) error {
+	ticker := time.NewTicker(s.config.OnchainStateRefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			s.logger.Info("refreshing onchain state")
+			blobParams, err := s.chainReader.GetAllVersionedBlobParams(ctx)
+			if err != nil {
+				s.logger.Error("error fetching blob params", "err", err)
+				continue
+			}
+			s.metadataProvider.UpdateBlobVersionParameters(v2.NewBlobVersionParameterMap(blobParams))
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 // Stop stops the server.

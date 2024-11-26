@@ -3,6 +3,10 @@ package workers
 import (
 	"context"
 	"crypto/md5"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	apiMock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -15,9 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
-	"sync"
-	"testing"
-	"time"
 )
 
 // TestBlobReaderNoOptionalReads tests the BlobReader's basic functionality'
@@ -40,7 +41,7 @@ func TestBlobReader(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(&binding.IEigenDAServiceManagerBatchHeader{}, nil)
+		mock.Anything).Return(&binding.BatchHeader{}, nil)
 	retrievalClient := &apiMock.MockRetrievalClient{}
 
 	blobReader := NewBlobReader(

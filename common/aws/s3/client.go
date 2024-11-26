@@ -18,6 +18,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	defaultBlobBufferSizeByte = 128 * 1024
+)
+
 var (
 	once              sync.Once
 	ref               *client
@@ -106,14 +110,20 @@ func NewClient(ctx context.Context, cfg commonaws.ClientConfig, logger logging.L
 }
 
 func (s *client) DownloadObject(ctx context.Context, bucket string, key string) ([]byte, error) {
+	objectSize := defaultBlobBufferSizeByte
+	size, err := s.HeadObject(ctx, bucket, key)
+	if err == nil {
+		objectSize = int(*size)
+	}
+	buffer := manager.NewWriteAtBuffer(make([]byte, 0, objectSize))
+
 	var partMiBs int64 = 10
 	downloader := manager.NewDownloader(s.s3Client, func(d *manager.Downloader) {
 		d.PartSize = partMiBs * 1024 * 1024 // 10MB per part
 		d.Concurrency = 3                   //The number of goroutines to spin up in parallel per call to Upload when sending parts
 	})
 
-	buffer := manager.NewWriteAtBuffer([]byte{})
-	_, err := downloader.Download(ctx, buffer, &s3.GetObjectInput{
+	_, err = downloader.Download(ctx, buffer, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
@@ -223,9 +233,6 @@ func (s *client) FragmentedUploadObject(
 	}
 	resultChannel := make(chan error, len(fragments))
 
-	ctx, cancel := context.WithTimeout(ctx, s.cfg.FragmentWriteTimeout)
-	defer cancel()
-
 	for _, fragment := range fragments {
 		fragmentCapture := fragment
 		s.concurrencyLimiter <- struct{}{}
@@ -282,9 +289,6 @@ func (s *client) FragmentedDownloadObject(
 		return nil, err
 	}
 	resultChannel := make(chan *readResult, len(fragmentKeys))
-
-	ctx, cancel := context.WithTimeout(ctx, s.cfg.FragmentWriteTimeout)
-	defer cancel()
 
 	for i, fragmentKey := range fragmentKeys {
 		boundFragmentKey := fragmentKey

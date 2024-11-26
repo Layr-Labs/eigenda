@@ -37,11 +37,11 @@ func (m *mockMetrics) NewLatencyMetric(
 	description string,
 	templateLabel any,
 	quantiles ...*Quantile) (LatencyMetric, error) {
-	return newLatencyMetric(name, description, nil, nil), nil
+	return &mockLatencyMetric{}, nil
 }
 
 func (m *mockMetrics) NewCountMetric(name string, description string, templateLabel any) (CountMetric, error) {
-	return newCountMetric(name, description, nil, nil), nil
+	return &mockCountMetric{}, nil
 }
 
 func (m *mockMetrics) NewGaugeMetric(
@@ -49,7 +49,7 @@ func (m *mockMetrics) NewGaugeMetric(
 	unit string,
 	description string,
 	labelTemplate any) (GaugeMetric, error) {
-	return newGaugeMetric(name, unit, description, nil, nil), nil
+	return &mockGaugeMetric{}, nil
 }
 
 func (m *mockMetrics) NewAutoGauge(
@@ -60,4 +60,95 @@ func (m *mockMetrics) NewAutoGauge(
 	source func() float64,
 	label ...any) error {
 	return nil
+}
+
+var _ CountMetric = &mockCountMetric{}
+
+type mockCountMetric struct {
+}
+
+func (m *mockCountMetric) Name() string {
+	return ""
+}
+
+func (m *mockCountMetric) Unit() string {
+	return ""
+}
+
+func (m *mockCountMetric) Description() string {
+	return ""
+}
+
+func (m *mockCountMetric) Type() string {
+	return ""
+}
+
+func (m *mockCountMetric) LabelFields() []string {
+	return make([]string, 0)
+}
+
+func (m *mockCountMetric) Increment(label ...any) {
+
+}
+
+func (m *mockCountMetric) Add(value float64, label ...any) {
+
+}
+
+var _ GaugeMetric = &mockGaugeMetric{}
+
+type mockGaugeMetric struct {
+}
+
+func (m *mockGaugeMetric) Name() string {
+	return ""
+}
+
+func (m *mockGaugeMetric) Unit() string {
+	return ""
+}
+
+func (m *mockGaugeMetric) Description() string {
+	return ""
+}
+
+func (m *mockGaugeMetric) Type() string {
+	return ""
+}
+
+func (m *mockGaugeMetric) LabelFields() []string {
+	return make([]string, 0)
+}
+
+func (m *mockGaugeMetric) Set(value float64, label ...any) {
+
+}
+
+var _ LatencyMetric = &mockLatencyMetric{}
+
+type mockLatencyMetric struct {
+}
+
+func (m *mockLatencyMetric) Name() string {
+	return ""
+}
+
+func (m *mockLatencyMetric) Unit() string {
+	return ""
+}
+
+func (m *mockLatencyMetric) Description() string {
+	return ""
+}
+
+func (m *mockLatencyMetric) Type() string {
+	return ""
+}
+
+func (m *mockLatencyMetric) LabelFields() []string {
+	return make([]string, 0)
+}
+
+func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) {
+
 }

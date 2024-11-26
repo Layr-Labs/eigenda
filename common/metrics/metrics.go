@@ -91,7 +91,7 @@ type GaugeMetric interface {
 	//
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
-	Set(value float64, label ...any) error
+	Set(value float64, label ...any)
 }
 
 // CountMetric allows the count of a type of event to be tracked.
@@ -102,13 +102,13 @@ type CountMetric interface {
 	//
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
-	Increment(label ...any) error
+	Increment(label ...any)
 
 	// Add increments the count by the given value.
 	//
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
-	Add(value float64, label ...any) error
+	Add(value float64, label ...any)
 }
 
 // Quantile describes a quantile of a latency metric that should be reported. For a description of how
@@ -138,5 +138,5 @@ type LatencyMetric interface {
 	//
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
-	ReportLatency(latency time.Duration, label ...any) error
+	ReportLatency(latency time.Duration, label ...any)
 }

@@ -17,6 +17,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -819,6 +820,12 @@ func (s *DispersalServer) GetRateConfig() *RateConfig {
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
+	pprofProfiler := pprof.NewPprofProfiler(s.serverConfig.PprofHttpPort, s.logger)
+	if s.serverConfig.EnablePprof {
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for disperser apiserver", "port", s.serverConfig.PprofHttpPort)
+	}
+
 	go func() {
 		t := time.NewTicker(s.rateConfig.AllowlistRefreshInterval)
 		defer t.Stop()

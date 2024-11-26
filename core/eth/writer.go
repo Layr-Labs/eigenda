@@ -272,7 +272,7 @@ func (t *Writer) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.Bat
 	}
 
 	signedStakeForQuorums := serializeSignedStakeForQuorums(quorums)
-	batchH := eigendasrvmg.IEigenDAServiceManagerBatchHeader{
+	batchH := eigendasrvmg.BatchHeader{
 		BlobHeadersRoot:       batchHeader.BatchRoot,
 		QuorumNumbers:         quorumNumbers,
 		SignedStakeForQuorums: signedStakeForQuorums,
