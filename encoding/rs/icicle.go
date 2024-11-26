@@ -3,6 +3,8 @@
 package rs
 
 import (
+	"sync"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
@@ -28,8 +30,9 @@ func CreateIcicleBackendEncoder(e *Encoder, params encoding.EncodingParams, fs *
 		EncodingParams: params,
 		Fs:             fs,
 		RSEncoderComputer: &rsicicle.RsIcicleBackend{
-			NttCfg: icicleDevice.NttCfg,
-			Device: icicleDevice.Device,
+			NttCfg:  icicleDevice.NttCfg,
+			Device:  icicleDevice.Device,
+			GpuLock: sync.Mutex{},
 		},
 	}, nil
 }

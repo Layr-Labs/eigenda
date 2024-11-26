@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -29,6 +30,7 @@ type KzgMultiProofIcicleBackend struct {
 	NttCfg         core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
 	MsmCfg         core.MSMConfig
 	Device         icicleRuntime.Device
+	GpuLock        sync.Mutex
 }
 
 type WorkerResult struct {
@@ -60,17 +62,15 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
 
-	// Lock the OS thread for GPU operations
+	// Lock the OS thread for operations
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Set device
-	originalDevice, icicleErr := icicleRuntime.GetActiveDevice()
-	if icicleErr != icicleRuntime.Success {
-		return nil, fmt.Errorf("failed to get active device: %v", err)
-	}
-	defer icicleRuntime.SetDevice(originalDevice)
+	// Lock the GPU for operations
+	p.GpuLock.Lock()
+	defer p.GpuLock.Unlock()
 
+	// Set device
 	if err := icicleRuntime.SetDevice(&p.Device); err != icicleRuntime.Success {
 		return nil, fmt.Errorf("failed to set device: %v", err)
 	}

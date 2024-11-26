@@ -4,6 +4,7 @@ package prover
 
 import (
 	"math"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
@@ -51,6 +52,7 @@ func CreateIcicleBackendProver(p *Prover, params encoding.EncodingParams, fs *ff
 		MsmCfg:         icicleDevice.MsmCfg,
 		KzgConfig:      p.KzgConfig,
 		Device:         icicleDevice.Device,
+		GpuLock:        sync.Mutex{},
 	}
 
 	// Set up gnark commitments backend

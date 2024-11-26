@@ -5,6 +5,7 @@ package icicle
 import (
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding/icicle"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -15,23 +16,22 @@ import (
 )
 
 type RsIcicleBackend struct {
-	NttCfg core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
-	Device icicleRuntime.Device
+	NttCfg  core.NTTConfig[[iciclebn254.SCALAR_LIMBS]uint32]
+	Device  icicleRuntime.Device
+	GpuLock sync.Mutex
 }
 
 // Encoding Reed Solomon using FFT
 func (g *RsIcicleBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, error) {
-	// Lock the OS thread for GPU operations
+	// Lock the OS thread for operations
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	// Set device
-	originalDevice, err := icicleRuntime.GetActiveDevice()
-	if err != icicleRuntime.Success {
-		return nil, fmt.Errorf("failed to get active device: %v", err)
-	}
-	defer icicleRuntime.SetDevice(originalDevice)
+	// Lock the GPU for operations
+	g.GpuLock.Lock()
+	defer g.GpuLock.Unlock()
 
+	// Set device
 	if err := icicleRuntime.SetDevice(&g.Device); err != icicleRuntime.Success {
 		return nil, fmt.Errorf("failed to set device: %v", err)
 	}
