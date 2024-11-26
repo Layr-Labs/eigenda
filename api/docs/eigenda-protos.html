@@ -2443,7 +2443,7 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -2477,15 +2477,7 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
               <tr>
                 <td>FAILED</td>
                 <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently (for reasons other than insufficient
-signatures, which is a separate state)</p></td>
-              </tr>
-            
-              <tr>
-                <td>INSUFFICIENT_SIGNATURES</td>
-                <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
-for at least one quorum.</p></td>
+                <td><p>FAILED means that the blob has failed permanently</p></td>
               </tr>
             
           </tbody>
