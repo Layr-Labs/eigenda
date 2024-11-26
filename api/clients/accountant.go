@@ -13,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
 
-var minNumBins uint32 = 3
 var requiredQuorums = []uint8{0, 1}
 
 type Accountant interface {
@@ -37,6 +36,7 @@ type accountant struct {
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
+	// number of bins in the circular accounting, restricted by minNumBins which is 3
 	numBins uint32
 }
 
@@ -62,7 +62,7 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 		minNumSymbols:     minNumSymbols,
 		binRecords:        binRecords,
 		cumulativePayment: big.NewInt(0),
-		numBins:           max(numBins, minNumBins),
+		numBins:           max(numBins, uint32(meterer.MinNumBins)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a

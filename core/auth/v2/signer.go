@@ -52,7 +52,7 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 	}
 
 	hash := sha256.Sum256([]byte(accountId))
-	// Sign the blob key using the private key
+	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign hash: %v", err)
