@@ -285,7 +285,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 
 	cacheSize := 100
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), maxConcurrency, accessor, nil)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
