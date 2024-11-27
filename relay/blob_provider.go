@@ -20,7 +20,7 @@ type blobProvider struct {
 	blobStore *blobstore.BlobStore
 
 	// blobCache is an LRU cache of blobs.
-	blobCache cache.CachedAccessor[v2.BlobKey, []byte]
+	blobCache cache.CacheAccessor[v2.BlobKey, []byte]
 
 	// fetchTimeout is the maximum time to wait for a blob fetch operation to complete.
 	fetchTimeout time.Duration
@@ -31,7 +31,7 @@ func newBlobProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	blobStore *blobstore.BlobStore,
-	blobCacheSize int,
+	blobCacheSize uint64,
 	maxIOConcurrency int,
 	fetchTimeout time.Duration) (*blobProvider, error) {
 
@@ -42,13 +42,21 @@ func newBlobProvider(
 		fetchTimeout: fetchTimeout,
 	}
 
-	c, err := cache.NewCachedAccessor[v2.BlobKey, []byte](blobCacheSize, maxIOConcurrency, server.fetchBlob)
+	c := cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight)
+
+	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](c, maxIOConcurrency, server.fetchBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}
-	server.blobCache = c
+	server.blobCache = cacheAccessor
 
 	return server, nil
+}
+
+// computeChunkCacheWeight computes the 'weight' of the blob for the cache. The weight of a blob
+// is equal to its size, in bytes.
+func computeBlobCacheWeight(_ v2.BlobKey, value []byte) uint64 {
+	return uint64(len(value))
 }
 
 // GetBlob retrieves a blob from the blob store.

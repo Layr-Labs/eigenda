@@ -32,8 +32,11 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 		return &str, nil
 	}
 	cacheSize := rand.Intn(dataSize) + 1
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	for i := 0; i < dataSize; i++ {
@@ -80,7 +83,11 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Get the first cacheSize keys. This should fill the cache.
@@ -143,7 +150,11 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -184,7 +195,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }
 
 func TestParallelAccess(t *testing.T) {
@@ -212,7 +223,11 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -253,7 +268,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	require.Equal(t, count+1, cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }
 
 func TestConcurrencyLimiter(t *testing.T) {
@@ -284,7 +299,11 @@ func TestConcurrencyLimiter(t *testing.T) {
 	}
 
 	cacheSize := 100
-	ca, err := NewCachedAccessor(cacheSize, maxConcurrency, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, maxConcurrency, accessor)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -338,7 +357,11 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -397,7 +420,7 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }
 
 func TestSecondaryRequesterTimesOut(t *testing.T) {
@@ -426,7 +449,11 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -489,5 +516,5 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }

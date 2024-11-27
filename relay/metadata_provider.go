@@ -36,7 +36,7 @@ type metadataProvider struct {
 
 	// metadataCache is an LRU cache of blob metadata. Blobs that do not belong to one of the relay shards
 	// assigned to this server will not be in the cache.
-	metadataCache cache.CachedAccessor[v2.BlobKey, *blobMetadata]
+	metadataCache cache.CacheAccessor[v2.BlobKey, *blobMetadata]
 
 	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
 	// that are not assigned to one of these IDs.
@@ -74,8 +74,13 @@ func newMetadataProvider(
 	}
 	server.blobParamsMap.Store(blobParamsMap)
 
-	metadataCache, err := cache.NewCachedAccessor[v2.BlobKey, *blobMetadata](
-		metadataCacheSize,
+	c := cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize),
+		func(key v2.BlobKey, value *blobMetadata) uint64 {
+			return uint64(1)
+		})
+
+	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
+		c,
 		maxIOConcurrency,
 		server.fetchMetadata)
 	if err != nil {

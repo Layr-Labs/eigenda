@@ -25,9 +25,9 @@ func defaultConfig() *Config {
 		MaxGRPCMessageSize:         1024 * 1024 * 300,
 		MetadataCacheSize:          1024 * 1024,
 		MetadataMaxConcurrency:     32,
-		BlobCacheSize:              32,
+		BlobCacheBytes:             1024 * 1024,
 		BlobMaxConcurrency:         32,
-		ChunkCacheSize:             32,
+		ChunkCacheSize:             1024 * 1024,
 		ChunkMaxConcurrency:        32,
 		MaxKeysPerGetChunksRequest: 1024,
 		RateLimits: limiter.Config{
