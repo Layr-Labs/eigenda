@@ -15,6 +15,7 @@ import (
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
+	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -37,6 +38,7 @@ type ContractBindings struct {
 	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
 	EjectionManager       *ejectionmg.ContractEjectionManager
 	AVSDirectory          *avsdir.ContractAVSDirectory
+	SocketRegistry        *socketreg.ContractSocketRegistry
 }
 
 type Reader struct {
@@ -164,10 +166,23 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
+	socketRegistryAddr, err := contractIRegistryCoordinator.SocketRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch SocketRegistry address", "err", err)
+		return err
+	}
+
+	contractSocketRegistry, err := socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
+	if err != nil {
+		t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
+		return err
+	}
+
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
 		AVSDirectory:          contractAVSDirectory,
+		SocketRegistry:        contractSocketRegistry,
 		OpStateRetriever:      contractBLSOpStateRetr,
 		BLSApkRegistry:        contractBLSPubkeyReg,
 		IndexRegistry:         contractIIndexReg,
@@ -373,6 +388,12 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 
 func (t *Reader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
 	return t.bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
+		Context: ctx,
+	})
+}
+
+func (t *Reader) SocketRegistry(ctx context.Context) (gethcommon.Address, error) {
+	return t.bindings.RegistryCoordinator.SocketRegistry(&bind.CallOpts{
 		Context: ctx,
 	})
 }
@@ -654,4 +675,17 @@ func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 	// contract is not implemented yet
 	return 0, nil
+}
+
+func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
+	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
+		Context: ctx,
+	}, [32]byte(operatorId))
+	if err != nil {
+		return "", err
+	}
+	if socket == "" {
+		return "", errors.New("operator socket string is empty, check operator with id: " + operatorId.Hex())
+	}
+	return socket, nil
 }

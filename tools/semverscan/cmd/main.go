@@ -87,6 +87,20 @@ func RunScan(ctx *cli.Context) error {
 			}
 		}
 	}
+
+	// check operator socket registration against the indexed state
+	for operatorID, operatorInfo := range operators {
+		socket, err := chainState.GetOperatorSocket(context.Background(), currentBlock, operatorID)
+		if err != nil {
+			logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
+			continue
+		}
+		if socket != operatorInfo.Socket {
+			// delete operator from operators if there's a mistmatch?
+			logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
+		}
+	}
+
 	logger.Info("Queried operator state", "count", len(operators))
 
 	semvers := semver.ScanOperators(operators, operatorState, config.UseRetrievalClient, config.Workers, config.Timeout, logger)

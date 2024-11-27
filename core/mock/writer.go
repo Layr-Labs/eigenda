@@ -241,3 +241,9 @@ func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, blockNumbe
 	result := args.Get(0)
 	return result.(core.OnDemandPayment), args.Error(1)
 }
+
+func (t *MockWriter) GetOperatorSocket(ctx context.Context, operatorID core.OperatorID) (string, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(string), args.Error(1)
+}

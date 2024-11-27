@@ -181,7 +181,8 @@ func newTestServer(t *testing.T) *churner.Server {
 
 	setupMockWriter()
 
-	metrics := churner.NewMetrics("9001", logger)
+	metrics, err := churner.NewMetrics(9001, logger)
+	assert.NoError(t, err)
 	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)
 	if err != nil {
 		log.Fatalln("cannot create churner", err)

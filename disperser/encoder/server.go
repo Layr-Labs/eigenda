@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -23,12 +24,12 @@ import (
 type EncoderServer struct {
 	pb.UnimplementedEncoderServer
 
-	config  ServerConfig
-	logger  logging.Logger
-	prover  encoding.Prover
-	metrics *Metrics
+	config      ServerConfig
+	logger      logging.Logger
+	prover      encoding.Prover
+	metrics     *Metrics
 	grpcMetrics *grpcprom.ServerMetrics
-	close   func()
+	close       func()
 
 	runningRequests chan struct{}
 	requestPool     chan blobRequest
@@ -46,10 +47,10 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 	metrics.SetQueueCapacity(config.RequestPoolSize)
 
 	return &EncoderServer{
-		config:  config,
-		logger:  logger.With("component", "EncoderServer"),
-		prover:  prover,
-		metrics: metrics,
+		config:      config,
+		logger:      logger.With("component", "EncoderServer"),
+		prover:      prover,
+		metrics:     metrics,
 		grpcMetrics: grpcMetrics,
 
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
@@ -59,6 +60,12 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 }
 
 func (s *EncoderServer) Start() error {
+	pprofProfiler := commonpprof.NewPprofProfiler(s.config.PprofHttpPort, s.logger)
+	if s.config.EnablePprof {
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for encoder server", "port", s.config.PprofHttpPort)
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
@@ -103,8 +110,6 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 	startTime := time.Now()
 	blobSize := len(req.GetData())
 	sizeBucket := common.BlobSizeBucket(blobSize)
-
-
 
 	select {
 	case s.requestPool <- blobRequest{blobSizeByte: blobSize}:
