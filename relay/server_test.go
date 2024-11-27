@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -56,6 +57,7 @@ func defaultConfig() *Config {
 			InternalGetProofsTimeout:       10 * time.Second,
 			InternalGetCoefficientsTimeout: 10 * time.Second,
 		},
+		MetricsPort: 9101,
 	}
 }
 
@@ -394,8 +396,9 @@ func TestReadWriteChunks(t *testing.T) {
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
 
-	blobCount := 10
+	blobCount := 100 // TODO revert this to 10
 	for i := 0; i < blobCount; i++ {
+		fmt.Printf("blob %d\n", i) // TODO remove this
 		header, _, chunks := randomBlobChunks(t)
 
 		blobKey, err := header.BlobKey()

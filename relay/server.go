@@ -203,7 +203,7 @@ func NewServer(
 		blobProvider:     bp,
 		chunkProvider:    cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits),
-		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits),
+		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics.GetChunksRateLimited),
 		authenticator:    authenticator,
 		relayMetrics:     relayMetrics,
 	}, nil
@@ -258,6 +258,8 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	start := time.Now()
+
 	if s.config.Timeouts.GetChunksTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
@@ -281,13 +283,18 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
+			s.relayMetrics.GetChunksAuthFailures.Increment()
 			return nil, fmt.Errorf("auth failed: %w", err)
 		}
 	}
 
+	finishedAuthenticating := time.Now()
+	if s.authenticator != nil {
+		s.relayMetrics.GetChunksAuthenticationLatency.ReportLatency(finishedAuthenticating.Sub(start))
+	}
+
 	clientID := string(request.OperatorId)
 	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
-
 	if err != nil {
 		return nil, err
 	}
@@ -304,6 +311,9 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
 	}
+
+	finishedFetchingMetadata := time.Now()
+	s.relayMetrics.GetChunksMetadataLatency.ReportLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
 	if err != nil {
@@ -323,6 +333,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, fmt.Errorf("error gathering chunk data: %w", err)
 	}
+
+	finishedFetchingData := time.Now()
+	s.relayMetrics.GetChunksDataLatency.ReportLatency(finishedFetchingData.Sub(finishedFetchingMetadata))
+	s.relayMetrics.GetChunksLatency.ReportLatency(time.Since(start))
 
 	return &pb.GetChunksReply{
 		Data: bytesToSend,
@@ -443,6 +457,11 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start(ctx context.Context) error {
+	err := s.relayMetrics.Start()
+	if err != nil {
+		return fmt.Errorf("error starting metrics server: %w", err)
+	}
+
 	if s.chainReader != nil && s.metadataProvider != nil {
 		go func() {
 			_ = s.RefreshOnchainState(ctx)
@@ -467,14 +486,8 @@ func (s *Server) Start(ctx context.Context) error {
 	healthcheck.RegisterHealthServer(name, s.grpcServer)
 
 	s.logger.Info("GRPC Listening", "port", s.config.GRPCPort, "address", listener.Addr().String())
-
 	if err = s.grpcServer.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")
-	}
-
-	err = s.relayMetrics.Start()
-	if err != nil {
-		return fmt.Errorf("error starting metrics server: %w", err)
 	}
 
 	return nil
