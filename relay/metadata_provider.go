@@ -74,7 +74,10 @@ func newMetadataProvider(
 	}
 	server.blobParamsMap.Store(blobParamsMap)
 
-	c := cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize))
+	c := cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize),
+		func(key v2.BlobKey, value *blobMetadata) uint64 {
+			return uint64(1)
+		})
 
 	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
 		c,

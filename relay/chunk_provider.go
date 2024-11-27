@@ -60,11 +60,7 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	c := cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize)
-	err := c.WithWeightCalculator(computeFramesCacheWeight)
-	if err != nil {
-		return nil, fmt.Errorf("error setting weight calculator: %w", err)
-	}
+	c := cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight)
 
 	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
 		c,

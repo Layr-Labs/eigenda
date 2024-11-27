@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"errors"
 	"github.com/emirpasic/gods/queues"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 )
@@ -20,15 +19,11 @@ type FIFOCache[K comparable, V any] struct {
 }
 
 // NewFIFOCache creates a new FIFOCache.
-func NewFIFOCache[K comparable, V any](maxWeight uint64) *FIFOCache[K, V] {
-	defaultWeightCalculator := func(key K, value V) uint64 {
-		return uint64(1)
-	}
-
+func NewFIFOCache[K comparable, V any](maxWeight uint64, calculator WeightCalculator[K, V]) *FIFOCache[K, V] {
 	return &FIFOCache[K, V]{
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
-		weightCalculator: defaultWeightCalculator,
+		weightCalculator: calculator,
 		expirationQueue:  linkedlistqueue.New(),
 	}
 }
@@ -67,14 +62,6 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		delete(f.data, keyToEvict)
 		f.currentWeight -= weightToEvict
 	}
-}
-
-func (f *FIFOCache[K, V]) WithWeightCalculator(weightCalculator WeightCalculator[K, V]) error {
-	if f.Size() > 0 {
-		return errors.New("cannot set weight calculator on non-empty cache")
-	}
-	f.weightCalculator = weightCalculator
-	return nil
 }
 
 func (f *FIFOCache[K, V]) Size() int {

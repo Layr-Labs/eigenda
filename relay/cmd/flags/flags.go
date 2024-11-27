@@ -60,8 +60,8 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	BlobCacheSizeFlag = cli.Uint64Flag{
-		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-size"),
+	BlobCacheBytes = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-bytes"),
 		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
@@ -297,7 +297,7 @@ var optionalFlags = []cli.Flag{
 	MaxGRPCMessageSizeFlag,
 	MetadataCacheSizeFlag,
 	MetadataMaxConcurrencyFlag,
-	BlobCacheSizeFlag,
+	BlobCacheBytes,
 	BlobMaxConcurrencyFlag,
 	ChunkCacheSizeFlag,
 	ChunkMaxConcurrencyFlag,

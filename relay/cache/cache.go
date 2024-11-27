@@ -17,11 +17,6 @@ type Cache[K comparable, V any] interface {
 	// of the cache in and of itself.
 	Put(key K, value V)
 
-	// WithWeightCalculator sets the weight calculator for the cache. May only be called
-	// when the cache is empty. The weight calculator should be an idempotent function that
-	// always returns the same output given the same input.
-	WithWeightCalculator(weightCalculator WeightCalculator[K, V]) error
-
 	// Size returns the number of key-value pairs in the cache.
 	Size() int
 

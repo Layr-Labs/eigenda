@@ -42,11 +42,7 @@ func newBlobProvider(
 		fetchTimeout: fetchTimeout,
 	}
 
-	c := cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize)
-	err := c.WithWeightCalculator(computeBlobCacheWeight)
-	if err != nil {
-		return nil, fmt.Errorf("error creating blob cache: %w", err)
-	}
+	c := cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight)
 
 	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](c, maxIOConcurrency, server.fetchBlob)
 	if err != nil {

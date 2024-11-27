@@ -78,8 +78,8 @@ type Config struct {
 	// goroutines.
 	MetadataMaxConcurrency int
 
-	// BlobCacheSize is the maximum size of the blob cache, in bytes.
-	BlobCacheSize uint64
+	// BlobCacheBytes is the maximum size of the blob cache, in bytes.
+	BlobCacheBytes uint64
 
 	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
 	BlobMaxConcurrency int
@@ -153,7 +153,7 @@ func NewServer(
 		ctx,
 		logger,
 		blobStore,
-		config.BlobCacheSize,
+		config.BlobCacheBytes,
 		config.BlobMaxConcurrency,
 		config.Timeouts.InternalGetBlobTimeout)
 	if err != nil {

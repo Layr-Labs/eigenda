@@ -60,7 +60,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MaxGRPCMessageSize:     ctx.Int(flags.MaxGRPCMessageSizeFlag.Name),
 			MetadataCacheSize:      ctx.Int(flags.MetadataCacheSizeFlag.Name),
 			MetadataMaxConcurrency: ctx.Int(flags.MetadataMaxConcurrencyFlag.Name),
-			BlobCacheSize:          ctx.Uint64(flags.BlobCacheSizeFlag.Name),
+			BlobCacheBytes:         ctx.Uint64(flags.BlobCacheBytes.Name),
 			BlobMaxConcurrency:     ctx.Int(flags.BlobMaxConcurrencyFlag.Name),
 			ChunkCacheSize:         ctx.Uint64(flags.ChunkCacheSizeFlag.Name),
 			ChunkMaxConcurrency:    ctx.Int(flags.ChunkMaxConcurrencyFlag.Name),
