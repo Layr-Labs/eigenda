@@ -13,7 +13,7 @@ type RelayMetrics struct {
 	metricsServer    metrics.Metrics
 	grpcServerOption grpc.ServerOption
 
-	// TODO (after cache changes merge): add metrics for cache
+	// TODO (cody-littley): after cache changes merge, add metrics for cache
 
 	// GetChunks metrics
 	GetChunksLatency               metrics.LatencyMetric
