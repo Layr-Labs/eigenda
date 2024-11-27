@@ -72,12 +72,10 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	errChan := make(chan error, 1)
 
 	var msmDone, firstECNttDone, secondECNttDone time.Time
 	runtime.RunOnDevice(&p.Device, func(args ...any) {
 		defer wg.Done()
-		defer close(errChan)
 		defer func() {
 			if r := recover(); r != nil {
 				icicleErr = fmt.Errorf("GPU operation panic: %v", r)

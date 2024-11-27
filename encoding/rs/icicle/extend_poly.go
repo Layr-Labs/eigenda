@@ -38,8 +38,8 @@ func (g *RsIcicleBackend) ExtendPolyEval(coeffs []fr.Element) ([]fr.Element, err
 		return nil, fmt.Errorf("failed to set device: %v", err.AsString())
 	}
 
-	var icicleErr error
 	// Perform NTT
+	var icicleErr error
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	icicleRuntime.RunOnDevice(&g.Device, func(args ...any) {
