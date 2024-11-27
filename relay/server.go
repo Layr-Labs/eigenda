@@ -117,6 +117,9 @@ type Config struct {
 
 	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed.
 	OnchainStateRefreshInterval time.Duration
+
+	// MetricsPort is the port that the relay metrics server listens on.
+	MetricsPort int
 }
 
 // NewServer creates a new relay Server.
@@ -188,7 +191,7 @@ func NewServer(
 		}
 	}
 
-	relayMetrics, err := metrics.NewRelayMetrics(logger, nil) // TODO config
+	relayMetrics, err := metrics.NewRelayMetrics(logger, config.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metrics: %w", err)
 	}
@@ -469,6 +472,11 @@ func (s *Server) Start(ctx context.Context) error {
 		return errors.New("could not start GRPC server")
 	}
 
+	err = s.relayMetrics.Start()
+	if err != nil {
+		return fmt.Errorf("error starting metrics server: %w", err)
+	}
+
 	return nil
 }
 
@@ -493,8 +501,15 @@ func (s *Server) RefreshOnchainState(ctx context.Context) error {
 }
 
 // Stop stops the server.
-func (s *Server) Stop() {
+func (s *Server) Stop() error {
 	if s.grpcServer != nil {
 		s.grpcServer.Stop()
 	}
+
+	err := s.relayMetrics.Stop()
+	if err != nil {
+		return fmt.Errorf("error stopping metrics server: %w", err)
+	}
+
+	return nil
 }

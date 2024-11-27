@@ -93,6 +93,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				InternalGetProofsTimeout:       ctx.Duration(flags.InternalGetProofsTimeoutFlag.Name),
 				InternalGetCoefficientsTimeout: ctx.Duration(flags.InternalGetCoefficientsTimeoutFlag.Name),
 			},
+			MetricsPort: ctx.Int(flags.MetricsPortFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),

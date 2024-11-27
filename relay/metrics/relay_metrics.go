@@ -12,11 +12,10 @@ type RelayMetrics struct {
 	grpcServerOption grpc.ServerOption
 }
 
-func NewRelayMetrics(
-	logger logging.Logger,
-	config *metrics.Config) (*RelayMetrics, error) {
+// NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
+func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 
-	server := metrics.NewMetrics(logger, config)
+	server := metrics.NewMetrics(logger, "relay", port)
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	server.RegisterExternalMetrics(grpcMetrics)
@@ -38,11 +37,6 @@ func (m *RelayMetrics) Start() error {
 // Stop stops the metrics server.
 func (m *RelayMetrics) Stop() error {
 	return m.metricsServer.Stop()
-}
-
-// WriteMetricsDocumentation writes documentation for all currently registered metrics to a file.
-func (m *RelayMetrics) WriteMetricsDocumentation() error {
-	return m.metricsServer.WriteMetricsDocumentation("relay/metrics/relay-metrics.md")
 }
 
 // GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.

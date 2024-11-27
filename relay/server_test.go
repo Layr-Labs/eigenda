@@ -122,7 +122,10 @@ func TestReadWriteBlobs(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]byte)
 
@@ -202,7 +205,10 @@ func TestReadNonExistentBlob(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	for i := 0; i < 10; i++ {
 		request := &pb.GetBlobRequest{
@@ -257,7 +263,10 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]byte)
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
@@ -377,7 +386,10 @@ func TestReadWriteChunks(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -575,7 +587,10 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -703,7 +718,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)
@@ -980,7 +998,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		err = server.Start(context.Background())
 		require.NoError(t, err)
 	}()
-	defer server.Stop()
+	defer func() {
+		err = server.Stop()
+		require.NoError(t, err)
+	}()
 
 	expectedData := make(map[v2.BlobKey][]*encoding.Frame)
 	fragmentInfoMap := make(map[v2.BlobKey]*encoding.FragmentInfo)

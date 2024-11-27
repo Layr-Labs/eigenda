@@ -280,6 +280,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    1 * time.Hour,
 	}
+	MetricsPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
+		Usage:    "Port to listen on for metrics",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
+		Value:    9101,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -327,6 +334,7 @@ var optionalFlags = []cli.Flag{
 	InternalGetProofsTimeoutFlag,
 	InternalGetCoefficientsTimeoutFlag,
 	OnchainStateRefreshIntervalFlag,
+	MetricsPortFlag,
 }
 
 var Flags []cli.Flag

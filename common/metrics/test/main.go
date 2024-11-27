@@ -24,18 +24,12 @@ type LabelType2 struct {
 }
 
 func main() {
-
-	metricsConfig := &metrics.Config{
-		Namespace: "test",
-		HTTPPort:  9101,
-	}
-
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	if err != nil {
 		panic(err)
 	}
 
-	metricsServer := metrics.NewMetrics(logger, metricsConfig)
+	metricsServer := metrics.NewMetrics(logger, "test", 9101)
 
 	l1, err := metricsServer.NewLatencyMetric(
 		"l1",
