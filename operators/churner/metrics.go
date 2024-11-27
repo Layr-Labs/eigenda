@@ -65,10 +65,7 @@ func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
-	metricsServer := metrics.NewMetrics(logger, &metrics.Config{
-		Namespace: "eigenda_churner",
-		HTTPPort:  httpPort,
-	})
+	metricsServer := metrics.NewMetrics(logger, "eigenda_churner", httpPort)
 
 	numRequests, err := metricsServer.NewCountMetric(
 		"request",
@@ -100,7 +97,7 @@ func NewMetrics(httpPort int, logger logging.Logger) (*Metrics, error) {
 
 // WriteMetricsDocumentation writes the metrics for the churner to a markdown file.
 func (g *Metrics) WriteMetricsDocumentation() error {
-	return g.metricsServer.WriteMetricsDocumentation("operators/churner/churner-metrics.md")
+	return g.metricsServer.WriteMetricsDocumentation("operators/churner/mdoc/churner-metrics.md")
 }
 
 // ObserveLatency observes the latency of a stage

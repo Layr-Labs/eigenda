@@ -82,7 +82,7 @@ func (m *runningAverageMetric) Description() string {
 }
 
 func (m *runningAverageMetric) Type() string {
-	return "histogram"
+	return "running average"
 }
 
 func (m *runningAverageMetric) LabelFields() []string {

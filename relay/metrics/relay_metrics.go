@@ -140,3 +140,8 @@ func (m *RelayMetrics) Stop() error {
 func (m *RelayMetrics) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
+
+// WriteMetricsDocumentation writes the metrics for the churner to a markdown file.
+func (m *RelayMetrics) WriteMetricsDocumentation() error {
+	return m.metricsServer.WriteMetricsDocumentation("relay/mdoc/relay-metrics.md")
+}
