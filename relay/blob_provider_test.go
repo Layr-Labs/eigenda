@@ -41,7 +41,8 @@ func TestReadWrite(t *testing.T) {
 		blobStore,
 		1024*1024*32,
 		32,
-		10*time.Second)
+		10*time.Second,
+		nil)
 	require.NoError(t, err)
 
 	// Read the blobs back.
@@ -78,7 +79,8 @@ func TestNonExistentBlob(t *testing.T) {
 		blobStore,
 		1024*1024*32,
 		32,
-		10*time.Second)
+		10*time.Second,
+		nil)
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {

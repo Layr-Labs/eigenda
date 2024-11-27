@@ -11,9 +11,7 @@ func TestExpirationOrder(t *testing.T) {
 	tu.InitializeRandom()
 
 	maxWeight := uint64(10 + rand.Intn(10))
-	c := NewFIFOCache[int, int](maxWeight, func(key int, value int) uint64 {
-		return 1
-	})
+	c := NewFIFOCache[int, int](maxWeight, nil, nil)
 
 	require.Equal(t, uint64(0), c.Weight())
 	require.Equal(t, 0, c.Size())
@@ -85,7 +83,7 @@ func TestWeightedValues(t *testing.T) {
 		return uint64(key)
 	}
 
-	c := NewFIFOCache[int, int](maxWeight, weightCalculator)
+	c := NewFIFOCache[int, int](maxWeight, weightCalculator, nil)
 
 	expectedValues := make(map[int]int)
 

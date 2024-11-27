@@ -86,7 +86,6 @@ require (
 	github.com/docker/docker v25.0.5+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect

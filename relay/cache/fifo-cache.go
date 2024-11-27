@@ -16,15 +16,30 @@ type FIFOCache[K comparable, V any] struct {
 	maxWeight       uint64
 	data            map[K]V
 	expirationQueue queues.Queue
+	evictionHandler func(K, V)
 }
 
-// NewFIFOCache creates a new FIFOCache.
-func NewFIFOCache[K comparable, V any](maxWeight uint64, calculator WeightCalculator[K, V]) *FIFOCache[K, V] {
+// NewFIFOCache creates a new FIFOCache. If the calculator is nil, the weight of each key-value pair will be 1.
+// If the evictionHandler is nil it is ignored.
+func NewFIFOCache[K comparable, V any](
+	maxWeight uint64,
+	calculator WeightCalculator[K, V],
+	evictionHandler func(K, V)) *FIFOCache[K, V] {
+
+	if calculator == nil {
+		calculator = func(K, V) uint64 { return 1 }
+	}
+
+	if evictionHandler == nil {
+		evictionHandler = func(K, V) {}
+	}
+
 	return &FIFOCache[K, V]{
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: calculator,
 		expirationQueue:  linkedlistqueue.New(),
+		evictionHandler:  evictionHandler,
 	}
 }
 
@@ -61,6 +76,7 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
 		delete(f.data, keyToEvict)
 		f.currentWeight -= weightToEvict
+		f.evictionHandler(keyToEvict, f.data[keyToEvict])
 	}
 }
 

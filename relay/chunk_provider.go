@@ -50,7 +50,8 @@ func newChunkProvider(
 	cacheSize uint64,
 	maxIOConcurrency int,
 	proofFetchTimeout time.Duration,
-	coefficientFetchTimeout time.Duration) (*chunkProvider, error) {
+	coefficientFetchTimeout time.Duration,
+	metrics *cache.CacheAccessorMetrics) (*chunkProvider, error) {
 
 	server := &chunkProvider{
 		ctx:                     ctx,
@@ -60,12 +61,12 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	c := cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight)
-
 	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		c,
+		computeFramesCacheWeight,
+		cacheSize,
 		maxIOConcurrency,
-		server.fetchFrames)
+		server.fetchFrames,
+		metrics)
 	if err != nil {
 		return nil, err
 	}

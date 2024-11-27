@@ -2,6 +2,7 @@ package relay
 
 import (
 	"github.com/Layr-Labs/eigenda/common/metrics"
+	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -13,7 +14,10 @@ type RelayMetrics struct {
 	metricsServer    metrics.Metrics
 	grpcServerOption grpc.ServerOption
 
-	// TODO (cody-littley): after cache changes merge, add metrics for cache
+	// Cache metrics
+	MetadataCacheMetrics *cache.CacheAccessorMetrics
+	ChunkCacheMetrics    *cache.CacheAccessorMetrics
+	BlobCacheMetrics     *cache.CacheAccessorMetrics
 
 	// GetChunks metrics
 	GetChunksLatency               metrics.LatencyMetric
@@ -48,6 +52,21 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		metrics.NewQuantile(0.5),
 		metrics.NewQuantile(0.9),
 		metrics.NewQuantile(0.99),
+	}
+
+	metadataCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "metadata")
+	if err != nil {
+		return nil, err
+	}
+
+	chunkCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "chunk")
+	if err != nil {
+		return nil, err
+	}
+
+	blobCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "blob")
+	if err != nil {
+		return nil, err
 	}
 
 	getChunksLatencyMetric, err := server.NewLatencyMetric(
@@ -169,6 +188,9 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 
 	return &RelayMetrics{
 		metricsServer:                  server,
+		MetadataCacheMetrics:           metadataCacheMetrics,
+		ChunkCacheMetrics:              chunkCacheMetrics,
+		BlobCacheMetrics:               blobCacheMetrics,
 		grpcServerOption:               grpcServerOption,
 		GetChunksLatency:               getChunksLatencyMetric,
 		GetChunksAuthenticationLatency: getChunksAuthenticationLatencyMetric,

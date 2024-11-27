@@ -4,6 +4,7 @@ import (
 	"context"
 	"golang.org/x/sync/semaphore"
 	"sync"
+	"time"
 )
 
 // CacheAccessor is an interface for accessing a resource that is cached. It assumes that cache misses
@@ -47,6 +48,9 @@ type cacheAccessor[K comparable, V any] struct {
 	// cache is the underlying cache that this wrapper manages.
 	cache Cache[K, V]
 
+	// weightCalculator is the function used to calculate the weight of a key-value pair.
+	calculator WeightCalculator[K, V]
+
 	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
 	concurrencyLimiter chan struct{}
 
@@ -55,17 +59,29 @@ type cacheAccessor[K comparable, V any] struct {
 
 	// accessor is the function used to fetch values that are not in the cache.
 	accessor Accessor[K, V]
+
+	// insertionTimes is a map of keys to the time they were inserted into the cache. Used to calculate the average
+	// lifespan of items in the cache.
+	insertionTimes map[K]time.Time
+
+	// metrics is used to record metrics about the cache accessor's performance.
+	metrics *CacheAccessorMetrics
 }
 
-// NewCacheAccessor creates a new CacheAccessor. The cacheSize parameter specifies the maximum number of items
-// that can be stored in the cache. The concurrencyLimit parameter specifies the maximum number of concurrent
-// lookups that can be in progress at any given time. If a greater number of lookups are requested, the excess
-// lookups will block until a lookup completes. If concurrencyLimit is zero, then no limits are imposed. The accessor
-// parameter is the function used to fetch values that are not in the cache.
+// NewCacheAccessor creates a new CacheAccessor.
+//
+// The concurrencyLimit parameter specifies the maximum number of concurrent lookups that can be in progress at any
+// given time. If a greater number of lookups are requested, the excess lookups will block until a lookup completes.
+// If concurrencyLimit is zero, then no limits are imposed. The accessor parameter is the function used to fetch values that are not in the cache.
+//
+// If metrics is not nil, it will be used to record metrics about the cache accessor's performance.
+// If nil, no metrics will be recorded.
 func NewCacheAccessor[K comparable, V any](
-	cache Cache[K, V],
+	calculator WeightCalculator[K, V],
+	maxWeight uint64,
 	concurrencyLimit int,
-	accessor Accessor[K, V]) (CacheAccessor[K, V], error) {
+	accessor Accessor[K, V],
+	metrics *CacheAccessorMetrics) (CacheAccessor[K, V], error) {
 
 	lookupsInProgress := make(map[K]*accessResult[V])
 
@@ -74,11 +90,30 @@ func NewCacheAccessor[K comparable, V any](
 		concurrencyLimiter = make(chan struct{}, concurrencyLimit)
 	}
 
+	insertionTimes := make(map[K]time.Time)
+	var evictionHandler func(K, V)
+	if metrics != nil {
+		// If metrics are enabled, track the amount of time each item spends in the cache.
+		// Thread safety is provided by the cacheLock.
+		evictionHandler = func(key K, _ V) {
+			if insertionTime, ok := insertionTimes[key]; ok {
+				lifespan := time.Since(insertionTime).Milliseconds()
+				metrics.averageLifespan.Update(float64(lifespan))
+				delete(insertionTimes, key)
+			}
+		}
+	}
+
+	cache := NewFIFOCache(maxWeight, calculator, evictionHandler)
+
 	return &cacheAccessor[K, V]{
 		cache:              cache,
+		calculator:         calculator,
 		concurrencyLimiter: concurrencyLimiter,
 		accessor:           accessor,
 		lookupsInProgress:  lookupsInProgress,
+		insertionTimes:     insertionTimes,
+		metrics:            metrics,
 	}, nil
 }
 
@@ -97,6 +132,10 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 	v, ok := c.cache.Get(key)
 	if ok {
 		c.cacheLock.Unlock()
+
+		if c.metrics != nil {
+			c.metrics.cacheHits.Increment()
+		}
 		return v, nil
 	}
 
@@ -108,6 +147,10 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 	}
 
 	c.cacheLock.Unlock()
+
+	if c.metrics != nil {
+		c.metrics.cacheMisses.Increment()
+	}
 
 	if alreadyLoading {
 		// The result is being fetched on another goroutine. Wait for it to finish.
@@ -150,11 +193,31 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 			<-c.concurrencyLimiter
 		}
 
+		if c.metrics != nil {
+			start := time.Now()
+			defer func() {
+				c.metrics.cacheMissLatency.ReportLatency(time.Since(start))
+			}()
+		}
+
 		c.cacheLock.Lock()
 
 		// Update the cache if the fetch was successful.
 		if err == nil {
 			c.cache.Put(key, value)
+
+			if c.metrics != nil {
+				c.insertionTimes[key] = time.Now()
+				size := c.cache.Size()
+				weight := c.cache.Weight()
+				c.metrics.size.Set(float64(size))
+				c.metrics.weight.Set(float64(weight))
+				var averageWeight float64
+				if size > 0 {
+					averageWeight = float64(weight) / float64(size)
+				}
+				c.metrics.averageWeight.Set(averageWeight)
+			}
 		}
 
 		// Provide the result to all other goroutines that may be waiting for it.

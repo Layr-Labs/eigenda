@@ -33,7 +33,8 @@ func newBlobProvider(
 	blobStore *blobstore.BlobStore,
 	blobCacheSize uint64,
 	maxIOConcurrency int,
-	fetchTimeout time.Duration) (*blobProvider, error) {
+	fetchTimeout time.Duration,
+	metrics *cache.CacheAccessorMetrics) (*blobProvider, error) {
 
 	server := &blobProvider{
 		ctx:          ctx,
@@ -42,9 +43,13 @@ func newBlobProvider(
 		fetchTimeout: fetchTimeout,
 	}
 
-	c := cache.NewFIFOCache[v2.BlobKey, []byte](blobCacheSize, computeBlobCacheWeight)
+	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](
+		computeBlobCacheWeight,
+		blobCacheSize,
+		maxIOConcurrency,
+		server.fetchBlob,
+		metrics)
 
-	cacheAccessor, err := cache.NewCacheAccessor[v2.BlobKey, []byte](c, maxIOConcurrency, server.fetchBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob cache: %w", err)
 	}

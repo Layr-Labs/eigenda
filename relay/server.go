@@ -141,6 +141,11 @@ func NewServer(
 		return nil, fmt.Errorf("error fetching blob params: %w", err)
 	}
 
+	metrics, err := NewRelayMetrics(logger, config.MetricsPort)
+	if err != nil {
+		return nil, fmt.Errorf("error creating metrics: %w", err)
+	}
+
 	mp, err := newMetadataProvider(
 		ctx,
 		logger,
@@ -149,7 +154,8 @@ func NewServer(
 		config.MetadataMaxConcurrency,
 		config.RelayIDs,
 		config.Timeouts.InternalGetMetadataTimeout,
-		v2.NewBlobVersionParameterMap(blobParams))
+		v2.NewBlobVersionParameterMap(blobParams),
+		metrics.MetadataCacheMetrics)
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata provider: %w", err)
@@ -161,7 +167,8 @@ func NewServer(
 		blobStore,
 		config.BlobCacheBytes,
 		config.BlobMaxConcurrency,
-		config.Timeouts.InternalGetBlobTimeout)
+		config.Timeouts.InternalGetBlobTimeout,
+		metrics.BlobCacheMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
@@ -173,7 +180,8 @@ func NewServer(
 		config.ChunkCacheSize,
 		config.ChunkMaxConcurrency,
 		config.Timeouts.InternalGetProofsTimeout,
-		config.Timeouts.InternalGetCoefficientsTimeout)
+		config.Timeouts.InternalGetCoefficientsTimeout,
+		metrics.ChunkCacheMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
@@ -188,11 +196,6 @@ func NewServer(
 		if err != nil {
 			return nil, fmt.Errorf("error creating authenticator: %w", err)
 		}
-	}
-
-	metrics, err := NewRelayMetrics(logger, config.MetricsPort)
-	if err != nil {
-		return nil, fmt.Errorf("error creating metrics: %w", err)
 	}
 
 	return &Server{
