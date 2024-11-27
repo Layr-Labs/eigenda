@@ -5,6 +5,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"sync"
 	"time"
 )
 
@@ -35,6 +36,9 @@ type runningAverageMetric struct {
 
 	// timeWindow is the time window used to calculate the running average.
 	timeWindow time.Duration
+
+	// lock is used to provide thread safety for the running average calculator.
+	lock sync.Mutex
 }
 
 // newRunningAverageMetric creates a new RunningAverageMetric instance.
@@ -104,7 +108,9 @@ func (m *runningAverageMetric) Update(value float64, label ...any) {
 		m.logger.Errorf("error extracting values from label: %v", err)
 	}
 
+	m.lock.Lock()
 	average := m.runningAverage.Update(time.Now(), value)
+	m.lock.Unlock()
 	m.vec.WithLabelValues(values...).Set(average)
 }
 
