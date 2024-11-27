@@ -350,12 +350,12 @@ func (m *metrics) NewAutoGauge(
 	return nil
 }
 
-func (m *metrics) NewHistogramMetric(
+func (m *metrics) NewRunningAverageMetric(
 	name string,
 	unit string,
 	description string,
-	bucketFactor float64,
-	labelTemplate any) (HistogramMetric, error) {
+	timeWindow time.Duration,
+	labelTemplate any) (RunningAverageMetric, error) {
 
 	if !m.isAlive.Load() {
 		return nil, errors.New("metrics server is not alive")
@@ -368,17 +368,17 @@ func (m *metrics) NewHistogramMetric(
 
 	preExistingMetric, ok := m.metricMap[id]
 	if ok {
-		return preExistingMetric.(HistogramMetric), nil
+		return preExistingMetric.(RunningAverageMetric), nil
 	}
 
-	metric, err := newHistogramMetric(
+	metric, err := newRunningAverageMetric(
 		m.logger,
 		m.registry,
 		m.namespace,
 		name,
 		unit,
 		description,
-		bucketFactor,
+		timeWindow,
 		labelTemplate)
 	if err != nil {
 		return nil, err

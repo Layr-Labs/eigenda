@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
+	"time"
 )
 
 type RelayMetrics struct {
@@ -18,8 +19,8 @@ type RelayMetrics struct {
 	GetChunksDataLatency           metrics.LatencyMetric
 	GetChunksAuthFailures          metrics.CountMetric
 	GetChunksRateLimited           metrics.CountMetric
-	GetChunksKeyCountHistogram     metrics.HistogramMetric
-	GetChunksDataSizeHistogram     metrics.HistogramMetric
+	GetChunksAverageKeyCount       metrics.RunningAverageMetric
+	GetChunksAverageDataSize       metrics.RunningAverageMetric
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -91,21 +92,21 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		return nil, err
 	}
 
-	getChunksKeyCountHistogram, err := server.NewHistogramMetric(
-		"get_chunks_key",
+	getChunksAverageKeyCount, err := server.NewRunningAverageMetric(
+		"average_get_chunks_key",
 		"count",
-		"Number of keys in a GetChunks request",
-		1.1,
+		"Average number of keys in a GetChunks request",
+		time.Minute,
 		nil)
 	if err != nil {
 		return nil, err
 	}
 
-	getChunksDataSizeHistogram, err := server.NewHistogramMetric(
-		"get_chunks_data",
+	getChunksAverageDataSize, err := server.NewRunningAverageMetric(
+		"average_get_chunks_data",
 		"bytes",
-		"Size of data in a GetChunks request, in bytes",
-		1.1,
+		"Average data size in a GetChunks request",
+		time.Minute,
 		nil)
 	if err != nil {
 		return nil, err
@@ -120,8 +121,8 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		GetChunksDataLatency:           getChunksDataLatencyMetric,
 		GetChunksAuthFailures:          getChunksAuthFailures,
 		GetChunksRateLimited:           getChunksRateLimited,
-		GetChunksKeyCountHistogram:     getChunksKeyCountHistogram,
-		GetChunksDataSizeHistogram:     getChunksDataSizeHistogram,
+		GetChunksAverageKeyCount:       getChunksAverageKeyCount,
+		GetChunksAverageDataSize:       getChunksAverageDataSize,
 	}, nil
 }
 

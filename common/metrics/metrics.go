@@ -66,20 +66,14 @@ type Metrics interface {
 		source func() float64,
 		label ...any) error
 
-	// NewHistogramMetric creates a new HistogramMetric instance. Useful for tracking the distribution of values.
-	// Metric name and label may only contain alphanumeric characters and underscores.
-	//
-	// Suggested bucket factor is 1.1. For additional documentation on bucket factor, see the prometheus documentation:
-	// https://github.com/prometheus/client_golang/blob/v1.20.5/prometheus/histogram.go#L430
-	//
-	// The labelTemplate parameter is the label type that will be used for this metric. Each field becomes a label for
-	// the metric. Each field type must be a string. If no labels are needed, pass nil.
-	NewHistogramMetric(
+	// NewRunningAverageMetric creates a new GaugeMetric instance that keeps track of the average of a series of values
+	// over a given time window. Each value within the window is given equal weight.
+	NewRunningAverageMetric(
 		name string,
 		unit string,
 		description string,
-		bucketFactor float64,
-		labelTemplate any) (HistogramMetric, error)
+		timeWindow time.Duration,
+		labelTemplate any) (RunningAverageMetric, error)
 
 	// RegisterExternalMetrics registers prometheus collectors created outside the metrics framework.
 	RegisterExternalMetrics(collectors ...prometheus.Collector)
@@ -162,10 +156,10 @@ type LatencyMetric interface {
 	ReportLatency(latency time.Duration, label ...any)
 }
 
-// HistogramMetric allows the distribution of values to be tracked.
-type HistogramMetric interface {
+// RunningAverageMetric tracks the average of a series of values over a given time window.
+type RunningAverageMetric interface {
 	Metric
 
-	// Observe reports a value to the histogram.
-	Observe(value float64, label ...any)
+	// Update adds a new value to the RunningAverage.
+	Update(value float64, label ...any)
 }

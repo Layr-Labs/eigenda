@@ -63,8 +63,13 @@ func (m *mockMetrics) NewAutoGauge(
 	return nil
 }
 
-func (m *mockMetrics) NewHistogramMetric(name string, unit string, description string, bucketFactor float64, labelTemplate any) (HistogramMetric, error) {
-	return &mockHistogramMetric{}, nil
+func (m *mockMetrics) NewRunningAverageMetric(
+	name string,
+	unit string,
+	description string,
+	timeWindow time.Duration,
+	labelTemplate any) (RunningAverageMetric, error) {
+	return &mockRunningAverageMetric{}, nil
 }
 
 func (m *mockMetrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
@@ -162,31 +167,31 @@ func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) {
 
 }
 
-var _ HistogramMetric = &mockHistogramMetric{}
+var _ RunningAverageMetric = &mockRunningAverageMetric{}
 
-type mockHistogramMetric struct {
+type mockRunningAverageMetric struct {
 }
 
-func (m mockHistogramMetric) Name() string {
+func (m *mockRunningAverageMetric) Name() string {
 	return ""
 }
 
-func (m mockHistogramMetric) Unit() string {
+func (m *mockRunningAverageMetric) Unit() string {
 	return ""
 }
 
-func (m mockHistogramMetric) Description() string {
+func (m *mockRunningAverageMetric) Description() string {
 	return ""
 }
 
-func (m mockHistogramMetric) Type() string {
+func (m *mockRunningAverageMetric) Type() string {
 	return ""
 }
 
-func (m mockHistogramMetric) LabelFields() []string {
+func (m *mockRunningAverageMetric) LabelFields() []string {
 	return make([]string, 0)
 }
 
-func (m mockHistogramMetric) Observe(value float64, label ...any) {
+func (m *mockRunningAverageMetric) Update(value float64, label ...any) {
 
 }
