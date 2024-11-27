@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	commonpprof "github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/disperser/common"
@@ -59,6 +60,12 @@ func NewEncoderServer(config ServerConfig, logger logging.Logger, prover encodin
 }
 
 func (s *EncoderServer) Start() error {
+	pprofProfiler := commonpprof.NewPprofProfiler(s.config.PprofHttpPort, s.logger)
+	if s.config.EnablePprof {
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for encoder server", "port", s.config.PprofHttpPort)
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.config.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
