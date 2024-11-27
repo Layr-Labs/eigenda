@@ -18,6 +18,8 @@ type RelayMetrics struct {
 	GetChunksDataLatency           metrics.LatencyMetric
 	GetChunksAuthFailures          metrics.CountMetric
 	GetChunksRateLimited           metrics.CountMetric
+	GetChunksKeyCountHistogram     metrics.HistogramMetric
+	GetChunksDataSizeHistogram     metrics.HistogramMetric
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -89,6 +91,26 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		return nil, err
 	}
 
+	getChunksKeyCountHistogram, err := server.NewHistogramMetric(
+		"get_chunks_key",
+		"count",
+		"Number of keys in a GetChunks request",
+		1.1,
+		nil)
+	if err != nil {
+		return nil, err
+	}
+
+	getChunksDataSizeHistogram, err := server.NewHistogramMetric(
+		"get_chunks_data",
+		"bytes",
+		"Size of data in a GetChunks request, in bytes",
+		1.1,
+		nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &RelayMetrics{
 		metricsServer:                  server,
 		grpcServerOption:               grpcServerOption,
@@ -98,6 +120,8 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		GetChunksDataLatency:           getChunksDataLatencyMetric,
 		GetChunksAuthFailures:          getChunksAuthFailures,
 		GetChunksRateLimited:           getChunksRateLimited,
+		GetChunksKeyCountHistogram:     getChunksKeyCountHistogram,
+		GetChunksDataSizeHistogram:     getChunksDataSizeHistogram,
 	}, nil
 }
 

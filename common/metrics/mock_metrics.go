@@ -63,6 +63,10 @@ func (m *mockMetrics) NewAutoGauge(
 	return nil
 }
 
+func (m *mockMetrics) NewHistogramMetric(name string, unit string, description string, bucketFactor float64, labelTemplate any) (HistogramMetric, error) {
+	return &mockHistogramMetric{}, nil
+}
+
 func (m *mockMetrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
 
 }
@@ -155,5 +159,34 @@ func (m *mockLatencyMetric) LabelFields() []string {
 }
 
 func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) {
+
+}
+
+var _ HistogramMetric = &mockHistogramMetric{}
+
+type mockHistogramMetric struct {
+}
+
+func (m mockHistogramMetric) Name() string {
+	return ""
+}
+
+func (m mockHistogramMetric) Unit() string {
+	return ""
+}
+
+func (m mockHistogramMetric) Description() string {
+	return ""
+}
+
+func (m mockHistogramMetric) Type() string {
+	return ""
+}
+
+func (m mockHistogramMetric) LabelFields() []string {
+	return make([]string, 0)
+}
+
+func (m mockHistogramMetric) Observe(value float64, label ...any) {
 
 }

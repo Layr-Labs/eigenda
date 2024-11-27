@@ -273,6 +273,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf(
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
+	s.relayMetrics.GetChunksKeyCountHistogram.Observe(float64(len(request.ChunkRequests)))
 
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
@@ -323,6 +324,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, err
 	}
+	s.relayMetrics.GetChunksDataSizeHistogram.Observe(float64(requiredBandwidth))
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {

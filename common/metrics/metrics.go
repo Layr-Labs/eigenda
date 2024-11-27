@@ -66,6 +66,21 @@ type Metrics interface {
 		source func() float64,
 		label ...any) error
 
+	// NewHistogramMetric creates a new HistogramMetric instance. Useful for tracking the distribution of values.
+	// Metric name and label may only contain alphanumeric characters and underscores.
+	//
+	// Suggested bucket factor is 1.1. For additional documentation on bucket factor, see the prometheus documentation:
+	// https://github.com/prometheus/client_golang/blob/v1.20.5/prometheus/histogram.go#L430
+	//
+	// The labelTemplate parameter is the label type that will be used for this metric. Each field becomes a label for
+	// the metric. Each field type must be a string. If no labels are needed, pass nil.
+	NewHistogramMetric(
+		name string,
+		unit string,
+		description string,
+		bucketFactor float64,
+		labelTemplate any) (HistogramMetric, error)
+
 	// RegisterExternalMetrics registers prometheus collectors created outside the metrics framework.
 	RegisterExternalMetrics(collectors ...prometheus.Collector)
 }
@@ -145,4 +160,12 @@ type LatencyMetric interface {
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
 	ReportLatency(latency time.Duration, label ...any)
+}
+
+// HistogramMetric allows the distribution of values to be tracked.
+type HistogramMetric interface {
+	Metric
+
+	// Observe reports a value to the histogram.
+	Observe(value float64, label ...any)
 }

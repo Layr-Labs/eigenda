@@ -350,6 +350,44 @@ func (m *metrics) NewAutoGauge(
 	return nil
 }
 
+func (m *metrics) NewHistogramMetric(
+	name string,
+	unit string,
+	description string,
+	bucketFactor float64,
+	labelTemplate any) (HistogramMetric, error) {
+
+	if !m.isAlive.Load() {
+		return nil, errors.New("metrics server is not alive")
+	}
+
+	id, err := newMetricID(name, unit)
+	if err != nil {
+		return nil, err
+	}
+
+	preExistingMetric, ok := m.metricMap[id]
+	if ok {
+		return preExistingMetric.(HistogramMetric), nil
+	}
+
+	metric, err := newHistogramMetric(
+		m.logger,
+		m.registry,
+		m.namespace,
+		name,
+		unit,
+		description,
+		bucketFactor,
+		labelTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	m.metricMap[id] = metric
+	return metric, nil
+}
+
 func (m *metrics) GenerateMetricsDocumentation() string {
 	sb := &strings.Builder{}
 
