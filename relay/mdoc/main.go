@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/relay/metrics"
+	"github.com/Layr-Labs/eigenda/relay"
 )
 
 // main generates documentation for relay metrics.
@@ -12,7 +12,7 @@ func main() {
 		panic(err)
 	}
 
-	metrics, err := metrics.NewRelayMetrics(logger, 0)
+	metrics, err := relay.NewRelayMetrics(logger, 0)
 	if err != nil {
 		panic(err)
 	}

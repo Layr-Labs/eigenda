@@ -1,4 +1,4 @@
-package metrics
+package relay
 
 import (
 	"github.com/Layr-Labs/eigenda/common/metrics"
@@ -13,6 +13,9 @@ type RelayMetrics struct {
 	metricsServer    metrics.Metrics
 	grpcServerOption grpc.ServerOption
 
+	// TODO (after cache changes merge): add metrics for cache
+
+	// GetChunks metrics
 	GetChunksLatency               metrics.LatencyMetric
 	GetChunksAuthenticationLatency metrics.LatencyMetric
 	GetChunksMetadataLatency       metrics.LatencyMetric
@@ -21,6 +24,13 @@ type RelayMetrics struct {
 	GetChunksRateLimited           metrics.CountMetric
 	GetChunksAverageKeyCount       metrics.RunningAverageMetric
 	GetChunksAverageDataSize       metrics.RunningAverageMetric
+
+	// GetBlob metrics
+	GetBlobLatency         metrics.LatencyMetric
+	GetBlobMetadataLatency metrics.LatencyMetric
+	GetBlobDataLatency     metrics.LatencyMetric
+	GetBlobRateLimited     metrics.CountMetric
+	GetBlobAverageDataSize metrics.RunningAverageMetric
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -112,6 +122,51 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		return nil, err
 	}
 
+	getBlobLatencyMetric, err := server.NewLatencyMetric(
+		"get_blob_latency",
+		"Latency of the GetBlob RPC",
+		nil,
+		standardQuantiles...)
+	if err != nil {
+		return nil, err
+	}
+
+	getBlobMetadataLatencyMetric, err := server.NewLatencyMetric(
+		"get_blob_metadata_latency",
+		"Latency of the GetBlob RPC metadata retrieval",
+		nil,
+		standardQuantiles...)
+	if err != nil {
+		return nil, err
+	}
+
+	getBlobDataLatencyMetric, err := server.NewLatencyMetric(
+		"get_blob_data_latency",
+		"Latency of the GetBlob RPC data retrieval",
+		nil,
+		standardQuantiles...)
+	if err != nil {
+		return nil, err
+	}
+
+	getBlobRateLimited, err := server.NewCountMetric(
+		"get_blob_rate_limited",
+		"Number of GetBlob RPC rate limited",
+		limiter.RateLimitLabel{})
+	if err != nil {
+		return nil, err
+	}
+
+	getBlobAverageDataSize, err := server.NewRunningAverageMetric(
+		"average_get_blob_data",
+		"bytes",
+		"Average data size of requested blobs",
+		time.Minute,
+		nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &RelayMetrics{
 		metricsServer:                  server,
 		grpcServerOption:               grpcServerOption,
@@ -123,6 +178,11 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		GetChunksRateLimited:           getChunksRateLimited,
 		GetChunksAverageKeyCount:       getChunksAverageKeyCount,
 		GetChunksAverageDataSize:       getChunksAverageDataSize,
+		GetBlobLatency:                 getBlobLatencyMetric,
+		GetBlobMetadataLatency:         getBlobMetadataLatencyMetric,
+		GetBlobDataLatency:             getBlobDataLatencyMetric,
+		GetBlobRateLimited:             getBlobRateLimited,
+		GetBlobAverageDataSize:         getBlobAverageDataSize,
 	}, nil
 }
 

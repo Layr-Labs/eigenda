@@ -2,6 +2,7 @@ package limiter
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/metrics"
 	"golang.org/x/time/rate"
 	"sync"
 	"time"
@@ -23,12 +24,15 @@ type BlobRateLimiter struct {
 	// operationsInFlight is the number of GetBlob operations currently in flight.
 	operationsInFlight int
 
+	// limitCounter is used to track rate limiting events, ignored if nil
+	limitCounter metrics.CountMetric
+
 	// this lock is used to provide thread safety
 	lock sync.Mutex
 }
 
 // NewBlobRateLimiter creates a new BlobRateLimiter.
-func NewBlobRateLimiter(config *Config) *BlobRateLimiter {
+func NewBlobRateLimiter(config *Config, limiterCounter metrics.CountMetric) *BlobRateLimiter {
 	globalGetBlobOpLimiter := rate.NewLimiter(
 		rate.Limit(config.MaxGetBlobOpsPerSecond),
 		config.GetBlobOpsBurstiness)
@@ -57,10 +61,16 @@ func (l *BlobRateLimiter) BeginGetBlobOperation(now time.Time) error {
 	defer l.lock.Unlock()
 
 	if l.operationsInFlight >= l.config.MaxConcurrentGetBlobOps {
+		if l.limitCounter != nil {
+			l.limitCounter.Increment(RateLimitLabel{"global concurrency"})
+		}
 		return fmt.Errorf("global concurrent request limit %d exceeded for getBlob operations, try again later",
 			l.config.MaxConcurrentGetBlobOps)
 	}
 	if l.opLimiter.TokensAt(now) < 1 {
+		if l.limitCounter != nil {
+			l.limitCounter.Increment(RateLimitLabel{"global rate"})
+		}
 		return fmt.Errorf("global rate limit %0.1fhz exceeded for getBlob operations, try again later",
 			l.config.MaxGetBlobOpsPerSecond)
 	}
@@ -98,6 +108,9 @@ func (l *BlobRateLimiter) RequestGetBlobBandwidth(now time.Time, bytes uint32) e
 
 	allowed := l.bandwidthLimiter.AllowN(now, int(bytes))
 	if !allowed {
+		if l.limitCounter != nil {
+			l.limitCounter.Increment(RateLimitLabel{"global bandwidth"})
+		}
 		return fmt.Errorf("global rate limit %dMib/s exceeded for getBlob bandwidth, try again later",
 			int(l.config.MaxGetBlobBytesPerSecond/1024/1024))
 	}
