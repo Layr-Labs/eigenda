@@ -60,12 +60,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	BlobCacheSizeFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-size"),
-		Usage:    "Max number of items in the blob cache",
+	BlobCacheBytes = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-bytes"),
+		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    32,
+		Value:    1024 * 1024 * 1024,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
@@ -74,12 +74,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	ChunkCacheSizeFlag = cli.IntFlag{
+	ChunkCacheSizeFlag = cli.Int64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-size"),
-		Usage:    "Max number of items in the chunk cache",
+		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_SIZE"),
-		Value:    32,
+		Value:    4 * 1024 * 1024 * 1024,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -304,7 +304,7 @@ var optionalFlags = []cli.Flag{
 	MaxGRPCMessageSizeFlag,
 	MetadataCacheSizeFlag,
 	MetadataMaxConcurrencyFlag,
-	BlobCacheSizeFlag,
+	BlobCacheBytes,
 	BlobMaxConcurrencyFlag,
 	ChunkCacheSizeFlag,
 	ChunkMaxConcurrencyFlag,

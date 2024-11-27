@@ -81,14 +81,14 @@ type Config struct {
 	// goroutines.
 	MetadataMaxConcurrency int
 
-	// BlobCacheSize is the maximum number of items in the blob cache.
-	BlobCacheSize int
+	// BlobCacheBytes is the maximum size of the blob cache, in bytes.
+	BlobCacheBytes uint64
 
 	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
 	BlobMaxConcurrency int
 
-	// ChunkCacheSize is the maximum number of items in the chunk cache.
-	ChunkCacheSize int
+	// ChunkCacheSize is the maximum size of the chunk cache, in bytes.
+	ChunkCacheSize uint64
 
 	// ChunkMaxConcurrency is the size of the work pool for fetching chunks. Note that this does not
 	// impact concurrency utilized by the s3 client to upload/download fragmented files.
@@ -159,7 +159,7 @@ func NewServer(
 		ctx,
 		logger,
 		blobStore,
-		config.BlobCacheSize,
+		config.BlobCacheBytes,
 		config.BlobMaxConcurrency,
 		config.Timeouts.InternalGetBlobTimeout)
 	if err != nil {

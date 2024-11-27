@@ -39,7 +39,7 @@ func TestReadWrite(t *testing.T) {
 		context.Background(),
 		logger,
 		blobStore,
-		10,
+		1024*1024*32,
 		32,
 		10*time.Second)
 	require.NoError(t, err)
@@ -76,7 +76,7 @@ func TestNonExistentBlob(t *testing.T) {
 		context.Background(),
 		logger,
 		blobStore,
-		10,
+		1024*1024*32,
 		32,
 		10*time.Second)
 	require.NoError(t, err)

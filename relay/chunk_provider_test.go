@@ -49,7 +49,7 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		context.Background(),
 		logger,
 		chunkReader,
-		10,
+		1024*1024*32,
 		32,
 		10*time.Second,
 		10*time.Second)
@@ -136,7 +136,7 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		context.Background(),
 		logger,
 		chunkReader,
-		10,
+		1024*1024*32,
 		32,
 		10*time.Second,
 		10*time.Second)
