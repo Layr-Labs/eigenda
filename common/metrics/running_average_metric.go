@@ -32,6 +32,9 @@ type runningAverageMetric struct {
 
 	// runningAverage is the running average used to calculate the average of the metric.
 	runningAverage *RunningAverage
+
+	// timeWindow is the time window used to calculate the running average.
+	timeWindow time.Duration
 }
 
 // newRunningAverageMetric creates a new RunningAverageMetric instance.
@@ -66,6 +69,7 @@ func newRunningAverageMetric(
 		vec:            vec,
 		labeler:        labeler,
 		runningAverage: NewRunningAverage(timeWindow),
+		timeWindow:     timeWindow,
 	}, nil
 }
 
@@ -102,4 +106,8 @@ func (m *runningAverageMetric) Update(value float64, label ...any) {
 
 	average := m.runningAverage.Update(time.Now(), value)
 	m.vec.WithLabelValues(values...).Set(average)
+}
+
+func (m *runningAverageMetric) GetTimeWindow() time.Duration {
+	return m.timeWindow
 }

@@ -195,3 +195,7 @@ func (m *mockRunningAverageMetric) LabelFields() []string {
 func (m *mockRunningAverageMetric) Update(value float64, label ...any) {
 
 }
+
+func (m *mockRunningAverageMetric) GetTimeWindow() time.Duration {
+	return 0
+}

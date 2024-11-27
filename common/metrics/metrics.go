@@ -162,4 +162,7 @@ type RunningAverageMetric interface {
 
 	// Update adds a new value to the RunningAverage.
 	Update(value float64, label ...any)
+
+	// GetTimeWindow returns the time window used to calculate the running average.
+	GetTimeWindow() time.Duration
 }

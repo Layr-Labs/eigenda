@@ -439,6 +439,10 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		if metric.Type() == "latency" {
 			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
 		}
+		if metric.Type() == "running average" {
+			sb.Write([]byte(fmt.Sprintf(
+				"| **Time Window** | `%s` |\n", metric.(*runningAverageMetric).GetTimeWindow())))
+		}
 		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | `%s_%s_%s` |\n",
 			m.namespace, id.name, id.unit)))
 	}

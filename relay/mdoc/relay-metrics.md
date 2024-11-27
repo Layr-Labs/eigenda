@@ -1,6 +1,6 @@
 # Metrics Documentation for namespace 'relay'
 
-This documentation was automatically generated at time `2024-11-27T10:04:53-06:00`
+This documentation was automatically generated at time `2024-11-27T10:08:20-06:00`
 
 There are a total of `8` registered metrics.
 
@@ -15,6 +15,7 @@ Average data size in a GetChunks request
 | **Name** | `average_get_chunks_data` |
 | **Unit** | `bytes` |
 | **Type** | `running average` |
+| **Time Window** | `1m0s` |
 | **Fully Qualified Name** | `relay_average_get_chunks_data_bytes` |
 ---
 
@@ -27,6 +28,7 @@ Average number of keys in a GetChunks request
 | **Name** | `average_get_chunks_key` |
 | **Unit** | `count` |
 | **Type** | `running average` |
+| **Time Window** | `1m0s` |
 | **Fully Qualified Name** | `relay_average_get_chunks_key_count` |
 ---
 
