@@ -16,19 +16,19 @@ interface IPaymentVault {
     /// @notice Emitted when an on-demand payment is created or updated
     event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
     /// @notice Emitted when globalSymbolsPerBin is updated
-    event GlobalSymbolsPerBinUpdated(uint256 previousValue, uint256 newValue);
+    event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
     /// @notice Emitted when reservationBinInterval is updated
-    event ReservationBinIntervalUpdated(uint256 previousValue, uint256 newValue);
+    event ReservationBinIntervalUpdated(uint128 previousValue, uint128 newValue);
     /// @notice Emitted when globalRateBinInterval is updated
-    event GlobalRateBinIntervalUpdated(uint256 previousValue, uint256 newValue);
+    event GlobalRateBinIntervalUpdated(uint128 previousValue, uint128 newValue);
     /// @notice Emitted when priceParams are updated
     event PriceParamsUpdated(
-        uint256 previousMinNumSymbols, 
-        uint256 newMinNumSymbols, 
-        uint256 previousPricePerSymbol, 
-        uint256 newPricePerSymbol, 
-        uint256 previousPriceUpdateCooldown, 
-        uint256 newPriceUpdateCooldown
+        uint128 previousMinNumSymbols, 
+        uint128 newMinNumSymbols, 
+        uint128 previousPricePerSymbol, 
+        uint128 newPricePerSymbol, 
+        uint128 previousPriceUpdateCooldown, 
+        uint128 newPriceUpdateCooldown
     );
 
     /**

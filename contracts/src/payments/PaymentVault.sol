@@ -25,12 +25,12 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
 
     function initialize(
         address _initialOwner,
-        uint256 _minNumSymbols,
-        uint256 _globalSymbolsPerBin,
-        uint256 _pricePerSymbol,
-        uint256 _reservationBinInterval,
-        uint256 _priceUpdateCooldown,
-        uint256 _globalRateBinInterval
+        uint128 _minNumSymbols,
+        uint128 _globalSymbolsPerBin,
+        uint128 _pricePerSymbol,
+        uint128 _reservationBinInterval,
+        uint128 _priceUpdateCooldown,
+        uint128 _globalRateBinInterval
     ) public initializer {
         _transferOwnership(_initialOwner);
         
@@ -41,7 +41,7 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         priceUpdateCooldown = _priceUpdateCooldown;
         globalRateBinInterval = _globalRateBinInterval;
 
-        lastPriceUpdateTime = block.timestamp;
+        lastPriceUpdateTime = uint128(block.timestamp);
     }
 
     /**
@@ -68,9 +68,9 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     }
 
     function setPriceParams(
-        uint256 _minNumSymbols,
-        uint256 _pricePerSymbol,
-        uint256 _priceUpdateCooldown
+        uint128 _minNumSymbols,
+        uint128 _pricePerSymbol,
+        uint128 _priceUpdateCooldown
     ) external onlyOwner {
         require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
         emit PriceParamsUpdated(
@@ -81,20 +81,20 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
         pricePerSymbol = _pricePerSymbol;
         minNumSymbols = _minNumSymbols;
         priceUpdateCooldown = _priceUpdateCooldown;
-        lastPriceUpdateTime = block.timestamp;
+        lastPriceUpdateTime = uint128(block.timestamp);
     }
 
-    function setGlobalSymbolsPerBin(uint256 _globalSymbolsPerBin) external onlyOwner {
+    function setGlobalSymbolsPerBin(uint128 _globalSymbolsPerBin) external onlyOwner {
         emit GlobalSymbolsPerBinUpdated(globalSymbolsPerBin, _globalSymbolsPerBin);
         globalSymbolsPerBin = _globalSymbolsPerBin;
     }
 
-    function setReservationBinInterval(uint256 _reservationBinInterval) external onlyOwner {
+    function setReservationBinInterval(uint128 _reservationBinInterval) external onlyOwner {
         emit ReservationBinIntervalUpdated(reservationBinInterval, _reservationBinInterval);
         reservationBinInterval = _reservationBinInterval;
     }
 
-    function setGlobalRateBinInterval(uint256 _globalRateBinInterval) external onlyOwner {
+    function setGlobalRateBinInterval(uint128 _globalRateBinInterval) external onlyOwner {
         emit GlobalRateBinIntervalUpdated(globalRateBinInterval, _globalRateBinInterval);
         globalRateBinInterval = _globalRateBinInterval;
     }

@@ -13,16 +13,16 @@ contract PaymentVaultUnit is Test {
 
     event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
     event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
-    event GlobalSymbolsPerBinUpdated(uint256 previousValue, uint256 newValue);
-    event ReservationBinIntervalUpdated(uint256 previousValue, uint256 newValue);
-    event GlobalRateBinIntervalUpdated(uint256 previousValue, uint256 newValue);
+    event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
+    event ReservationBinIntervalUpdated(uint128 previousValue, uint128 newValue);
+    event GlobalRateBinIntervalUpdated(uint128 previousValue, uint128 newValue);
     event PriceParamsUpdated(
-        uint256 previousMinNumSymbols, 
-        uint256 newMinNumSymbols, 
-        uint256 previousPricePerSymbol, 
-        uint256 newPricePerSymbol, 
-        uint256 previousPriceUpdateCooldown, 
-        uint256 newPriceUpdateCooldown
+        uint128 previousMinNumSymbols, 
+        uint128 newMinNumSymbols, 
+        uint128 previousPricePerSymbol, 
+        uint128 newPricePerSymbol, 
+        uint128 previousPriceUpdateCooldown, 
+        uint128 newPriceUpdateCooldown
     );
 
     PaymentVault paymentVault;
@@ -34,13 +34,13 @@ contract PaymentVaultUnit is Test {
     address user = address(uint160(uint256(keccak256(abi.encodePacked("user")))));
     address user2 = address(uint160(uint256(keccak256(abi.encodePacked("user2")))));
 
-    uint256 minNumSymbols = 1;
-    uint256 globalSymbolsPerBin = 2;
-    uint256 pricePerSymbol = 3;
-    uint256 reservationBinInterval = 4;
-    uint256 globalRateBinInterval = 5;
+    uint128 minNumSymbols = 1;
+    uint128 globalSymbolsPerBin = 2;
+    uint128 pricePerSymbol = 3;
+    uint128 reservationBinInterval = 4;
+    uint128 globalRateBinInterval = 5;
 
-    uint256 priceUpdateCooldown = 6 days;
+    uint128 priceUpdateCooldown = 6 days;
 
     bytes quorumNumbers = hex"0001";
     bytes quorumSplits = hex"3232";
