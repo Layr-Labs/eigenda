@@ -12,7 +12,7 @@ contract PaymentVaultUnit is Test {
     using stdStorage for StdStorage;
 
     event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
-    event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
+    event OnDemandPaymentUpdated(address indexed account, uint128 onDemandPayment, uint128 totalDeposit);
     event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
     event ReservationBinIntervalUpdated(uint128 previousValue, uint128 newValue);
     event GlobalRateBinIntervalUpdated(uint128 previousValue, uint128 newValue);
@@ -335,7 +335,7 @@ contract PaymentVaultUnit is Test {
         accounts[0] = user;
         accounts[1] = user2;
 
-        uint256[] memory payments = paymentVault.getOnDemandAmounts(accounts);
+        uint128[] memory payments = paymentVault.getOnDemandAmounts(accounts);
         assertEq(payments[0], 100 ether);
         assertEq(payments[1], 200 ether);
     }

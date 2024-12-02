@@ -14,7 +14,7 @@ interface IPaymentVault {
     /// @notice Emitted when a reservation is created or updated
     event ReservationUpdated(address indexed account, Reservation reservation);
     /// @notice Emitted when an on-demand payment is created or updated
-    event OnDemandPaymentUpdated(address indexed account, uint256 onDemandPayment, uint256 totalDeposit);
+    event OnDemandPaymentUpdated(address indexed account, uint128 onDemandPayment, uint128 totalDeposit);
     /// @notice Emitted when globalSymbolsPerBin is updated
     event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
     /// @notice Emitted when reservationBinInterval is updated
@@ -54,8 +54,8 @@ interface IPaymentVault {
     function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations);
 
     /// @notice Fetches the current total on demand balance of an account
-    function getOnDemandAmount(address _account) external view returns (uint256);
+    function getOnDemandAmount(address _account) external view returns (uint128);
 
     /// @notice Fetches the current total on demand balances for a set of accounts
-    function getOnDemandAmounts(address[] memory _accounts) external view returns (uint256[] memory _payments);
+    function getOnDemandAmounts(address[] memory _accounts) external view returns (uint128[] memory _payments);
 }

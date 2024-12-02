@@ -116,8 +116,8 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     }
 
     function _deposit(address _account, uint256 _amount) internal {
-        onDemandPayments[_account] += _amount;
-        emit OnDemandPaymentUpdated(_account, _amount, onDemandPayments[_account]);
+        onDemandPayments[_account] += uint128(_amount);
+        emit OnDemandPaymentUpdated(_account, uint128(_amount), uint128(onDemandPayments[_account]));
     }
 
     /// @notice Fetches the current reservation for an account
@@ -134,13 +134,13 @@ contract PaymentVault is PaymentVaultStorage, OwnableUpgradeable {
     }
 
     /// @notice Fetches the current total on demand balance of an account
-    function getOnDemandAmount(address _account) external view returns (uint256) {
+    function getOnDemandAmount(address _account) external view returns (uint128) {
         return onDemandPayments[_account];
     }    
 
     /// @notice Fetches the current total on demand balances for a set of accounts
-    function getOnDemandAmounts(address[] memory _accounts) external view returns (uint256[] memory _payments) {
-        _payments = new uint256[](_accounts.length);
+    function getOnDemandAmounts(address[] memory _accounts) external view returns (uint128[] memory _payments) {
+        _payments = new uint128[](_accounts.length);
         for(uint256 i; i < _accounts.length; ++i){
             _payments[i] = onDemandPayments[_accounts[i]];
         }
