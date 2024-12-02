@@ -33,6 +33,7 @@ clean:
 # Builds the protobuf files inside a docker container.
 protoc: clean
 	./api/builder/protoc-docker.sh
+	./api/builder/generate-docs.sh
 
 # Builds the protobuf files locally (i.e. without docker).
 protoc-local: clean
