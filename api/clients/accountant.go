@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
@@ -16,7 +15,7 @@ import (
 var requiredQuorums = []uint8{0, 1}
 
 type Accountant interface {
-	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, error)
+	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*core.PaymentMetadata, error)
 }
 
 var _ Accountant = &accountant{}
@@ -116,7 +115,7 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, error) {
+func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*core.PaymentMetadata, error) {
 	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
@@ -127,9 +126,8 @@ func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 	}
-	protoPaymentHeader := pm.ConvertToProtoPaymentHeader()
 
-	return protoPaymentHeader, nil
+	return pm, nil
 }
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
