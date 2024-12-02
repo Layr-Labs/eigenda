@@ -94,7 +94,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				InternalGetCoefficientsTimeout: ctx.Duration(flags.InternalGetCoefficientsTimeoutFlag.Name),
 			},
 		},
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
