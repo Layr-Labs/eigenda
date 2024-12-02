@@ -14,14 +14,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -98,47 +95,17 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 	cs := eth.NewChainState(tx, gethClient)
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
-	}
-
-	var ics core.IndexedChainState
-	if config.UseGraph {
-		logger.Info("Using graph node")
-
-		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
-	} else {
-		logger.Info("Using built-in indexer")
-
-		indexer, err := coreindexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			gethClient,
-			rpcClient,
-			config.EigenDAServiceManagerAddr,
-			logger,
-		)
-		if err != nil {
-			return err
-		}
-		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
-		if err != nil {
-			return err
-		}
-	}
 
 	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
+	retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, config.NumConnections)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
 	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
-	if err = retrieverServiceServer.Start(context.Background()); err != nil {
-		log.Fatalln("failed to start retriever service server", err)
-	}
+	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, cs, chainClient)
+	// This only start the metrics server; consider unwrapping the function
+	retrieverServiceServer.Start(context.Background())
 
 	// Register reflection service on gRPC server
 	// This makes "grpcurl -plaintext localhost:9000 list" command work
