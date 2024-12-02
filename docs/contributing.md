@@ -1,5 +1,3 @@
-
-
 # Organization
 
 The EigenDA repo is organized as a monorepo, with each project adhering to the "Ben Johnson" project structure style. Within the core project directories (e.g., `core`, `disperser`, `node`, `retriever`, `indexer`), the main interfaces and data types are defined at the root of the project, while implementations are organized by dependency. For instance, the folder `indexer/inmem` contains implementations of the interfaces in `indexer` which use in-memory storage, while `indexer/leveldb` may contain implementations of the same interfaces that use `leveldb`. Mocks of all interfaces in the `indexer` project go in `indexer/mock`.
@@ -9,7 +7,7 @@ The same pattern is used for intra-project and inter-project dependencies. For i
 In general, the `core` project contains implementation of all the important business logic responsible for the security guarantees of the EigenDA protocol, while the other projects add the networking layers needed to run the distributed system.
 
 
-## Directory structure
+# Directory structure
 <pre>
 ┌── <a href="../api">api</a> Protobuf definitions, contract bindings and client-side libraries for users to integrate with EigenDA
 ├── <a href="../common">common</a>: Common utility libraries
@@ -29,13 +27,13 @@ In general, the `core` project contains implementation of all the important busi
 ├── <a href="../tools">tools</a>: General tools such as traffic generator
 </pre>
 
-## Data Flow Diagram
+# Data Flow Diagram
 
 You can convert [Mermaid source code](dataflow.md) into an image using the [VS Code extention](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) or the [Mermaid Live Editor](https://mermaid.live).
 
 ![dataflow.png](dataflow.png)
 
-## Data structures
+# Data structures
 ```
 data: []byte
 
@@ -48,13 +46,14 @@ v2.Batch:
     []v2.BlobCertificate:
         v2.BlobHeader
 
+v2.BlobVerificate:
+    []RelayKey: uint16
+
 v2.BlobVerificationInfo:
     serialized merkletree.Proof
-
-v2.BlobMetadata:    
 ```
 
-## Finite field elements
+# Finite field elements
 ```
 fr.Element: [4]uint64
 fp.Element: [4]uint64

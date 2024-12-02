@@ -1,47 +1,53 @@
 ```mermaid
 flowchart TB
 
-disperser -- data --> blobstore
+disperser -- []byte --> blobstore
 
-blobstore -- data --> encoder
+blobstore -- []byte --> encserver
 
-encoder -- data --> prover
-prover -- encoding.Frame --> encoder
+encserver -- []byte --> prover
+prover -- []encoding.Frame --> encserver
 
-prover -- fr.Element --> prover1
-prover1 -- encoding.Frame --> prover
+prover -- []fr.Element --> prover1
+prover1 -- []bn254.G1Affine --> prover
+%% prover1: polyFr ->(GetSlicesCoeff) coeffStore -> sumVec -> fft_inv -> fft -> proof
+%% fft: fast compute polynomial value using Toeplitz Matrix
 
-encoder -- encoding.Frame --> chunkstore
-chunkstore -- v2.FragmentInfo --> encoder
+encserver -- []encoding.Frame --> chunkstore
+chunkstore -- v2.FragmentInfo --> encserver
+chunkstore -- []encoding.Frame --> relay
 
-encoder -- v2.FragmentInfo --> encmgr
+encserver -- v2.FragmentInfo --> encmgr
+encmgr -- []v2.BlobHeader --> certstore
+certstore -- []v2.BlobHeader --> newbatch
 
-encmgr -- v2.BlobCertificate *v2.Encoded* --> certstore
+newbatch -- BatchHeader.BatchRoot []v2.BlobHeader --> dispatcher
+newbatch -- []merkletree.Proof --> verifstore 
+verifstore -- []merkletree.Proof --> relay
 
-certstore -- v2.BlobCertificate *v2.Encoded* --> dispatcher
+relay -- []merkletree.Proof --> node
+relay -- []encoding.Frame --> node
 
-dispatcher -- v2.BuildMerkleTree merkletree.Proof --> verifstore 
-dispatcher -- v2.Batch --> dispatcher1
-dispatcher1 -- v2.Batch --> node
+dispatcher -- BatchHeader.BatchRoot []v2.BlobHeader --> node
+%% node -- Signature --> dispatcher
 
-%% relay
-verifstore -- merkletree.Proof --> relay
-chunkstore -- encoding.Frame --> relay
-relay -- merkletree.Proof encoding.Frame --> node
+%% check header.BatchRoot
+node -- BatchHeader.BatchRoot []v2.BlobHeader --> validate1 
 
-node --> validate
-validate --> node
+%% 
+node -- []v2.BlobHeader []merkletree.Proof []encoding.Frame --> validate2
 
-dispatcher[Dispatcher.NewBatch]
-dispatcher1[Dispatcher.HandleBatch]
+newbatch[Dispatcher.NewBatch]
+dispatcher[Dispatcher.HandleBatch]
 prover[Prover.GetFrames]
-prover1[ParametrizedProver.GetFrames]
+prover1[ComputeMultiFrameProof]
 encmgr[EncodingManager.HandleBatch]
-encoder[EncoderServerV2.handleEncodingToChunkStore]
-relay[relay.Server.GetChunks]
+encserver[EncoderServerV2.handleEncodingToChunkStore]
 
+relay[relay.Server.GetChunks]
 node[*node* ServerV2.StoreChunks]
-validate[Node.ValidateBatchV2]
+validate1[v2.shardValidator.ValidateBatchHeader]
+validate2[v2.shardValidator.ValidateBlobs]
 
 blobstore[(blobstore)]
 chunkstore[(chunkstore)]
