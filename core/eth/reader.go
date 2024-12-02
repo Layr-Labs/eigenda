@@ -12,6 +12,7 @@ import (
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
+	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDARelayRegistry"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
@@ -39,6 +40,7 @@ type ContractBindings struct {
 	EjectionManager       *ejectionmg.ContractEjectionManager
 	AVSDirectory          *avsdir.ContractAVSDirectory
 	SocketRegistry        *socketreg.ContractSocketRegistry
+	RelayRegistry         *relayreg.ContractIEigenDARelayRegistry
 }
 
 type Reader struct {
@@ -178,6 +180,18 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
+	var contractRelayRegistry *relayreg.ContractIEigenDARelayRegistry
+	relayRegistryAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
+		// TODO(ian-shim): return err when the contract is deployed
+	} else {
+		contractRelayRegistry, err = relayreg.NewContractIEigenDARelayRegistry(relayRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
+		}
+	}
+
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
@@ -191,6 +205,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		StakeRegistry:         contractStakeRegistry,
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,
+		RelayRegistry:         contractRelayRegistry,
 	}
 	return nil
 }
@@ -688,4 +703,43 @@ func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.Operator
 		return "", errors.New("operator socket string is empty, check operator with id: " + operatorId.Hex())
 	}
 	return socket, nil
+}
+
+func (t *Reader) GetRelayURL(ctx context.Context, key uint16) (string, error) {
+	if t.bindings.RelayRegistry == nil {
+		return "", errors.New("relay registry not deployed")
+	}
+
+	return t.bindings.RelayRegistry.GetRelayURL(&bind.CallOpts{
+		Context: ctx,
+	}, uint32(key))
+}
+
+func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint16]string, error) {
+	if t.bindings.RelayRegistry == nil {
+		return nil, errors.New("relay registry not deployed")
+	}
+
+	res := make(map[uint16]string)
+	relayKey := uint16(0)
+	for {
+		url, err := t.bindings.RelayRegistry.GetRelayURL(&bind.CallOpts{
+			Context: ctx,
+		}, uint32(relayKey))
+
+		if err != nil && strings.Contains(err.Error(), "execution reverted") {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		res[relayKey] = url
+		relayKey++
+	}
+
+	if len(res) == 0 {
+		return nil, errors.New("no relay URLs found")
+	}
+
+	return res, nil
 }
