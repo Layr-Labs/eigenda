@@ -45,7 +45,7 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
-	socketMap, err := cs.buildSocketMap(ctx, operatorsByQuorum, uint32(blockNumber))
+	socketMap, err := cs.buildSocketMap(ctx, operatorsByQuorum)
 	if err != nil {
 		return nil, err
 	}
@@ -72,10 +72,14 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 }
 
 // buildSocketMap returns a map from operatorID to socket address for the operators in the operatorsByQuorum
-func (cs *ChainState) buildSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes, blockNumber uint32) (map[core.OperatorID]string, error) {
+func (cs *ChainState) buildSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) (map[core.OperatorID]string, error) {
 	socketMap := make(map[core.OperatorID]string)
 	for _, quorum := range operatorsByQuorum {
 		for _, op := range quorum {
+			// if the socket is already in the map, skip
+			if _, ok := socketMap[op.OperatorID]; ok {
+				continue
+			}
 			socket, err := cs.Tx.GetOperatorSocket(ctx, op.OperatorID)
 			if err != nil {
 				return nil, err
