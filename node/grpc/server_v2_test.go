@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -27,6 +28,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+var (
+	blobParams = &core.BlobVersionParameters{
+		NumChunks:       8192,
+		CodingRate:      8,
+		MaxNumOperators: 3537,
+	}
+	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: blobParams,
+	}
 )
 
 type testComponents struct {
@@ -57,6 +69,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 	s := nodemock.NewMockStoreV2()
 	relay := clientsmock.NewRelayClient()
+	var atomicRelayClient atomic.Value
+	atomicRelayClient.Store(relay)
 	node := &node.Node{
 		Config:      config,
 		Logger:      logger,
@@ -65,8 +79,9 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		StoreV2:     s,
 		ChainState:  chainState,
 		ValidatorV2: val,
-		RelayClient: relay,
+		RelayClient: atomicRelayClient,
 	}
+	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	server := grpc.NewServerV2(config, node, logger, ratelimiter)
 	return &testComponents{
 		server:      server,

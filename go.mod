@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
 	github.com/consensys/gnark-crypto v0.12.1
+	github.com/emirpasic/gods v1.18.1
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/gin-contrib/logger v0.2.6
@@ -37,6 +38,7 @@ require (
 	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
 	golang.org/x/sync v0.8.0
+	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.64.1
 )
 
@@ -151,7 +153,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
-	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

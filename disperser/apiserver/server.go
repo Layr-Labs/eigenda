@@ -17,6 +17,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -268,6 +269,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}))
 	defer timer.ObserveDuration()
 
+	dispersalStart := time.Now()
+
 	securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
 	for i, sp := range securityParams {
@@ -318,6 +321,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	for _, param := range securityParams {
 		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 	}
+	s.metrics.BlobLatency.WithLabelValues(apiMethodName, dispcommon.BlobSizeBucket(blobSize)).Set(float64(time.Since(dispersalStart).Milliseconds()))
 
 	return &pb.DisperseBlobReply{
 		Result:    pb.BlobStatus_PROCESSING,
@@ -700,6 +704,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}))
 	defer timer.ObserveDuration()
 
+	retrievalStart := time.Now()
+
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("RetrieveBlob")
@@ -806,6 +812,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
+	s.metrics.BlobLatency.WithLabelValues("RetrieveBlob", dispcommon.BlobSizeBucket(len(data))).Set(float64(time.Since(retrievalStart).Milliseconds()))
 
 	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "data size (bytes)", len(data), "duration", time.Since(stageTimer).String())
 
@@ -819,6 +826,12 @@ func (s *DispersalServer) GetRateConfig() *RateConfig {
 }
 
 func (s *DispersalServer) Start(ctx context.Context) error {
+	pprofProfiler := pprof.NewPprofProfiler(s.serverConfig.PprofHttpPort, s.logger)
+	if s.serverConfig.EnablePprof {
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for disperser apiserver", "port", s.serverConfig.PprofHttpPort)
+	}
+
 	go func() {
 		t := time.NewTicker(s.rateConfig.AllowlistRefreshInterval)
 		defer t.Stop()

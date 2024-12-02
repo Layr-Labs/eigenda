@@ -612,3 +612,9 @@ type ActiveReservation struct {
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user
 }
+
+type BlobVersionParameters struct {
+	CodingRate      uint32
+	MaxNumOperators uint32
+	NumChunks       uint32
+}

@@ -95,8 +95,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserVersion: DisperserVersion(version),
 		AwsClientConfig:  aws.ReadClientConfig(ctx, flags.FlagPrefix),
 		ServerConfig: disperser.ServerConfig{
-			GrpcPort:    ctx.GlobalString(flags.GrpcPortFlag.Name),
-			GrpcTimeout: ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
+			GrpcPort:      ctx.GlobalString(flags.GrpcPortFlag.Name),
+			GrpcTimeout:   ctx.GlobalDuration(flags.GrpcTimeoutFlag.Name),
+			PprofHttpPort: ctx.GlobalString(flags.PprofHttpPort.Name),
+			EnablePprof:   ctx.GlobalBool(flags.EnablePprof.Name),
 		},
 		BlobstoreConfig: blobstore.Config{
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),

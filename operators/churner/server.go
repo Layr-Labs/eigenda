@@ -47,8 +47,12 @@ func NewServer(
 func (s *Server) Start(metricsConfig MetricsConfig) error {
 	// Enable Metrics Block
 	if metricsConfig.EnableMetrics {
-		httpSocket := fmt.Sprintf(":%s", metricsConfig.HTTPPort)
-		s.metrics.Start(context.Background())
+		httpSocket := fmt.Sprintf(":%d", metricsConfig.HTTPPort)
+		err := s.metrics.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start metrics server: %w", err)
+		}
+
 		s.logger.Info("Enabled metrics for Churner", "socket", httpSocket)
 	}
 	return nil
@@ -62,7 +66,7 @@ func (s *Server) Churn(ctx context.Context, req *pb.ChurnRequest) (*pb.ChurnRepl
 	}
 
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("Churn", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("Churn", time.Duration(f*float64(time.Second)))
 	}))
 	defer timer.ObserveDuration()
 	s.logger.Info("Received request: ", "QuorumIds", req.GetQuorumIds())

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -36,6 +37,8 @@ type EncodingManagerConfig struct {
 	EncoderAddress string
 	// MaxNumBlobsPerIteration is the maximum number of blobs to encode per iteration
 	MaxNumBlobsPerIteration int32
+	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed
+	OnchainStateRefreshInterval time.Duration
 }
 
 // EncodingManager is responsible for pulling queued blobs from the blob
@@ -52,7 +55,8 @@ type EncodingManager struct {
 	logger            logging.Logger
 
 	// state
-	cursor *blobstore.StatusIndexCursor
+	cursor                *blobstore.StatusIndexCursor
+	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
 }
 
 func NewEncodingManager(
@@ -84,6 +88,30 @@ func NewEncodingManager(
 }
 
 func (e *EncodingManager) Start(ctx context.Context) error {
+	// Refresh blob version parameters
+	err := e.refreshBlobVersionParams(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to refresh blob version parameters: %w", err)
+	}
+
+	go func() {
+		ticker := time.NewTicker(e.EncodingManagerConfig.OnchainStateRefreshInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				e.logger.Info("refreshing blob version params")
+				if err := e.refreshBlobVersionParams(ctx); err != nil {
+					e.logger.Error("failed to refresh blob version params", "err", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the encoding loop
 	go func() {
 		ticker := time.NewTicker(e.PullInterval)
 		defer ticker.Stop()
@@ -118,6 +146,11 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return errNoBlobsToEncode
 	}
 
+	blobVersionParams := e.blobVersionParameters.Load()
+	if blobVersionParams == nil {
+		return fmt.Errorf("blob version parameters is nil")
+	}
+
 	for _, blob := range blobMetadatas {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
@@ -126,11 +159,17 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 			continue
 		}
 
+		blobParams, ok := blobVersionParams.Get(blob.BlobHeader.BlobVersion)
+		if !ok {
+			e.logger.Error("failed to get blob version parameters", "version", blob.BlobHeader.BlobVersion)
+			continue
+		}
+
 		// Encode the blobs
 		e.pool.Submit(func() {
 			for i := 0; i < e.NumEncodingRetries+1; i++ {
 				encodingCtx, cancel := context.WithTimeout(ctx, e.EncodingRequestTimeout)
-				fragmentInfo, err := e.encodeBlob(encodingCtx, blobKey, blob)
+				fragmentInfo, err := e.encodeBlob(encodingCtx, blobKey, blob, blobParams)
 				cancel()
 				if err != nil {
 					e.logger.Error("failed to encode blob", "blobKey", blobKey.Hex(), "err", err)
@@ -183,12 +222,23 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	return nil
 }
 
-func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey, blob *v2.BlobMetadata) (*encoding.FragmentInfo, error) {
-	encodingParams, err := blob.BlobHeader.GetEncodingParams()
+func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey, blob *v2.BlobMetadata, blobParams *core.BlobVersionParameters) (*encoding.FragmentInfo, error) {
+	encodingParams, err := blob.BlobHeader.GetEncodingParams(blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get encoding params: %w", err)
 	}
 	return e.encodingClient.EncodeBlob(ctx, blobKey, encodingParams)
+}
+
+func (e *EncodingManager) refreshBlobVersionParams(ctx context.Context) error {
+	e.logger.Debug("Refreshing blob version params")
+	blobParams, err := e.chainReader.GetAllVersionedBlobParams(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get blob version parameters: %w", err)
+	}
+
+	e.blobVersionParameters.Store(corev2.NewBlobVersionParameterMap(blobParams))
+	return nil
 }
 
 func GetRelayKeys(numAssignment uint16, availableRelays []corev2.RelayKey) ([]corev2.RelayKey, error) {

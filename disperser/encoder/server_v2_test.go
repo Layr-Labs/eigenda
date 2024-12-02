@@ -24,6 +24,12 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+var blobParams = &core.BlobVersionParameters{
+	NumChunks:       8192,
+	CodingRate:      8,
+	MaxNumOperators: 3537,
+}
+
 type testComponents struct {
 	encoderServer    *encoder.EncoderServerV2
 	blobStore        *blobstore.BlobStore
@@ -58,8 +64,8 @@ func TestEncodeBlob(t *testing.T) {
 	)
 
 	var (
-		codingRatio = corev2.ParametersMap[0].CodingRate
-		numChunks   = corev2.ParametersMap[0].NumChunks
+		codingRatio = blobParams.CodingRate
+		numChunks   = blobParams.NumChunks
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeoutSeconds*time.Second)
@@ -85,7 +91,7 @@ func TestEncodeBlob(t *testing.T) {
 	blobLength := encoding.GetBlobLength(blobSize)
 
 	// Get chunk length for blob version 0
-	chunkLength, err := corev2.GetChunkLength(0, core.NextPowerOf2(uint32(blobLength)))
+	chunkLength, err := corev2.GetChunkLength(core.NextPowerOf2(uint32(blobLength)), blobParams)
 	if !assert.NoError(t, err, "Failed to get chunk length") {
 		t.FailNow()
 	}

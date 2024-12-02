@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"sync"
+	"time"
 )
 
 type chunkProvider struct {
@@ -19,10 +20,16 @@ type chunkProvider struct {
 
 	// metadataCache is an LRU cache of blob metadata. Each relay is authorized to serve data assigned to one or more
 	// relay IDs. Blobs that do not belong to one of the relay IDs assigned to this server will not be in the cache.
-	frameCache cache.CachedAccessor[blobKeyWithMetadata, []*encoding.Frame]
+	frameCache cache.CacheAccessor[blobKeyWithMetadata, []*encoding.Frame]
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
+
+	// fetchTimeout is the maximum time to wait for a chunk proof fetch operation to complete.
+	proofFetchTimeout time.Duration
+
+	// coefficientFetchTimeout is the maximum time to wait for a chunk coefficient fetch operation to complete.
+	coefficientFetchTimeout time.Duration
 }
 
 // blobKeyWithMetadata attaches some additional metadata to a blobKey.
@@ -40,29 +47,41 @@ func newChunkProvider(
 	ctx context.Context,
 	logger logging.Logger,
 	chunkReader chunkstore.ChunkReader,
-	cacheSize int,
-	maxIOConcurrency int) (*chunkProvider, error) {
+	cacheSize uint64,
+	maxIOConcurrency int,
+	proofFetchTimeout time.Duration,
+	coefficientFetchTimeout time.Duration) (*chunkProvider, error) {
 
 	server := &chunkProvider{
-		ctx:         ctx,
-		logger:      logger,
-		chunkReader: chunkReader,
+		ctx:                     ctx,
+		logger:                  logger,
+		chunkReader:             chunkReader,
+		proofFetchTimeout:       proofFetchTimeout,
+		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	c, err := cache.NewCachedAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		cacheSize,
+	c := cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight)
+
+	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
+		c,
 		maxIOConcurrency,
 		server.fetchFrames)
 	if err != nil {
 		return nil, err
 	}
-	server.frameCache = c
+	server.frameCache = cacheAccessor
 
 	return server, nil
 }
 
 // frameMap is a map of blob keys to frames.
 type frameMap map[v2.BlobKey][]*encoding.Frame
+
+// computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
+// is equal to the size required to store the data, in bytes.
+func computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
+	return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+}
 
 // GetFrames retrieves the frames for a blob.
 func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
@@ -89,7 +108,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 
 		boundKey := key
 		go func() {
-			frames, err := s.frameCache.Get(*boundKey)
+			frames, err := s.frameCache.Get(ctx, *boundKey)
 			if err != nil {
 				s.logger.Errorf("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
 				completionChannel <- &framesResult{
@@ -128,10 +147,13 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 	var proofsErr error
 
 	go func() {
+		ctx, cancel := context.WithTimeout(s.ctx, s.proofFetchTimeout)
 		defer func() {
 			wg.Done()
+			cancel()
 		}()
-		proofs, proofsErr = s.chunkReader.GetChunkProofs(s.ctx, key.blobKey)
+
+		proofs, proofsErr = s.chunkReader.GetChunkProofs(ctx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
@@ -139,7 +161,10 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 		FragmentSizeBytes:   key.metadata.fragmentSizeBytes,
 	}
 
-	coefficients, err := s.chunkReader.GetChunkCoefficients(s.ctx, key.blobKey, fragmentInfo)
+	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
+	defer cancel()
+
+	coefficients, err := s.chunkReader.GetChunkCoefficients(ctx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}

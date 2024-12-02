@@ -224,6 +224,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
 	}
+	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2 (default: 1h)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 
 	// Test only, DO NOT USE the following flags in production
 
@@ -306,6 +313,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
 	}
+	PprofHttpPort = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
+		Usage:    "the http port which the pprof server is listening",
+		Required: false,
+		Value:    "6060",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PPROF_HTTP_PORT"),
+	}
+	EnablePprof = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "start prrof server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -353,6 +373,9 @@ var optionalFlags = []cli.Flag{
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
 	EnableV2Flag,
+	OnchainStateRefreshIntervalFlag,
+	PprofHttpPort,
+	EnablePprof,
 }
 
 func init() {

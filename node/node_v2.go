@@ -34,8 +34,14 @@ type RawBundles struct {
 }
 
 func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
-	if n.RelayClient == nil {
+	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
+	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
+	}
+
+	blobVersionParams := n.BlobVersionParams.Load()
+	if blobVersionParams == nil {
+		return nil, nil, fmt.Errorf("blob version params is nil")
 	}
 
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
@@ -61,7 +67,11 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 		relayIndex := rand.Intn(len(cert.RelayKeys))
 		relayKey := cert.RelayKeys[relayIndex]
 		for _, quorum := range cert.BlobHeader.QuorumNumbers {
-			assgn, err := corev2.GetAssignment(operatorState, batch.BlobCertificates[0].BlobHeader.BlobVersion, quorum, n.Config.ID)
+			blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
+			if !ok {
+				return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
+			}
+			assgn, err := corev2.GetAssignment(operatorState, blobParams, quorum, n.Config.ID)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get assignments: %v", err)
 			}
@@ -93,7 +103,7 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 		relayKey := relayKey
 		req := requests[relayKey]
 		pool.Submit(func() {
-			bundles, err := n.RelayClient.GetChunksByRange(ctx, relayKey, req.chunkRequests)
+			bundles, err := relayClient.GetChunksByRange(ctx, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -145,5 +155,6 @@ func (n *Node) ValidateBatchV2(
 		return fmt.Errorf("failed to validate batch header: %v", err)
 	}
 	pool := workerpool.New(n.Config.NumBatchValidators)
-	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, pool, operatorState)
+	blobVersionParams := n.BlobVersionParams.Load()
+	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, pool, operatorState)
 }

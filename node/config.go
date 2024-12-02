@@ -89,7 +89,11 @@ type Config struct {
 	LoggerConfig    common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
 
-	EnableV2 bool
+	EnableV2                    bool
+	OnchainStateRefreshInterval time.Duration
+
+	PprofHttpPort string
+	EnablePprof   bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -235,5 +239,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSSignerTLSCertFilePath:       ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
 		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
 		EnableV2:                       ctx.GlobalBool(flags.EnableV2Flag.Name),
+		OnchainStateRefreshInterval:    ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+		PprofHttpPort:                  ctx.GlobalString(flags.PprofHttpPort.Name),
+		EnablePprof:                    ctx.GlobalBool(flags.EnablePprof.Name),
 	}, nil
 }

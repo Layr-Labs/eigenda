@@ -2,6 +2,7 @@ package node_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"runtime"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,6 +22,15 @@ import (
 var (
 	privateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 	opID       = [32]byte{0}
+
+	blobParams = &core.BlobVersionParameters{
+		NumChunks:       8192,
+		CodingRate:      8,
+		MaxNumOperators: 3537,
+	}
+	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
+		0: blobParams,
+	}
 )
 
 type components struct {
@@ -71,27 +82,29 @@ func newComponents(t *testing.T) *components {
 		panic("failed to create a new levelDB store")
 	}
 	defer os.Remove(dbPath)
-	relayClient := clientsmock.NewRelayClient()
+	n := &node.Node{
+		Config:     config,
+		Logger:     logger,
+		KeyPair:    keyPair,
+		Metrics:    nil,
+		Store:      store,
+		ChainState: chainState,
+		Validator:  mockVal,
+		Transactor: tx,
+	}
+	n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	return &components{
-		node: &node.Node{
-			Config:      config,
-			Logger:      logger,
-			KeyPair:     keyPair,
-			Metrics:     nil,
-			Store:       store,
-			ChainState:  chainState,
-			Validator:   mockVal,
-			Transactor:  tx,
-			RelayClient: relayClient,
-		},
+		node:        n,
 		tx:          tx,
-		relayClient: relayClient,
+		relayClient: clientsmock.NewRelayClient(),
 	}
 }
 
 func TestNodeStartNoAddress(t *testing.T) {
 	c := newComponents(t)
 	c.node.Config.RegisterNodeAtStart = false
+
+	c.tx.On("GetOperatorSocket", mock.Anything).Return("", errors.New("failed to get operator socket"))
 
 	err := c.node.Start(context.Background())
 	assert.NoError(t, err)

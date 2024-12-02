@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"errors"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/require"
@@ -31,12 +32,15 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 		return &str, nil
 	}
 	cacheSize := rand.Intn(dataSize) + 1
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	for i := 0; i < dataSize; i++ {
-		value, err := ca.Get(i)
+		value, err := ca.Get(context.Background(), i)
 
 		if i%17 == 0 {
 			require.Error(t, err)
@@ -48,7 +52,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 
 	for k, v := range baseData {
-		value, err := ca.Get(k)
+		value, err := ca.Get(context.Background(), k)
 
 		if k%17 == 0 {
 			require.Error(t, err)
@@ -79,14 +83,18 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Get the first cacheSize keys. This should fill the cache.
 	expectedCacheMissCount := uint64(0)
 	for i := 0; i < cacheSize; i++ {
 		expectedCacheMissCount++
-		value, err := ca.Get(i)
+		value, err := ca.Get(context.Background(), i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -94,7 +102,7 @@ func TestCacheMisses(t *testing.T) {
 
 	// Get the first cacheSize keys again. This should not increase the cache miss count.
 	for i := 0; i < cacheSize; i++ {
-		value, err := ca.Get(i)
+		value, err := ca.Get(context.Background(), i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -102,14 +110,14 @@ func TestCacheMisses(t *testing.T) {
 
 	// Read the last key. This should cause the first key to be evicted.
 	expectedCacheMissCount++
-	value, err := ca.Get(cacheSize)
+	value, err := ca.Get(context.Background(), cacheSize)
 	require.NoError(t, err)
 	require.Equal(t, baseData[cacheSize], *value)
 
 	// Read the keys in order. Due to the order of evictions, each read should result in a cache miss.
 	for i := 0; i < cacheSize; i++ {
 		expectedCacheMissCount++
-		value, err := ca.Get(i)
+		value, err := ca.Get(context.Background(), i)
 		require.NoError(t, err)
 		require.Equal(t, baseData[i], *value)
 		require.Equal(t, expectedCacheMissCount, cacheMissCount.Load())
@@ -142,7 +150,11 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -154,7 +166,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(0)
+			value, err := ca.Get(context.Background(), 0)
 			require.NoError(t, err)
 			require.Equal(t, baseData[0], *value)
 		}()
@@ -177,13 +189,13 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// Fetching the key again should not result in a cache miss.
-	value, err := ca.Get(0)
+	value, err := ca.Get(context.Background(), 0)
 	require.NoError(t, err)
 	require.Equal(t, baseData[0], *value)
 	require.Equal(t, uint64(1), cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }
 
 func TestParallelAccess(t *testing.T) {
@@ -211,7 +223,11 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	ca, err := NewCachedAccessor(cacheSize, 0, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -223,7 +239,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
-			value, err := ca.Get(0)
+			value, err := ca.Get(context.Background(), 0)
 			require.Nil(t, value)
 			require.Equal(t, errors.New("intentional error"), err)
 		}()
@@ -246,13 +262,13 @@ func TestParallelAccessWithError(t *testing.T) {
 	require.True(t, count >= 1)
 
 	// Fetching the key again should result in another cache miss since the previous fetch failed.
-	value, err := ca.Get(0)
+	value, err := ca.Get(context.Background(), 0)
 	require.Nil(t, value)
 	require.Equal(t, errors.New("intentional error"), err)
 	require.Equal(t, count+1, cacheMissCount.Load())
 
 	// The internal lookupsInProgress map should no longer contain the key.
-	require.Equal(t, 0, len(ca.(*cachedAccessor[int, *string]).lookupsInProgress))
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }
 
 func TestConcurrencyLimiter(t *testing.T) {
@@ -283,7 +299,11 @@ func TestConcurrencyLimiter(t *testing.T) {
 	}
 
 	cacheSize := 100
-	ca, err := NewCachedAccessor(cacheSize, maxConcurrency, accessor)
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, maxConcurrency, accessor)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -291,7 +311,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 	for i := 0; i < dataSize; i++ {
 		boundI := i
 		go func() {
-			value, err := ca.Get(boundI)
+			value, err := ca.Get(context.Background(), boundI)
 			require.NoError(t, err)
 			require.Equal(t, baseData[boundI], *value)
 			wg.Done()
@@ -309,4 +329,192 @@ func TestConcurrencyLimiter(t *testing.T) {
 	// Unlock the accessor. This will allow the goroutines to proceed.
 	accessorLock.Unlock()
 	wg.Wait()
+}
+
+func TestOriginalRequesterTimesOut(t *testing.T) {
+	tu.InitializeRandom()
+
+	dataSize := 1024
+
+	baseData := make(map[int]string)
+	for i := 0; i < dataSize; i++ {
+		baseData[i] = tu.RandomString(10)
+	}
+
+	accessorLock := sync.RWMutex{}
+	cacheMissCount := atomic.Uint64{}
+	accessor := func(key int) (*string, error) {
+
+		// Intentionally block if accessorLock is held by the outside scope.
+		// Used to provoke specific race conditions.
+		accessorLock.Lock()
+		defer accessorLock.Unlock()
+
+		cacheMissCount.Add(1)
+
+		str := baseData[key]
+		return &str, nil
+	}
+	cacheSize := rand.Intn(dataSize) + 1
+
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
+	require.NoError(t, err)
+
+	// Lock the accessor. This will cause all cache misses to block.
+	accessorLock.Lock()
+
+	// Start several goroutines that will attempt to access the same key.
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	errCount := atomic.Uint64{}
+	for i := 0; i < 10; i++ {
+
+		var ctx context.Context
+		if i == 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			defer cancel()
+		} else {
+			ctx = context.Background()
+		}
+
+		go func() {
+			defer wg.Done()
+			value, err := ca.Get(ctx, 0)
+
+			if err != nil {
+				errCount.Add(1)
+			} else {
+				require.Equal(t, baseData[0], *value)
+			}
+		}()
+
+		if i == 0 {
+			// Give the thread with the small timeout a chance to start. Although this sleep statement is
+			// not required for the test to pass, it makes it much more likely for this test to exercise
+			// the intended code pathway.
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// Unlock the accessor. This will allow the goroutines to proceed.
+	accessorLock.Unlock()
+
+	// Wait for the goroutines to finish.
+	wg.Wait()
+
+	// Only one of the goroutines should have called into the accessor.
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// At most, one goroutine should have timed out.
+	require.True(t, errCount.Load() <= 1)
+
+	// Fetching the key again should not result in a cache miss.
+	value, err := ca.Get(context.Background(), 0)
+	require.NoError(t, err)
+	require.Equal(t, baseData[0], *value)
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// The internal lookupsInProgress map should no longer contain the key.
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
+}
+
+func TestSecondaryRequesterTimesOut(t *testing.T) {
+	tu.InitializeRandom()
+
+	dataSize := 1024
+
+	baseData := make(map[int]string)
+	for i := 0; i < dataSize; i++ {
+		baseData[i] = tu.RandomString(10)
+	}
+
+	accessorLock := sync.RWMutex{}
+	cacheMissCount := atomic.Uint64{}
+	accessor := func(key int) (*string, error) {
+
+		// Intentionally block if accessorLock is held by the outside scope.
+		// Used to provoke specific race conditions.
+		accessorLock.Lock()
+		defer accessorLock.Unlock()
+
+		cacheMissCount.Add(1)
+
+		str := baseData[key]
+		return &str, nil
+	}
+	cacheSize := rand.Intn(dataSize) + 1
+
+	c := NewFIFOCache[int, *string](uint64(cacheSize), func(key int, value *string) uint64 {
+		return 1
+	})
+
+	ca, err := NewCacheAccessor[int, *string](c, 0, accessor)
+	require.NoError(t, err)
+
+	// Lock the accessor. This will cause all cache misses to block.
+	accessorLock.Lock()
+
+	// Start several goroutines that will attempt to access the same key.
+	wg := sync.WaitGroup{}
+	wg.Add(10)
+	errCount := atomic.Uint64{}
+	for i := 0; i < 10; i++ {
+
+		var ctx context.Context
+		if i == 1 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.Background(), 1*time.Millisecond)
+			defer cancel()
+		} else {
+			ctx = context.Background()
+		}
+
+		go func() {
+			defer wg.Done()
+			value, err := ca.Get(ctx, 0)
+
+			if err != nil {
+				errCount.Add(1)
+			} else {
+				require.Equal(t, baseData[0], *value)
+			}
+		}()
+
+		if i == 0 {
+			// Give the thread with the context that won't time out a chance to start. Although this sleep statement is
+			// not required for the test to pass, it makes it much more likely for this test to exercise
+			// the intended code pathway.
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	// Give context a chance to time out. Although this sleep statement is not required for the test to pass, it makes
+	// it much more likely for this test to exercise the intended code pathway.
+	time.Sleep(100 * time.Millisecond)
+
+	// Unlock the accessor. This will allow the goroutines to proceed.
+	accessorLock.Unlock()
+
+	// Wait for the goroutines to finish.
+	wg.Wait()
+
+	// Only one of the goroutines should have called into the accessor.
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// At most, one goroutine should have timed out.
+	require.True(t, errCount.Load() <= 1)
+
+	// Fetching the key again should not result in a cache miss.
+	value, err := ca.Get(context.Background(), 0)
+	require.NoError(t, err)
+	require.Equal(t, baseData[0], *value)
+	require.Equal(t, uint64(1), cacheMissCount.Load())
+
+	// The internal lookupsInProgress map should no longer contain the key.
+	require.Equal(t, 0, len(ca.(*cacheAccessor[int, *string]).lookupsInProgress))
 }

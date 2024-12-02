@@ -33,10 +33,12 @@ type storeV2 struct {
 
 var _ StoreV2 = &storeV2{}
 
-func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger) *storeV2 {
+func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger, ttl time.Duration) *storeV2 {
 	return &storeV2{
 		db:     db,
 		logger: logger,
+
+		ttl: ttl,
 	}
 }
 

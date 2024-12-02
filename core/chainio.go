@@ -72,6 +72,9 @@ type Reader interface {
 	// GetOperatorSetParams returns operator set params for the quorum.
 	GetOperatorSetParams(ctx context.Context, quorumID QuorumID) (*OperatorSetParam, error)
 
+	// GetOperatorSocket returns a operator's socket.
+	GetOperatorSocket(ctx context.Context, operatorID OperatorID) (string, error)
+
 	// GetNumberOfRegisteredOperatorForQuorum returns the number of registered operators for the quorum.
 	GetNumberOfRegisteredOperatorForQuorum(ctx context.Context, quorumID QuorumID) (uint32, error)
 
@@ -100,6 +103,12 @@ type Reader interface {
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
 
+	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
+	GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*BlobVersionParameters, error)
+
+	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
+	GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*BlobVersionParameters, error)
+
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
 	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
 
@@ -111,6 +120,12 @@ type Reader interface {
 
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
+
+	// GetRelayURL returns the relay URL address for the given key.
+	GetRelayURL(ctx context.Context, key uint16) (string, error)
+
+	// GetRelayURLs returns the relay URL addresses for all relays.
+	GetRelayURLs(ctx context.Context) (map[uint16]string, error)
 }
 
 type Writer interface {

@@ -7,6 +7,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestReadWrite(t *testing.T) {
@@ -34,12 +35,18 @@ func TestReadWrite(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(
+		context.Background(),
+		logger,
+		blobStore,
+		1024*1024*32,
+		32,
+		10*time.Second)
 	require.NoError(t, err)
 
 	// Read the blobs back.
 	for key, data := range expectedData {
-		blob, err := server.GetBlob(key)
+		blob, err := server.GetBlob(context.Background(), key)
 
 		require.NoError(t, err)
 		require.Equal(t, data, blob)
@@ -47,7 +54,7 @@ func TestReadWrite(t *testing.T) {
 
 	// Read the blobs back again to test caching.
 	for key, data := range expectedData {
-		blob, err := server.GetBlob(key)
+		blob, err := server.GetBlob(context.Background(), key)
 
 		require.NoError(t, err)
 		require.Equal(t, data, blob)
@@ -65,11 +72,17 @@ func TestNonExistentBlob(t *testing.T) {
 
 	blobStore := buildBlobStore(t, logger)
 
-	server, err := newBlobProvider(context.Background(), logger, blobStore, 10, 32)
+	server, err := newBlobProvider(
+		context.Background(),
+		logger,
+		blobStore,
+		1024*1024*32,
+		32,
+		10*time.Second)
 	require.NoError(t, err)
 
 	for i := 0; i < 10; i++ {
-		blob, err := server.GetBlob(v2.BlobKey(tu.RandomBytes(32)))
+		blob, err := server.GetBlob(context.Background(), v2.BlobKey(tu.RandomBytes(32)))
 		require.Error(t, err)
 		require.Nil(t, blob)
 	}

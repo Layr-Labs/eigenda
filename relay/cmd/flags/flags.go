@@ -1,11 +1,12 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/urfave/cli"
-	"time"
 )
 
 const (
@@ -59,12 +60,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	BlobCacheSizeFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-size"),
-		Usage:    "Max number of items in the blob cache",
+	BlobCacheBytes = cli.Uint64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "blob-cache-bytes"),
+		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    32,
+		Value:    1024 * 1024 * 1024,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
@@ -73,12 +74,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	ChunkCacheSizeFlag = cli.IntFlag{
+	ChunkCacheSizeFlag = cli.Int64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-size"),
-		Usage:    "Max number of items in the chunk cache",
+		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_SIZE"),
-		Value:    32,
+		Value:    4 * 1024 * 1024 * 1024,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -230,6 +231,55 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_DISABLED"),
 	}
+	GetChunksTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-timeout"),
+		Usage:    "Timeout for GetChunks()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	GetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-blob-timeout"),
+		Usage:    "Timeout for GetBlob()",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetMetadataTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-metadata-timeout"),
+		Usage:    "Timeout for internal metadata fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_METADATA_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetBlobTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-blob-timeout"),
+		Usage:    "Timeout for internal blob fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_BLOB_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	InternalGetProofsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-proofs-timeout"),
+		Usage:    "Timeout for internal proofs fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_PROOFS_TIMEOUT"),
+		Required: false,
+		Value:    5 * time.Second,
+	}
+	InternalGetCoefficientsTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-get-coefficients-timeout"),
+		Usage:    "Timeout for internal coefficients fetch",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INTERNAL_GET_COEFFICIENTS_TIMEOUT"),
+		Required: false,
+		Value:    20 * time.Second,
+	}
+	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -239,13 +289,15 @@ var requiredFlags = []cli.Flag{
 	RelayIDsFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	AuthenticationTimeoutFlag,
+	AuthenticationDisabledFlag,
 }
 
 var optionalFlags = []cli.Flag{
 	MaxGRPCMessageSizeFlag,
 	MetadataCacheSizeFlag,
 	MetadataMaxConcurrencyFlag,
-	BlobCacheSizeFlag,
+	BlobCacheBytes,
 	BlobMaxConcurrencyFlag,
 	ChunkCacheSizeFlag,
 	ChunkMaxConcurrencyFlag,
@@ -268,6 +320,13 @@ var optionalFlags = []cli.Flag{
 	AuthenticationKeyCacheSizeFlag,
 	AuthenticationTimeoutFlag,
 	AuthenticationDisabledFlag,
+	GetChunksTimeoutFlag,
+	GetBlobTimeoutFlag,
+	InternalGetMetadataTimeoutFlag,
+	InternalGetBlobTimeoutFlag,
+	InternalGetProofsTimeoutFlag,
+	InternalGetCoefficientsTimeoutFlag,
+	OnchainStateRefreshIntervalFlag,
 }
 
 var Flags []cli.Flag
