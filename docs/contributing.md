@@ -27,7 +27,7 @@ In general, the `core` project contains implementation of all the important busi
 ├── <a href="../tools">tools</a>: General tools such as traffic generator
 </pre>
 
-# Data Flow Diagram
+# Data flow diagram
 
 You can convert [Mermaid source code](dataflow.md) into an image using the [VS Code extention](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) or the [Mermaid Live Editor](https://mermaid.live).
 
@@ -35,22 +35,20 @@ You can convert [Mermaid source code](dataflow.md) into an image using the [VS C
 
 # Data structures
 ```
-data: []byte
-
 encoding.Frame: 
     Proof: bn254.G1Affine
     Coeffs: fr.Element
 
 v2.Batch:
     ReferenceBlockNumber: uint64
-    []v2.BlobCertificate:
-        v2.BlobHeader
+    []v2.BlobCertificate: v2.BlobHeader
 
-v2.BlobVerificate:
-    []RelayKey: uint16
-
-v2.BlobVerificationInfo:
-    serialized merkletree.Proof
+v2.BlobHeader:
+    BlobCommitment
+        Commitment: []byte
+        LengthCommitment: []byte
+        LengthProof: []byte
+        Length: uint32
 ```
 
 # Finite field elements
