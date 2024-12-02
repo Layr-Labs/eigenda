@@ -39,6 +39,8 @@ type RelayClient interface {
 	// The returned slice has the same length and ordering as the input slice, and the i-th element is the bundle for the i-th request.
 	// Each bundle is a sequence of frames in raw form (i.e., serialized core.Bundle bytearray).
 	GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error)
+	// GetSockets returns the relay sockets
+	GetSockets() map[corev2.RelayKey]string
 	Close() error
 }
 
@@ -65,6 +67,8 @@ func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (*relayCli
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 
+	logger.Info("creating relay client", "config", config)
+
 	initOnce := sync.Map{}
 	for key := range config.Sockets {
 		initOnce.Store(key, &sync.Once{})
@@ -73,7 +77,7 @@ func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (*relayCli
 		config: config,
 
 		initOnce: &initOnce,
-		logger:   logger,
+		logger:   logger.With("component", "RelayClient"),
 	}, nil
 }
 
@@ -194,6 +198,10 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 		c.grpcClients.Store(key, relaygrpc.NewRelayClient(conn))
 	})
 	return initErr
+}
+
+func (c *relayClient) GetSockets() map[corev2.RelayKey]string {
+	return c.config.Sockets
 }
 
 func (c *relayClient) Close() error {

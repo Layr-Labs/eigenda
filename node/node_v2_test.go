@@ -11,12 +11,14 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDownloadBundles(t *testing.T) {
 	c := newComponents(t)
+	c.node.RelayClient.Store(c.relayClient)
 	ctx := context.Background()
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
 	blobCerts := batch.BlobCertificates
@@ -89,6 +91,7 @@ func TestDownloadBundles(t *testing.T) {
 
 func TestDownloadBundlesFail(t *testing.T) {
 	c := newComponents(t)
+	c.node.RelayClient.Store(c.relayClient)
 	ctx := context.Background()
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
 
@@ -123,9 +126,10 @@ func TestDownloadBundlesFail(t *testing.T) {
 	require.Nil(t, rawBundles)
 }
 
-func TestRefreshOnchainState(t *testing.T) {
+func TestRefreshOnchainStateFailure(t *testing.T) {
 	c := newComponents(t)
 	c.node.Config.EnableV2 = true
+	c.node.RelayClient.Store(c.relayClient)
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 	ctx := context.Background()
 	bp, ok := c.node.BlobVersionParams.Load().Get(0)
@@ -133,9 +137,67 @@ func TestRefreshOnchainState(t *testing.T) {
 	require.Equal(t, bp, blobParams)
 	_, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.False(t, ok)
+	relayClient, ok := c.node.RelayClient.Load().(clients.RelayClient)
+	require.True(t, ok)
+	require.NotNil(t, relayClient)
 
+	// Both updates fail
 	newCtx, cancel := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
 	defer cancel()
+
+	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
+	c.relayClient.On("GetSockets").Return(nil)
+	c.tx.On("GetRelayURLs", mock.Anything).Return(nil, assert.AnError)
+	err := c.node.RefreshOnchainState(newCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	bp, ok = c.node.BlobVersionParams.Load().Get(0)
+	require.True(t, ok)
+	require.Equal(t, bp, blobParams)
+	_, ok = c.node.BlobVersionParams.Load().Get(1)
+	require.False(t, ok)
+	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
+	require.Same(t, relayClient, newRelayClient)
+
+	// Same relay URLs shouldn't trigger update
+	newCtx1, cancel1 := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel1()
+
+	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
+	relayURLs := map[v2.RelayKey]string{
+		0: "http://localhost:8080",
+	}
+	c.relayClient.On("GetSockets").Return(relayURLs).Once()
+	c.tx.On("GetRelayURLs", mock.Anything).Return(relayURLs, nil)
+	err = c.node.RefreshOnchainState(newCtx1)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	newRelayClient = c.node.RelayClient.Load().(clients.RelayClient)
+	require.Same(t, relayClient, newRelayClient)
+}
+
+func TestRefreshOnchainStateSuccess(t *testing.T) {
+	c := newComponents(t)
+	c.node.Config.EnableV2 = true
+	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
+	relayURLs := map[v2.RelayKey]string{
+		0: "http://localhost:8080",
+	}
+	relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
+		Sockets: relayURLs,
+	}, c.node.Logger)
+	require.NoError(t, err)
+	// set up non-mock client
+	c.node.RelayClient.Store(relayClient)
+	ctx := context.Background()
+	bp, ok := c.node.BlobVersionParams.Load().Get(0)
+	require.True(t, ok)
+	require.Equal(t, bp, blobParams)
+	_, ok = c.node.BlobVersionParams.Load().Get(1)
+	require.False(t, ok)
+
+	// Blob params updated successfully
+	newCtx, cancel := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
+	defer cancel()
+
 	blobParams2 := &core.BlobVersionParameters{
 		NumChunks:       111,
 		CodingRate:      1,
@@ -145,7 +207,12 @@ func TestRefreshOnchainState(t *testing.T) {
 		0: blobParams,
 		1: blobParams2,
 	}, nil)
-	err := c.node.RefreshOnchainState(newCtx)
+	newRelayURLs := map[v2.RelayKey]string{
+		1: "http://localhost:8081",
+		2: "http://localhost:8082",
+	}
+	c.tx.On("GetRelayURLs", mock.Anything).Return(newRelayURLs, nil)
+	err = c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	bp, ok = c.node.BlobVersionParams.Load().Get(0)
 	require.True(t, ok)
@@ -153,6 +220,9 @@ func TestRefreshOnchainState(t *testing.T) {
 	bp, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams2)
+	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
+	require.NotSame(t, relayClient, newRelayClient)
+	require.Equal(t, newRelayURLs, newRelayClient.GetSockets())
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {
