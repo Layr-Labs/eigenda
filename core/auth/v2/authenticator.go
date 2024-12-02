@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -57,27 +56,26 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader) error {
 	return nil
 }
 
-func (*authenticator) AuthenticatePaymentStateRequest(request *pb.GetPaymentStateRequest) error {
+func (*authenticator) AuthenticatePaymentStateRequest(sig []byte, accountId string) error {
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	sig := request.GetSignature()
 	if len(sig) != 65 {
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
 	// Decode public key
-	publicKeyBytes, err := hexutil.Decode(request.GetAccountId())
+	publicKeyBytes, err := hexutil.Decode(accountId)
 	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", request.GetAccountId(), err)
+		return fmt.Errorf("failed to decode public key (%v): %v", accountId, err)
 	}
 
 	// Convert bytes to public key
 	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to convert bytes to public key (%v): %v", request.GetAccountId(), err)
+		return fmt.Errorf("failed to convert bytes to public key (%v): %v", accountId, err)
 	}
 
 	// Verify the signature
-	hash := sha256.Sum256([]byte(request.GetAccountId()))
+	hash := sha256.Sum256([]byte(accountId))
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)

@@ -214,7 +214,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	// validate the signature
-	if err := s.authenticator.AuthenticatePaymentStateRequest(req); err != nil {
+	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters

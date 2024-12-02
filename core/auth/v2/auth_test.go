@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -126,27 +125,16 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 	assert.NoError(t, err)
 
 	accountId, err := signer.GetAccountID()
-
 	assert.NoError(t, err)
 
-	request := &pb.GetPaymentStateRequest{
-		AccountId: accountId,
-		Signature: signature,
-	}
-
-	err = authenticator.AuthenticatePaymentStateRequest(request)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
 	assert.NoError(t, err)
 }
 
 func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 	authenticator := auth.NewAuthenticator()
 
-	request := &pb.GetPaymentStateRequest{
-		AccountId: "0x123",
-		Signature: []byte{1, 2, 3}, // Invalid length
-	}
-
-	err := authenticator.AuthenticatePaymentStateRequest(request)
+	err := authenticator.AuthenticatePaymentStateRequest([]byte{1, 2, 3}, "0x123")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
@@ -154,12 +142,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 	authenticator := auth.NewAuthenticator()
 
-	request := &pb.GetPaymentStateRequest{
-		AccountId: "not-hex-encoded",
-		Signature: make([]byte, 65),
-	}
-
-	err := authenticator.AuthenticatePaymentStateRequest(request)
+	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), "not-hex-encoded")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode public key")
 }
@@ -178,12 +161,7 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 	signature, err := wrongSigner.SignPaymentStateRequest()
 	assert.NoError(t, err)
 
-	request := &pb.GetPaymentStateRequest{
-		AccountId: accountId,
-		Signature: signature,
-	}
-
-	err = authenticator.AuthenticatePaymentStateRequest(request)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature doesn't match with provided public key")
 }
@@ -202,11 +180,6 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	// Corrupt the signature
 	signature[0] ^= 0x01
 
-	request := &pb.GetPaymentStateRequest{
-		AccountId: accountId,
-		Signature: signature,
-	}
-
-	err = authenticator.AuthenticatePaymentStateRequest(request)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
 	assert.Error(t, err)
 }
