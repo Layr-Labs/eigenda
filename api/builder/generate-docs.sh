@@ -23,6 +23,9 @@ for i in "${!PROTO_FILES[@]}"; do
     PROTO_FILES[$i]=$(relativePath "${PROTO_FILES[$i]}" "${PROTO_DIR}")
 done
 
+# Sort the proto files alphabetically. Required for deterministic output.
+IFS=$'\n' PROTO_FILES=($(sort <<<"${PROTO_FILES[*]}")); unset IFS
+
 # Generate HTML doc
 docker run --rm \
   -v "${DOCS_DIR}":/out \
