@@ -27,7 +27,7 @@ type accountant struct {
 	reservation       *core.ActiveReservation
 	onDemand          *core.OnDemandPayment
 	reservationWindow uint32
-	pricePerSymbol    uint32
+	pricePerSymbol    *big.Int
 	minNumSymbols     uint32
 
 	// local accounting
@@ -45,7 +45,7 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID string, reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *accountant {
+func NewAccountant(accountID string, reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol *big.Int, minNumSymbols uint32, numBins uint32) *accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
@@ -104,7 +104,7 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 	// reservation not available, attempt on-demand
 	//todo: rollback later if disperser respond with some type of rejection?
 	relativeBinRecord.Usage -= numSymbols
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(numSymbols))))
+	incrementRequired := a.PaymentCharged(uint(numSymbols))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
@@ -132,10 +132,10 @@ func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums
 	return protoPaymentHeader, nil
 }
 
-// TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *accountant) PaymentCharged(numSymbols uint) uint64 {
-	return uint64(a.SymbolsCharged(numSymbols)) * uint64(a.pricePerSymbol)
+func (a *accountant) PaymentCharged(numSymbols uint) *big.Int {
+	symbolsCharged := big.NewInt(int64(a.SymbolsCharged(numSymbols)))
+	return new(big.Int).Mul(symbolsCharged, a.pricePerSymbol)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length

@@ -247,7 +247,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	paymentGlobalParams := pb.PaymentGlobalParams{
 		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
 		MinNumSymbols:          minNumSymbols,
-		PricePerSymbol:         pricePerSymbol,
+		PricePerSymbol:         uint32(pricePerSymbol.Uint64()),
 		ReservationWindow:      reservationWindow,
 	}
 

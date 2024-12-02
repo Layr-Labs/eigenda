@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -66,9 +67,9 @@ func (m *MockOnchainPaymentState) GetMinNumSymbols() uint32 {
 	return args.Get(0).(uint32)
 }
 
-func (m *MockOnchainPaymentState) GetPricePerSymbol() uint32 {
+func (m *MockOnchainPaymentState) GetPricePerSymbol() *big.Int {
 	args := m.Called()
-	return args.Get(0).(uint32)
+	return args.Get(0).(*big.Int)
 }
 
 func (m *MockOnchainPaymentState) GetReservationWindow() uint32 {
