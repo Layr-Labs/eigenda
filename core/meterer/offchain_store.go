@@ -241,7 +241,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	return prevPayment, nextPayment, nextDataLength, nil
 }
 
-func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, binIndex uint32) ([3]*pb.BinRecord, error) {
+func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, binIndex uint32) ([MinNumBins]*pb.BinRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -255,14 +255,14 @@ func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, bin
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return [3]*pb.BinRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	records := [3]*pb.BinRecord{}
-	for i := 0; i < len(bins) && i < 3; i++ {
+	records := [MinNumBins]*pb.BinRecord{}
+	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
 		binRecord, err := parseBinRecord(bins[i])
 		if err != nil {
-			return [3]*pb.BinRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
 		records[i] = binRecord
 	}

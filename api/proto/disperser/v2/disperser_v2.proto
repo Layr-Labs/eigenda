@@ -68,24 +68,24 @@ message BlobCommitmentReply {
 
 // GetPaymentStateRequest contains parameters to query the payment state of an account.
 message GetPaymentStateRequest {
-	string account_id = 1;
+  string account_id = 1;
   // Signature over the account ID
   // TODO: sign over a bin index or a nonce to mitigate signature replay attacks
-	bytes signature = 2;
+  bytes signature = 2;
 }
 
 // GetPaymentStateReply contains the payment state of an account.
 message GetPaymentStateReply {
-	// global payment vault parameters
-	PaymentGlobalParams payment_global_params = 1;
-	// off-chain account reservation usage records
-	repeated BinRecord bin_records = 2;
-	// on-chain account reservation setting
-	Reservation reservation = 3;
-	// off-chain on-demand payment usage
-	bytes cumulative_payment = 4;
-	// on-chain on-demand payment deposited
-	bytes onchain_cumulative_payment = 5;
+  // global payment vault parameters
+  PaymentGlobalParams payment_global_params = 1;
+  // off-chain account reservation usage records
+  repeated BinRecord bin_records = 2;
+  // on-chain account reservation setting
+  Reservation reservation = 3;
+  // off-chain on-demand payment usage
+  bytes cumulative_payment = 4;
+  // on-chain on-demand payment deposited
+  bytes onchain_cumulative_payment = 5;
 }
 
 // Data Types
@@ -152,24 +152,24 @@ message Attestation {
 }
 
 message PaymentGlobalParams {
-	uint64 global_symbols_per_second = 1;
-	uint32 min_num_symbols = 2;
-	uint32 price_per_symbol = 3;
-	uint32 reservation_window = 4;
-	repeated uint32 on_demand_quorum_numbers = 5;
+  uint64 global_symbols_per_second = 1;
+  uint32 min_num_symbols = 2;
+  uint32 price_per_symbol = 3;
+  uint32 reservation_window = 4;
+  repeated uint32 on_demand_quorum_numbers = 5;
 }
 
 message Reservation {
-	uint64 symbols_per_second = 1;
-	uint32 start_timestamp = 2;
-	uint32 end_timestamp = 3;
-	repeated uint32 quorum_numbers = 4;
-	repeated uint32 quorum_split = 5;
+  uint64 symbols_per_second = 1;
+  uint32 start_timestamp = 2;
+  uint32 end_timestamp = 3;
+  repeated uint32 quorum_numbers = 4;
+  repeated uint32 quorum_split = 5;
 }
 
 // BinRecord is the usage record of an account in a bin. The API should return the active bin 
 // record and the subsequent two records that contains potential overflows.
 message BinRecord {
-	uint32 index = 1;
-	uint64 usage = 2;
+  uint32 index = 1;
+  uint64 usage = 2;
 }
