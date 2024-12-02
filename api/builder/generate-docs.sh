@@ -28,7 +28,6 @@ docker run --rm \
   -v "${DOCS_DIR}":/out \
   -v "${PROTO_DIR}":/protos \
   pseudomuto/protoc-gen-doc \
-  --deterministic_output \
   "${PROTO_FILES[@]}" \
   --doc_opt=html,eigenda-protos.html
 
@@ -41,7 +40,6 @@ docker run --rm \
   -v "${DOCS_DIR}":/out \
   -v "${PROTO_DIR}":/protos \
   pseudomuto/protoc-gen-doc \
-  --deterministic_output \
   "${PROTO_FILES[@]}" \
   --doc_opt=markdown,eigenda-protos.md
 
