@@ -13,17 +13,17 @@ import (
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
 
-var minNumBins uint32 = 3
 var requiredQuorums = []uint8{0, 1}
 
 type Accountant interface {
-	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error)
+	AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, error)
 }
 
 var _ Accountant = &accountant{}
 
 type accountant struct {
 	// on-chain states
+	accountID         string
 	reservation       *core.ActiveReservation
 	onDemand          *core.OnDemandPayment
 	reservationWindow uint32
@@ -36,8 +36,8 @@ type accountant struct {
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
-	paymentSigner core.PaymentSigner
-	numBins       uint32
+	// number of bins in the circular accounting, restricted by minNumBins which is 3
+	numBins uint32
 }
 
 type BinRecord struct {
@@ -45,7 +45,7 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, paymentSigner core.PaymentSigner, numBins uint32) *accountant {
+func NewAccountant(accountID string, reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
@@ -54,6 +54,7 @@ func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandP
 		binRecords[i] = BinRecord{Index: uint32(i), Usage: 0}
 	}
 	a := accountant{
+		accountID:         accountID,
 		reservation:       reservation,
 		onDemand:          onDemand,
 		reservationWindow: reservationWindow,
@@ -61,8 +62,7 @@ func NewAccountant(reservation *core.ActiveReservation, onDemand *core.OnDemandP
 		minNumSymbols:     minNumSymbols,
 		binRecords:        binRecords,
 		cumulativePayment: big.NewInt(0),
-		paymentSigner:     paymentSigner,
-		numBins:           max(numBins, minNumBins),
+		numBins:           max(numBins, uint32(meterer.MinNumBins)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -116,26 +116,20 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, []byte, error) {
+func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, error) {
 	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	accountID := a.paymentSigner.GetAccountID()
 	pm := &core.PaymentMetadata{
-		AccountID:         accountID,
+		AccountID:         a.accountID,
 		BinIndex:          binIndex,
 		CumulativePayment: cumulativePayment,
 	}
 	protoPaymentHeader := pm.ConvertToProtoPaymentHeader()
 
-	signature, err := a.paymentSigner.SignBlobPayment(pm)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return protoPaymentHeader, signature, nil
+	return protoPaymentHeader, nil
 }
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored

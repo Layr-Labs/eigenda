@@ -176,6 +176,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			blobMetadataStore,
 			transactor,
 			ratelimiter,
+			meterer,
 			authv2.NewAuthenticator(),
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
