@@ -5,6 +5,8 @@ import "../interfaces/IEigenDAStructs.sol";
 
 interface IEigenDAThresholdRegistry {
 
+    event VersionedBlobParamsAdded(uint16 indexed version, VersionedBlobParams versionedBlobParams);
+
     ///////////////////////// V1 ///////////////////////////////
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index

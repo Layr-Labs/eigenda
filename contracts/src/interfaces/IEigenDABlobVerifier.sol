@@ -110,6 +110,56 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
     ) external view;
 
     /**
+     * @notice Verifies a blob for the base required quorums and the default security thresholds
+     * @param signedBatch The signed batch to verify the blob against
+     * @param blobVerificationProof The blob verification proof for the blob
+     */
+    function verifyBlobV2FromSignedBatch(
+        SignedBatch calldata signedBatch,
+        BlobVerificationProofV2 calldata blobVerificationProof
+    ) external view;
+
+    /**
+     * @notice Verifies a blob for a defined set of quorums and the default security thresholds
+     * @param signedBatch The signed batch to verify the blob against
+     * @param blobVerificationProof The blob verification proof for the blob
+     * @param quorumNumbersRequired The required quorum numbers
+     */
+    function verifyBlobV2FromSignedBatch(
+        SignedBatch calldata signedBatch,
+        BlobVerificationProofV2 calldata blobVerificationProof,
+        bytes calldata quorumNumbersRequired 
+    ) external view;
+
+    /**
+     * @notice Verifies a blob for a defined set of quorums and a custom security threshold
+     * @param signedBatch The signed batch to verify the blob against
+     * @param blobVerificationProof The blob verification proof for the blob
+     * @param securityThreshold The custom security threshold to verify the blob against
+     * @param quorumNumbersRequired The required quorum numbers
+     */
+    function verifyBlobV2FromSignedBatch(
+        SignedBatch calldata signedBatch,
+        BlobVerificationProofV2 calldata blobVerificationProof,
+        SecurityThresholds memory securityThreshold,
+        bytes calldata quorumNumbersRequired
+    ) external view;
+
+    /**
+     * @notice Verifies a blob for a defined set of quorums and a set of custom security thresholds
+     * @param signedBatch The signed batch to verify the blob against
+     * @param blobVerificationProof The blob verification proof for the blob
+     * @param securityThresholds The set of custom security thresholds to verify the blob against
+     * @param quorumNumbersRequired The required quorum numbers
+     */
+    function verifyBlobV2FromSignedBatch(
+        SignedBatch calldata signedBatch,
+        BlobVerificationProofV2 calldata blobVerificationProof,
+        SecurityThresholds[] memory securityThresholds,
+        bytes calldata quorumNumbersRequired
+    ) external view;
+
+    /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      */

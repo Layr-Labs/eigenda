@@ -7,6 +7,10 @@ import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/Ownabl
 import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
+/**
+ * @title The `EigenDAThresholdRegistry` contract.
+ * @author Layr Labs, Inc.
+ */
 contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpgradeable {
 
     constructor() {
@@ -47,12 +51,14 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         quorumNumbersRequired = _quorumNumbersRequired;
     }
 
-    function updateVersionedBlobParams(uint16 version, VersionedBlobParams memory _versionedBlobParams) external onlyOwner {
-        versionedBlobParams[version] = _versionedBlobParams;
-    }
-
     function updateDefaultSecurityThresholdsV2(SecurityThresholds memory _defaultSecurityThresholdsV2) external onlyOwner {
         defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
+    }
+
+    function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) external onlyOwner returns (uint16) {
+        versionedBlobParams[nextBlobVersion] = _versionedBlobParams;
+        emit VersionedBlobParamsAdded(nextBlobVersion, _versionedBlobParams);
+        return nextBlobVersion++;
     }
 
     ///////////////////////// V1 ///////////////////////////////
