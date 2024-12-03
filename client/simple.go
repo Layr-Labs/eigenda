@@ -8,6 +8,11 @@ import (
 	"net/http"
 )
 
+var (
+	// 503 error type informing rollup to failover to other DA location
+	ErrServiceUnavailable = fmt.Errorf("eigenda service is unavailable")
+)
+
 // TODO: Add support for custom http client option
 type Config struct {
 	URL string
@@ -81,7 +86,8 @@ func (c *SimpleCommitmentClient) GetData(ctx context.Context, comm []byte) ([]by
 	return b, nil
 }
 
-// SetData writes raw byte data to DA and returns the respective certificate
+// SetData writes raw byte data to DA and returns the associated certificate
+// which should be verified within the proxy
 func (c *SimpleCommitmentClient) SetData(ctx context.Context, b []byte) ([]byte, error) {
 	url := fmt.Sprintf("%s/put?commitment_mode=simple", c.cfg.URL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
@@ -98,6 +104,10 @@ func (c *SimpleCommitmentClient) SetData(ctx context.Context, b []byte) ([]byte,
 	b, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		return nil, ErrServiceUnavailable
 	}
 
 	if resp.StatusCode != http.StatusOK {
