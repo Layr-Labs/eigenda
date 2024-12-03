@@ -283,12 +283,16 @@ library EigenDABlobVerificationUtils {
     function _getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        Attestation calldata attestation,
-        bytes calldata quorumNumbers
+        Attestation calldata attestation
     ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature) {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](attestation.nonSignerPubkeys.length);
         for (uint i = 0; i < attestation.nonSignerPubkeys.length; ++i) {
             nonSignerOperatorIds[i] = BN254.hashG1Point(attestation.nonSignerPubkeys[i]);
+        }
+
+        bytes memory quorumNumbers;
+        for (uint i = 0; i < attestation.quorumNumbers.length; ++i) {
+            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(attestation.quorumNumbers[i]));
         }
 
         OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever.getCheckSignaturesIndices(

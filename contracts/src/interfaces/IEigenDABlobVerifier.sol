@@ -112,11 +112,9 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
-     * @param blobHeader The blob header of the blob in the signed batch
      */
     function getNonSignerStakesAndSignature(
-        SignedBatch calldata signedBatch,
-        BlobHeaderV2 calldata blobHeader
+        SignedBatch calldata signedBatch
     ) external view returns (NonSignerStakesAndSignature memory);
 
     /**
