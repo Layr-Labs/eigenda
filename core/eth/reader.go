@@ -168,16 +168,18 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
+	var contractSocketRegistry *socketreg.ContractSocketRegistry
 	socketRegistryAddr, err := contractIRegistryCoordinator.SocketRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch SocketRegistry address", "err", err)
-		return err
-	}
-
-	contractSocketRegistry, err := socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
-	if err != nil {
-		t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
-		return err
+		//TODO: Temporarily warn, but continue without the socket registry
+		// Once the contract is deployed, we should return an error
+		t.logger.Warn("Failed to fetch SocketRegistry address", "err", err)
+	} else {
+		contractSocketRegistry, err = socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
+			return err
+		}
 	}
 
 	var contractRelayRegistry *relayreg.ContractIEigenDARelayRegistry
@@ -693,6 +695,9 @@ func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
+	if t.bindings.SocketRegistry == nil {
+		return "", errors.New("socket registry not deployed")
+	}
 	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
 		Context: ctx,
 	}, [32]byte(operatorId))
