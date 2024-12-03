@@ -180,8 +180,8 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 
 	D := params.ChunkLength
 
-	if D > v.SRSNumberToLoad {
-		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.SRSNumberToLoad)
+	if D > v.kzgConfig.SRSNumberToLoad {
+		return fmt.Errorf("requested chunkLen %v is larger than Loaded SRS points %v", D, v.kzgConfig.SRSNumberToLoad)
 	}
 
 	n := len(samples)
@@ -212,11 +212,11 @@ func (v *Verifier) UniversalVerify(params encoding.EncodingParams, samples []Sam
 	}
 	// lhs g2
 	exponent := uint64(math.Log2(float64(D)))
-	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.KzgConfig)
+	G2atD, err := kzg.ReadG2PointOnPowerOf2(exponent, v.kzgConfig.SRSOrder, v.kzgConfig.G2PowerOf2Path)
 
 	if err != nil {
 		// then try to access if there is a full list of g2 srs
-		G2atD, err = kzg.ReadG2Point(D, v.KzgConfig)
+		G2atD, err = kzg.ReadG2Point(D, v.kzgConfig.SRSOrder, v.kzgConfig.G2Path)
 		if err != nil {
 			return err
 		}

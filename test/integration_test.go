@@ -98,7 +98,6 @@ func init() {
 
 // makeTestEncoder makes an encoder currently using the only supported backend.
 func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
-
 	config := &kzg.KzgConfig{
 		G1Path:          "../inabox/resources/kzg/g1.point",
 		G2Path:          "../inabox/resources/kzg/g2.point",
@@ -106,14 +105,15 @@ func mustMakeTestComponents() (encoding.Prover, encoding.Verifier) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(config, true)
+	p, err := prover.NewProver(config, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	v, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

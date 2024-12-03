@@ -179,7 +179,8 @@ func NewNode(
 	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
-	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
+	config.EncoderConfig.LoadG2Points = false
+	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 	if err != nil {
 		return nil, err
 	}

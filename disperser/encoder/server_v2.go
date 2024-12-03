@@ -249,3 +249,10 @@ func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.
 	}
 	return proofs, coeffs
 }
+
+func (s *EncoderServerV2) Close() {
+	if s.close == nil {
+		return
+	}
+	s.close()
+}
