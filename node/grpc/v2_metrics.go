@@ -130,3 +130,8 @@ func (m *V2Metrics) Stop() error {
 func (m *V2Metrics) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
+
+// WriteMetricsDocumentation writes the metrics for the DA node to a markdown file.
+func (m *V2Metrics) WriteMetricsDocumentation() error {
+	return m.metricsServer.WriteMetricsDocumentation("node/mdoc/node-metrics.md")
+}
