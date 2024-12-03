@@ -3,11 +3,11 @@
 
 ## Table of Contents
 
-- [retriever/retriever.proto](#retriever_retriever-proto)
-    - [BlobReply](#retriever-BlobReply)
-    - [BlobRequest](#retriever-BlobRequest)
+- [lightnode/lightnode.proto](#lightnode_lightnode-proto)
+    - [StreamChunkAvailabilityReply](#lightnode-StreamChunkAvailabilityReply)
+    - [StreamChunkAvailabilityRequest](#lightnode-StreamChunkAvailabilityRequest)
   
-    - [Retriever](#retriever-Retriever)
+    - [LightNode](#lightnode-LightNode)
   
 - [common/common.proto](#common_common-proto)
     - [BlobCommitment](#common-BlobCommitment)
@@ -18,40 +18,38 @@
 
 
 
-<a name="retriever_retriever-proto"></a>
+<a name="lightnode_lightnode-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## retriever/retriever.proto
+## lightnode/lightnode.proto
 
 
 
-<a name="retriever-BlobReply"></a>
+<a name="lightnode-StreamChunkAvailabilityReply"></a>
 
-### BlobReply
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
-
-
-
-
-
-
-<a name="retriever-BlobRequest"></a>
-
-### BlobRequest
-
+### StreamChunkAvailabilityReply
+A reply to a StreamAvailabilityStatus request.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| batch_header_hash | [bytes](#bytes) |  | The hash of the ReducedBatchHeader defined onchain, see: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43 This identifies the batch that this blob belongs to. |
-| blob_index | [uint32](#uint32) |  | Which blob in the batch this is requesting for (note: a batch is logically an ordered list of blobs). |
-| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
-| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
+| header_hash | [bytes](#bytes) |  | The hash of a blob header corresponding to a chunk the agent received and verified. From the light node&#39;s perspective, the blob is available if all chunks the light node wants to sample are available. |
+
+
+
+
+
+
+<a name="lightnode-StreamChunkAvailabilityRequest"></a>
+
+### StreamChunkAvailabilityRequest
+A request from a DA node to an agent light node to stream the availability status of all chunks
+assigned to the light node.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| authentication_token | [bytes](#bytes) |  |  |
 
 
 
@@ -64,26 +62,14 @@
  
 
 
-<a name="retriever-Retriever"></a>
+<a name="lightnode-LightNode"></a>
 
-### Retriever
-The Retriever is a service for retrieving chunks corresponding to a blob from
-the EigenDA operator nodes and reconstructing the original blob from the chunks.
-This is a client-side library that the users are supposed to operationalize.
+### LightNode
 
-Note: Users generally have two ways to retrieve a blob from EigenDA:
-  1) Retrieve from the Disperser that the user initially used for dispersal: the API
-     is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto
-  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
-
-The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the
-Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
-(the 2nd approach here) removes the need to trust the Disperser, with the downside of
-worse cost and performance.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| StreamBlobAvailability | [StreamChunkAvailabilityRequest](#lightnode-StreamChunkAvailabilityRequest) | [StreamChunkAvailabilityReply](#lightnode-StreamChunkAvailabilityReply) stream | StreamBlobAvailability streams the availability status blobs from the light node&#39;s perspective. A light node considers a blob to be available if all chunks it wants to sample are available. This API is for use by a DA node for monitoring the availability of chunks through its constellation of agent light nodes. |
 
  
 
