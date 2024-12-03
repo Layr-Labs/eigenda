@@ -163,9 +163,9 @@ library EigenDABlobVerificationUtils {
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
-        BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        BatchHeaderV2 memory batchHeader,
+        BlobVerificationProofV2 memory blobVerificationProof,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -187,6 +187,11 @@ library EigenDABlobVerificationUtils {
             blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
+        );
+
+        _verifyRelayKeysSet(
+            eigenDARelayRegistry,
+            blobVerificationProof.blobCertificate.relayKeys
         );
 
         _verifyBlobSecurityParams(
@@ -222,9 +227,9 @@ library EigenDABlobVerificationUtils {
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
-        BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        BatchHeaderV2 memory batchHeader,
+        BlobVerificationProofV2 memory blobVerificationProof,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -251,6 +256,11 @@ library EigenDABlobVerificationUtils {
             blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
+        );
+
+        _verifyRelayKeysSet(
+            eigenDARelayRegistry,
+            blobVerificationProof.blobCertificate.relayKeys
         );
 
         uint256 confirmedQuorumsBitmap;
@@ -283,10 +293,68 @@ library EigenDABlobVerificationUtils {
         );
     }
 
+    function _verifyBlobV2ForQuorumsFromSignedBatch(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier signatureVerifier,
+        IEigenDARelayRegistry eigenDARelayRegistry,
+        OperatorStateRetriever operatorStateRetriever,
+        IRegistryCoordinator registryCoordinator,
+        SignedBatch memory signedBatch,
+        BlobVerificationProofV2 memory blobVerificationProof,
+        SecurityThresholds memory securityThresholds,
+        bytes memory requiredQuorumNumbers
+    ) internal view {
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
+            signedBatch.attestation
+        );
+
+        _verifyBlobV2ForQuorums(
+            eigenDAThresholdRegistry,
+            signatureVerifier,
+            eigenDARelayRegistry,
+            signedBatch.batchHeader,
+            blobVerificationProof,
+            nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers
+        );
+    }
+
+    function _verifyBlobV2ForQuorumsForThresholdsFromSignedBatch(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier signatureVerifier,
+        IEigenDARelayRegistry eigenDARelayRegistry,
+        OperatorStateRetriever operatorStateRetriever,
+        IRegistryCoordinator registryCoordinator,
+        SignedBatch memory signedBatch,
+        BlobVerificationProofV2 memory blobVerificationProof,
+        SecurityThresholds[] memory securityThresholds,
+        bytes memory requiredQuorumNumbers
+    ) internal view {
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
+            signedBatch.attestation
+        );
+
+        _verifyBlobV2ForQuorumsForThresholds(
+            eigenDAThresholdRegistry,
+            signatureVerifier,
+            eigenDARelayRegistry,
+            signedBatch.batchHeader,
+            blobVerificationProof,
+            nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers
+        );
+    }
+
     function _getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        Attestation calldata attestation
+        Attestation memory attestation
     ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature) {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](attestation.nonSignerPubkeys.length);
         for (uint i = 0; i < attestation.nonSignerPubkeys.length; ++i) {
