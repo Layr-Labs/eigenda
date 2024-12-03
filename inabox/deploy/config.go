@@ -623,7 +623,7 @@ func (env *Config) GenerateAllVariables() {
 
 	// Controller
 	name = "controller0"
-	logPath, _, filename, envFile = env.getPaths(name)
+	_, _, filename, envFile = env.getPaths(name)
 	key, _ = env.getKey(name)
 	port += 2
 	grpcPort := fmt.Sprint(port)
