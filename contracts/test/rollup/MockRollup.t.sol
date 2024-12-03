@@ -82,6 +82,12 @@ contract MockRollupTest is BLSMockAVSDeployer {
             )
         );
 
+        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(
+                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
+            )
+        );
+
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
             rewardsCoordinator,
@@ -89,12 +95,6 @@ contract MockRollupTest is BLSMockAVSDeployer {
             stakeRegistry,
             eigenDAThresholdRegistry,
             eigenDARelayRegistry
-        );
-
-        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
-            address(
-                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-            )
         );
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
@@ -152,7 +152,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, registryCoordinatorOwner)
         );
 
-        mockRollup = new MockRollup(eigenDABlobVerifier, s1);
+        mockRollup = new MockRollup(IEigenDAServiceManager(address(eigenDAServiceManager)), s1);
 
         //hardcode g2 proof
         illegalProof.X[1] = 11151623676041303181597631684634074376466382703418354161831688442589830350329;

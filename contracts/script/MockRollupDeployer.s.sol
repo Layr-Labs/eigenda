@@ -13,12 +13,12 @@ contract MockRollupDeployer is Script {
 
     BN254.G1Point public s1 = BN254.generatorG1().scalar_mul(2);
     
-    // forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --sig "run(address)" <DABV address> --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv // --broadcast
-    function run(address _eigenDABlobVerifier) external {
+    // forge script script/MockRollupDeployer.s.sol:MockRollupDeployer --sig "run(address)" <DASM address> --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvvv // --broadcast
+    function run(address _eigenDAServiceManager) external {
         vm.startBroadcast();
 
         mockRollup = new MockRollup(
-            IEigenDABlobVerifier(_eigenDABlobVerifier),
+            IEigenDAServiceManager(_eigenDAServiceManager),
             s1
         );
 
