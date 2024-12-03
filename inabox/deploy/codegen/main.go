@@ -9,7 +9,6 @@ import (
 
 	dis "github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	bat "github.com/Layr-Labs/eigenda/disperser/cmd/batcher/flags"
-	controller "github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	enc "github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	opr "github.com/Layr-Labs/eigenda/node/flags"
 	churner "github.com/Layr-Labs/eigenda/operators/churner/flags"
@@ -120,7 +119,6 @@ func main() {
 	configs += genVars("OperatorVars", opr.Flags)
 	configs += genVars("RetrieverVars", retriever.Flags)
 	configs += genVars("ChurnerVars", churner.Flags)
-	configs += genVars("ControllerVars", controller.Flags)
 
 	fmt.Println(configs)
 
