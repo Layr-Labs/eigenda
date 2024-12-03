@@ -46,19 +46,11 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	numPoly := uint64(len(polyFr)) / dimE / chunkLen
 
 	// Pre-processing stage - CPU computations
-	coeffStore, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
+	flattenCoeffStoreFr, err := p.computeCoeffStore(polyFr, numWorker, l, dimE)
 	if err != nil {
 		return nil, fmt.Errorf("coefficient computation error: %v", err)
 	}
 	preprocessDone := time.Now()
-
-	// Prepare data before GPU operations
-	flattenCoeffStoreFr := make([]fr.Element, len(coeffStore)*len(coeffStore[0]))
-	idx := 0
-	for i := 0; i < len(coeffStore); i++ {
-		copy(flattenCoeffStoreFr[idx:], coeffStore[i])
-		idx += len(coeffStore[i])
-	}
 
 	flattenCoeffStoreSf := icicle.ConvertFrToScalarFieldsBytes(flattenCoeffStoreFr)
 	flattenCoeffStoreCopy := core.HostSliceFromElements[iciclebn254.ScalarField](flattenCoeffStoreSf)
@@ -147,15 +139,13 @@ func (p *KzgMultiProofIcicleBackend) ComputeMultiFrameProof(polyFr []fr.Element,
 	return icicleFFTBatch, nil
 }
 
-// Helper function to handle coefficient computation
-func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([][]fr.Element, error) {
+// Modify the function signature to return a flat array
+func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numWorker, l, dimE uint64) ([]fr.Element, error) {
+	totalSize := dimE * 2 * l // Total size of the flattened array
+	coeffStore := make([]fr.Element, totalSize)
+
 	jobChan := make(chan uint64, numWorker)
 	results := make(chan WorkerResult, numWorker)
-
-	coeffStore := make([][]fr.Element, dimE*2)
-	for i := range coeffStore {
-		coeffStore[i] = make([]fr.Element, l)
-	}
 
 	// Start workers
 	for w := uint64(0); w < numWorker; w++ {
@@ -183,25 +173,28 @@ func (p *KzgMultiProofIcicleBackend) computeCoeffStore(polyFr []fr.Element, numW
 	return coeffStore, nil
 }
 
+// Modified worker function to write directly to the flat array
 func (p *KzgMultiProofIcicleBackend) proofWorker(
 	polyFr []fr.Element,
 	jobChan <-chan uint64,
 	l uint64,
 	dimE uint64,
-	coeffStore [][]fr.Element,
+	coeffStore []fr.Element,
 	results chan<- WorkerResult,
 ) {
-
 	for j := range jobChan {
 		coeffs, err := p.GetSlicesCoeff(polyFr, dimE, j, l)
 		if err != nil {
 			results <- WorkerResult{
 				err: err,
 			}
-		} else {
-			for i := 0; i < len(coeffs); i++ {
-				coeffStore[i][j] = coeffs[i]
-			}
+			return
+		}
+
+		// Write directly to the correct positions in the flat array
+		// For each j, we need to write to the corresponding position in each block
+		for i := uint64(0); i < dimE*2; i++ {
+			coeffStore[i*l+j] = coeffs[i]
 		}
 	}
 

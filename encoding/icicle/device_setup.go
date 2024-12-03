@@ -3,6 +3,7 @@
 package icicle
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -42,7 +43,10 @@ type IcicleDeviceConfig struct {
 func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 	runtime.LoadBackendFromEnvOrDefault()
 
-	device := setupDevice(config.GPUEnable)
+	device, err := setupDevice(config.GPUEnable)
+	if err != nil {
+		return nil, err
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -96,7 +100,7 @@ func NewIcicleDevice(config IcicleDeviceConfig) (*IcicleDevice, error) {
 }
 
 // setupDevice initializes either a GPU or CPU device
-func setupDevice(gpuEnable bool) runtime.Device {
+func setupDevice(gpuEnable bool) (runtime.Device, error) {
 	if gpuEnable {
 		return setupGPUDevice()
 	}
@@ -105,14 +109,14 @@ func setupDevice(gpuEnable bool) runtime.Device {
 }
 
 // setupGPUDevice attempts to initialize a CUDA device, falling back to CPU if unavailable
-func setupGPUDevice() runtime.Device {
+func setupGPUDevice() (runtime.Device, error) {
 	deviceCuda := runtime.CreateDevice("CUDA", 0)
 	if runtime.IsDeviceAvailable(&deviceCuda) {
 		device := runtime.CreateDevice("CUDA", 0)
 		slog.Info("CUDA device available, setting device")
 		runtime.SetDevice(&device)
 
-		return device
+		return device, nil
 	}
 
 	slog.Info("CUDA device not available, falling back to CPU")
@@ -120,12 +124,13 @@ func setupGPUDevice() runtime.Device {
 }
 
 // setupCPUDevice initializes a CPU device
-func setupCPUDevice() runtime.Device {
+func setupCPUDevice() (runtime.Device, error) {
 	device := runtime.CreateDevice("CPU", 0)
-	if runtime.IsDeviceAvailable(&device) {
-		slog.Info("CPU device available, setting device")
+	if !runtime.IsDeviceAvailable(&device) {
+		slog.Error("CPU device is not available")
+		return device, errors.New("cpu device is not available")
 	}
-	runtime.SetDevice(&device)
 
-	return device
+	runtime.SetDevice(&device)
+	return device, nil
 }
