@@ -98,7 +98,7 @@ func NewCacheAccessor[K comparable, V any](
 		evictionHandler = func(key K, _ V) {
 			if insertionTime, ok := insertionTimes[key]; ok {
 				lifespan := time.Since(insertionTime).Milliseconds()
-				metrics.averageLifespan.Update(float64(lifespan))
+				metrics.lifespan.Set(float64(lifespan))
 				delete(insertionTimes, key)
 			}
 		}

@@ -1,48 +1,9 @@
 # Metrics Documentation for namespace 'relay'
 
-This documentation was automatically generated at time `2024-11-27T12:13:08-06:00`
+This documentation was automatically generated at time `2024-12-03T10:26:19-06:00`
 
 There are a total of `34` registered metrics.
 
----
-
-## average_get_blob_data_bytes
-
-Average data size of requested blobs
-
-|   |   |
-|---|---|
-| **Name** | `average_get_blob_data` |
-| **Unit** | `bytes` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_average_get_blob_data_bytes` |
----
-
-## average_get_chunks_data_bytes
-
-Average data size in a GetChunks request
-
-|   |   |
-|---|---|
-| **Name** | `average_get_chunks_data` |
-| **Unit** | `bytes` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_average_get_chunks_data_bytes` |
----
-
-## average_get_chunks_key_count
-
-Average number of keys in a GetChunks request
-
-|   |   |
-|---|---|
-| **Name** | `average_get_chunks_key` |
-| **Unit** | `count` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_average_get_chunks_key_count` |
 ---
 
 ## blob_cache_size
@@ -81,19 +42,6 @@ Average weight of items currently in the blob cache
 | **Fully Qualified Name** | `relay_blob_cache_average_weight` |
 ---
 
-## blob_cache_average_lifespan_ms
-
-Average time an item remains in the blob cache before being evicted.
-
-|   |   |
-|---|---|
-| **Name** | `blob_cache_average_lifespan` |
-| **Unit** | `ms` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_blob_cache_average_lifespan_ms` |
----
-
 ## blob_cache_hit_count
 
 Number of cache hits in the blob cache
@@ -104,6 +52,18 @@ Number of cache hits in the blob cache
 | **Unit** | `count` |
 | **Type** | `counter` |
 | **Fully Qualified Name** | `relay_blob_cache_hit_count` |
+---
+
+## blob_cache_lifespan_ms
+
+Time an item remains in the blob cache before being evicted.
+
+|   |   |
+|---|---|
+| **Name** | `blob_cache_lifespan` |
+| **Unit** | `ms` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_blob_cache_lifespan_ms` |
 ---
 
 ## blob_cache_miss_count
@@ -167,19 +127,6 @@ Average weight of items currently in the chunk cache
 | **Fully Qualified Name** | `relay_chunk_cache_average_weight` |
 ---
 
-## chunk_cache_average_lifespan_ms
-
-Average time an item remains in the chunk cache before being evicted.
-
-|   |   |
-|---|---|
-| **Name** | `chunk_cache_average_lifespan` |
-| **Unit** | `ms` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_chunk_cache_average_lifespan_ms` |
----
-
 ## chunk_cache_hit_count
 
 Number of cache hits in the chunk cache
@@ -190,6 +137,18 @@ Number of cache hits in the chunk cache
 | **Unit** | `count` |
 | **Type** | `counter` |
 | **Fully Qualified Name** | `relay_chunk_cache_hit_count` |
+---
+
+## chunk_cache_lifespan_ms
+
+Time an item remains in the chunk cache before being evicted.
+
+|   |   |
+|---|---|
+| **Name** | `chunk_cache_lifespan` |
+| **Unit** | `ms` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_chunk_cache_lifespan_ms` |
 ---
 
 ## chunk_cache_miss_count
@@ -228,6 +187,18 @@ Latency of the GetBlob RPC data retrieval
 | **Type** | `latency` |
 | **Quantiles** | `0.500`, `0.900`, `0.990` |
 | **Fully Qualified Name** | `relay_get_blob_data_latency_ms` |
+---
+
+## get_blob_data_size_bytes
+
+Data size of requested blobs.
+
+|   |   |
+|---|---|
+| **Name** | `get_blob_data_size` |
+| **Unit** | `bytes` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_get_blob_data_size_bytes` |
 ---
 
 ## get_blob_latency_ms
@@ -307,6 +278,30 @@ Latency of the GetChunks RPC data retrieval
 | **Fully Qualified Name** | `relay_get_chunks_data_latency_ms` |
 ---
 
+## get_chunks_data_size_bytes
+
+Data size in a GetChunks request.
+
+|   |   |
+|---|---|
+| **Name** | `get_chunks_data_size` |
+| **Unit** | `bytes` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_get_chunks_data_size_bytes` |
+---
+
+## get_chunks_key_count
+
+Number of keys in a GetChunks request.
+
+|   |   |
+|---|---|
+| **Name** | `get_chunks_key` |
+| **Unit** | `count` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_get_chunks_key_count` |
+---
+
 ## get_chunks_latency_ms
 
 Latency of the GetChunks RPC
@@ -382,19 +377,6 @@ Average weight of items currently in the metadata cache
 | **Fully Qualified Name** | `relay_metadata_cache_average_weight` |
 ---
 
-## metadata_cache_average_lifespan_ms
-
-Average time an item remains in the metadata cache before being evicted.
-
-|   |   |
-|---|---|
-| **Name** | `metadata_cache_average_lifespan` |
-| **Unit** | `ms` |
-| **Type** | `running average` |
-| **Time Window** | `1m0s` |
-| **Fully Qualified Name** | `relay_metadata_cache_average_lifespan_ms` |
----
-
 ## metadata_cache_hit_count
 
 Number of cache hits in the metadata cache
@@ -405,6 +387,18 @@ Number of cache hits in the metadata cache
 | **Unit** | `count` |
 | **Type** | `counter` |
 | **Fully Qualified Name** | `relay_metadata_cache_hit_count` |
+---
+
+## metadata_cache_lifespan_ms
+
+Time an item remains in the metadata cache before being evicted.
+
+|   |   |
+|---|---|
+| **Name** | `metadata_cache_lifespan` |
+| **Unit** | `ms` |
+| **Type** | `gauge` |
+| **Fully Qualified Name** | `relay_metadata_cache_lifespan_ms` |
 ---
 
 ## metadata_cache_miss_count

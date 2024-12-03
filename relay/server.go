@@ -256,7 +256,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
 
-	s.metrics.GetBlobAverageDataSize.Update(float64(len(data)))
+	s.metrics.GetBlobDataSize.Set(float64(len(data)))
 	s.metrics.GetBlobDataLatency.ReportLatency(time.Since(finishedFetchingMetadata))
 	s.metrics.GetBlobLatency.ReportLatency(time.Since(start))
 
@@ -283,7 +283,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf(
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
-	s.metrics.GetChunksAverageKeyCount.Update(float64(len(request.ChunkRequests)))
+	s.metrics.GetChunksKeyCount.Set(float64(len(request.ChunkRequests)))
 
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
@@ -334,7 +334,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	s.metrics.GetChunksAverageDataSize.Update(float64(requiredBandwidth))
+	s.metrics.GetChunksDataSize.Set(float64(requiredBandwidth))
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {

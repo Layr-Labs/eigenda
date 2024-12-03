@@ -3,7 +3,6 @@ package cache
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/metrics"
-	"time"
 )
 
 // CacheAccessorMetrics provides metrics for a CacheAccessor.
@@ -13,7 +12,7 @@ type CacheAccessorMetrics struct {
 	size             metrics.GaugeMetric
 	weight           metrics.GaugeMetric
 	averageWeight    metrics.GaugeMetric
-	averageLifespan  metrics.RunningAverageMetric
+	lifespan         metrics.GaugeMetric
 	cacheMissLatency metrics.LatencyMetric
 }
 
@@ -65,11 +64,10 @@ func NewCacheAccessorMetrics(
 		return nil, err
 	}
 
-	averageLifespan, err := server.NewRunningAverageMetric(
-		fmt.Sprintf("%s_cache_average_lifespan", cacheName),
+	lifespan, err := server.NewGaugeMetric(
+		fmt.Sprintf("%s_cache_lifespan", cacheName),
 		"ms",
-		fmt.Sprintf("Average time an item remains in the %s cache before being evicted.", cacheName),
-		time.Minute,
+		fmt.Sprintf("Time an item remains in the %s cache before being evicted.", cacheName),
 		nil)
 	if err != nil {
 		return nil, err
@@ -92,7 +90,7 @@ func NewCacheAccessorMetrics(
 		size:             size,
 		weight:           weight,
 		averageWeight:    averageWeight,
-		averageLifespan:  averageLifespan,
+		lifespan:         lifespan,
 		cacheMissLatency: cacheMissLatency,
 	}, nil
 }

@@ -350,44 +350,6 @@ func (m *metrics) NewAutoGauge(
 	return nil
 }
 
-func (m *metrics) NewRunningAverageMetric(
-	name string,
-	unit string,
-	description string,
-	timeWindow time.Duration,
-	labelTemplate any) (RunningAverageMetric, error) {
-
-	if !m.isAlive.Load() {
-		return nil, errors.New("metrics server is not alive")
-	}
-
-	id, err := newMetricID(name, unit)
-	if err != nil {
-		return nil, err
-	}
-
-	preExistingMetric, ok := m.metricMap[id]
-	if ok {
-		return preExistingMetric.(RunningAverageMetric), nil
-	}
-
-	metric, err := newRunningAverageMetric(
-		m.logger,
-		m.registry,
-		m.namespace,
-		name,
-		unit,
-		description,
-		timeWindow,
-		labelTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	m.metricMap[id] = metric
-	return metric, nil
-}
-
 func (m *metrics) GenerateMetricsDocumentation() string {
 	sb := &strings.Builder{}
 
@@ -438,10 +400,6 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 		sb.Write([]byte(fmt.Sprintf("| **Type** | `%s` |\n", metric.Type())))
 		if metric.Type() == "latency" {
 			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
-		}
-		if metric.Type() == "running average" {
-			sb.Write([]byte(fmt.Sprintf(
-				"| **Time Window** | `%s` |\n", metric.(*runningAverageMetric).GetTimeWindow())))
 		}
 		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | `%s_%s_%s` |\n",
 			m.namespace, id.name, id.unit)))

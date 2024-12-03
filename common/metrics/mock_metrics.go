@@ -63,15 +63,6 @@ func (m *mockMetrics) NewAutoGauge(
 	return nil
 }
 
-func (m *mockMetrics) NewRunningAverageMetric(
-	name string,
-	unit string,
-	description string,
-	timeWindow time.Duration,
-	labelTemplate any) (RunningAverageMetric, error) {
-	return &mockRunningAverageMetric{}, nil
-}
-
 func (m *mockMetrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
 
 }
@@ -165,37 +156,4 @@ func (m *mockLatencyMetric) LabelFields() []string {
 
 func (m *mockLatencyMetric) ReportLatency(latency time.Duration, label ...any) {
 
-}
-
-var _ RunningAverageMetric = &mockRunningAverageMetric{}
-
-type mockRunningAverageMetric struct {
-}
-
-func (m *mockRunningAverageMetric) Name() string {
-	return ""
-}
-
-func (m *mockRunningAverageMetric) Unit() string {
-	return ""
-}
-
-func (m *mockRunningAverageMetric) Description() string {
-	return ""
-}
-
-func (m *mockRunningAverageMetric) Type() string {
-	return ""
-}
-
-func (m *mockRunningAverageMetric) LabelFields() []string {
-	return make([]string, 0)
-}
-
-func (m *mockRunningAverageMetric) Update(value float64, label ...any) {
-
-}
-
-func (m *mockRunningAverageMetric) GetTimeWindow() time.Duration {
-	return 0
 }

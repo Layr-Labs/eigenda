@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
-	"time"
 )
 
 type RelayMetrics struct {
@@ -26,15 +25,15 @@ type RelayMetrics struct {
 	GetChunksDataLatency           metrics.LatencyMetric
 	GetChunksAuthFailures          metrics.CountMetric
 	GetChunksRateLimited           metrics.CountMetric
-	GetChunksAverageKeyCount       metrics.RunningAverageMetric
-	GetChunksAverageDataSize       metrics.RunningAverageMetric
+	GetChunksKeyCount              metrics.GaugeMetric
+	GetChunksDataSize              metrics.GaugeMetric
 
 	// GetBlob metrics
 	GetBlobLatency         metrics.LatencyMetric
 	GetBlobMetadataLatency metrics.LatencyMetric
 	GetBlobDataLatency     metrics.LatencyMetric
 	GetBlobRateLimited     metrics.CountMetric
-	GetBlobAverageDataSize metrics.RunningAverageMetric
+	GetBlobDataSize        metrics.GaugeMetric
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -121,21 +120,19 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		return nil, err
 	}
 
-	getChunksAverageKeyCount, err := server.NewRunningAverageMetric(
-		"average_get_chunks_key",
+	getChunksKeyCount, err := server.NewGaugeMetric(
+		"get_chunks_key",
 		"count",
-		"Average number of keys in a GetChunks request",
-		time.Minute,
+		"Number of keys in a GetChunks request.",
 		nil)
 	if err != nil {
 		return nil, err
 	}
 
-	getChunksAverageDataSize, err := server.NewRunningAverageMetric(
-		"average_get_chunks_data",
+	getChunksDataSize, err := server.NewGaugeMetric(
+		"get_chunks_data_size",
 		"bytes",
-		"Average data size in a GetChunks request",
-		time.Minute,
+		"Data size in a GetChunks request.",
 		nil)
 	if err != nil {
 		return nil, err
@@ -176,11 +173,10 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		return nil, err
 	}
 
-	getBlobAverageDataSize, err := server.NewRunningAverageMetric(
-		"average_get_blob_data",
+	getBlobDataSize, err := server.NewGaugeMetric(
+		"get_blob_data_size",
 		"bytes",
-		"Average data size of requested blobs",
-		time.Minute,
+		"Data size of requested blobs.",
 		nil)
 	if err != nil {
 		return nil, err
@@ -198,13 +194,13 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		GetChunksDataLatency:           getChunksDataLatencyMetric,
 		GetChunksAuthFailures:          getChunksAuthFailures,
 		GetChunksRateLimited:           getChunksRateLimited,
-		GetChunksAverageKeyCount:       getChunksAverageKeyCount,
-		GetChunksAverageDataSize:       getChunksAverageDataSize,
+		GetChunksKeyCount:              getChunksKeyCount,
+		GetChunksDataSize:              getChunksDataSize,
 		GetBlobLatency:                 getBlobLatencyMetric,
 		GetBlobMetadataLatency:         getBlobMetadataLatencyMetric,
 		GetBlobDataLatency:             getBlobDataLatencyMetric,
 		GetBlobRateLimited:             getBlobRateLimited,
-		GetBlobAverageDataSize:         getBlobAverageDataSize,
+		GetBlobDataSize:                getBlobDataSize,
 	}, nil
 }
 

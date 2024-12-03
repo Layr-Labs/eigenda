@@ -66,15 +66,6 @@ type Metrics interface {
 		source func() float64,
 		label ...any) error
 
-	// NewRunningAverageMetric creates a new GaugeMetric instance that keeps track of the average of a series of values
-	// over a given time window. Each value within the window is given equal weight.
-	NewRunningAverageMetric(
-		name string,
-		unit string,
-		description string,
-		timeWindow time.Duration,
-		labelTemplate any) (RunningAverageMetric, error)
-
 	// RegisterExternalMetrics registers prometheus collectors created outside the metrics framework.
 	RegisterExternalMetrics(collectors ...prometheus.Collector)
 }
@@ -154,15 +145,4 @@ type LatencyMetric interface {
 	// The label parameter accepts zero or one label. If the label type does not match the template label type provided
 	// when creating the metric, an error will be returned.
 	ReportLatency(latency time.Duration, label ...any)
-}
-
-// RunningAverageMetric tracks the average of a series of values over a given time window.
-type RunningAverageMetric interface {
-	Metric
-
-	// Update adds a new value to the RunningAverage.
-	Update(value float64, label ...any)
-
-	// GetTimeWindow returns the time window used to calculate the running average.
-	GetTimeWindow() time.Duration
 }
