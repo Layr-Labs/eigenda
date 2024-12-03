@@ -172,6 +172,7 @@ type Config struct {
 	Operators  []OperatorVars
 	Stakers    []Staker
 	Retriever  RetrieverVars
+	Controller ControllerVars
 }
 
 func (c Config) IsEigenDADeployed() bool {
