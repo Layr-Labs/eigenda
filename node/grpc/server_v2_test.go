@@ -79,7 +79,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		RelayClient: relay,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-	server := grpc.NewServerV2(config, node, logger, ratelimiter)
+	server, err := grpc.NewServerV2(config, node, logger, ratelimiter)
+	require.NoError(t, err)
 	return &testComponents{
 		server:      server,
 		node:        node,

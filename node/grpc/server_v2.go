@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"runtime"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -15,6 +13,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shirou/gopsutil/mem"
+	"runtime"
+	"time"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -26,6 +26,7 @@ type ServerV2 struct {
 	node        *node.Node
 	ratelimiter common.RateLimiter
 	logger      logging.Logger
+	metrics     *V2Metrics
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -33,14 +34,20 @@ func NewServerV2(
 	config *node.Config,
 	node *node.Node,
 	logger logging.Logger,
-	ratelimiter common.RateLimiter,
-) *ServerV2 {
+	ratelimiter common.RateLimiter) (*ServerV2, error) {
+
+	metrics, err := NewV2Metrics(logger, config.MetricsPort, config.DbPath, config.DBSizePollPeriod)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ServerV2{
 		config:      config,
 		node:        node,
 		ratelimiter: ratelimiter,
 		logger:      logger,
-	}
+		metrics:     metrics,
+	}, nil
 }
 
 func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
@@ -58,6 +65,8 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
+	start := time.Now()
+
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
@@ -92,7 +101,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 	storeChan := make(chan storeResult)
 	go func() {
-		keys, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
+		keys, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
 		if err != nil {
 			storeChan <- storeResult{
 				keys: nil,
@@ -100,6 +109,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			}
 			return
 		}
+
+		s.metrics.StoreChunksDataSize.Set(float64(size))
 
 		storeChan <- storeResult{
 			keys: keys,
@@ -124,6 +135,10 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	sig := s.node.KeyPair.SignMessage(batchHeaderHash).Bytes()
+
+	timeElapsed := time.Since(start)
+	s.metrics.StoreChunksLatency.ReportLatency(timeElapsed)
+
 	return &pb.StoreChunksReply{
 		Signature: sig[:],
 	}, nil
@@ -144,6 +159,8 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 }
 
 func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	start := time.Now()
+
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
@@ -165,6 +182,15 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
 	}
+
+	var size uint64
+	for _, chunk := range chunks {
+		size += uint64(len(chunk))
+	}
+	s.metrics.GetChunksDataSize.Set(float64(size))
+
+	elapsed := time.Since(start)
+	s.metrics.GetChunksLatency.ReportLatency(elapsed)
 
 	return &pb.GetChunksReply{
 		Chunks: chunks,

@@ -66,11 +66,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_METRICS"),
 	}
-	MetricsPortFlag = cli.StringFlag{
+	MetricsPortFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
 		Usage:    "Port at which node listens for metrics calls",
 		Required: false,
-		Value:    "9091",
+		Value:    9091,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "METRICS_PORT"),
 	}
 	OnchainMetricsIntervalFlag = cli.StringFlag{
@@ -97,6 +97,13 @@ var (
 		Usage:    "Path for level db",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
+	}
+	DBSizePollPeriodFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "db-size-poll-period"),
+		Usage:    "The period at which the database size is polled. If set to 0, the database size is not polled.",
+		Required: false,
+		Value:    10 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_SIZE_POLL_PERIOD"),
 	}
 	// The files for encrypted private keys.
 	BlsKeyFileFlag = cli.StringFlag{
@@ -376,6 +383,7 @@ var optionalFlags = []cli.Flag{
 	OnchainStateRefreshIntervalFlag,
 	PprofHttpPort,
 	EnablePprof,
+	DBSizePollPeriodFlag,
 }
 
 func init() {

@@ -103,7 +103,7 @@ func NewNode(
 
 	nodeLogger := logger.With("component", "Node")
 
-	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
+	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
 	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
 
 	// Make sure config folder exists.
@@ -175,7 +175,7 @@ func NewNode(
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
-	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
+	metrics := NewMetrics(eigenMetrics, reg, logger, fmt.Sprintf(":%d", config.MetricsPort), config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
 	v, err := verifier.NewVerifier(&config.EncoderConfig, false)

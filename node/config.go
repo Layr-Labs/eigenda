@@ -52,7 +52,7 @@ type Config struct {
 	EnableNodeApi                  bool
 	NodeApiPort                    string
 	EnableMetrics                  bool
-	MetricsPort                    string
+	MetricsPort                    int
 	OnchainMetricsInterval         int64
 	Timeout                        time.Duration
 	RegisterNodeAtStart            bool
@@ -62,6 +62,7 @@ type Config struct {
 	OverrideStoreDurationBlocks    int64
 	QuorumIDList                   []core.QuorumID
 	DbPath                         string
+	DBSizePollPeriod               time.Duration
 	LogPath                        string
 	PrivateBls                     string
 	ID                             core.OperatorID
@@ -206,7 +207,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableNodeApi:                  ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                    ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                  ctx.GlobalBool(flags.EnableMetricsFlag.Name),
-		MetricsPort:                    ctx.GlobalString(flags.MetricsPortFlag.Name),
+		MetricsPort:                    ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		OnchainMetricsInterval:         ctx.GlobalInt64(flags.OnchainMetricsIntervalFlag.Name),
 		Timeout:                        timeout,
 		RegisterNodeAtStart:            registerNodeAtStart,
@@ -217,6 +218,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideStoreDurationBlocks:    ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                   ids,
 		DbPath:                         ctx.GlobalString(flags.DbPathFlag.Name),
+		DBSizePollPeriod:               ctx.GlobalDuration(flags.DBSizePollPeriodFlag.Name),
 		PrivateBls:                     privateBls,
 		EthClientConfig:                ethClientConfig,
 		EncoderConfig:                  kzg.ReadCLIConfig(ctx),

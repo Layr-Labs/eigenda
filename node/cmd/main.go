@@ -86,7 +86,10 @@ func NodeMain(ctx *cli.Context) error {
 
 	// Creates the GRPC server.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
-	serverV2 := nodegrpc.NewServerV2(config, node, logger, ratelimiter)
+	serverV2, err := nodegrpc.NewServerV2(config, node, logger, ratelimiter)
+	if err != nil {
+		return fmt.Errorf("failed to create server v2: %v", err)
+	}
 	err = nodegrpc.RunServers(server, serverV2, config, logger)
 
 	return err

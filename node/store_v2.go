@@ -19,7 +19,9 @@ const (
 )
 
 type StoreV2 interface {
-	StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, error)
+	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
+	// and the size of the stored data, in bytes.
+	StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error)
 	DeleteKeys(keys []kvstore.Key) error
 	GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error)
 }
@@ -40,81 +42,85 @@ func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger) *storeV2 {
 	}
 }
 
-func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, error) {
+func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error) {
 	if len(rawBundles) == 0 {
-		return nil, fmt.Errorf("no raw bundles")
+		return nil, 0, fmt.Errorf("no raw bundles")
 	}
 	if len(rawBundles) != len(batch.BlobCertificates) {
-		return nil, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)", len(rawBundles), len(batch.BlobCertificates))
+		return nil, 0, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)", len(rawBundles), len(batch.BlobCertificates))
 	}
 
 	dbBatch := s.db.NewTTLBatch()
+	var size uint64
 	keys := make([]kvstore.Key, 0)
 
 	batchHeaderKeyBuilder, err := s.db.GetKeyBuilder(BatchHeaderTableName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key builder for batch header: %v", err)
+		return nil, 0, fmt.Errorf("failed to get key builder for batch header: %v", err)
 	}
 
 	batchHeaderHash, err := batch.BatchHeader.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash batch header: %v", err)
+		return nil, 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
 
 	// Store batch header
 	batchHeaderKey := batchHeaderKeyBuilder.Key(batchHeaderHash[:])
 	if _, err = s.db.Get(batchHeaderKey); err == nil {
-		return nil, ErrBatchAlreadyExist
+		return nil, 0, ErrBatchAlreadyExist
 	}
 	batchHeaderBytes, err := batch.BatchHeader.Serialize()
 	if err != nil {
-		return nil, fmt.Errorf("failed to serialize batch header: %v", err)
+		return nil, 0, fmt.Errorf("failed to serialize batch header: %v", err)
 	}
 
 	keys = append(keys, batchHeaderKey)
 	dbBatch.PutWithTTL(batchHeaderKey, batchHeaderBytes, s.ttl)
+	size += uint64(len(batchHeaderBytes))
 
 	// Store blob shards
 	for _, bundles := range rawBundles {
 		// Store blob certificate
 		blobCertificateKeyBuilder, err := s.db.GetKeyBuilder(BlobCertificateTableName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get key builder for blob certificate: %v", err)
+			return nil, 0, fmt.Errorf("failed to get key builder for blob certificate: %v", err)
 		}
 		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get blob key: %v", err)
+			return nil, 0, fmt.Errorf("failed to get blob key: %v", err)
 		}
 		blobCertificateKey := blobCertificateKeyBuilder.Key(blobKey[:])
 		blobCertificateBytes, err := bundles.BlobCertificate.Serialize()
 		if err != nil {
-			return nil, fmt.Errorf("failed to serialize blob certificate: %v", err)
+			return nil, 0, fmt.Errorf("failed to serialize blob certificate: %v", err)
 		}
 		keys = append(keys, blobCertificateKey)
 		dbBatch.PutWithTTL(blobCertificateKey, blobCertificateBytes, s.ttl)
+		size += uint64(len(blobCertificateBytes))
 
 		// Store bundles
 		for quorum, bundle := range bundles.Bundles {
 			bundlesKeyBuilder, err := s.db.GetKeyBuilder(BundleTableName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get key builder for bundles: %v", err)
+				return nil, 0, fmt.Errorf("failed to get key builder for bundles: %v", err)
 			}
 
 			k, err := BundleKey(blobKey, quorum)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get key for bundles: %v", err)
+				return nil, 0, fmt.Errorf("failed to get key for bundles: %v", err)
 			}
 
 			keys = append(keys, bundlesKeyBuilder.Key(k))
 			dbBatch.PutWithTTL(bundlesKeyBuilder.Key(k), bundle, s.ttl)
+			size += uint64(len(bundle))
 		}
 	}
 
 	if err := dbBatch.Apply(); err != nil {
-		return nil, fmt.Errorf("failed to apply batch: %v", err)
+		return nil, 0, fmt.Errorf("failed to apply batch: %v", err)
 	}
 
-	return keys, nil
+	return keys, size, nil
 }
 
 func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
