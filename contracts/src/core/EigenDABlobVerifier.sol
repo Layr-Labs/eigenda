@@ -8,6 +8,7 @@ import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier
 import {EigenDABlobVerificationUtils} from "../libraries/EigenDABlobVerificationUtils.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 contract EigenDABlobVerifier is IEigenDABlobVerifier {
@@ -15,6 +16,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorage;
     IEigenDASignatureVerifier public immutable eigenDASignatureVerifier;
+    IEigenDARelayRegistry public immutable eigenDARelayRegistry;
 
     OperatorStateRetriever public immutable operatorStateRetriever;
     IRegistryCoordinator public immutable registryCoordinator;
@@ -23,13 +25,14 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage _eigenDABatchMetadataStorage,
         IEigenDASignatureVerifier _eigenDASignatureVerifier,
+        IEigenDARelayRegistry _eigenDARelayRegistry,
         OperatorStateRetriever _operatorStateRetriever,
         IRegistryCoordinator _registryCoordinator
     ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDABatchMetadataStorage = _eigenDABatchMetadataStorage;
         eigenDASignatureVerifier = _eigenDASignatureVerifier;
-
+        eigenDARelayRegistry = _eigenDARelayRegistry;
         operatorStateRetriever = _operatorStateRetriever;
         registryCoordinator = _registryCoordinator;
     }
@@ -128,6 +131,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
+            eigenDARelayRegistry,
             batchHeader,
             blobVerificationProof,
             nonSignerStakesAndSignature,
@@ -152,6 +156,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
+            eigenDARelayRegistry,
             batchHeader,
             blobVerificationProof,
             nonSignerStakesAndSignature,
@@ -178,6 +183,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
+            eigenDARelayRegistry,
             batchHeader,
             blobVerificationProof,
             nonSignerStakesAndSignature,
@@ -204,6 +210,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsForThresholds(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
+            eigenDARelayRegistry,
             batchHeader,
             blobVerificationProof,
             nonSignerStakesAndSignature,

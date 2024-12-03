@@ -269,6 +269,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            IEigenDARelayRegistry(address(eigenDARelayRegistry)),
             OperatorStateRetriever(address(operatorStateRetriever)),
             IRegistryCoordinator(address(registryCoordinator))
         );

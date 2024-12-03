@@ -3,13 +3,13 @@ pragma solidity ^0.8.9;
 
 interface IEigenDARelayRegistry {
 
-    event RelayAdded(address indexed relay, uint32 indexed id, string relayURL);
+    event RelayAdded(address indexed relay, uint32 indexed key, string relayURL);
 
-    function setRelayURL(address relay, uint32 id, string memory relayURL) external;
+    function addRelayURL(address relay, string memory relayURL) external returns (uint32);
 
-    function getRelayURL(uint32 id) external view returns (string memory);
+    function getRelayURL(uint32 key) external view returns (string memory);
 
-    function getRelayId(address relay) external view returns (uint32);
+    function getRelayKey(address relay) external view returns (uint32);
 
-    function getRelayAddress(uint32 id) external view returns (address);
+    function getRelayAddress(uint32 key) external view returns (address);
 }

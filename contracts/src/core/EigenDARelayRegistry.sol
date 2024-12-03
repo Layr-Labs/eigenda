@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {EigenDARelayRegistryStorage} from "./EigenDARelayRegistryStorage.sol";
+import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 
-contract EigenDARelayRegistry is IEigenDARelayRegistry, OwnableUpgradeable {
-
-    mapping(uint32 => string) public relayIdToURL;
-    mapping(address => uint32) public relayAddressToId;
-    mapping(uint32 => address) public relayIdToAddress;
+/**
+ * @title Registry for EigenDA relay keys
+ * @author Layr Labs, Inc.
+ */
+contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage, IEigenDARelayRegistry {
 
     constructor() {
         _disableInitializers();
@@ -20,24 +21,24 @@ contract EigenDARelayRegistry is IEigenDARelayRegistry, OwnableUpgradeable {
         _transferOwnership(_initialOwner);
     }
 
-    function setRelayURL(address relay, uint32 id, string memory relayURL) external onlyOwner {
-        require(relayIdToAddress[id] == address(0), "EigenDARelayRegistry: relay id already taken");
+    function addRelayURL(address relay, string memory relayURL) external onlyOwner returns (uint32) {
+        relayKeyToURL[nextRelayKey] = relayURL;
+        relayAddressToKey[relay] = nextRelayKey;
+        relayKeyToAddress[nextRelayKey] = relay;
 
-        relayIdToURL[id] = relayURL;
-        relayAddressToId[relay] = id;
-        relayIdToAddress[id] = relay;
-        emit RelayAdded(relay, id, relayURL);
+        emit RelayAdded(relay, nextRelayKey, relayURL);
+        return nextRelayKey++;
     }
 
-    function getRelayURL(uint32 id) external view returns (string memory) {
-        return relayIdToURL[id];
+    function getRelayURL(uint32 key) external view returns (string memory) {
+        return relayKeyToURL[key];
     }
 
-    function getRelayId(address relay) external view returns (uint32) {
-        return relayAddressToId[relay];
+    function getRelayKey(address relay) external view returns (uint32) {
+        return relayAddressToKey[relay];
     }
 
-    function getRelayAddress(uint32 id) external view returns (address) {
-        return relayIdToAddress[id];
+    function getRelayAddress(uint32 key) external view returns (address) {
+        return relayKeyToAddress[key];
     }
 }

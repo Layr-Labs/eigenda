@@ -11,6 +11,7 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
@@ -161,6 +162,7 @@ library EigenDABlobVerificationUtils {
     function _verifyBlobV2ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
+        IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 calldata batchHeader,
         BlobVerificationProofV2 calldata blobVerificationProof,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
@@ -219,6 +221,7 @@ library EigenDABlobVerificationUtils {
     function _verifyBlobV2ForQuorumsForThresholds(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
+        IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 calldata batchHeader,
         BlobVerificationProofV2 calldata blobVerificationProof,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
@@ -312,7 +315,7 @@ library EigenDABlobVerificationUtils {
         nonSignerStakesAndSignature.nonSignerStakeIndices = checkSignaturesIndices.nonSignerStakeIndices; 
     }
 
-     function _verifyBlobSecurityParams(
+    function _verifyBlobSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) internal pure {
@@ -325,4 +328,15 @@ library EigenDABlobVerificationUtils {
         require(n >= blobParams.maxNumOperators * 10000, "EigenDABlobVerificationUtils._verifyBlobSecurityParams: security assumptions are not met");
     }
 
+    function _verifyRelayKeysSet(
+        IEigenDARelayRegistry eigenDARelayRegistry,
+        uint32[] memory relayKeys
+    ) internal view {
+        for (uint i = 0; i < relayKeys.length; ++i) {
+            require(
+                eigenDARelayRegistry.getRelayAddress(relayKeys[i]) != address(0),
+                "EigenDABlobVerificationUtils._verifyRelayKeysSet: relay key is not set"
+            );
+        }
+    }
 }
