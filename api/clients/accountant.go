@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 )
@@ -156,6 +157,37 @@ func (a *accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 	}
 
 	return &a.binRecords[relativeIndex]
+}
+
+func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) {
+	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
+
+	a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.OnchainCumulativePayment)
+	a.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
+	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
+
+	a.reservation.SymbolsPerSec = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
+	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
+	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
+	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
+	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
+	for i, quorum := range paymentState.Reservation.QuorumNumbers {
+		quorumNumbers[i] = uint8(quorum)
+	}
+	a.reservation.QuorumNumbers = quorumNumbers
+	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
+	for i, quorum := range paymentState.Reservation.QuorumSplit {
+		quorumSplit[i] = uint8(quorum)
+	}
+	a.reservation.QuorumSplit = quorumSplit
+	binRecords := make([]BinRecord, len(paymentState.BinRecords))
+	for i, record := range paymentState.BinRecords {
+		binRecords[i] = BinRecord{
+			Index: record.Index,
+			Usage: record.Usage,
+		}
+	}
+	a.binRecords = binRecords
 }
 
 // QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers
