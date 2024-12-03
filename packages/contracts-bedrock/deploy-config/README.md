@@ -1,0 +1,2 @@
+This weird path is only needed here because we're using optimism's e2e testing framework, and they hardcode the path to the devnetL1.json file.
+See https://github.com/ethereum-optimism/optimism/blob/3f43f039a9e68b777045d7e2446947acbd9b0592/op-e2e/config/init.go#L156

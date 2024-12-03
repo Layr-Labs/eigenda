@@ -33,10 +33,10 @@ test:
 	go test ./... -parallel 4 
 
 e2e-test:
-	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4 -deploy-config ../.devnet/devnetL1.json
+	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4
 
 holesky-test:
-	TESTNET=true go test -timeout 50m ./e2e  -parallel 4 -deploy-config ../.devnet/devnetL1.json
+	TESTNET=true go test -timeout 50m ./e2e  -parallel 4
 
 .PHONY: lint
 lint:
@@ -67,7 +67,7 @@ op-devnet-allocs:
 	@./scripts/op-devnet-allocs.sh
 
 benchmark:
-	go test -benchmem -run=^$ -bench . ./e2e -test.parallel 4 -deploy-config ../.devnet/devnetL1.json
+	go test -benchmem -run=^$ -bench . ./e2e -test.parallel 4
 
 .PHONY: \
 	clean \
