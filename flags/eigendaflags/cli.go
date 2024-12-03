@@ -144,14 +144,14 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:    "URL of the Ethereum RPC endpoint. Needed to confirm blobs landed onchain.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "ETH_RPC")},
 			Category: category,
-			Required: true,
+			Required: false,
 		},
 		&cli.StringFlag{
 			Name:     SvcManagerAddrFlagName,
 			Usage:    "Address of the EigenDAServiceManager contract. Required to confirm blobs landed onchain. See https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
 			Category: category,
-			Required: true,
+			Required: false,
 		},
 		// Flags that are proxy specific, and not used by the eigenda-client
 		// TODO: should we move this to a more specific category, like EIGENDA_STORE?

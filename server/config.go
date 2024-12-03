@@ -45,6 +45,22 @@ func (cfg *Config) Check() error {
 		}
 	}
 
+	// provide dummy values to eigenda client config. Since the client won't be called in this
+	// mode it doesn't matter.
+	if cfg.MemstoreEnabled {
+		cfg.EdaClientConfig.SvcManagerAddr = "0x0000000000000000000000000000000000000000"
+		cfg.EdaClientConfig.EthRpcUrl = "http://0.0.0.0:666"
+	}
+
+	if !cfg.MemstoreEnabled {
+		if cfg.EdaClientConfig.SvcManagerAddr == "" {
+			return fmt.Errorf("service manager address is required for communication with EigenDA")
+		}
+		if cfg.EdaClientConfig.EthRpcUrl == "" {
+			return fmt.Errorf("eth prc url is required for communication with EigenDA")
+		}
+	}
+
 	// cert verification is enabled
 	// TODO: move this verification logic to verify/cli.go
 	if cfg.VerifierConfig.VerifyCerts {

@@ -20,7 +20,7 @@ type Config struct {
 
 // SimpleCommitmentClient implements a simple client for the eigenda-proxy
 // that can put/get simple commitment data and query the health endpoint.
-// It is meant to be used by arbitrum nitro integrations.
+// Currently it is meant to be used by Arbitrum nitro integrations but can be extended to others in the future.
 // Optimism has its own client: https://github.com/ethereum-optimism/optimism/blob/develop/op-alt-da/daclient.go
 // so clients wanting to send op commitment mode data should use that client.
 type SimpleCommitmentClient struct {
