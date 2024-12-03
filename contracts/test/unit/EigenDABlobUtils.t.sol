@@ -100,7 +100,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             )
         );
 
-        uint16[] memory versions = new uint16[](0);
         VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
 
         cheats.prank(proxyAdminOwner);
@@ -113,7 +112,6 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
                 quorumAdversaryThresholdPercentages,
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
-                versions,
                 versionedBlobParams,
                 defaultSecurityThresholds
             )

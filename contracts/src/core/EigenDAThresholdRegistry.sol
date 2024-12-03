@@ -22,7 +22,6 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumAdversaryThresholdPercentages,
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
-        uint16[] memory _versions,
         VersionedBlobParams[] memory _versionedBlobParams,
         SecurityThresholds memory _defaultSecurityThresholdsV2
     ) external initializer {
@@ -33,9 +32,8 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         quorumNumbersRequired = _quorumNumbersRequired;
         defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
         
-        require(_versions.length == _versionedBlobParams.length, "EigenDAThresholdRegistry: versions and versioned blob params length mismatch");
-        for (uint256 i = 0; i < _versions.length; ++i) {
-            versionedBlobParams[_versions[i]] = _versionedBlobParams[i];
+        for (uint256 i = 0; i < _versionedBlobParams.length; ++i) {
+            _addVersionedBlobParams(_versionedBlobParams[i]);
         }
     }
 
@@ -56,6 +54,10 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     }
 
     function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) external onlyOwner returns (uint16) {
+        return _addVersionedBlobParams(_versionedBlobParams);
+    }
+
+    function _addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) internal returns (uint16) {
         versionedBlobParams[nextBlobVersion] = _versionedBlobParams;
         emit VersionedBlobParamsAdded(nextBlobVersion, _versionedBlobParams);
         return nextBlobVersion++;

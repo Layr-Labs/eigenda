@@ -244,7 +244,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
-        uint16[] memory versions = new uint16[](0);
         VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
         SecurityThresholds memory defaultSecurityThresholds = SecurityThresholds(33, 55);
 
@@ -257,7 +256,6 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 hex"212121",
                 hex"373737",
                 hex"0001",
-                versions,
                 versionedBlobParams,
                 defaultSecurityThresholds
             )
