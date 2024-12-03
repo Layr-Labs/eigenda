@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/urfave/cli"
 )
 
@@ -204,13 +205,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
 	}
-	IndexerPullIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "indexer-pull-interval"),
-		Usage:    "Interval to pull from the indexer",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INDEXER_PULL_INTERVAL"),
-		Value:    5 * time.Minute,
-	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
 		Usage:    "Max number of items in the authentication key cache",
@@ -289,8 +283,6 @@ var requiredFlags = []cli.Flag{
 	RelayIDsFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
-	AuthenticationTimeoutFlag,
-	AuthenticationDisabledFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -316,7 +308,6 @@ var optionalFlags = []cli.Flag{
 	MaxGetChunkBytesPerSecondClientFlag,
 	GetChunkBytesBurstinessClientFlag,
 	MaxConcurrentGetChunkOpsClientFlag,
-	IndexerPullIntervalFlag,
 	AuthenticationKeyCacheSizeFlag,
 	AuthenticationTimeoutFlag,
 	AuthenticationDisabledFlag,
@@ -336,4 +327,5 @@ func init() {
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
 }
