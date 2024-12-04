@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/eigenda/tools/srs-utils/parser"
-	"github.com/eigenda/tools/srs-utils/verifier"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/parser"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/verifier"
 	"github.com/urfave/cli"
 )
 

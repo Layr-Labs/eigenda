@@ -3,8 +3,8 @@ package parser_test
 import (
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/parser"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/eigenda/tools/srs-utils/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

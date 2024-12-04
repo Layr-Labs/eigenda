@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/verifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"github.com/eigenda/tools/srs-utils/verifier"
 )
 
 func GetGeneratorPoints(n uint64) ([]bn254.G1Affine, []bn254.G2Affine) {
