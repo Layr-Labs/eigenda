@@ -18,3 +18,6 @@ lightnode/docker/args.sh
 .vscode
 
 icicle/*
+
+# Just to make sure somebody doesn't accidentally commit the disperser's private TLS key.
+eigenda-disperser-private.key
