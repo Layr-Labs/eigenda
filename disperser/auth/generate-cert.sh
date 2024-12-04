@@ -5,6 +5,15 @@ if [ -z "${1}" ]; then
   exit 1
 fi
 
+if ! command -v cowsay 2>&1 >/dev/null
+then
+    echo "cowsay is not installed. Please install it ('brew install cowsay' or 'apt-get install cowsay')."
+    exit 1
+fi
+
+# The location where this script can be found.
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 # Used to pass options to the 'openssl req' command.
 # It expects a human in the loop, but it's preferable to automate it.
 options() {
@@ -44,4 +53,7 @@ openssl x509 -req \
 # Clean up the certificate signing request.
 rm cert.csr
 
-cowsay "This certificate will expire in one year. Ensure that a new one is made available to node operators before then."
+NEXT_YEAR=$("${SCRIPT_DIR}"'/next-year.py')
+
+cowsay "This certificate will expire on ${NEXT_YEAR}. Ensure that a new one is made available to node operators before then."
+cowsay "This certificate will expire on ${NEXT_YEAR}." >> eigenda-disperser-public.crt
