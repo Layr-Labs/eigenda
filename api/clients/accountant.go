@@ -159,9 +159,40 @@ func (a *accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 	return &a.binRecords[relativeIndex]
 }
 
-func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) {
-	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
+func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
+	if paymentState == nil {
+		return fmt.Errorf("payment state cannot be nil")
+	}
 
+	if paymentState.PaymentGlobalParams == nil {
+		return fmt.Errorf("payment global params cannot be nil")
+	}
+
+	if paymentState.OnchainCumulativePayment == nil {
+		return fmt.Errorf("onchain cumulative payment cannot be nil")
+	}
+
+	if paymentState.CumulativePayment == nil {
+		return fmt.Errorf("cumulative payment cannot be nil")
+	}
+
+	if paymentState.Reservation == nil {
+		return fmt.Errorf("reservation cannot be nil")
+	}
+
+	if paymentState.Reservation.QuorumNumbers == nil {
+		return fmt.Errorf("reservation quorum numbers cannot be nil")
+	}
+
+	if paymentState.Reservation.QuorumSplit == nil {
+		return fmt.Errorf("reservation quorum split cannot be nil")
+	}
+
+	if paymentState.BinRecords == nil {
+		return fmt.Errorf("bin records cannot be nil")
+	}
+
+	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
 	a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.OnchainCumulativePayment)
 	a.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
 	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
@@ -170,16 +201,19 @@ func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
 	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
 	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
+
 	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
 	for i, quorum := range paymentState.Reservation.QuorumNumbers {
 		quorumNumbers[i] = uint8(quorum)
 	}
 	a.reservation.QuorumNumbers = quorumNumbers
+
 	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
 	for i, quorum := range paymentState.Reservation.QuorumSplit {
 		quorumSplit[i] = uint8(quorum)
 	}
 	a.reservation.QuorumSplit = quorumSplit
+
 	binRecords := make([]BinRecord, len(paymentState.BinRecords))
 	for i, record := range paymentState.BinRecords {
 		binRecords[i] = BinRecord{
@@ -188,6 +222,8 @@ func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 	a.binRecords = binRecords
+
+	return nil
 }
 
 // QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers

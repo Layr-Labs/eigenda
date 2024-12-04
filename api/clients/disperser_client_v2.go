@@ -84,7 +84,6 @@ func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobReq
 }
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
-// This function is required to be called before using the accountant. Perhaps rename to Start()?
 func (c *disperserClientV2) PopulateAccountant(ctx context.Context) error {
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
@@ -119,6 +118,9 @@ func (c *disperserClientV2) DisperseBlob(
 
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+	}
+	if c.accountant == nil {
+		return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
