@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/bxue-l2/srs-verification/parser"
-	"github.com/bxue-l2/srs-verification/verifier"
+	"github.com/eigenda/tools/srs-utils/parser"
+	"github.com/eigenda/tools/srs-utils/verifier"
 	"github.com/urfave/cli"
 )
 
