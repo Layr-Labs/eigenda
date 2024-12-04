@@ -55,8 +55,6 @@ rm cert.csr
 
 # Document the expiration date of the certificate.
 NEXT_YEAR=$("${SCRIPT_DIR}"'/next-year.py')
-
 EXPIRATION_MESSAGE=$(cowsay "This certificate expires on ${NEXT_YEAR}.")
 echo -e "${EXPIRATION_MESSAGE}\n$(cat eigenda-disperser-public.crt)" > eigenda-disperser-public.crt
-
-cowsay "This certificate will expire on ${NEXT_YEAR}. Ensure that a new one is made available to node operators before then."
+cowsay "This certificate expires on ${NEXT_YEAR}. Ensure that a new one is made available to node operators before then."
