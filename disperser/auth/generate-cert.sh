@@ -28,7 +28,7 @@ options() {
   # Organizational Unit Name (eg, section) []:
   echo 'EigenDA'
   # Common Name (e.g. server FQDN or YOUR name) []:
-  echo 'disperser'
+  echo '.'
   # Email Address []:
   echo '.'
   # A challenge password []:
@@ -42,13 +42,25 @@ options | \
   openssl req -new \
   -key "${1}" \
   -noenc \
+  -addext "subjectAltName = IP:0.0.0.0" \
   -out cert.csr
+
+if [ $? -ne 0 ]; then
+  echo "Failed to generate certificate signing request."
+  exit 1
+fi
 
 # Self sign the certificate.
 openssl x509 -req \
   -days 365 \
   -in cert.csr \
+  -copy_extensions=copyall \
   -signkey "${1}" -out eigenda-disperser-public.crt
+
+if [ $? -ne 0 ]; then
+  echo "Failed to generate certificate."
+  exit 1
+fi
 
 # Clean up the certificate signing request.
 rm cert.csr

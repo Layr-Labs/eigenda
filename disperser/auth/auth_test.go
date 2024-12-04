@@ -2,14 +2,20 @@ package auth
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"net"
+	"os"
 	"testing"
 )
+
+// The purpose of these tests are to verify that TLS key generation works as expected.
+// TODO recreate keys each time a test is run
 
 var _ v2.DispersalServer = (*mockDispersalServer)(nil)
 
@@ -30,11 +36,23 @@ func (s *mockDispersalServer) NodeInfo(context.Context, *v2.NodeInfoRequest) (*v
 func buildClient(t *testing.T) v2.DispersalClient {
 	addr := "0.0.0.0:50051"
 
-	options := make([]grpc.DialOption, 0)
-	//options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
-	options = append(options, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cert, err := tls.LoadX509KeyPair("./test-disperser.crt", "./test-disperser.key")
+	require.NoError(t, err)
 
-	conn, err := grpc.NewClient(addr, options...)
+	nodeCert, err := os.ReadFile("./test-node.crt")
+	require.NoError(t, err)
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(nodeCert)
+	require.True(t, ok)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      certPool,
+		//ServerName:   "0.0.0.0",
+		//InsecureSkipVerify: true,
+	})
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
 	require.NoError(t, err)
 
 	return v2.NewDispersalClient(conn)
@@ -43,8 +61,24 @@ func buildClient(t *testing.T) v2.DispersalClient {
 func buildServer(t *testing.T) (v2.DispersalServer, *grpc.Server) {
 	dispersalServer := &mockDispersalServer{}
 
-	options := make([]grpc.ServerOption, 0)
-	server := grpc.NewServer(options...)
+	cert, err := tls.LoadX509KeyPair("./test-node.crt", "./test-node.key")
+	require.NoError(t, err)
+
+	disperserCert, err := os.ReadFile("./test-disperser.crt")
+	require.NoError(t, err)
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(disperserCert)
+	ok := certPool.AppendCertsFromPEM(disperserCert)
+	require.True(t, ok)
+
+	creds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert, // TODO commenting this makes things pass
+		//ServerName:   "0.0.0.0",
+	})
+
+	server := grpc.NewServer(grpc.Creds(creds))
 	v2.RegisterDispersalServer(server, dispersalServer)
 
 	addr := "0.0.0.0:50051"
