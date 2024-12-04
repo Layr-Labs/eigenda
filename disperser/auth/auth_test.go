@@ -67,14 +67,13 @@ func buildServer(t *testing.T) (v2.DispersalServer, *grpc.Server) {
 	disperserCert, err := os.ReadFile("./test-disperser.crt")
 	require.NoError(t, err)
 	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(disperserCert)
 	ok := certPool.AppendCertsFromPEM(disperserCert)
 	require.True(t, ok)
 
 	creds := credentials.NewTLS(&tls.Config{
 		Certificates: []tls.Certificate{cert},
-		RootCAs:      certPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert, // TODO commenting this makes things pass
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
 		//ServerName:   "0.0.0.0",
 	})
 
