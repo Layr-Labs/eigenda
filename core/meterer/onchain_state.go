@@ -215,10 +215,6 @@ func (pcs *OnchainPaymentState) GetGlobalRateBinInterval() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalRateBinInterval
 }
 
-func (pcs *OnchainPaymentState) GetGlobalRateBinInterval() uint64 {
-	return pcs.PaymentVaultParams.GlobalRateBinInterval
-}
-
 func (pcs *OnchainPaymentState) GetMinNumSymbols() uint32 {
 	return pcs.PaymentVaultParams.Load().MinNumSymbols
 }
