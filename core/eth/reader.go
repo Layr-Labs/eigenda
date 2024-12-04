@@ -210,6 +210,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,
 		RelayRegistry:         contractRelayRegistry,
+		// PaymentVault:          contractPaymentVault,
 	}
 	return nil
 }
@@ -656,69 +657,80 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 	return res, nil
 }
 
-func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []string) (map[string]core.ActiveReservation, error) {
-	// map accountIDs to addresses
-	accountAddresses := make([]gethcommon.Address, len(accountIDs))
-	for i, accountID := range accountIDs {
-		accountAddresses[i] = gethcommon.HexToAddress(accountID)
-	}
-
-	reservations_map := make(map[string]core.ActiveReservation)
+func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]core.ActiveReservation, error) {
+	reservationsMap := make(map[gethcommon.Address]core.ActiveReservation)
 	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
 		Context: ctx,
-	}, accountAddresses)
+	}, accountIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		reservations_map[accountIDs[i]] = reservation
+		reservationsMap[accountIDs[i]] = reservation
 	}
-	return reservations_map, nil
+
+	// filter out all zero-valued reservations
+	for accountID, reservation := range reservationsMap {
+		if isZeroValuedReservation(reservation) {
+			delete(reservationsMap, accountID)
+		}
+	}
+
+	return &reservationsMap, nil
 }
 
-func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
+func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
-	}, gethcommon.HexToAddress(accountID))
+	}, accountID)
 	if err != nil {
-		return core.ActiveReservation{}, err
+		return nil, err
 	}
-	return reservation, nil
+	if isZeroValuedReservation(reservation) {
+		return nil, errors.New("reservation is zero-valued")
+	}
+	return &reservation, nil
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []string) (map[string]core.OnDemandPayment, error) {
-	// map accountIDs to addresses
-	accountAddresses := make([]gethcommon.Address, len(accountIDs))
-	for i, accountID := range accountIDs {
-		accountAddresses[i] = gethcommon.HexToAddress(accountID)
-	}
-	payments_map := make(map[string]core.OnDemandPayment)
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]core.OnDemandPayment, error) {
+	paymentsMap := make(map[gethcommon.Address]core.OnDemandPayment)
 	payments, err := t.bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
 		Context: ctx,
-	}, accountAddresses)
+	}, accountIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	// since payments are returned in the same order as the accountIDs, we can directly map them
 	for i, payment := range payments {
-		payments_map[accountIDs[i]] = core.OnDemandPayment{
+		paymentsMap[accountIDs[i]] = core.OnDemandPayment{
 			CumulativePayment: payment,
 		}
 	}
-	return payments_map, nil
+
+	// filter out all zero-valued payments
+	for accountID, payment := range paymentsMap {
+		if payment.CumulativePayment.Cmp(big.NewInt(0)) == 0 {
+			delete(paymentsMap, accountID)
+		}
+	}
+
+	return &paymentsMap, nil
 }
 
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
+func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
 	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandAmount(&bind.CallOpts{
 		Context: ctx,
-	}, gethcommon.HexToAddress(accountID))
+	}, accountID)
 	if err != nil {
-		return core.OnDemandPayment{}, err
+		return nil, err
 	}
-	return core.OnDemandPayment{
+	if onDemandPayment == big.NewInt(0) {
+		return nil, errors.New("on-demand payment is zero-valued")
+	}
+	return &core.OnDemandPayment{
 		CumulativePayment: onDemandPayment,
 	}, nil
 }
