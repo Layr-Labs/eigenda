@@ -107,10 +107,10 @@ type Reader interface {
 	GetNumBlobVersions(ctx context.Context) (uint16, error)
 
 	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
-	GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*BlobVersionParameters, error)
+	GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*BlobVersionParameters, error)
 
 	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
-	GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*BlobVersionParameters, error)
+	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
 	GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*ActiveReservation, error)
