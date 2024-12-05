@@ -14,13 +14,12 @@ import (
 )
 
 const (
-	churnerImage    = "ghcr.io/layr-labs/eigenda/churner:local"
-	disImage        = "ghcr.io/layr-labs/eigenda/disperser:local"
-	encoderImage    = "ghcr.io/layr-labs/eigenda/encoder:local"
-	batcherImage    = "ghcr.io/layr-labs/eigenda/batcher:local"
-	nodeImage       = "ghcr.io/layr-labs/eigenda/node:local"
-	retrieverImage  = "ghcr.io/layr-labs/eigenda/retriever:local"
-	controllerImage = "ghcr.io/layr-labs/eigenda/controller:local"
+	churnerImage   = "ghcr.io/layr-labs/eigenda/churner:local"
+	disImage       = "ghcr.io/layr-labs/eigenda/disperser:local"
+	encoderImage   = "ghcr.io/layr-labs/eigenda/encoder:local"
+	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
+	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
+	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
 )
 
 func (env *Config) getKeyString(name string) string {

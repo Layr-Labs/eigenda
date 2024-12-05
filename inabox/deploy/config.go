@@ -43,7 +43,6 @@ func (env *Config) loadPrivateKeys() error {
 	addNames("opr", env.Services.Counts.NumOpr)
 	addNames("staker", env.Services.Counts.NumOpr)
 	addNames("retriever", 1)
-	addNames("controller", 1)
 
 	log.Println("service names:", names)
 
@@ -354,30 +353,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 	return v
 }
 
-// Generates controller .env
-func (env *Config) generateControllerVars(ind int, key, graphUrl string) ControllerVars {
-	v := ControllerVars{
-		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata",
-		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		CONTROLLER_USE_GRAPH:                   "true",
-		CONTROLLER_ENCODING_PULL_INTERVAL:      "10s",
-		CONTROLLER_AVAILABLE_RELAYS:            "1,2,3",
-		CONTROLLER_ENCODER_ADDRESS:             "host.docker.internal:34000",
-		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "10s",
-		CONTROLLER_NODE_REQUEST_TIMEOUT:        "5s",
-		CONTROLLER_NUM_CONNECTIONS_TO_NODES:    "50",
-		CONTROLLER_CHAIN_RPC:                   "",
-		CONTROLLER_PRIVATE_KEY:                 key[2:],
-		CONTROLLER_AWS_REGION:                  "",
-		CONTROLLER_GRAPH_URL:                   graphUrl,
-	}
-
-	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
-
-	return v
-}
-
 // Used to generate a docker compose file corresponding to the test environment
 func (env *Config) genService(compose testbed, name, image, envFile string, ports []string) {
 
@@ -620,19 +595,4 @@ func (env *Config) GenerateAllVariables() {
 		}
 		writeFile(composeFile, composeYaml)
 	}
-
-	// Controller
-	name = "controller0"
-	logPath, _, filename, envFile = env.getPaths(name)
-	key, _ = env.getKey(name)
-	port += 2
-	grpcPort := fmt.Sprint(port)
-
-	controllerConfig := env.generateControllerVars(0, key, graphUrl)
-	writeEnv(controllerConfig.getEnvMap(), envFile)
-	env.Controller = controllerConfig
-
-	env.genService(
-		compose, name, controllerImage,
-		filename, []string{grpcPort})
 }
