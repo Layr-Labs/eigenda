@@ -5,6 +5,7 @@
 
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
+    - [BinRecord](#disperser-v2-BinRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -12,6 +13,10 @@
     - [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
+    - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
+    - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
+    - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
     - [BlobStatus](#disperser-v2-BlobStatus)
@@ -42,6 +47,23 @@
 | quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum |
 | sigma | [bytes](#bytes) |  | Serialized bytes of aggregate signature |
 | quorum_numbers | [uint32](#uint32) | repeated | Relevant quorum numbers for the attestation |
+
+
+
+
+
+
+<a name="disperser-v2-BinRecord"></a>
+
+### BinRecord
+BinRecord is the usage record of an account in a bin. The API should return the active bin 
+record and the subsequent two records that contains potential overflows.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| index | [uint32](#uint32) |  |  |
+| usage | [uint64](#uint64) |  |  |
 
 
 
@@ -160,6 +182,79 @@ BlobVerificationInfo is the information needed to verify the inclusion of a blob
 
 
 
+<a name="disperser-v2-GetPaymentStateReply"></a>
+
+### GetPaymentStateReply
+GetPaymentStateReply contains the payment state of an account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
+| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
+| cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
+| onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateRequest"></a>
+
+### GetPaymentStateRequest
+GetPaymentStateRequest contains parameters to query the payment state of an account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  |  |
+| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a bin index or a nonce to mitigate signature replay attacks |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentGlobalParams"></a>
+
+### PaymentGlobalParams
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| global_symbols_per_second | [uint64](#uint64) |  |  |
+| min_num_symbols | [uint32](#uint32) |  |  |
+| price_per_symbol | [uint32](#uint32) |  |  |
+| reservation_window | [uint32](#uint32) |  |  |
+| on_demand_quorum_numbers | [uint32](#uint32) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-Reservation"></a>
+
+### Reservation
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| symbols_per_second | [uint64](#uint64) |  |  |
+| start_timestamp | [uint32](#uint32) |  |  |
+| end_timestamp | [uint32](#uint32) |  |  |
+| quorum_numbers | [uint32](#uint32) | repeated |  |
+| quorum_split | [uint32](#uint32) | repeated |  |
+
+
+
+
+
+
 <a name="disperser-v2-SignedBatch"></a>
 
 ### SignedBatch
@@ -217,6 +312,7 @@ Disperser defines the public APIs for dispersing blobs.
 | DisperseBlob | [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest) | [DisperseBlobReply](#disperser-v2-DisperseBlobReply) | DisperseBlob accepts blob to disperse from clients. This executes the dispersal asynchronously, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob. |
 | GetBlobStatus | [BlobStatusRequest](#disperser-v2-BlobStatusRequest) | [BlobStatusReply](#disperser-v2-BlobStatusReply) | GetBlobStatus is meant to be polled for the blob status. |
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. |
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account. |
 
  
 

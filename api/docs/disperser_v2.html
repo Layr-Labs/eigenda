@@ -183,6 +183,10 @@
                 </li>
               
                 <li>
+                  <a href="#disperser.v2.BinRecord"><span class="badge">M</span>BinRecord</a>
+                </li>
+              
+                <li>
                   <a href="#disperser.v2.BlobCommitmentReply"><span class="badge">M</span>BlobCommitmentReply</a>
                 </li>
               
@@ -208,6 +212,22 @@
               
                 <li>
                   <a href="#disperser.v2.DisperseBlobRequest"><span class="badge">M</span>DisperseBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateReply"><span class="badge">M</span>GetPaymentStateReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateRequest"><span class="badge">M</span>GetPaymentStateRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentGlobalParams"><span class="badge">M</span>PaymentGlobalParams</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.Reservation"><span class="badge">M</span>Reservation</a>
                 </li>
               
                 <li>
@@ -283,6 +303,37 @@
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
                   <td><p>Relevant quorum numbers for the attestation </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BinRecord">BinRecord</h3>
+        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>usage</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -507,6 +558,194 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
 
         
       
+        <h3 id="disperser.v2.GetPaymentStateReply">GetPaymentStateReply</h3>
+        <p>GetPaymentStateReply contains the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payment_global_params</td>
+                  <td><a href="#disperser.v2.PaymentGlobalParams">PaymentGlobalParams</a></td>
+                  <td></td>
+                  <td><p>global payment vault parameters </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bin_records</td>
+                  <td><a href="#disperser.v2.BinRecord">BinRecord</a></td>
+                  <td>repeated</td>
+                  <td><p>off-chain account reservation usage records </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation</td>
+                  <td><a href="#disperser.v2.Reservation">Reservation</a></td>
+                  <td></td>
+                  <td><p>on-chain account reservation setting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>off-chain on-demand payment usage </p></td>
+                </tr>
+              
+                <tr>
+                  <td>onchain_cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>on-chain on-demand payment deposited </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</h3>
+        <p>GetPaymentStateRequest contains parameters to query the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Signature over the account ID
+TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentGlobalParams">PaymentGlobalParams</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>global_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>min_num_symbols</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>price_per_symbol</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_window</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.Reservation">Reservation</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>start_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_split</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="disperser.v2.SignedBatch">SignedBatch</h3>
         <p>SignedBatch is a batch of blobs with a signature.</p>
 
@@ -623,6 +862,13 @@ processing status of the blob.</p></td>
                 <td><a href="#disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</a></td>
                 <td><a href="#disperser.v2.BlobCommitmentReply">BlobCommitmentReply</a></td>
                 <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetPaymentState</td>
+                <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
+                <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
+                <td><p>GetPaymentState is a utility method to get the payment state of a given account.</p></td>
               </tr>
             
           </tbody>
