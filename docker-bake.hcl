@@ -44,7 +44,8 @@ group "all" {
     "churner",
     "dataapi",
     "traffic-generator",
-    "controller"
+    "controller",
+    "relay"
   ]
 }
 
@@ -67,7 +68,8 @@ group "ci-release" {
     "retriever",
     "churner",
     "dataapi",
-    "controller"
+    "controller",
+    "relay"
   ]
 }
 
@@ -82,7 +84,8 @@ group "internal-release" {
     "churner-internal",
     "dataapi-internal",
     "traffic-generator-internal",
-    "controller-internal"
+    "controller-internal",
+    "relay-internal"
   ]
 }
 
@@ -211,6 +214,22 @@ target "traffic-generator2-internal" {
     "${REGISTRY}/eigenda-traffic-generator2:${BUILD_TAG}",
     "${REGISTRY}/eigenda-traffic-generator2:${GIT_SHA}",
     "${REGISTRY}/eigenda-traffic-generator2:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "relay" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "relay"
+  tags       = ["${REGISTRY}/${REPO}/relay:${BUILD_TAG}"]
+}
+
+target "relay-internal" {
+  inherits = ["relay"]
+  tags     = [
+    "${REGISTRY}/eigenda-relay:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-relay:${GIT_SHA}",
+    "${REGISTRY}/eigenda-relay:sha-${GIT_SHORT_SHA}"
   ]
 }
 
