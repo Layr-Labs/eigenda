@@ -122,10 +122,10 @@ type Reader interface {
 	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
 
 	// GetRelayURL returns the relay URL address for the given key.
-	GetRelayURL(ctx context.Context, key uint16) (string, error)
+	GetRelayURL(ctx context.Context, key uint32) (string, error)
 
 	// GetRelayURLs returns the relay URL addresses for all relays.
-	GetRelayURLs(ctx context.Context) (map[uint16]string, error)
+	GetRelayURLs(ctx context.Context) (map[uint32]string, error)
 }
 
 type Writer interface {

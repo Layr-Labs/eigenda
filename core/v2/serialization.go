@@ -184,7 +184,7 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		},
 		{
 			Name: "relayKeys",
-			Type: "uint16[]",
+			Type: "uint32[]",
 		},
 	})
 	if err != nil {
