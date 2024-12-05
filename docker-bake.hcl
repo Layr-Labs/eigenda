@@ -43,7 +43,8 @@ group "all" {
     "retriever",
     "churner",
     "dataapi",
-    "traffic-generator"
+    "traffic-generator",
+    "controller"
   ]
 }
 
@@ -65,7 +66,8 @@ group "ci-release" {
     "encoder",
     "retriever",
     "churner",
-    "dataapi"
+    "dataapi",
+    "controller"
   ]
 }
 
@@ -79,7 +81,8 @@ group "internal-release" {
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
-    "traffic-generator-internal"
+    "traffic-generator-internal",
+    "controller-internal"
   ]
 }
 
@@ -224,6 +227,21 @@ target "dataapi-internal" {
     "${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
     "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
     "${REGISTRY}/eigenda-dataapi:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "controller" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/controller:${BUILD_TAG}"]
+}
+
+target "controller-internal" {
+  inherits = ["controller"]
+  tags     = [
+    "${REGISTRY}/eigenda-controller:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-controller:${GIT_SHA}",
+    "${REGISTRY}/eigenda-controller:sha-${GIT_SHORT_SHA}"
   ]
 }
 
