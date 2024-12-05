@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -39,15 +40,17 @@ var (
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName = "test-BlobMetadata"
-	bucketTableName   = "test-BucketStore"
-	logger            logging.Logger
-	ethClient         common.EthClient
-	rpcClient         common.RPCEthClient
-	mockRollup        *rollupbindings.ContractMockRollup
-	retrievalClient   clients.RetrievalClient
-	numConfirmations  int = 3
-	numRetries            = 0
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
+	logger              logging.Logger
+	ethClient           common.EthClient
+	rpcClient           common.RPCEthClient
+	mockRollup          *rollupbindings.ContractMockRollup
+	retrievalClient     clients.RetrievalClient
+	numConfirmations    int = 3
+	numRetries              = 0
+	relays                  = map[corev2.RelayKey]string{}
 
 	cancel context.CancelFunc
 )
@@ -91,9 +94,8 @@ var _ = BeforeSuite(func() {
 			dockertestPool = pool
 			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, "")
+			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
 			Expect(err).To(BeNil())
-
 		} else {
 			fmt.Println("Using in-memory Blob Store")
 		}
@@ -109,29 +111,35 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
 
+		loggerConfig := common.DefaultLoggerConfig()
+		logger, err = common.NewLogger(loggerConfig)
+		Expect(err).To(BeNil())
+
+		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+		pk = strings.TrimPrefix(pk, "0x")
+		pk = strings.TrimPrefix(pk, "0X")
+		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+			RPCURLs:          []string{testConfig.Deployers[0].RPC},
+			PrivateKeyString: pk,
+			NumConfirmations: numConfirmations,
+			NumRetries:       numRetries,
+		}, gcommon.Address{}, logger)
+		Expect(err).To(BeNil())
+		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		Expect(err).To(BeNil())
+
+		// set up thresholds and relay addresses
+		fmt.Println("Registering blob versions and relays")
+		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
+
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
-	}
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err = common.NewLogger(loggerConfig)
-	Expect(err).To(BeNil())
 
-	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
-	ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: numConfirmations,
-		NumRetries:       numRetries,
-	}, gcommon.Address{}, logger)
-	Expect(err).To(BeNil())
-	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
-	Expect(err).To(BeNil())
-	mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
-	Expect(err).To(BeNil())
-	err = setupRetrievalClient(testConfig)
-	Expect(err).To(BeNil())
+		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+		Expect(err).To(BeNil())
+		err = setupRetrievalClient(testConfig)
+		Expect(err).To(BeNil())
+	}
 })
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
@@ -209,8 +217,9 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
-
-		cancel()
+		if cancel != nil {
+			cancel()
+		}
 
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()

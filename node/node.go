@@ -276,6 +276,7 @@ func NewNode(
 			return nil, fmt.Errorf("failed to get relay URLs: %w", err)
 		}
 
+		logger.Info("Creating relay client", "relayURLs", relayURLs)
 		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
 			Sockets:           relayURLs,
 			UseSecureGrpcFlag: config.UseSecureGrpc,

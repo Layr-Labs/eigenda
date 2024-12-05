@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,14 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/Layr-Labs/eigenda/common"
+	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
+	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -20,6 +28,7 @@ const (
 	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
 	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
 	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
+	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
 )
 
 func (env *Config) getKeyString(name string) string {
@@ -150,6 +159,64 @@ func (env *Config) DeployExperiment() {
 	env.GenerateAllVariables()
 
 	fmt.Println("Test environment has successfully deployed!")
+}
+
+func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint16]string {
+	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	contractThresholdRegistry, err := thresholdreg.NewContractEigenDAThresholdRegistry(thresholdRegistryAddr, ethClient)
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	opts, err := ethClient.GetNoSendTransactOpts()
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	for _, blobVersionParam := range env.BlobVersionParams {
+		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.VersionedBlobParams{
+			MaxNumOperators: blobVersionParam.MaxNumOperators,
+			NumChunks:       blobVersionParam.NumChunks,
+			CodingRate:      uint8(blobVersionParam.CodingRate),
+		})
+		if err != nil {
+			log.Panicf("Error: %s", err)
+		}
+		err = ethClient.SendTransaction(context.Background(), txn)
+		if err != nil {
+			log.Panicf("Error: %s", err)
+		}
+	}
+
+	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	contractRelayRegistry, err := relayreg.NewContractEigenDARelayRegistry(relayAddr, ethClient)
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	relays := map[uint16]string{}
+	for i, relayVars := range env.Relays {
+		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
+		txn, err := contractRelayRegistry.AddRelayURL(opts, gcommon.Address{0}, url)
+		if err != nil {
+			log.Panicf("Error: %s", err)
+		}
+		err = ethClient.SendTransaction(context.Background(), txn)
+		if err != nil {
+			log.Panicf("Error: %s", err)
+		}
+		relays[uint16(i)] = url
+	}
+
+	return relays
 }
 
 // TODO: Supply the test path to the runner utility

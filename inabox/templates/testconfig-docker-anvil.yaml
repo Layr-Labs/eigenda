@@ -12,6 +12,11 @@ deployers:
 eigenda:
   deployer: "default"
 
+blobVersions:
+  - codingRate: 8
+    numChunks: 8192
+    maxNumOperators: 3537
+
 privateKeys:
   ecdsaMap:
     default:
@@ -29,8 +34,8 @@ telemetry:
 
 services:
   counts:
-    dispersers: 1
     operators: 4
+    relays: 4
   stakes:
     total: 100e18
     distribution: [1.3, 2, 3, 5]
@@ -41,13 +46,13 @@ services:
       TIMEOUT: 20s
       CHAIN_RPC: http://172.17.0.1:8545
       CHAIN_ID: 40525
-      G1_PATH: /data/kzg/g1.point
-      G2_PATH: /data/kzg/g2.point
-      G2_POWER_OF_2_PATH: resources/kzg/g2.point.powerOf2
+      G1_PATH: /data/kzg/g1.point.300000
+      G2_PATH: /data/kzg/g2.point.300000
+      G2_POWER_OF_2_PATH: resources/kzg/g2.point.300000.powerOf2
       CACHE_PATH: /data/kzg/SRSTables
-      SRS_ORDER: 3000
-      SRS_LOAD: 2000
-      CHALLENGE_ORDER: 3000
+      SRS_ORDER: 10000
+      SRS_LOAD: 10000
+      CHALLENGE_ORDER: 10000
       LOG_LEVEL: "debug"
       LOG_FORMAT: "text"
       VERBOSE: true

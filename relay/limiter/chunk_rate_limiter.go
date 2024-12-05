@@ -2,10 +2,11 @@ package limiter
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/relay/metrics"
-	"golang.org/x/time/rate"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/relay/metrics"
+	"golang.org/x/time/rate"
 )
 
 // ChunkRateLimiter enforces rate limits on GetChunk operations.
