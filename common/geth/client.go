@@ -231,7 +231,7 @@ func (c *EthClient) EnsureTransactionEvaled(ctx context.Context, tx *types.Trans
 		c.Logger.Error("Transaction Failed", "tag", tag, "txHash", tx.Hash().Hex(), "status", receipt.Status, "GasUsed", receipt.GasUsed)
 		return nil, ErrTransactionFailed
 	}
-	c.Logger.Debug("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed)
+	c.Logger.Debug("transaction confirmed", "txHash", tx.Hash().Hex(), "tag", tag, "gasUsed", receipt.GasUsed, "blockNumber", receipt.BlockNumber)
 	return receipt, nil
 }
 
