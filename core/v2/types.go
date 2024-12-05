@@ -111,7 +111,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 
 	paymentMetadata := core.PaymentMetadata{
 		AccountID:         proto.GetPaymentHeader().GetAccountId(),
-		BinIndex:          proto.GetPaymentHeader().GetBinIndex(),
+		ReservationPeriod: proto.GetPaymentHeader().GetReservationPeriod(),
 		CumulativePayment: new(big.Int).SetBytes(proto.GetPaymentHeader().GetCumulativePayment()),
 	}
 

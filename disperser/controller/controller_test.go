@@ -172,7 +172,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          uint32(binIndex.Int64()),
+			ReservationPeriod: uint32(binIndex.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
 		Signature: sig,

@@ -250,8 +250,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
-	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
-	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentBinIndex)
+	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
+	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}

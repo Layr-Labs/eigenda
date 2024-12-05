@@ -156,7 +156,7 @@ type PaymentHeader struct {
 	unknownFields protoimpl.UnknownFields
 
 	AccountId         string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	BinIndex          uint32 `protobuf:"varint,2,opt,name=bin_index,json=binIndex,proto3" json:"bin_index,omitempty"`
+	ReservationPeriod          uint32 `protobuf:"varint,2,opt,name=bin_index,json=binIndex,proto3" json:"bin_index,omitempty"`
 	CumulativePayment []byte `protobuf:"bytes,3,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 }
 
@@ -199,9 +199,9 @@ func (x *PaymentHeader) GetAccountId() string {
 	return ""
 }
 
-func (x *PaymentHeader) GetBinIndex() uint32 {
+func (x *PaymentHeader) GetReservationPeriod() uint32 {
 	if x != nil {
-		return x.BinIndex
+		return x.ReservationPeriod
 	}
 	return 0
 }
