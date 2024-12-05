@@ -10,12 +10,15 @@ import (
 
 var (
 	// 503 error type informing rollup to failover to other DA location
-	ErrServiceUnavailable = fmt.Errorf("eigenda service is unavailable")
+	ErrServiceUnavailable = fmt.Errorf("eigenda service is temporarily unavailable")
 )
 
-// TODO: Add support for custom http client option
 type Config struct {
-	URL string
+	URL string // EigenDA proxy REST API URL
+}
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // SimpleCommitmentClient implements a simple client for the eigenda-proxy
@@ -25,14 +28,30 @@ type Config struct {
 // so clients wanting to send op commitment mode data should use that client.
 type SimpleCommitmentClient struct {
 	cfg        *Config
-	httpClient *http.Client
+	httpClient HTTPClient
 }
 
-func New(cfg *Config) *SimpleCommitmentClient {
-	return &SimpleCommitmentClient{
+type SimpleClientOption func(scc *SimpleCommitmentClient)
+
+// WithHTTPClient ... Embeds custom http client type
+func WithHTTPClient(client HTTPClient) SimpleClientOption {
+	return func(scc *SimpleCommitmentClient) {
+		scc.httpClient = client
+	}
+}
+
+// New ... Constructor
+func New(cfg *Config, opts ...SimpleClientOption) *SimpleCommitmentClient {
+	scc := &SimpleCommitmentClient{
 		cfg,
 		http.DefaultClient,
 	}
+
+	for _, opt := range opts {
+		opt(scc)
+	}
+
+	return scc
 }
 
 // Health indicates if the server is operational; useful for event based awaits
@@ -80,7 +99,7 @@ func (c *SimpleCommitmentClient) GetData(ctx context.Context, comm []byte) ([]by
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received error response, code=%d, msg = %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf("received error response when reading from eigenda-proxy, code=%d, msg = %s", resp.StatusCode, string(b))
 	}
 
 	return b, nil
@@ -106,16 +125,17 @@ func (c *SimpleCommitmentClient) SetData(ctx context.Context, b []byte) ([]byte,
 		return nil, err
 	}
 
+	// failover signal
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		return nil, ErrServiceUnavailable
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to store data: %v, err = %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf("received error response when dispersing to eigenda-proxy, code=%d, err = %s", resp.StatusCode, string(b))
 	}
 
 	if len(b) == 0 {
-		return nil, fmt.Errorf("read certificate is empty")
+		return nil, fmt.Errorf("received an empty certificate")
 	}
 
 	return b, err
