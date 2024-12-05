@@ -50,7 +50,6 @@ type Reader struct {
 }
 
 var _ core.Reader = (*Reader)(nil)
-var socketRegisterEnabled = false
 
 func NewReader(
 	logger logging.Logger,
@@ -170,13 +169,12 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	}
 
 	var contractSocketRegistry *socketreg.ContractSocketRegistry
-	if socketRegisterEnabled {
-		socketRegistryAddr, err := contractIRegistryCoordinator.SocketRegistry(&bind.CallOpts{})
-		if err != nil {
-			t.logger.Error("Failed to fetch SocketRegistry address", "err", err)
-			return err
-		}
-
+	socketRegistryAddr, err := contractIRegistryCoordinator.SocketRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Warn("Failed to fetch SocketRegistry address", "err", err)
+		// TODO: don't panic until there is socket registry deployment
+		// return err
+	} else {
 		contractSocketRegistry, err = socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
 		if err != nil {
 			t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
@@ -697,7 +695,7 @@ func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
-	if !socketRegisterEnabled {
+	if t.bindings.SocketRegistry == nil {
 		return "", errors.New("socket registry not enabled")
 	}
 	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
