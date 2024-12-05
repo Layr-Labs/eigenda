@@ -35,7 +35,7 @@ type disperserClientV2 struct {
 	conn       *grpc.ClientConn
 	client     disperser_rpc.DisperserClient
 	prover     encoding.Prover
-	accountant *accountant
+	accountant *Accountant
 }
 
 var _ DisperserClientV2 = &disperserClientV2{}
@@ -60,7 +60,7 @@ var _ DisperserClientV2 = &disperserClientV2{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *accountant) (*disperserClientV2, error) {
+func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClientV2, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
