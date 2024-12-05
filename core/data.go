@@ -507,7 +507,7 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "binIndex",
+			Name: "reservationPeriod",
 			Type: "uint32",
 		},
 		{
@@ -561,11 +561,11 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
 	}
 	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
-	binIndex, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
+	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
 	if err != nil {
 		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
-	pm.ReservationPeriod = uint32(binIndex)
+	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
 	return nil
 }
