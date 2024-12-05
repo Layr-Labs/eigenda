@@ -112,9 +112,9 @@ type Stakes struct {
 
 type ServicesSpec struct {
 	Counts struct {
-		NumDis              int `yaml:"dispersers"`
 		NumOpr              int `yaml:"operators"`
 		NumMaxOperatorCount int `yaml:"maxOperatorCount"`
+		NumRelays           int `yaml:"relays"`
 	} `yaml:"counts"`
 	Stakes    []Stakes  `yaml:"stakes"`
 	BasePort  int       `yaml:"basePort"`
@@ -130,6 +130,12 @@ type KeyInfo struct {
 	Password string `yaml:"password"`
 	// The file path to the encrypted private key.
 	KeyFile string `yaml:"keyFile"`
+}
+
+type BlobVersionParam struct {
+	CodingRate      uint32 `yaml:"codingRate"`
+	MaxNumOperators uint32 `yaml:"maxNumOperators"`
+	NumChunks       uint32 `yaml:"numChunks"`
 }
 
 type PkConfig struct {
@@ -156,8 +162,9 @@ type Config struct {
 
 	Deployers []*ContractDeployer `yaml:"deployers"`
 
-	EigenDA    EigenDAContract `yaml:"eigenda"`
-	MockRollup string          `yaml:"mockRollup" json:"mockRollup"`
+	EigenDA           EigenDAContract     `yaml:"eigenda"`
+	BlobVersionParams []*BlobVersionParam `yaml:"blobVersions"`
+	MockRollup        string              `yaml:"mockRollup" json:"mockRollup"`
 
 	Pks *PkConfig `yaml:"privateKeys"`
 
@@ -172,6 +179,8 @@ type Config struct {
 	Operators  []OperatorVars
 	Stakers    []Staker
 	Retriever  RetrieverVars
+	Controller ControllerVars
+	Relays     []RelayVars
 }
 
 func (c Config) IsEigenDADeployed() bool {

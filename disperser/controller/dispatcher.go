@@ -242,6 +242,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
 
+	d.logger.Debug("got new metadatas to make batch", "numBlobs", len(blobMetadatas))
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
 	}
@@ -269,7 +270,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	if len(certs) != len(keys) {
-		return nil, fmt.Errorf("blob certificates not found for all blob keys")
+		return nil, fmt.Errorf("blob certificates (%d) not found for all blob keys (%d)", len(certs), len(keys))
 	}
 
 	certsMap := make(map[corev2.BlobKey]*corev2.BlobCertificate, len(certs))
@@ -353,6 +354,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		d.cursor = cursor
 	}
 
+	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
 		Batch: &corev2.Batch{
 			BatchHeader:      batchHeader,

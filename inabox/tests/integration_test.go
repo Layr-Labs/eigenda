@@ -67,8 +67,8 @@ var _ = Describe("Inabox Integration", func() {
 
 		var reply1 *disperserpb.BlobStatusReply
 		var reply2 *disperserpb.BlobStatusReply
-	loop:
-		for {
+
+		for loop := true; loop; {
 			select {
 			case <-ctx.Done():
 				Fail("timed out")
@@ -114,7 +114,7 @@ var _ = Describe("Inabox Integration", func() {
 				mineAnvilBlocks(numConfirmations + 1)
 				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
 				Expect(err).To(BeNil())
-				break loop
+				loop = false
 			}
 		}
 		Expect(*blobStatus1).To(Equal(disperser.Confirmed))

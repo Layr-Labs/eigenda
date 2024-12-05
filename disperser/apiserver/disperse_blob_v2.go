@@ -115,9 +115,10 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
-		return api.NewErrorInvalidArg("invalid payment metadata")
-	}
+	// TODO(ian-shim): enable this check when we have payment metadata + authentication in disperser client
+	// if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	// 	return api.NewErrorInvalidArg("invalid payment metadata")
+	// }
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)
 	if err != nil {
