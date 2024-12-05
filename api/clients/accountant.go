@@ -111,14 +111,14 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
-	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
 	}
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		ReservationPeriod: binIndex,
+		ReservationPeriod: reservationPeriod,
 		CumulativePayment: cumulativePayment,
 		Salt:              salt,
 	}

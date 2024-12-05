@@ -280,7 +280,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	for i, v := range reservation.QuorumNumbers {
 		quorumNumbers[i] = uint32(v)
 	}
-
 	quorumSplits := make([]uint32, len(reservation.QuorumSplits))
 	for i, v := range reservation.QuorumSplits {
 		quorumSplits[i] = uint32(v)
@@ -293,8 +292,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   uint32(reservation.StartTimestamp),
 			EndTimestamp:     uint32(reservation.EndTimestamp),
-			QuorumNumbers:    quorumNumbers,
 			QuorumSplits:     quorumSplits,
+			QuorumNumbers:    quorumNumbers,
 		},
 		CumulativePayment:        largestCumulativePayment.Bytes(),
 		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),

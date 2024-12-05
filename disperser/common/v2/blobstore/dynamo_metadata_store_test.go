@@ -223,14 +223,14 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, certs, numCerts)
 	assert.Len(t, fragmentInfos, numCerts)
-	binIndexes := make(map[uint32]struct{})
+	reservationPeriodes := make(map[uint32]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
-		binIndexes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
+		reservationPeriodes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
 	}
-	assert.Len(t, binIndexes, numCerts)
+	assert.Len(t, reservationPeriodes, numCerts)
 	for i := 0; i < numCerts; i++ {
-		assert.Contains(t, binIndexes, uint32(i))
+		assert.Contains(t, reservationPeriodes, uint32(i))
 	}
 
 	deleteItems(t, []commondynamodb.Key{
@@ -502,7 +502,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	binIndex, err := rand.Int(rand.Reader, big.NewInt(256))
+	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
@@ -515,7 +515,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(binIndex.Int64()),
+			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
 		Signature: sig,

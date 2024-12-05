@@ -133,13 +133,13 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 
 	// handle payments and check rate limits
 	if blobHeaderProto.GetPaymentHeader() != nil {
-		binIndex := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
+		reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
 		cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 		accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 
 		paymentHeader := core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: binIndex,
+			ReservationPeriod: reservationPeriod,
 			CumulativePayment: cumulativePayment,
 		}
 
