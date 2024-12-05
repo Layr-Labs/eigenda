@@ -20,6 +20,7 @@ message BlobCommitment {
 
 message PaymentHeader {
   string account_id = 1;
-  uint32 bin_index = 2;
+  uint32 reservation_period = 2;
   bytes cumulative_payment = 3;
+  uint32 salt = 4;
 }

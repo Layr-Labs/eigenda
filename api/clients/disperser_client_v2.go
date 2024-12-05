@@ -23,7 +23,7 @@ type DisperserClientV2Config struct {
 
 type DisperserClientV2 interface {
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID, salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
@@ -114,6 +114,7 @@ func (c *disperserClientV2) DisperseBlob(
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
+	salt uint32,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
@@ -128,7 +129,7 @@ func (c *disperserClientV2) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
