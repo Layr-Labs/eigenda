@@ -26,26 +26,61 @@ done
 # Sort the proto files alphabetically. Required for deterministic output.
 IFS=$'\n' PROTO_FILES=($(sort <<<"${PROTO_FILES[*]}")); unset IFS
 
-# Generate HTML doc
+# Generate unified HTML doc
+echo "Generating unified HTML documentation..."
 docker run --rm \
   -v "${DOCS_DIR}":/out \
   -v "${PROTO_DIR}":/protos \
   pseudomuto/protoc-gen-doc \
   "${PROTO_FILES[@]}" \
-  --doc_opt=html,eigenda-protos.html
+  --doc_opt=html,eigenda-protos.html 2>/dev/null
 
 if [ $? -ne 0 ]; then
+  echo "Failed to generate unified HTML documentation."
   exit 1
 fi
 
-# Generate markdown doc
+# Generate unified markdown doc
+echo "Generating unified markdown documentation..."
 docker run --rm \
   -v "${DOCS_DIR}":/out \
   -v "${PROTO_DIR}":/protos \
   pseudomuto/protoc-gen-doc \
   "${PROTO_FILES[@]}" \
-  --doc_opt=markdown,eigenda-protos.md
+  --doc_opt=markdown,eigenda-protos.md 2>/dev/null
 
 if [ $? -ne 0 ]; then
+  echo "Failed to generate unified markdown documentation."
   exit 1
 fi
+
+# Generate individual markdown/HTML docs
+for PROTO_FILE in "${PROTO_FILES[@]}"; do
+  PROTO_NAME=$(basename "${PROTO_FILE}" .proto)
+
+  echo "Generating markdown documentation for ${PROTO_NAME}..."
+  docker run --rm \
+    -v "${DOCS_DIR}":/out \
+    -v "${PROTO_DIR}":/protos \
+    pseudomuto/protoc-gen-doc \
+    "${PROTO_FILE}" \
+    --doc_opt=markdown,"${PROTO_NAME}.md" 2>/dev/null
+
+  if [ $? -ne 0 ]; then
+    echo "Failed to generate documentation for ${PROTO_NAME}."
+    exit 1
+  fi
+
+  echo "Generating HTML documentation for ${PROTO_NAME}..."
+  docker run --rm \
+    -v "${DOCS_DIR}":/out \
+    -v "${PROTO_DIR}":/protos \
+    pseudomuto/protoc-gen-doc \
+    "${PROTO_FILE}" \
+    --doc_opt=html,"${PROTO_NAME}.html" 2>/dev/null
+
+  if [ $? -ne 0 ]; then
+    echo "Failed to generate documentation for ${PROTO_NAME}."
+    exit 1
+  fi
+done
