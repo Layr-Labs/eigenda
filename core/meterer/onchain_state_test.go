@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	dummyActiveReservation = core.ActiveReservation{
+	dummyActiveReservation = &core.ActiveReservation{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
 		QuorumSplits:     []byte{50, 50},
 	}
-	dummyOnDemandPayment = core.OnDemandPayment{
+	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 )
