@@ -197,6 +197,12 @@ func (t *MockWriter) GetRequiredQuorumNumbers(ctx context.Context, blockNumber u
 	return result.([]uint8), args.Error(1)
 }
 
+func (t *MockWriter) GetNumBlobVersions(ctx context.Context) (uint16, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(uint16), args.Error(1)
+}
+
 func (t *MockWriter) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
 	args := t.Called()
 	if args.Get(0) == nil {
@@ -249,6 +255,12 @@ func (t *MockWriter) GetOperatorSocket(ctx context.Context, operatorID core.Oper
 	args := t.Called()
 	result := args.Get(0)
 	return result.(string), args.Error(1)
+}
+
+func (t *MockWriter) GetNumRelays(ctx context.Context) (uint32, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(uint32), args.Error(1)
 }
 
 func (t *MockWriter) GetRelayURL(ctx context.Context, key uint32) (string, error) {
