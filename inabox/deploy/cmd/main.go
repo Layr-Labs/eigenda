@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,13 +15,15 @@ var (
 	localstackFlagName      = "localstack-port"
 	deployResourcesFlagName = "deploy-resources"
 
-	metadataTableName = "test-BlobMetadata"
-	bucketTableName   = "test-BucketStore"
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
 
-	chainCmdName      = "chain"
-	localstackCmdName = "localstack"
-	expCmdName        = "exp"
-	allCmdName        = "all"
+	chainCmdName       = "chain"
+	localstackCmdName  = "localstack"
+	expCmdName         = "exp"
+	generateEnvCmdName = "env"
+	allCmdName         = "all"
 )
 
 func main() {
@@ -67,6 +68,11 @@ func main() {
 				Action: getRunner(expCmdName),
 			},
 			{
+				Name:   generateEnvCmdName,
+				Usage:  "generate the environment variables for the inabox test",
+				Action: getRunner(generateEnvCmdName),
+			},
+			{
 				Name:   allCmdName,
 				Usage:  "deploy all infra, resources, contracts",
 				Action: getRunner(allCmdName),
@@ -106,6 +112,8 @@ func getRunner(command string) func(ctx *cli.Context) error {
 			return localstack(ctx)
 		case expCmdName:
 			config.DeployExperiment()
+		case generateEnvCmdName:
+			config.GenerateAllVariables()
 		case allCmdName:
 			return all(ctx, config)
 		}
@@ -121,7 +129,6 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 	config.StartAnvil()
 
 	if deployer, ok := config.GetDeployer(config.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
-		fmt.Println("Starting graph node")
 		config.StartGraphNode()
 	}
 
@@ -130,14 +137,12 @@ func chainInfra(ctx *cli.Context, config *deploy.Config) error {
 }
 
 func localstack(ctx *cli.Context) error {
-
 	pool, _, err := deploy.StartDockertestWithLocalstackContainer(ctx.String(localstackFlagName))
 	if err != nil {
 		return err
 	}
-
 	if ctx.Bool(deployResourcesFlagName) {
-		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName, "")
+		return deploy.DeployResources(pool, ctx.String(localstackFlagName), metadataTableName, bucketTableName, metadataTableNameV2)
 	}
 
 	return nil

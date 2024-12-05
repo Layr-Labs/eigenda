@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -15,6 +16,8 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
 var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
@@ -246,6 +249,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, errNoBlobsToDispatch
 	}
 
+	d.logger.Debug("got new metadatas to make batch", "numBlobs", len(blobMetadatas))
+
 	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state: %w", err)
@@ -269,7 +274,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	if len(certs) != len(keys) {
-		return nil, fmt.Errorf("blob certificates not found for all blob keys")
+		return nil, fmt.Errorf("blob certificates (%d) not found for all blob keys (%d)", len(certs), len(keys))
 	}
 
 	certsMap := make(map[corev2.BlobKey]*corev2.BlobCertificate, len(certs))
@@ -289,6 +294,13 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			return nil, fmt.Errorf("blob certificate not found for blob key %s", key.Hex())
 		}
 		certs[i] = c
+
+		// DEBUG
+		certHash, err := c.Hash()
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute blob certificate hash: %w", err)
+		}
+		d.logger.Debug("cert hash", "blobKey", key.Hex(), "certHash", hex.EncodeToString(certHash[:]))
 	}
 
 	batchHeader := &corev2.BatchHeader{
@@ -336,6 +348,22 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			BlobIndex:      uint32(i),
 			InclusionProof: core.SerializeMerkleProof(merkleProof),
 		}
+
+		// DEBUG
+		serialized := core.SerializeMerkleProof(merkleProof)
+		certHash, err := cert.Hash()
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute blob certificate hash: %w", err)
+		}
+		deserialized, err := core.DeserializeMerkleProof(serialized, uint64(i))
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize merkle proof: %w", err)
+		}
+		verified, err := merkletree.VerifyProofUsing(certHash[:], false, deserialized, [][]byte{tree.Root()}, keccak256.New())
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify proof: %w", err)
+		}
+		d.logger.Debug("verified proof", "blobKey", blobKey.Hex(), "blobIndex", i, "certHash", hex.EncodeToString(certHash[:]), "verified", verified)
 	}
 
 	verificationInfos := make([]*corev2.BlobVerificationInfo, len(verificationInfoMap))
@@ -353,6 +381,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		d.cursor = cursor
 	}
 
+	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
 		Batch: &corev2.Batch{
 			BatchHeader:      batchHeader,

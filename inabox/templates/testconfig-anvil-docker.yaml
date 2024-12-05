@@ -22,9 +22,9 @@ privateKeys:
 
 services:
   counts:
-    dispersers: 1
     operators: 4
     maxOperatorCount: 3
+    relays: 4
   stakes:
     - total: 100e18
       distribution: [1, 4, 6, 10]

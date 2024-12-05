@@ -151,6 +151,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return fmt.Errorf("blob version parameters is nil")
 	}
 
+	e.logger.Debug("request encoding", "numBlobs", len(blobMetadatas))
 	for _, blob := range blobMetadatas {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
@@ -168,6 +169,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		// Encode the blobs
 		e.pool.Submit(func() {
 			for i := 0; i < e.NumEncodingRetries+1; i++ {
+				e.logger.Debug("encoding blob", "blobKey", blobKey.Hex())
 				encodingCtx, cancel := context.WithTimeout(ctx, e.EncodingRequestTimeout)
 				fragmentInfo, err := e.encodeBlob(encodingCtx, blobKey, blob, blobParams)
 				cancel()
@@ -175,6 +177,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to encode blob", "blobKey", blobKey.Hex(), "err", err)
 					continue
 				}
+				e.logger.Debug("successfully encoded blob", "blobKey", blobKey.Hex(), "fragmentInfo", fragmentInfo)
 				relayKeys, err := GetRelayKeys(e.NumRelayAssignment, e.AvailableRelays)
 				if err != nil {
 					e.logger.Error("failed to get relay keys", "err", err)
@@ -190,8 +193,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				err = e.blobMetadataStore.PutBlobCertificate(storeCtx, cert, fragmentInfo)
 				cancel()
 				if err != nil && !errors.Is(err, dispcommon.ErrAlreadyExists) {
-					e.logger.Error("failed to put blob certificate", "err", err)
+					e.logger.Error("failed to put blob certificate", "blobKey", blobKey.Hex(), "err", err)
 					continue
+				} else if err != nil {
+					e.logger.Warn("blob certificate already exists", "blobKey", blobKey.Hex(), "err", err)
 				}
 
 				storeCtx, cancel = context.WithTimeout(ctx, e.StoreTimeout)
@@ -199,6 +204,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				cancel()
 				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
+					e.logger.Debug("successfully updated blob to encoded status", "blobKey", blobKey.Hex())
 					return
 				}
 

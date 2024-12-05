@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"time"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"time"
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.
@@ -140,6 +141,7 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 				}
 			}
 
+			m.logger.Debug("fetched metadata for blob", "blobKey", boundKey.Hex())
 			completionChannel <- &blobMetadataResult{
 				key:      boundKey,
 				metadata: metadata,
@@ -173,6 +175,7 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	}
 
 	// Retrieve the metadata from the store.
+	m.logger.Debug("fetching metadata for blob", "blobKey", key.Hex())
 	cert, fragmentInfo, err := m.metadataStore.GetBlobCertificate(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)

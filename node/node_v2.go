@@ -103,6 +103,8 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 		relayKey := relayKey
 		req := requests[relayKey]
 		pool.Submit(func() {
+			n.Logger.Info("getting chunks from relay", "relayKey", relayKey)
+			// TODO(ian-shim): add timeout
 			bundles, err := relayClient.GetChunksByRange(ctx, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)

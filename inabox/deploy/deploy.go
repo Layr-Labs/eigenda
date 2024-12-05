@@ -20,6 +20,7 @@ const (
 	batcherImage   = "ghcr.io/layr-labs/eigenda/batcher:local"
 	nodeImage      = "ghcr.io/layr-labs/eigenda/node:local"
 	retrieverImage = "ghcr.io/layr-labs/eigenda/retriever:local"
+	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
 )
 
 func (env *Config) getKeyString(name string) string {

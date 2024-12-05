@@ -112,9 +112,9 @@ type Stakes struct {
 
 type ServicesSpec struct {
 	Counts struct {
-		NumDis              int `yaml:"dispersers"`
 		NumOpr              int `yaml:"operators"`
 		NumMaxOperatorCount int `yaml:"maxOperatorCount"`
+		NumRelays           int `yaml:"relays"`
 	} `yaml:"counts"`
 	Stakes    []Stakes  `yaml:"stakes"`
 	BasePort  int       `yaml:"basePort"`
@@ -172,6 +172,8 @@ type Config struct {
 	Operators  []OperatorVars
 	Stakers    []Staker
 	Retriever  RetrieverVars
+	Controller ControllerVars
+	Relays     []RelayVars
 }
 
 func (c Config) IsEigenDADeployed() bool {
