@@ -117,6 +117,17 @@ library EigenDAHasher {
      * @param blobHeader the V2 blob header to hash
      */
     function hashBlobHeaderV2(BlobHeaderV2 memory blobHeader) internal pure returns(bytes32) {
-        return keccak256(abi.encode(blobHeader));
+        return keccak256(
+            abi.encode(
+                keccak256(
+                    abi.encode(
+                        blobHeader.version,
+                        blobHeader.quorumNumbers,
+                        blobHeader.commitment
+                    )
+                ),
+                blobHeader.paymentHeaderHash
+            )
+        );
     }
 }
