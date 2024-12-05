@@ -16,7 +16,6 @@ More on that below.
 
 The following APIs are currently experimental:
 - `disperser/v2/*`
-- `lightnode/*`
 - `node/v2/*`
 - `relay/*`
 

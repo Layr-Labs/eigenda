@@ -3,50 +3,112 @@
 
 ## Table of Contents
 
-- [retriever/retriever.proto](#retriever_retriever-proto)
-    - [BlobReply](#retriever-BlobReply)
-    - [BlobRequest](#retriever-BlobRequest)
+- [node/v2/node_v2.proto](#node_v2_node_v2-proto)
+    - [GetChunksReply](#node-v2-GetChunksReply)
+    - [GetChunksRequest](#node-v2-GetChunksRequest)
+    - [NodeInfoReply](#node-v2-NodeInfoReply)
+    - [NodeInfoRequest](#node-v2-NodeInfoRequest)
+    - [StoreChunksReply](#node-v2-StoreChunksReply)
+    - [StoreChunksRequest](#node-v2-StoreChunksRequest)
   
-    - [Retriever](#retriever-Retriever)
+    - [Dispersal](#node-v2-Dispersal)
+    - [Retrieval](#node-v2-Retrieval)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="retriever_retriever-proto"></a>
+<a name="node_v2_node_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## retriever/retriever.proto
+## node/v2/node_v2.proto
 
 
 
-<a name="retriever-BlobReply"></a>
+<a name="node-v2-GetChunksReply"></a>
 
-### BlobReply
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
-
-
-
-
-
-
-<a name="retriever-BlobRequest"></a>
-
-### BlobRequest
+### GetChunksReply
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| batch_header_hash | [bytes](#bytes) |  | The hash of the ReducedBatchHeader defined onchain, see: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43 This identifies the batch that this blob belongs to. |
-| blob_index | [uint32](#uint32) |  | Which blob in the batch this is requesting for (note: a batch is logically an ordered list of blobs). |
-| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
-| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
+| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
+
+
+
+
+
+
+<a name="node-v2-GetChunksRequest"></a>
+
+### GetChunksRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_key | [bytes](#bytes) |  |  |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
+
+
+
+
+
+
+<a name="node-v2-NodeInfoReply"></a>
+
+### NodeInfoReply
+Node info reply
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| semver | [string](#string) |  |  |
+| arch | [string](#string) |  |  |
+| os | [string](#string) |  |  |
+| num_cpu | [uint32](#uint32) |  |  |
+| mem_bytes | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="node-v2-NodeInfoRequest"></a>
+
+### NodeInfoRequest
+Node info request
+
+
+
+
+
+
+<a name="node-v2-StoreChunksReply"></a>
+
+### StoreChunksReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| signature | [bytes](#bytes) |  |  |
+
+
+
+
+
+
+<a name="node-v2-StoreChunksRequest"></a>
+
+### StoreChunksRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
 
 
 
@@ -59,26 +121,26 @@
  
 
 
-<a name="retriever-Retriever"></a>
+<a name="node-v2-Dispersal"></a>
 
-### Retriever
-The Retriever is a service for retrieving chunks corresponding to a blob from
-the EigenDA operator nodes and reconstructing the original blob from the chunks.
-This is a client-side library that the users are supposed to operationalize.
-
-Note: Users generally have two ways to retrieve a blob from EigenDA:
-  1) Retrieve from the Disperser that the user initially used for dispersal: the API
-     is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto
-  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
-
-The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the
-Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
-(the 2nd approach here) removes the need to trust the Disperser, with the downside of
-worse cost and performance.
+### Dispersal
+WARNING: the following RPCs are experimental and subject to change.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) |  |
+| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) |  |
+
+
+<a name="node-v2-Retrieval"></a>
+
+### Retrieval
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. |
+| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | Retrieve node info metadata |
 
  
 
