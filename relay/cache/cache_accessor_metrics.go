@@ -12,7 +12,6 @@ type CacheAccessorMetrics struct {
 	size             metrics.GaugeMetric
 	weight           metrics.GaugeMetric
 	averageWeight    metrics.GaugeMetric
-	lifespan         metrics.GaugeMetric
 	cacheMissLatency metrics.LatencyMetric
 }
 
@@ -56,18 +55,9 @@ func NewCacheAccessorMetrics(
 	}
 
 	averageWeight, err := server.NewGaugeMetric(
-		fmt.Sprintf("%s_cache_average", cacheName),
+		fmt.Sprintf("%s_cache_item", cacheName),
 		"weight",
-		fmt.Sprintf("Average weight of items currently in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
-
-	lifespan, err := server.NewGaugeMetric(
-		fmt.Sprintf("%s_cache_lifespan", cacheName),
-		"ms",
-		fmt.Sprintf("Time an item remains in the %s cache before being evicted.", cacheName),
+		fmt.Sprintf("Weight of each item currently in the %s cache", cacheName),
 		nil)
 	if err != nil {
 		return nil, err
@@ -90,7 +80,6 @@ func NewCacheAccessorMetrics(
 		size:             size,
 		weight:           weight,
 		averageWeight:    averageWeight,
-		lifespan:         lifespan,
 		cacheMissLatency: cacheMissLatency,
 	}, nil
 }

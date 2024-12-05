@@ -33,7 +33,8 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	for i := 0; i < dataSize; i++ {
@@ -80,7 +81,8 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	// Get the first cacheSize keys. This should fill the cache.
@@ -143,7 +145,8 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -212,7 +215,8 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -285,7 +289,8 @@ func TestConcurrencyLimiter(t *testing.T) {
 
 	cacheSize := 100
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), maxConcurrency, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, maxConcurrency, accessor, nil)
 	require.NoError(t, err)
 
 	wg := sync.WaitGroup{}
@@ -339,7 +344,8 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
@@ -427,7 +433,8 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	ca, err := NewCacheAccessor[int, *string](nil, uint64(cacheSize), 0, accessor, nil)
+	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
 	// Lock the accessor. This will cause all cache misses to block.
