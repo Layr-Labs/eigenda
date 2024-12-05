@@ -19,6 +19,8 @@ import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {ISocketRegistry, SocketRegistry} from "eigenlayer-middleware/SocketRegistry.sol";
 import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
+import {PaymentVault} from "../src/payments/PaymentVault.sol";
 
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
@@ -41,6 +43,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IStakeRegistry public stakeRegistry;
     ISocketRegistry public socketRegistry;
     OperatorStateRetriever public operatorStateRetriever;
+    IPaymentVault public paymentVault;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -48,6 +51,14 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
     ISocketRegistry public socketRegistryImplementation;
+    IPaymentVault public paymentVaultImplementation;
+
+    uint128 _minNumSymbols = 4096;
+    uint128 _globalSymbolsPerBin = 131072;
+    uint128 _pricePerSymbol = 0.4470 gwei;
+    uint128 _reservationBinInterval = 300;
+    uint128 _priceUpdateCooldown = 1;
+    uint128 _globalRateBinInterval = 30;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -118,6 +129,29 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         socketRegistry = ISocketRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+
+        {
+        paymentVault = IPaymentVault(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+
+        paymentVaultImplementation = new PaymentVault();
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(paymentVault))),
+            address(paymentVaultImplementation),
+            abi.encodeWithSelector(
+                PaymentVault.initialize.selector,
+                addressConfig.eigenDACommunityMultisig,
+                _minNumSymbols,
+                _globalSymbolsPerBin,
+                _pricePerSymbol,
+                _reservationBinInterval,
+                _priceUpdateCooldown,
+                _globalRateBinInterval
+            )
+        );
+        }
 
         indexRegistryImplementation = new IndexRegistry(
             registryCoordinator
@@ -206,7 +240,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             registryCoordinator,
             stakeRegistry,
             IEigenDAThresholdRegistry(address(0)),
-            IEigenDARelayRegistry(address(0))
+            IEigenDARelayRegistry(address(0)),
+            paymentVault
         );
 
         address[] memory confirmers = new address[](1);
