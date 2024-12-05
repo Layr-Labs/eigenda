@@ -9,6 +9,7 @@ import (
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -507,7 +508,7 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "binIndex",
+			Name: "reservationPeriod",
 			Type: "uint32",
 		},
 		{
@@ -561,11 +562,11 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
 	}
 	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
-	binIndex, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
+	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
 	if err != nil {
 		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
-	pm.ReservationPeriod = uint32(binIndex)
+	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
 	return nil
 }
@@ -611,15 +612,7 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
-type ActiveReservation struct {
-	SymbolsPerSec uint64 // reserve number of symbols per second
-	//TODO: we are not using start and end timestamp, add check or remove
-	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
-	EndTimestamp   uint64
-
-	QuorumNumbers []uint8 // allowed quorums
-	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-}
+type ActiveReservation = paymentvault.IPaymentVaultReservation
 
 type OnDemandPayment struct {
 	CumulativePayment *big.Int // Total amount deposited by the user
