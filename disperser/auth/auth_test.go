@@ -39,17 +39,17 @@ func buildClient(t *testing.T) v2.DispersalClient {
 	cert, err := tls.LoadX509KeyPair("./test-disperser.crt", "./test-disperser.key")
 	require.NoError(t, err)
 
-	nodeCert, err := os.ReadFile("./test-node.crt")
-	require.NoError(t, err)
-	certPool := x509.NewCertPool()
-	ok := certPool.AppendCertsFromPEM(nodeCert)
-	require.True(t, ok)
+	// This is what we'd enable if we wanted to verify the server's certificate
+	//nodeCert, err := os.ReadFile("./test-node.crt")
+	//require.NoError(t, err)
+	//certPool := x509.NewCertPool()
+	//ok := certPool.AppendCertsFromPEM(nodeCert)
+	//require.True(t, ok)
 
 	creds := credentials.NewTLS(&tls.Config{
 		Certificates: []tls.Certificate{cert},
-		RootCAs:      certPool,
-		//ServerName:   "0.0.0.0",
-		//InsecureSkipVerify: true,
+		//RootCAs:      certPool,
+		InsecureSkipVerify: true,
 	})
 
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
@@ -74,7 +74,6 @@ func buildServer(t *testing.T) (v2.DispersalServer, *grpc.Server) {
 		Certificates: []tls.Certificate{cert},
 		ClientCAs:    certPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
-		//ServerName:   "0.0.0.0",
 	})
 
 	server := grpc.NewServer(grpc.Creds(creds))
