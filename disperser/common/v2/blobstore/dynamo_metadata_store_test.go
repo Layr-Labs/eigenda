@@ -205,7 +205,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "0x123",
-					BinIndex:          uint32(i),
+					ReservationPeriod: uint32(i),
 					CumulativePayment: big.NewInt(321),
 				},
 				Signature: []byte("signature"),
@@ -226,7 +226,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	binIndexes := make(map[uint32]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
-		binIndexes[certs[i].BlobHeader.PaymentMetadata.BinIndex] = struct{}{}
+		binIndexes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
 	}
 	assert.Len(t, binIndexes, numCerts)
 	for i := 0; i < numCerts; i++ {
@@ -515,7 +515,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          uint32(binIndex.Int64()),
+			ReservationPeriod: uint32(binIndex.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
 		Signature: sig,

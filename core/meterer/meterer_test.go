@@ -172,7 +172,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
-	binIndex := meterer.GetBinIndex(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
+	binIndex := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
@@ -220,12 +220,12 @@ func TestMetererReservations(t *testing.T) {
 		err = mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-			"AccountID": &types.AttributeValueMemberS{Value: accountID2},
-			"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
+			"AccountID":         &types.AttributeValueMemberS{Value: accountID2},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, accountID2, item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(binIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, strconv.Itoa(int(binIndex)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	}
@@ -234,14 +234,14 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 25, quoromNumbers)
 	assert.NoError(t, err)
-	overflowedBinIndex := binIndex + 2
+	overflowedReservationPeriod := binIndex + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID2},
-		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedBinIndex))},
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID2},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, accountID2, item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, strconv.Itoa(int(overflowedBinIndex)), item["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
@@ -466,7 +466,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 func createPaymentHeader(binIndex uint32, cumulativePayment uint64, accountID string) *core.PaymentMetadata {
 	return &core.PaymentMetadata{
 		AccountID:         accountID,
-		BinIndex:          binIndex,
+		ReservationPeriod: binIndex,
 		CumulativePayment: big.NewInt(int64(cumulativePayment)),
 	}
 }

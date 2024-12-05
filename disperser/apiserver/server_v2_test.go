@@ -65,7 +65,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -123,7 +123,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -142,7 +142,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -159,7 +159,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -176,7 +176,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -193,7 +193,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 		Signature: []byte{1, 2, 3},
@@ -211,7 +211,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          0,
+			ReservationPeriod: 0,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -236,7 +236,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    invalidCommitment,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -266,7 +266,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -292,7 +292,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x1234",
-			BinIndex:          0,
+			ReservationPeriod: 0,
 			CumulativePayment: big.NewInt(532),
 		},
 	}
