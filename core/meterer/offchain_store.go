@@ -66,10 +66,10 @@ func NewOffchainStore(
 }
 
 type ReservationBin struct {
-	AccountID string
-	BinIndex  uint32
-	BinUsage  uint32
-	UpdatedAt time.Time
+	AccountID         string
+	ReservationPeriod uint32
+	BinUsage          uint32
+	UpdatedAt         time.Time
 }
 
 type PaymentTuple struct {
@@ -78,15 +78,15 @@ type PaymentTuple struct {
 }
 
 type GlobalBin struct {
-	BinIndex  uint32
-	BinUsage  uint64
-	UpdatedAt time.Time
+	ReservationPeriod uint32
+	BinUsage          uint64
+	UpdatedAt         time.Time
 }
 
 func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, binIndex uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID},
-		"BinIndex":  &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
 	}
 
 	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
@@ -114,7 +114,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, binIndex uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
-		"BinIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(binIndex, 10)},
 	}
 
 	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
@@ -245,7 +245,7 @@ func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, bin
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND BinIndex > :binIndex"),
+		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod > :binIndex"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":  &types.AttributeValueMemberS{Value: accountID},
 			":binIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
@@ -299,19 +299,19 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 }
 
 func parseBinRecord(bin map[string]types.AttributeValue) (*pb.BinRecord, error) {
-	binIndex, ok := bin["BinIndex"]
+	binIndex, ok := bin["ReservationPeriod"]
 	if !ok {
-		return nil, errors.New("BinIndex is not present in the response")
+		return nil, errors.New("ReservationPeriod is not present in the response")
 	}
 
 	binIndexAttr, ok := binIndex.(*types.AttributeValueMemberN)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type for BinIndex: %T", binIndex)
+		return nil, fmt.Errorf("unexpected type for ReservationPeriod: %T", binIndex)
 	}
 
 	binIndexValue, err := strconv.ParseUint(binIndexAttr.Value, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse BinIndex: %w", err)
+		return nil, fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
 
 	binUsage, ok := bin["BinUsage"]
