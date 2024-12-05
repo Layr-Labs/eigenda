@@ -2,9 +2,10 @@ package limiter
 
 import (
 	"fmt"
-	"golang.org/x/time/rate"
 	"sync"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // ChunkRateLimiter enforces rate limits on GetChunk operations.

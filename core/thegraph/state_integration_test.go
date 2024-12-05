@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,9 +59,22 @@ func setup() {
 	fmt.Println("Deploying experiment")
 	testConfig.DeployExperiment()
 
+	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+	pk = strings.TrimPrefix(pk, "0x")
+	pk = strings.TrimPrefix(pk, "0X")
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{testConfig.Deployers[0].RPC},
+		PrivateKeyString: pk,
+		NumConfirmations: 0,
+		NumRetries:       1,
+	}, gethcommon.Address{}, logging.NewNoopLogger())
+	if err != nil {
+		panic(err)
+	}
+	_ = testConfig.RegisterBlobVersionAndRelays(ethClient)
+
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()
-
 }
 
 func teardown() {

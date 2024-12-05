@@ -151,6 +151,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return fmt.Errorf("blob version parameters is nil")
 	}
 
+	e.logger.Debug("request encoding", "numBlobs", len(blobMetadatas))
 	for _, blob := range blobMetadatas {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
@@ -167,6 +168,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 		// Encode the blobs
 		e.pool.Submit(func() {
+			e.logger.Debug("encoding blob", "blobKey", blobKey.Hex())
 			for i := 0; i < e.NumEncodingRetries+1; i++ {
 				encodingCtx, cancel := context.WithTimeout(ctx, e.EncodingRequestTimeout)
 				fragmentInfo, err := e.encodeBlob(encodingCtx, blobKey, blob, blobParams)
@@ -175,6 +177,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to encode blob", "blobKey", blobKey.Hex(), "err", err)
 					continue
 				}
+				e.logger.Debug("successfully encoded blob", "blobKey", blobKey.Hex(), "fragmentInfo", fragmentInfo)
 				relayKeys, err := GetRelayKeys(e.NumRelayAssignment, e.AvailableRelays)
 				if err != nil {
 					e.logger.Error("failed to get relay keys", "err", err)
