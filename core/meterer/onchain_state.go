@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -30,8 +32,8 @@ var _ OnchainPayment = (*OnchainPaymentState)(nil)
 type OnchainPaymentState struct {
 	tx *eth.Reader
 
-	ActiveReservations *map[gethcommon.Address]core.ActiveReservation
-	OnDemandPayments   *map[gethcommon.Address]core.OnDemandPayment
+	ActiveReservations map[gethcommon.Address]*core.ActiveReservation
+	OnDemandPayments   map[gethcommon.Address]*core.OnDemandPayment
 
 	ReservationsLock sync.RWMutex
 	OnDemandLocks    sync.RWMutex
@@ -56,8 +58,8 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (OnchainPayment
 
 	return OnchainPaymentState{
 		tx:                 tx,
-		ActiveReservations: &map[gethcommon.Address]core.ActiveReservation{},
-		OnDemandPayments:   &map[gethcommon.Address]core.OnDemandPayment{},
+		ActiveReservations: make(map[gethcommon.Address]*core.ActiveReservation),
+		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
 		PaymentVaultParams: paymentVaultParams,
 	}, nil
 }
@@ -109,11 +111,11 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		return err
 	}
 	// These parameters should be rarely updated, but we refresh them anyway
-	pcs.PaymentVaultParams = paymentVaultParams
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&pcs.PaymentVaultParams)), unsafe.Pointer(paymentVaultParams))
 
 	pcs.ReservationsLock.Lock()
-	accountIDs := make([]gethcommon.Address, 0, len(*pcs.ActiveReservations))
-	for accountID := range *pcs.ActiveReservations {
+	accountIDs := make([]gethcommon.Address, 0, len(pcs.ActiveReservations))
+	for accountID := range pcs.ActiveReservations {
 		accountIDs = append(accountIDs, accountID)
 	}
 
@@ -125,8 +127,8 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 	pcs.ReservationsLock.Unlock()
 
 	pcs.OnDemandLocks.Lock()
-	accountIDs = make([]gethcommon.Address, 0, len(*pcs.OnDemandPayments))
-	for accountID := range *pcs.OnDemandPayments {
+	accountIDs = make([]gethcommon.Address, 0, len(pcs.OnDemandPayments))
+	for accountID := range pcs.OnDemandPayments {
 		accountIDs = append(accountIDs, accountID)
 	}
 
@@ -142,8 +144,8 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 
 // GetActiveReservationByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
-	if reservation, ok := (*pcs.ActiveReservations)[accountID]; ok {
-		return &reservation, nil
+	if reservation, ok := (pcs.ActiveReservations)[accountID]; ok {
+		return reservation, nil
 	}
 
 	// pulls the chain state
@@ -152,7 +154,7 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Contex
 		return nil, err
 	}
 	pcs.ReservationsLock.Lock()
-	(*pcs.ActiveReservations)[accountID] = *res
+	(pcs.ActiveReservations)[accountID] = res
 	pcs.ReservationsLock.Unlock()
 	return res, nil
 }
@@ -168,8 +170,8 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccountOnChain(ctx context
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	if payment, ok := (*pcs.OnDemandPayments)[accountID]; ok {
-		return &payment, nil
+	if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
+		return payment, nil
 	}
 	// pulls the chain state
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
@@ -178,7 +180,7 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	}
 
 	pcs.OnDemandLocks.Lock()
-	(*pcs.OnDemandPayments)[accountID] = *res
+	(pcs.OnDemandPayments)[accountID] = res
 	pcs.OnDemandLocks.Unlock()
 	return res, nil
 }

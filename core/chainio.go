@@ -110,13 +110,13 @@ type Reader interface {
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*BlobVersionParameters, error)
 
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
-	GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]ActiveReservation, error)
+	GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*ActiveReservation, error)
 
 	// GetActiveReservationByAccount returns active reservation by account ID
 	GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*ActiveReservation, error)
 
 	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]OnDemandPayment, error)
+	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
 
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)

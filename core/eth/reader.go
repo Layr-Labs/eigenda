@@ -657,8 +657,8 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 	return res, nil
 }
 
-func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]core.ActiveReservation, error) {
-	reservationsMap := make(map[gethcommon.Address]core.ActiveReservation)
+func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+	reservationsMap := make(map[gethcommon.Address]*core.ActiveReservation)
 	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
 		Context: ctx,
 	}, accountIDs)
@@ -668,17 +668,17 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		reservationsMap[accountIDs[i]] = reservation
+		reservationsMap[accountIDs[i]] = &reservation
 	}
 
 	// filter out all zero-valued reservations
 	for accountID, reservation := range reservationsMap {
-		if isZeroValuedReservation(reservation) {
+		if isZeroValuedReservation(*reservation) {
 			delete(reservationsMap, accountID)
 		}
 	}
 
-	return &reservationsMap, nil
+	return reservationsMap, nil
 }
 
 func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
@@ -689,13 +689,13 @@ func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID ge
 		return nil, err
 	}
 	if isZeroValuedReservation(reservation) {
-		return nil, errors.New("reservation is zero-valued")
+		return nil, errors.New("reservation does not exist for given account")
 	}
 	return &reservation, nil
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (*map[gethcommon.Address]core.OnDemandPayment, error) {
-	paymentsMap := make(map[gethcommon.Address]core.OnDemandPayment)
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
 	payments, err := t.bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
 		Context: ctx,
 	}, accountIDs)
@@ -705,7 +705,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 
 	// since payments are returned in the same order as the accountIDs, we can directly map them
 	for i, payment := range payments {
-		paymentsMap[accountIDs[i]] = core.OnDemandPayment{
+		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
 			CumulativePayment: payment,
 		}
 	}
@@ -717,7 +717,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 		}
 	}
 
-	return &paymentsMap, nil
+	return paymentsMap, nil
 }
 
 func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
