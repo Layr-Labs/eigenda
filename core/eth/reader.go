@@ -619,7 +619,7 @@ func (t *Reader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint3
 	return requiredQuorums, nil
 }
 
-func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*core.BlobVersionParameters, error) {
 	params, err := t.bindings.EigenDAServiceManager.GetBlobParams(&bind.CallOpts{
 		Context: ctx,
 	}, uint16(blobVersion))
@@ -633,9 +633,9 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) 
 	}, nil
 }
 
-func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
-	res := make(map[uint8]*core.BlobVersionParameters)
-	version := uint8(0)
+func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*core.BlobVersionParameters, error) {
+	res := make(map[uint16]*core.BlobVersionParameters)
+	version := uint16(0)
 	for {
 		params, err := t.GetVersionedBlobParams(ctx, version)
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
