@@ -162,33 +162,19 @@ func (a *accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 func (a *accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
-	}
-
-	if paymentState.PaymentGlobalParams == nil {
+	} else if paymentState.GetPaymentGlobalParams() == nil {
 		return fmt.Errorf("payment global params cannot be nil")
-	}
-
-	if paymentState.OnchainCumulativePayment == nil {
+	} else if paymentState.GetOnchainCumulativePayment() == nil {
 		return fmt.Errorf("onchain cumulative payment cannot be nil")
-	}
-
-	if paymentState.CumulativePayment == nil {
+	} else if paymentState.GetCumulativePayment() == nil {
 		return fmt.Errorf("cumulative payment cannot be nil")
-	}
-
-	if paymentState.Reservation == nil {
+	} else if paymentState.GetReservation() == nil {
 		return fmt.Errorf("reservation cannot be nil")
-	}
-
-	if paymentState.Reservation.QuorumNumbers == nil {
+	} else if paymentState.GetReservation().GetQuorumNumbers() == nil {
 		return fmt.Errorf("reservation quorum numbers cannot be nil")
-	}
-
-	if paymentState.Reservation.QuorumSplit == nil {
+	} else if paymentState.GetReservation().GetQuorumSplit() == nil {
 		return fmt.Errorf("reservation quorum split cannot be nil")
-	}
-
-	if paymentState.BinRecords == nil {
+	} else if paymentState.GetBinRecords() == nil {
 		return fmt.Errorf("bin records cannot be nil")
 	}
 
