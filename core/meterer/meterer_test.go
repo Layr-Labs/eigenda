@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
@@ -30,12 +31,12 @@ var (
 	dockertestResource       *dockertest.Resource
 	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
-	accountID1               string
-	account1Reservations     core.ActiveReservation
-	account1OnDemandPayments core.OnDemandPayment
-	accountID2               string
-	account2Reservations     core.ActiveReservation
-	account2OnDemandPayments core.OnDemandPayment
+	accountID1               gethcommon.Address
+	account1Reservations     *core.ActiveReservation
+	account1OnDemandPayments *core.OnDemandPayment
+	accountID2               gethcommon.Address
+	account2Reservations     *core.ActiveReservation
+	account2OnDemandPayments *core.OnDemandPayment
 	mt                       *meterer.Meterer
 
 	deployLocalStack           bool
@@ -123,12 +124,12 @@ func setup(_ *testing.M) {
 	}
 
 	now := uint64(time.Now().Unix())
-	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey).Hex()
-	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey).Hex()
-	account1Reservations = core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
-	account1OnDemandPayments = core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
-	account2OnDemandPayments = core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
+	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
+	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
+	account1Reservations = &core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = &core.ActiveReservation{SymbolsPerSec: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplit: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
+	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
 	store, err := meterer.NewOffchainStore(
 		clientConfig,
@@ -175,10 +176,10 @@ func TestMetererReservations(t *testing.T) {
 	binIndex := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
 	})).Return(account1Reservations, nil)
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
 	})).Return(account2Reservations, nil)
 	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(core.ActiveReservation{}, fmt.Errorf("reservation not found"))
@@ -202,7 +203,7 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header = createPaymentHeader(1, 0, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
+	header = createPaymentHeader(1, 0, crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
@@ -220,7 +221,7 @@ func TestMetererReservations(t *testing.T) {
 		err = mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-			"AccountID":         &types.AttributeValueMemberS{Value: accountID2},
+			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(binIndex))},
 		})
 		assert.NoError(t, err)
@@ -236,7 +237,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	overflowedReservationPeriod := binIndex + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID2},
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
 	assert.NoError(t, err)
@@ -259,13 +260,13 @@ func TestMetererOnDemand(t *testing.T) {
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 	binIndex := uint32(0) // this field doesn't matter for on-demand payments wrt global rate limit
 
-	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
-	})).Return(account1OnDemandPayments, nil)
-	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account string) bool {
+	})).Return(&account1OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
-	})).Return(account2OnDemandPayments, nil)
-	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(core.OnDemandPayment{}, fmt.Errorf("payment not found"))
+	})).Return(&account2OnDemandPayments, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.OnDemandPayment{}, fmt.Errorf("payment not found"))
 	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 
 	// test unregistered account
@@ -273,7 +274,7 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header := createPaymentHeader(binIndex, 2, crypto.PubkeyToAddress(unregisteredUser.PublicKey).Hex())
+	header := createPaymentHeader(binIndex, 2, crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
@@ -290,7 +291,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// No rollback after meter request
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
-			Value: accountID1,
+			Value: accountID1.Hex(),
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(result))
@@ -335,7 +336,7 @@ func TestMetererOnDemand(t *testing.T) {
 	numPrevRecords := 12
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
-			Value: accountID2,
+			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, numPrevRecords, len(result))
@@ -346,7 +347,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// Correct rollback
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
-			Value: accountID2,
+			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, numPrevRecords, len(result))
@@ -463,9 +464,9 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 	}
 }
 
-func createPaymentHeader(binIndex uint32, cumulativePayment uint64, accountID string) *core.PaymentMetadata {
+func createPaymentHeader(binIndex uint32, cumulativePayment uint64, accountID gethcommon.Address) *core.PaymentMetadata {
 	return &core.PaymentMetadata{
-		AccountID:         accountID,
+		AccountID:         accountID.Hex(),
 		ReservationPeriod: binIndex,
 		CumulativePayment: big.NewInt(int64(cumulativePayment)),
 	}

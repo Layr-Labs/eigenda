@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	dummyActiveReservation = core.ActiveReservation{
+	dummyActiveReservation = &core.ActiveReservation{
 		SymbolsPerSec:  100,
 		StartTimestamp: 1000,
 		EndTimestamp:   2000,
 		QuorumSplit:    []byte{50, 50},
 	}
-	dummyOnDemandPayment = core.OnDemandPayment{
+	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 )
@@ -56,7 +56,7 @@ func TestGetOnDemandPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
 	accountID := "account1"
-	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
+	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(&dummyOnDemandPayment, nil)
 
 	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, accountID)
 	assert.NoError(t, err)

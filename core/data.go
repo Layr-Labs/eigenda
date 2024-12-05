@@ -491,10 +491,12 @@ type PaymentMetadata struct {
 	AccountID string `json:"account_id"`
 
 	// ReservationPeriod represents the range of time at which the dispersal is made
-	ReservationPeriod uint32 `json:"bin_index"`
+	ReservationPeriod uint32 `json:"reservation_period"`
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
 	CumulativePayment *big.Int `json:"cumulative_payment"`
+	// Allow same blob to be dispersed multiple times within the same reservation period
+	Salt uint32 `json:"salt"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -511,6 +513,10 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		{
 			Name: "cumulativePayment",
 			Type: "uint256",
+		},
+		{
+			Name: "salt",
+			Type: "uint32",
 		},
 	})
 	if err != nil {
@@ -544,6 +550,7 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
+			"Salt": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Salt)},
 		},
 	}, nil
 }
@@ -568,6 +575,7 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
 		AccountId:         pm.AccountID,
 		ReservationPeriod: pm.ReservationPeriod,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
+		Salt:              pm.Salt,
 	}
 }
 
@@ -577,6 +585,7 @@ func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
 		AccountID:         header.AccountId,
 		ReservationPeriod: header.ReservationPeriod,
 		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
+		Salt:              header.Salt,
 	}
 }
 
@@ -586,6 +595,7 @@ func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader
 		AccountId:         pm.AccountID,
 		ReservationPeriod: pm.ReservationPeriod,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
+		Salt:              pm.Salt,
 	}
 }
 
@@ -595,6 +605,7 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 		AccountID:         ph.AccountId,
 		ReservationPeriod: ph.ReservationPeriod,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+		Salt:              ph.Salt,
 	}
 }
 
