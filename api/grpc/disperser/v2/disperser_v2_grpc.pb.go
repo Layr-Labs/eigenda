@@ -22,6 +22,7 @@ const (
 	Disperser_DisperseBlob_FullMethodName      = "/disperser.v2.Disperser/DisperseBlob"
 	Disperser_GetBlobStatus_FullMethodName     = "/disperser.v2.Disperser/GetBlobStatus"
 	Disperser_GetBlobCommitment_FullMethodName = "/disperser.v2.Disperser/GetBlobCommitment"
+	Disperser_GetPaymentState_FullMethodName   = "/disperser.v2.Disperser/GetPaymentState"
 )
 
 // DisperserClient is the client API for Disperser service.
@@ -37,6 +38,8 @@ type DisperserClient interface {
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
+	// GetPaymentState is a utility method to get the payment state of a given account.
+	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 }
 
 type disperserClient struct {
@@ -74,6 +77,15 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, in *BlobCommitm
 	return out, nil
 }
 
+func (c *disperserClient) GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error) {
+	out := new(GetPaymentStateReply)
+	err := c.cc.Invoke(ctx, Disperser_GetPaymentState_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DisperserServer is the server API for Disperser service.
 // All implementations must embed UnimplementedDisperserServer
 // for forward compatibility
@@ -87,6 +99,8 @@ type DisperserServer interface {
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
+	// GetPaymentState is a utility method to get the payment state of a given account.
+	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }
 
@@ -102,6 +116,9 @@ func (UnimplementedDisperserServer) GetBlobStatus(context.Context, *BlobStatusRe
 }
 func (UnimplementedDisperserServer) GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlobCommitment not implemented")
+}
+func (UnimplementedDisperserServer) GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPaymentState not implemented")
 }
 func (UnimplementedDisperserServer) mustEmbedUnimplementedDisperserServer() {}
 
@@ -170,6 +187,24 @@ func _Disperser_GetBlobCommitment_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Disperser_GetPaymentState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPaymentStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DisperserServer).GetPaymentState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Disperser_GetPaymentState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DisperserServer).GetPaymentState(ctx, req.(*GetPaymentStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Disperser_ServiceDesc is the grpc.ServiceDesc for Disperser service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -188,6 +223,10 @@ var Disperser_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlobCommitment",
 			Handler:    _Disperser_GetBlobCommitment_Handler,
+		},
+		{
+			MethodName: "GetPaymentState",
+			Handler:    _Disperser_GetPaymentState_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

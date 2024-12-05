@@ -162,7 +162,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
-		prover, err := prover.NewProver(&config.EncodingConfig, true)
+		config.EncodingConfig.LoadG2Points = true
+		prover, err := prover.NewProver(&config.EncodingConfig, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
@@ -176,6 +177,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			blobMetadataStore,
 			transactor,
 			ratelimiter,
+			meterer,
 			authv2.NewAuthenticator(),
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),

@@ -28,27 +28,31 @@ type BenchmarkResult struct {
 }
 
 type Config struct {
-	OutputFile   string
-	BlobLength   uint64
-	NumChunks    uint64
-	NumRuns      uint64
-	CPUProfile   string
-	MemProfile   string
-	EnableVerify bool
+	MinBlobLength uint64 `json:"min_blob_length"`
+	MaxBlobLength uint64 `json:"max_blob_length"`
+	OutputFile    string
+	BlobLength    uint64
+	NumChunks     uint64
+	NumRuns       uint64
+	CPUProfile    string
+	MemProfile    string
+	EnableVerify  bool
 }
 
 func parseFlags() Config {
 	config := Config{}
 	flag.StringVar(&config.OutputFile, "output", "benchmark_results.json", "Output file for results")
-	flag.Uint64Var(&config.BlobLength, "blob-length", 1048576, "Blob length (power of 2)")
+	flag.Uint64Var(&config.MinBlobLength, "min-blob-length", 1024, "Minimum blob length (power of 2)")
+	flag.Uint64Var(&config.MaxBlobLength, "max-blob-length", 1048576, "Maximum blob length (power of 2)")
 	flag.Uint64Var(&config.NumChunks, "num-chunks", 8192, "Minimum number of chunks (power of 2)")
-	flag.Uint64Var(&config.NumRuns, "num-runs", 10, "Number of times to run the benchmark")
 	flag.StringVar(&config.CPUProfile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&config.MemProfile, "memprofile", "", "Write memory profile to file")
-	flag.BoolVar(&config.EnableVerify, "enable-verify", false, "Verify blobs after encoding")
+	flag.BoolVar(&config.EnableVerify, "enable-verify", true, "Verify blobs after encoding")
 	flag.Parse()
 	return config
 }
+
+var kzgConfig = &kzg.KzgConfig{}
 
 func main() {
 	config := parseFlags()
@@ -56,20 +60,28 @@ func main() {
 	fmt.Println("Config output", config.OutputFile)
 
 	// Setup phase
-	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "/home/ec2-user/resources/kzg/g1.point",
-		G2Path:          "/home/ec2-user/resources/kzg/g2.point",
-		CacheDir:        "/home/ec2-user/resources/kzg/SRSTables",
+	kzgConfig = &kzg.KzgConfig{
+		G1Path:          "/home/ubuntu/resources/kzg/g1.point",
+		G2Path:          "/home/ubuntu/resources/kzg/g2.point",
+		CacheDir:        "/home/ubuntu/resources/kzg/SRSTables",
 		SRSOrder:        268435456,
-		SRSNumberToLoad: 2097152,
+		SRSNumberToLoad: 1048576,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		Verbose:         true,
+		LoadG2Points:    true,
 	}
 
 	fmt.Printf("* Task Starts\n")
 
-	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, true)
+	cfg := &encoding.Config{
+		BackendType: encoding.IcicleBackend,
+		GPUEnable:   true,
+		NumWorker:   uint64(runtime.GOMAXPROCS(0)),
+	}
+	p, err := prover.NewProver(kzgConfig, cfg)
+
+	if err != nil {
+		log.Fatalf("Failed to create prover: %v", err)
+	}
 
 	if config.CPUProfile != "" {
 		f, err := os.Create(config.CPUProfile)
@@ -115,12 +127,13 @@ func runBenchmark(p *prover.Prover, config *Config) []BenchmarkResult {
 
 	// Fixed coding ratio of 8
 	codingRatio := uint64(8)
-	for i := uint64(0); i < config.NumRuns; i++ {
-		chunkLen := (config.BlobLength * codingRatio) / config.NumChunks
+
+	for blobLength := config.MinBlobLength; blobLength <= config.MaxBlobLength; blobLength *= 2 {
+		chunkLen := (blobLength * codingRatio) / config.NumChunks
 		if chunkLen < 1 {
 			continue // Skip invalid configurations
 		}
-		result := benchmarkEncodeAndVerify(p, config.BlobLength, config.NumChunks, chunkLen, config.EnableVerify)
+		result := benchmarkEncodeAndVerify(p, blobLength, config.NumChunks, chunkLen, config.EnableVerify)
 		results = append(results, result)
 	}
 	return results
@@ -134,7 +147,10 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 
 	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
-	enc, _ := p.GetKzgEncoder(params)
+	enc, err := p.GetKzgEncoder(params)
+	if err != nil {
+		log.Fatalf("Failed to get KZG encoder: %v", err)
+	}
 
 	// Create polynomial
 	inputSize := blobLength
@@ -166,9 +182,13 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 				log.Fatal("leading coset inconsistency")
 			}
 
-			lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+			rs, err := enc.GetRsEncoder(enc.EncodingParams)
+			if err != nil {
+				log.Fatalf("%v", err)
+			}
+			lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), p.KzgConfig)
+			g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 			if err != nil {
 				log.Fatalf("Load g2 %v failed\n", err)
 			}

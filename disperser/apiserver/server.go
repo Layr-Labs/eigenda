@@ -269,6 +269,8 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}))
 	defer timer.ObserveDuration()
 
+	dispersalStart := time.Now()
+
 	securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
 	for i, sp := range securityParams {
@@ -319,6 +321,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	for _, param := range securityParams {
 		s.metrics.HandleSuccessfulRequest(fmt.Sprintf("%d", param.QuorumID), blobSize, apiMethodName)
 	}
+	s.metrics.BlobLatency.WithLabelValues(apiMethodName, dispcommon.BlobSizeBucket(blobSize)).Set(float64(time.Since(dispersalStart).Milliseconds()))
 
 	return &pb.DisperseBlobReply{
 		Result:    pb.BlobStatus_PROCESSING,
@@ -701,6 +704,8 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}))
 	defer timer.ObserveDuration()
 
+	retrievalStart := time.Now()
+
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
 		s.metrics.HandleInvalidArgRpcRequest("RetrieveBlob")
@@ -807,6 +812,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 	s.metrics.HandleSuccessfulRpcRequest("RetrieveBlob")
 	s.metrics.HandleSuccessfulRequest("", len(data), "RetrieveBlob")
+	s.metrics.BlobLatency.WithLabelValues("RetrieveBlob", dispcommon.BlobSizeBucket(len(data))).Set(float64(time.Since(retrievalStart).Milliseconds()))
 
 	s.logger.Debug("fetched blob content", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "data size (bytes)", len(data), "duration", time.Since(stageTimer).String())
 

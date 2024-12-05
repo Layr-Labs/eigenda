@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"math/big"
 	"net/http"
@@ -78,7 +79,7 @@ type Node struct {
 	ChainID                 *big.Int
 	BLSSigner               blssignerV1.SignerClient
 
-	RelayClient clients.RelayClient
+	RelayClient atomic.Value
 
 	mu            sync.Mutex
 	CurrentSocket string
@@ -178,7 +179,8 @@ func NewNode(
 	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
-	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
+	config.EncoderConfig.LoadG2Points = false
+	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +225,6 @@ func NewNode(
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
-	var relayClient clients.RelayClient
-
 	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
@@ -239,7 +239,6 @@ func NewNode(
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
-		RelayClient:             relayClient,
 		BLSSigner:               blsClient,
 	}
 
@@ -262,7 +261,8 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
 		}
-		storeV2 = NewLevelDBStoreV2(dbV2, logger)
+		timeToExpire := (blockStaleMeasure + storeDurationBlocks) * 12 // 12s per block
+		storeV2 = NewLevelDBStoreV2(dbV2, logger, time.Duration(timeToExpire)*time.Second)
 
 		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
 		if err != nil {
@@ -270,7 +270,22 @@ func NewNode(
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		// TODO(ian-shim): Create a new relay client with relay addresses onchain
+		var relayClient clients.RelayClient
+		relayURLs, err := tx.GetRelayURLs(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get relay URLs: %w", err)
+		}
+
+		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
+			Sockets:           relayURLs,
+			UseSecureGrpcFlag: config.UseSecureGrpc,
+		}, logger)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new relay client: %w", err)
+		}
+
+		n.RelayClient.Store(relayClient)
 	}
 
 	n.StoreV2 = storeV2
@@ -395,6 +410,10 @@ func (n *Node) expireLoop() {
 	}
 }
 
+// RefreshOnchainState refreshes the onchain state of the node.
+// It fetches the latest blob parameters from the chain and updates the BlobVersionParams.
+// It runs periodically based on the OnchainStateRefreshInterval.
+// WARNING: this method is not thread-safe and should not be called concurrently.
 func (n *Node) RefreshOnchainState(ctx context.Context) error {
 	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
 		return nil
@@ -406,13 +425,47 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			n.Logger.Info("Refreshing onchain state")
+			existingBlobParams := n.BlobVersionParams.Load()
 			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
-			if err != nil {
+			if err == nil {
+				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
+					n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParams))
+				}
+			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
+			}
+
+			existingRelayClient, ok := n.RelayClient.Load().(clients.RelayClient)
+			if !ok {
+				n.Logger.Error("error fetching relay client")
 				continue
 			}
 
-			n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParams))
+			existingURLs := map[v2.RelayKey]string{}
+			if existingRelayClient != nil {
+				existingURLs = existingRelayClient.GetSockets()
+			}
+			relayURLs, err := n.Transactor.GetRelayURLs(ctx)
+			if err != nil {
+				n.Logger.Error("error fetching relay URLs", "err", err)
+				continue
+			}
+
+			if maps.Equal(existingURLs, relayURLs) {
+				n.Logger.Info("No change in relay URLs")
+				continue
+			}
+
+			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
+				Sockets:           relayURLs,
+				UseSecureGrpcFlag: n.Config.UseSecureGrpc,
+			}, n.Logger)
+			if err != nil {
+				n.Logger.Error("error creating relay client", "err", err)
+				continue
+			}
+
+			n.RelayClient.Store(clients.RelayClient(relayClient))
 		case <-ctx.Done():
 			return ctx.Err()
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -431,6 +432,52 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader := &mock.MockWriter{}
 	rateConfig := apiserver.RateConfig{}
 
+	// append test name to each table name for an unique store
+	mockState := &mock.MockOnchainPaymentState{}
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	mockState.On("GetReservationWindow", tmock.Anything).Return(uint32(1), nil)
+	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint32(2), nil)
+	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint32(3), nil)
+
+	now := uint64(time.Now().Unix())
+	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(core.ActiveReservation{SymbolsPerSec: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplit: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
+	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
+
+	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
+	err = meterer.CreateReservationTable(awsConfig, table_names[0])
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
+	store, err := meterer.NewOffchainStore(
+		awsConfig,
+		table_names[0],
+		table_names[1],
+		table_names[2],
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+
 	chainReader.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	chainReader.On("GetQuorumCount").Return(uint8(2), nil)
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
@@ -447,7 +494,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	s := apiserver.NewDispersalServerV2(disperser.ServerConfig{
 		GrpcPort:    "51002",
 		GrpcTimeout: 1 * time.Second,
-	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, auth.NewAuthenticator(), prover, 10, time.Hour, logger)
+	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, meterer, auth.NewAuthenticator(), prover, 10, time.Hour, logger)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

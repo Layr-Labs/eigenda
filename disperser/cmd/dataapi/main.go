@@ -16,9 +16,11 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
@@ -127,6 +129,33 @@ func RunDataApi(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
 	}
 
+	if config.ServerVersion == 2 {
+		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		serverv2 := dataapi.NewServerV2(
+			dataapi.Config{
+				ServerMode:         config.ServerMode,
+				SocketAddr:         config.SocketAddr,
+				AllowOrigins:       config.AllowOrigins,
+				DisperserHostname:  config.DisperserHostname,
+				ChurnerHostname:    config.ChurnerHostname,
+				BatcherHealthEndpt: config.BatcherHealthEndpt,
+			},
+			blobMetadataStorev2,
+			promClient,
+			subgraphClient,
+			tx,
+			chainState,
+			indexedChainState,
+			logger,
+			metrics,
+		)
+		return runServer(serverv2, logger)
+	}
+
+	return runServer(server, logger)
+}
+
+func runServer[T dataapi.ServerInterface](server T, logger logging.Logger) error {
 	// Setup channel to listen for termination signals
 	quit := make(chan os.Signal, 1)
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
@@ -142,7 +171,7 @@ func RunDataApi(ctx *cli.Context) error {
 	// Block until a signal is received.
 	<-quit
 	logger.Info("Shutting down server...")
-	err = server.Shutdown()
+	err := server.Shutdown()
 
 	if err != nil {
 		logger.Errorf("Failed to shutdown server: %v", err)

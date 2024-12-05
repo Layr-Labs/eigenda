@@ -161,7 +161,7 @@ func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (
 	}, nil
 }
 
-type RelayKey uint16
+type RelayKey = uint16
 
 type BlobCertificate struct {
 	BlobHeader *BlobHeader

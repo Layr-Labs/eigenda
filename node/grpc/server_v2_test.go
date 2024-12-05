@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -68,6 +69,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 	s := nodemock.NewMockStoreV2()
 	relay := clientsmock.NewRelayClient()
+	var atomicRelayClient atomic.Value
+	atomicRelayClient.Store(relay)
 	node := &node.Node{
 		Config:      config,
 		Logger:      logger,
@@ -76,7 +79,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		StoreV2:     s,
 		ChainState:  chainState,
 		ValidatorV2: val,
-		RelayClient: relay,
+		RelayClient: atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	server := grpc.NewServerV2(config, node, logger, ratelimiter)
