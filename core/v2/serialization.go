@@ -3,9 +3,12 @@ package v2
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
@@ -292,6 +295,88 @@ func DeserializeBatchHeader(data []byte) (*BatchHeader, error) {
 		return nil, err
 	}
 	return &h, nil
+}
+
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) Hash() ([32]byte, error) {
+	paymentMetadataType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "accountID",
+			Type: "string",
+		},
+		{
+			Name: "reservationIndex",
+			Type: "uint32",
+		},
+		{
+			Name: "cumulativePayment",
+			Type: "uint256",
+		},
+		{
+			Name: "salt",
+			Type: "uint256",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	arguments := abi.Arguments{
+		{
+			Type: paymentMetadataType,
+		},
+	}
+
+	bytes, err := arguments.Pack(pm)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	var hash [32]byte
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(bytes)
+	copy(hash[:], hasher.Sum(nil)[:32])
+
+	return hash, nil
+}
+
+func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	return &types.AttributeValueMemberM{
+		Value: map[string]types.AttributeValue{
+			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.ReservationPeriod)},
+			"CumulativePayment": &types.AttributeValueMemberN{
+				Value: pm.CumulativePayment.String(),
+			},
+			"Salt": &types.AttributeValueMemberN{
+				Value: fmt.Sprintf("%d", pm.Salt),
+			},
+		},
+	}, nil
+}
+
+func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
+	}
+	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
+	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
+	if err != nil {
+		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
+	}
+	pm.ReservationPeriod = uint32(reservationPeriod)
+	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
+	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 16)
+	if err != nil {
+		return fmt.Errorf("failed to parse Salt: %w", err)
+	}
+	if salt > MaxSaltValue {
+		return errors.New("salt value is too large")
+	}
+
+	pm.Salt = uint16(salt)
+	return nil
 }
 
 func BuildMerkleTree(certs []*BlobCertificate) (*merkletree.MerkleTree, error) {

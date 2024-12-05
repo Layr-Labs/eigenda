@@ -200,9 +200,9 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobVersion:     0,
 				QuorumNumbers:   []core.QuorumID{0},
 				BlobCommitments: mockCommitment,
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: &corev2.PaymentMetadata{
 					AccountID:         "account 1",
-					BinIndex:          0,
+					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
 				Signature: []byte("signature"),
@@ -214,9 +214,9 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobVersion:     0,
 				QuorumNumbers:   []core.QuorumID{0, 1},
 				BlobCommitments: mockCommitment,
-				PaymentMetadata: core.PaymentMetadata{
+				PaymentMetadata: &corev2.PaymentMetadata{
 					AccountID:         "account 2",
-					BinIndex:          0,
+					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
 				Signature: []byte("signature"),

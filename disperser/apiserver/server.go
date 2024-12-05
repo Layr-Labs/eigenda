@@ -219,7 +219,7 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 	}
 
 	// Disperse the blob
-	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated", nil)
+	reply, err := s.disperseBlob(ctx, blob, authenticatedAddress, "DisperseBlobAuthenticated")
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -251,7 +251,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob", nil)
+	reply, err := s.disperseBlob(ctx, blob, "", "DisperseBlob")
 	if err != nil {
 		// Note the disperseBlob already updated metrics for this error.
 		s.logger.Info("failed to disperse blob", "err", err)
@@ -263,7 +263,7 @@ func (s *DispersalServer) DisperseBlob(ctx context.Context, req *pb.DisperseBlob
 
 // Note: disperseBlob will internally update metrics upon an error; the caller doesn't need
 // to track the error again.
-func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string, paymentHeader *core.PaymentMetadata) (*pb.DisperseBlobReply, error) {
+func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, authenticatedAddress string, apiMethodName string) (*pb.DisperseBlobReply, error) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency(apiMethodName, f*1000) // make milliseconds
 	}))
@@ -290,14 +290,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 
 	s.logger.Debug("received a new blob dispersal request", "authenticatedAddress", authenticatedAddress, "origin", origin, "blobSizeBytes", blobSize, "securityParams", strings.Join(securityParamsStrings, ", "))
 
-	// If paymentHeader is not empty, we use the meterer, otherwise we use the ratelimiter if the ratelimiter is available
-	if paymentHeader != nil {
-		blobLength := encoding.GetBlobLength(uint(blobSize))
-		err := s.meterer.MeterRequest(ctx, *paymentHeader, blobLength, blob.GetQuorumNumbers())
-		if err != nil {
-			return nil, api.NewErrorResourceExhausted(err.Error())
-		}
-	} else if s.ratelimiter != nil {
+	if s.ratelimiter != nil {
 		err := s.checkRateLimitsAndAddRatesToHeader(ctx, blob, origin, authenticatedAddress, apiMethodName)
 		if err != nil {
 			// Note checkRateLimitsAndAddRatesToHeader already updated the metrics for this error.

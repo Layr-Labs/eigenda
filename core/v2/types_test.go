@@ -21,9 +21,9 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &v2.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
@@ -32,9 +32,9 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &v2.PaymentMetadata{
 			AccountID:         "0x456",
-			BinIndex:          6,
+			ReservationPeriod: 6,
 			CumulativePayment: big.NewInt(200),
 		},
 		Signature: []byte{1, 2, 3},
@@ -77,9 +77,9 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &v2.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
@@ -105,9 +105,9 @@ func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &v2.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},

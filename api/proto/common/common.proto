@@ -17,9 +17,3 @@ message BlobCommitment {
   bytes length_proof = 3;
   uint32 length = 4;
 }
-
-message PaymentHeader {
-  string account_id = 1;
-  uint32 bin_index = 2;
-  bytes cumulative_payment = 3;
-}

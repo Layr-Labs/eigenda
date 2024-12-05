@@ -93,18 +93,6 @@ message DisperseBlobRequest {
 	string account_id = 3;
 }
 
-message DispersePaidBlobRequest {
-	// The data to be dispersed. Same requirements as DisperseBlobRequest.
-	bytes data = 1;
-	// The quorums to which the blob to be sent
-	repeated uint32 quorum_numbers = 2;
-	
-	// Payment header contains AccountID, BinIndex, and CumulativePayment
-	common.PaymentHeader payment_header = 3;
-	// signature of payment_header
-	bytes payment_signature = 4;
-}
-
 message DisperseBlobReply {
 	// The status of the blob associated with the request_id. Will always be PROCESSING.
 	BlobStatus result = 1;

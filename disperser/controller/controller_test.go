@@ -159,7 +159,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	binIndex, err := rand.Int(rand.Reader, big.NewInt(256))
+	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
@@ -170,9 +170,9 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobVersion:     0,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		BlobCommitments: mockCommitment,
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &corev2.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          uint32(binIndex.Int64()),
+			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
 		Signature: sig,

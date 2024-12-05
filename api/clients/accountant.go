@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
 var requiredQuorums = []uint8{0, 1}
@@ -75,11 +76,11 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 // and both fields are used to create the payment header and signature
 func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
-	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
+	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativeBinRecord := a.GetRelativeBinRecord(currentBinIndex)
+	relativeBinRecord := a.GetRelativeBinRecord(currentReservationPeriod)
 	relativeBinRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
@@ -88,17 +89,17 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentBinIndex, big.NewInt(0), nil
+		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
-	overflowBinRecord := a.GetRelativeBinRecord(currentBinIndex + 2)
+	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
 		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentBinIndex, big.NewInt(0), nil
+		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
 	// reservation not available, attempt on-demand
@@ -117,19 +118,18 @@ func (a *accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 // AccountBlob accountant provides and records payment information
 func (a *accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*commonpb.PaymentHeader, error) {
-	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
 	}
 
-	pm := &core.PaymentMetadata{
+	pm := &corev2.PaymentMetadata{
 		AccountID:         a.accountID,
-		BinIndex:          binIndex,
+		ReservationPeriod: reservationPeriod,
 		CumulativePayment: cumulativePayment,
 	}
-	protoPaymentHeader := pm.ConvertToProtoPaymentHeader()
 
-	return protoPaymentHeader, nil
+	return pm.ToProtobuf(), nil
 }
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored

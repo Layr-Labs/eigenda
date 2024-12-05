@@ -3,12 +3,10 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -115,23 +113,18 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
 		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
 	// handle payments and check rate limits
 	if blobHeaderProto.GetPaymentHeader() != nil {
-		binIndex := blobHeaderProto.GetPaymentHeader().GetBinIndex()
-		cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-		accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
-
-		paymentHeader := core.PaymentMetadata{
-			AccountID:         accountID,
-			BinIndex:          binIndex,
-			CumulativePayment: cumulativePayment,
+		paymentHeader, err := corev2.PaymentHeaderFromProtobuf(blobHeaderProto.GetPaymentHeader())
+		if err != nil {
+			return api.NewErrorInvalidArg(fmt.Sprintf("invalid payment header: %s", err.Error()))
 		}
 
-		err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+		err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
 		if err != nil {
 			return api.NewErrorResourceExhausted(err.Error())
 		}

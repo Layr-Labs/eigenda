@@ -15,6 +15,14 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+const (
+	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
+	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
+	// different IDs).
+	MaxQuorumID  = 254
+	MaxSaltValue = 65535
+)
+
 type BlobVersion = uint8
 
 // Assignment contains information about the set of chunks that a specific node will receive
@@ -69,7 +77,7 @@ type BlobHeader struct {
 	QuorumNumbers []core.QuorumID
 
 	// PaymentMetadata contains the payment information for the blob
-	PaymentMetadata core.PaymentMetadata
+	PaymentMetadata *PaymentMetadata
 
 	// Signature is the signature of the blob header by the account ID
 	Signature []byte
@@ -109,10 +117,9 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		quorumNumbers[i] = core.QuorumID(q)
 	}
 
-	paymentMetadata := core.PaymentMetadata{
-		AccountID:         proto.GetPaymentHeader().GetAccountId(),
-		BinIndex:          proto.GetPaymentHeader().GetBinIndex(),
-		CumulativePayment: new(big.Int).SetBytes(proto.GetPaymentHeader().GetCumulativePayment()),
+	paymentMetadata, err := PaymentHeaderFromProtobuf(proto.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payment metadata: %v", err)
 	}
 
 	return &BlobHeader{
@@ -390,9 +397,46 @@ type DispersalResponse struct {
 	Error string
 }
 
-const (
-	// We use uint8 to count the number of quorums, so we can have at most 255 quorums,
-	// which means the max ID can not be larger than 254 (from 0 to 254, there are 255
-	// different IDs).
-	MaxQuorumID = 254
-)
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// AccountID is the ETH account address for the payer
+	AccountID string `json:"account_id"`
+
+	// ReservationPeriod represents the range of time at which the dispersal is made
+	ReservationPeriod uint32 `json:"reservation_period"`
+	// TODO: we are thinking the contract can use uint128 for cumulative payment,
+	// but the definition on v2 uses uint64. Double check with team.
+	CumulativePayment *big.Int `json:"cumulative_payment"`
+
+	// Salt is any number that can be used to generate a unique payment
+	// Configuring different salt enables the same blob to be dispersed multiple
+	// times within the same reservation period
+	Salt uint16 `json:"salt"`
+}
+
+// ToProtobuf converts a PaymentMetadata to a protobuf payment header
+func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+	return &commonpb.PaymentHeader{
+		AccountId:         pm.AccountID,
+		ReservationPeriod: pm.ReservationPeriod,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+		Salt:              uint32(pm.Salt),
+	}
+}
+
+// PaymentHeaderFromProtobuf converts a protobuf payment header to a PaymentMetadata
+func PaymentHeaderFromProtobuf(header *commonpb.PaymentHeader) (*PaymentMetadata, error) {
+	if header == nil {
+		return nil, errors.New("payment header is nil")
+	}
+	salt := header.GetSalt()
+	if salt > MaxSaltValue {
+		return nil, errors.New("salt value is too large")
+	}
+	return &PaymentMetadata{
+		AccountID:         header.AccountId,
+		ReservationPeriod: header.ReservationPeriod,
+		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
+		Salt:              uint16(salt),
+	}, nil
+}

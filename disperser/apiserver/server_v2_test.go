@@ -27,7 +27,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
-	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -63,9 +62,9 @@ func TestV2DisperseBlob(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -121,9 +120,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	invalidReqProto := &pbcommonv2.BlobHeader{
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -140,9 +139,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1, 2, 3},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -157,9 +156,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{2, 54},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -174,9 +173,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       2,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -191,9 +190,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 		Signature: []byte{1, 2, 3},
@@ -209,9 +208,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          0,
+			ReservationPeriod: 0,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -234,9 +233,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    invalidCommitment,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -264,9 +263,9 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -290,9 +289,9 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobVersion:     0,
 		BlobCommitments: mockCommitment,
 		QuorumNumbers:   []core.QuorumID{0},
-		PaymentMetadata: core.PaymentMetadata{
+		PaymentMetadata: &corev2.PaymentMetadata{
 			AccountID:         "0x1234",
-			BinIndex:          0,
+			ReservationPeriod: 0,
 			CumulativePayment: big.NewInt(532),
 		},
 	}

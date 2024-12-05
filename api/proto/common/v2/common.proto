@@ -9,7 +9,7 @@ message BlobHeader {
   uint32 version = 1;
   repeated uint32 quorum_numbers = 2;
   common.BlobCommitment commitment = 3;
-  common.PaymentHeader payment_header = 4;
+  PaymentHeader payment_header = 4;
 
   // signature over keccak hash of the blob_header that can be verified by blob_header.account_id
   bytes signature = 5;
@@ -35,4 +35,19 @@ message Batch {
   BatchHeader header = 1;
   // blob_certificates is the list of blob certificates in the batch
   repeated BlobCertificate blob_certificates = 2;
+}
+
+// PaymentHeader contains the payment information for a blob
+message PaymentHeader {
+  // account_id is the account that the payment is associated with
+  string account_id = 1;
+  // reservation_period is period for which the payment is reserved
+  uint32 reservation_period = 2;
+  // cumulative_payment is the cumulative payment for the blob
+  // This is only needed for on-demand payments
+  bytes cumulative_payment = 3;
+  // salt is any number that can be used to generate a unique payment
+  // Configuring different salt enables the same blob to be dispersed multiple 
+  // times within the same reservation period
+  uint32 salt = 4;
 }

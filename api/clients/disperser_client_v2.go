@@ -109,14 +109,14 @@ func (c *disperserClientV2) DisperseBlob(
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 
-	var payment core.PaymentMetadata
+	var payment corev2.PaymentMetadata
 	accountId, err := c.signer.GetAccountID()
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
 	}
 	payment.AccountID = accountId
 	// TODO: add payment metadata
-	payment.BinIndex = 0
+	payment.ReservationPeriod = 0
 	payment.CumulativePayment = big.NewInt(0)
 
 	if len(quorums) == 0 {
@@ -160,7 +160,7 @@ func (c *disperserClientV2) DisperseBlob(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: payment,
+		PaymentMetadata: &payment,
 	}
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {

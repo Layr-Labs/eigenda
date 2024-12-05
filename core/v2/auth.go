@@ -10,3 +10,8 @@ type BlobRequestSigner interface {
 	SignPaymentStateRequest() ([]byte, error)
 	GetAccountID() (string, error)
 }
+
+type PaymentSigner interface {
+	SignBlobPayment(header *PaymentMetadata) ([]byte, error)
+	GetAccountID() string
+}
