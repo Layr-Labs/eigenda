@@ -171,6 +171,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BATCH_SIZE"),
 		Value:    128,
 	}
+	MetricsPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
+		Usage:    "Port to expose metrics",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
+		Value:    9101,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -202,6 +209,7 @@ var optionalFlags = []cli.Flag{
 	NumConcurrentDispersalRequestsFlag,
 	NodeClientCacheNumEntriesFlag,
 	MaxBatchSizeFlag,
+	MetricsPortFlag,
 }
 
 var Flags []cli.Flag

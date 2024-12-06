@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	"testing"
 	"time"
 
@@ -304,6 +305,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond
+
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
 		PullInterval:                1 * time.Second,
 		EncodingRequestTimeout:      5 * time.Second,
@@ -313,7 +315,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger)
+	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)

@@ -34,6 +34,8 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+
+	MetricsPort int
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -89,6 +91,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 	}
 	return config, nil
 }
