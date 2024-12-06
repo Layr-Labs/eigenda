@@ -3,8 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -76,6 +81,22 @@ func RunController(ctx *cli.Context) error {
 		config.DynamoDBTableName,
 	)
 
+	metricsRegistry := prometheus.NewRegistry()
+	metricsRegistry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	metricsRegistry.MustRegister(collectors.NewGoCollector())
+
+	logger.Infof("Starting metrics server at port %d", config.MetricsPort)
+	addr := fmt.Sprintf(":%d", config.MetricsPort)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(
+		metricsRegistry,
+		promhttp.HandlerOpts{},
+	))
+	metricsServer := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -88,6 +109,7 @@ func RunController(ctx *cli.Context) error {
 		encoderClient,
 		chainReader,
 		logger,
+		metricsRegistry,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -153,6 +175,13 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to start dispatcher: %v", err)
 	}
+
+	go func() {
+		err := metricsServer.ListenAndServe()
+		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+			logger.Errorf("metrics metricsServer error: %v", err)
+		}
+	}()
 
 	return nil
 }
