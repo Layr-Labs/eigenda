@@ -24,13 +24,10 @@
     - [StoreChunksReply](#node-StoreChunksReply)
     - [StoreChunksRequest](#node-StoreChunksRequest)
   
-    - [ChunkEncoding](#node-ChunkEncoding)
+    - [ChunkEncodingFormat](#node-ChunkEncodingFormat)
   
     - [Dispersal](#node-Dispersal)
     - [Retrieval](#node-Retrieval)
-  
-- [common/common.proto](#common_common-proto)
-    - [G1Commitment](#common-G1Commitment)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -274,7 +271,7 @@ Node info request
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
-| encoding | [ChunkEncoding](#node-ChunkEncoding) |  | How the above chunks encoded. |
+| chunk_encoding_format | [ChunkEncodingFormat](#node-ChunkEncodingFormat) |  | How the above chunks are encoded. |
 
 
 
@@ -362,9 +359,9 @@ Node info request
  
 
 
-<a name="node-ChunkEncoding"></a>
+<a name="node-ChunkEncodingFormat"></a>
 
-### ChunkEncoding
+### ChunkEncodingFormat
 This describes how the chunks returned in RetrieveChunksReply are encoded.
 Used to facilitate the decoding of chunks.
 
@@ -388,8 +385,8 @@ Used to facilitate the decoding of chunks.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed. |
-| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. |
-| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. |
+| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used |
+| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used |
 | NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
 
 
@@ -403,38 +400,6 @@ Used to facilitate the decoding of chunks.
 | RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node. |
 | GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob. |
 | NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
-
- 
-
-
-
-<a name="common_common-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## common/common.proto
-
-
-
-<a name="common-G1Commitment"></a>
-
-### G1Commitment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-
-
-
-
-
- 
-
- 
-
- 
 
  
 

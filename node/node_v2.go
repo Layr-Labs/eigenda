@@ -34,7 +34,8 @@ type RawBundles struct {
 }
 
 func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
-	if n.RelayClient == nil {
+	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
+	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
 	}
 
@@ -102,7 +103,9 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 		relayKey := relayKey
 		req := requests[relayKey]
 		pool.Submit(func() {
-			bundles, err := n.RelayClient.GetChunksByRange(ctx, relayKey, req.chunkRequests)
+			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
+			defer cancel()
+			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{

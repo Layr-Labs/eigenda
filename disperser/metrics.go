@@ -24,6 +24,7 @@ type Metrics struct {
 	NumBlobRequests *prometheus.CounterVec
 	NumRpcRequests  *prometheus.CounterVec
 	BlobSize        *prometheus.GaugeVec
+	BlobLatency     *prometheus.GaugeVec
 	Latency         *prometheus.SummaryVec
 
 	httpPort string
@@ -78,6 +79,15 @@ func NewMetrics(reg *prometheus.Registry, httpPort string, logger logging.Logger
 			},
 			[]string{"method"},
 		),
+		BlobLatency: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "blob_latency_ms",
+				Help:      "blob dispersal or retrieval latency by size",
+			},
+			[]string{"method", "size_bucket"},
+		),
+
 		registry: reg,
 		httpPort: httpPort,
 		logger:   logger.With("component", "DisperserMetrics"),

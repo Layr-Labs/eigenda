@@ -92,6 +92,7 @@ type Config struct {
 
 	EnableV2                    bool
 	OnchainStateRefreshInterval time.Duration
+	ChunkDownloadTimeout        time.Duration
 
 	PprofHttpPort string
 	EnablePprof   bool
@@ -242,6 +243,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
 		EnableV2:                       ctx.GlobalBool(flags.EnableV2Flag.Name),
 		OnchainStateRefreshInterval:    ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+		ChunkDownloadTimeout:           ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		PprofHttpPort:                  ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                    ctx.GlobalBool(flags.EnablePprof.Name),
 	}, nil

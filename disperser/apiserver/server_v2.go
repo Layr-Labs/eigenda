@@ -10,10 +10,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -31,12 +33,18 @@ type OnchainState struct {
 	TTL                   time.Duration
 }
 
+// Include disperser v1 protos to support grpcurl/reflection of v1 APIs
+type DispersalServerV1 struct {
+	pbv1.UnimplementedDisperserServer
+}
+
 type DispersalServerV2 struct {
 	pb.UnimplementedDisperserServer
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
 	blobMetadataStore *blobstore.BlobMetadataStore
+	meterer           *meterer.Meterer
 
 	chainReader   core.Reader
 	authenticator corev2.BlobRequestAuthenticator
@@ -57,6 +65,7 @@ func NewDispersalServerV2(
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	chainReader core.Reader,
 	ratelimiter common.RateLimiter,
+	meterer *meterer.Meterer,
 	authenticator corev2.BlobRequestAuthenticator,
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
@@ -72,6 +81,7 @@ func NewDispersalServerV2(
 
 		chainReader:   chainReader,
 		authenticator: authenticator,
+		meterer:       meterer,
 		prover:        prover,
 		logger:        logger,
 
@@ -93,6 +103,9 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
+
+	// Unimplemented v1 server for grpcurl/reflection support
+	pbv1.RegisterDisperserServer(gs, &DispersalServerV1{})
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
@@ -206,4 +219,63 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	s.onchainState.Store(onchainState)
 
 	return nil
+}
+
+func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	// validate the signature
+	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+	}
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+
+	// off-chain account specific payment state
+	now := uint64(time.Now().Unix())
+	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
+	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentBinIndex)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+	}
+	// on-Chain account state
+	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get active reservation")
+	}
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, req.AccountId)
+	if err != nil {
+		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+	}
+
+	paymentGlobalParams := pb.PaymentGlobalParams{
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
+	}
+
+	quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+	for i, v := range reservation.QuorumNumbers {
+		quorumNumbers[i] = uint32(v)
+	}
+	// build reply
+	reply := &pb.GetPaymentStateReply{
+		PaymentGlobalParams: &paymentGlobalParams,
+		BinRecords:          binRecords[:],
+		Reservation: &pb.Reservation{
+			SymbolsPerSecond: reservation.SymbolsPerSec,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
+			QuorumNumbers:    quorumNumbers,
+		},
+		CumulativePayment:        largestCumulativePayment.Bytes(),
+		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+	}
+	return reply, nil
 }

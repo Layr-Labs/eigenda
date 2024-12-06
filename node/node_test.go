@@ -82,23 +82,21 @@ func newComponents(t *testing.T) *components {
 		panic("failed to create a new levelDB store")
 	}
 	defer os.Remove(dbPath)
-	relayClient := clientsmock.NewRelayClient()
 	n := &node.Node{
-		Config:      config,
-		Logger:      logger,
-		KeyPair:     keyPair,
-		Metrics:     nil,
-		Store:       store,
-		ChainState:  chainState,
-		Validator:   mockVal,
-		Transactor:  tx,
-		RelayClient: relayClient,
+		Config:     config,
+		Logger:     logger,
+		KeyPair:    keyPair,
+		Metrics:    nil,
+		Store:      store,
+		ChainState: chainState,
+		Validator:  mockVal,
+		Transactor: tx,
 	}
 	n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	return &components{
 		node:        n,
 		tx:          tx,
-		relayClient: relayClient,
+		relayClient: clientsmock.NewRelayClient(),
 	}
 }
 

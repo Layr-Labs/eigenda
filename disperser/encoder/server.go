@@ -99,13 +99,6 @@ func (s *EncoderServer) Start() error {
 	return gs.Serve(listener)
 }
 
-func (s *EncoderServer) Close() {
-	if s.close == nil {
-		return
-	}
-	s.close()
-}
-
 func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
 	startTime := time.Now()
 	blobSize := len(req.GetData())
@@ -193,7 +186,6 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 	}
 
 	var chunksData [][]byte
-
 	var format pb.ChunkEncodingFormat
 	if s.config.EnableGnarkChunkEncoding {
 		format = pb.ChunkEncodingFormat_GNARK
@@ -227,4 +219,11 @@ func (s *EncoderServer) handleEncoding(ctx context.Context, req *pb.EncodeBlobRe
 		Chunks:              chunksData,
 		ChunkEncodingFormat: format,
 	}, nil
+}
+
+func (s *EncoderServer) Close() {
+	if s.close == nil {
+		return
+	}
+	s.close()
 }

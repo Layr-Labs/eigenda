@@ -10,5 +10,6 @@ if output=$(git status --porcelain) && [ -z "$output" ]; then
 else
   echo "Repository is dirty:"
   git status
+  git diff
   exit 1
 fi

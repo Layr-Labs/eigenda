@@ -33,6 +33,7 @@ clean:
 # Builds the protobuf files inside a docker container.
 protoc: clean
 	./api/builder/protoc-docker.sh
+	./api/builder/generate-docs.sh
 
 # Builds the protobuf files locally (i.e. without docker).
 protoc-local: clean
@@ -86,7 +87,6 @@ integration-tests-dataapi:
 docker-release-build:
 	BUILD_TAG=${SEMVER} SEMVER=${SEMVER} GITDATE=${GITDATE} GIT_SHA=${GITSHA} GIT_SHORT_SHA=${GITCOMMIT} \
 	docker buildx bake node-group-release ${PUSH_FLAG}
-
 
 semver:
 	echo "${SEMVER}"

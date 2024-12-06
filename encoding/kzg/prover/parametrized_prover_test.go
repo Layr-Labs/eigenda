@@ -14,8 +14,8 @@ import (
 )
 
 func TestProveAllCosetThreads(t *testing.T) {
-
-	group, _ := prover.NewProver(kzgConfig, true)
+	group, err := prover.NewProver(kzgConfig, nil)
+	require.NoError(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
@@ -37,9 +37,12 @@ func TestProveAllCosetThreads(t *testing.T) {
 		assert.Equal(t, j, q, "leading coset inconsistency")
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
-		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+		rs, err := enc.GetRsEncoder(params)
+		require.Nil(t, err)
 
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		lc := rs.Fs.ExpandedRootsOfUnity[uint64(j)]
+
+		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 		require.Nil(t, err)
 		assert.Nil(t, verifier.VerifyFrame(&f, enc.Ks, commit, &lc, &g2Atn), "Proof %v failed\n", i)
 	}

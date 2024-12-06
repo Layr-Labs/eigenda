@@ -62,8 +62,7 @@ func newChunkProvider(
 	}
 
 	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		computeFramesCacheWeight,
-		cacheSize,
+		cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)

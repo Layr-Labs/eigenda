@@ -95,7 +95,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			},
 			MetricsPort: ctx.Int(flags.MetricsPortFlag.Name),
 		},
-		EthClientConfig:               geth.ReadEthClientConfig(ctx),
+		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),

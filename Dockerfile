@@ -22,6 +22,7 @@ COPY contracts /app/contracts
 COPY indexer /app/indexer
 COPY encoding /app/encoding
 COPY relay /app/relay
+COPY inabox /app/inabox
 
 # Churner build stage
 FROM common-builder AS churner-builder
@@ -91,6 +92,19 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -o ./bin/nodeplugin ./plugin/cmd
 
+# Controller build stage
+FROM common-builder AS controller-builder
+WORKDIR /app/disperser
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o ./bin/controller ./cmd/controller
+
+# Relay build stage
+FROM common-builder AS relay-builder
+WORKDIR /app/relay
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o ./bin/relay ./cmd
 
 # Final stages for each component
 FROM alpine:3.18 AS churner
@@ -124,3 +138,11 @@ ENTRYPOINT ["node"]
 FROM alpine:3.18 AS nodeplugin
 COPY --from=node-plugin-builder /app/node/bin/nodeplugin /usr/local/bin
 ENTRYPOINT ["nodeplugin"]
+
+FROM alpine:3.18 AS controller
+COPY --from=controller-builder /app/disperser/bin/controller /usr/local/bin
+ENTRYPOINT ["controller"]
+
+FROM alpine:3.18 AS relay
+COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
+ENTRYPOINT ["relay"]

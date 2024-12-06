@@ -3,6 +3,7 @@ package flags
 import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
@@ -67,6 +68,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_GNARK_CHUNK_ENCODING"),
 	}
+	GPUEnableFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "gpu-enable"),
+		Usage:    "Enable GPU, falls back to CPU if not available",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GPU_ENABLE"),
+	}
+	BackendFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "backend"),
+		Usage:    "Backend to use for encoding",
+		Required: false,
+		Value:    string(encoding.GnarkBackend),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BACKEND"),
+	}
 	PreventReencodingFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "prevent-reencoding"),
 		Usage:    "if true, will prevent reencoding of chunks by checking if the chunk already exists in the chunk store",
@@ -100,6 +114,8 @@ var optionalFlags = []cli.Flag{
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
 	S3BucketNameFlag,
+	GPUEnableFlag,
+	BackendFlag,
 	PreventReencodingFlag,
 	PprofHttpPort,
 	EnablePprof,

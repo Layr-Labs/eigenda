@@ -1,9 +1,8 @@
-package relay
+package metrics
 
 import (
 	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/Layr-Labs/eigenda/relay/cache"
-	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
@@ -34,6 +33,10 @@ type RelayMetrics struct {
 	GetBlobDataLatency     metrics.LatencyMetric
 	GetBlobRateLimited     metrics.CountMetric
 	GetBlobDataSize        metrics.GaugeMetric
+}
+
+type RateLimitLabel struct {
+	Reason string
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -115,7 +118,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 	getChunksRateLimited, err := server.NewCountMetric(
 		"get_chunks_rate_limited",
 		"Number of GetChunks RPC rate limited",
-		limiter.RateLimitLabel{})
+		RateLimitLabel{})
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +171,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 	getBlobRateLimited, err := server.NewCountMetric(
 		"get_blob_rate_limited",
 		"Number of GetBlob RPC rate limited",
-		limiter.RateLimitLabel{})
+		RateLimitLabel{})
 	if err != nil {
 		return nil, err
 	}

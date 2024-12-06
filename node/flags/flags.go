@@ -238,6 +238,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    1 * time.Hour,
 	}
+	ChunkDownloadTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chunk-download-timeout"),
+		Usage:    "The timeout for downloading chunks from the relay (default: 30s)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
+		Value:    20 * time.Second,
+	}
 
 	// Test only, DO NOT USE the following flags in production
 
@@ -381,6 +388,7 @@ var optionalFlags = []cli.Flag{
 	BLSSignerCertFileFlag,
 	EnableV2Flag,
 	OnchainStateRefreshIntervalFlag,
+	ChunkDownloadTimeoutFlag,
 	PprofHttpPort,
 	EnablePprof,
 	DBSizePollPeriodFlag,

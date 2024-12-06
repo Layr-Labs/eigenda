@@ -35,14 +35,15 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(config, true)
+	p, err := prover.NewProver(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}

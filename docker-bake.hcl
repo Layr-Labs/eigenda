@@ -30,13 +30,23 @@ variable "GITDATE" {
 }
 
 # GROUPS
-
 group "default" {
   targets = ["all"]
 }
 
 group "all" {
-  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi", "traffic-generator"]
+  targets = [
+    "node-group",
+    "batcher",
+    "disperser",
+    "encoder",
+    "retriever",
+    "churner",
+    "dataapi",
+    "traffic-generator",
+    "controller",
+    "relay"
+  ]
 }
 
 group "node-group" {
@@ -50,17 +60,36 @@ group "node-group-release" {
 
 # Github CI builds
 group "ci-release" {
-  targets = ["node-group", "batcher", "disperser", "encoder", "retriever", "churner", "dataapi"]
+  targets = [
+    "node-group",
+    "batcher",
+    "disperser",
+    "encoder",
+    "retriever",
+    "churner",
+    "dataapi",
+    "controller",
+    "relay"
+  ]
 }
 
 # Internal devops builds
 group "internal-release" {
-  targets = ["node-internal", "batcher-internal", "disperser-internal", "encoder-internal", "retriever-internal", "churner-internal", "dataapi-internal", "traffic-generator-internal"]
+  targets = [
+    "node-internal",
+    "batcher-internal",
+    "disperser-internal",
+    "encoder-internal",
+    "retriever-internal",
+    "churner-internal",
+    "dataapi-internal",
+    "traffic-generator-internal",
+    "controller-internal",
+    "relay-internal"
+  ]
 }
 
-
 # DISPERSER TARGETS
-
 target "batcher" {
   context    = "."
   dockerfile = "./Dockerfile"
@@ -70,10 +99,11 @@ target "batcher" {
 
 target "batcher-internal" {
   inherits = ["batcher"]
-  tags       = ["${REGISTRY}/eigenda-batcher:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-batcher:${GIT_SHA}",
-                "${REGISTRY}/eigenda-batcher:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-batcher:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-batcher:${GIT_SHA}",
+    "${REGISTRY}/eigenda-batcher:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "disperser" {
@@ -85,10 +115,11 @@ target "disperser" {
 
 target "disperser-internal" {
   inherits = ["disperser"]
-  tags       = ["${REGISTRY}/eigenda-disperser:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-disperser:${GIT_SHA}",
-                "${REGISTRY}/eigenda-disperser:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-disperser:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-disperser:${GIT_SHA}",
+    "${REGISTRY}/eigenda-disperser:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "encoder" {
@@ -98,12 +129,28 @@ target "encoder" {
   tags       = ["${REGISTRY}/${REPO}/encoder:${BUILD_TAG}"]
 }
 
+target "encoder-icicle" {
+  context    = "."
+  dockerfile = "./disperser/cmd/encoder/icicle.Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/encoder-icicle:${BUILD_TAG}"]
+}
+
 target "encoder-internal" {
   inherits = ["encoder"]
-  tags       = ["${REGISTRY}/eigenda-encoder:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-encoder:${GIT_SHA}",
-                "${REGISTRY}/eigenda-encoder:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-encoder:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-encoder:${GIT_SHA}",
+    "${REGISTRY}/eigenda-encoder:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "encoder-icicle-internal" {
+  inherits = ["encoder-icicle"]
+  tags     = [
+    "${REGISTRY}/eigenda-encoder-icicle:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-encoder-icicle:${GIT_SHA}",
+    "${REGISTRY}/eigenda-encoder-icicle:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "retriever" {
@@ -115,10 +162,11 @@ target "retriever" {
 
 target "retriever-internal" {
   inherits = ["retriever"]
-  tags       = ["${REGISTRY}/eigenda-retriever:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-retriever:${GIT_SHA}",
-                "${REGISTRY}/eigenda-retriever:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-retriever:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-retriever:${GIT_SHA}",
+    "${REGISTRY}/eigenda-retriever:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "churner" {
@@ -130,10 +178,11 @@ target "churner" {
 
 target "churner-internal" {
   inherits = ["churner"]
-  tags       = ["${REGISTRY}/eigenda-churner:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-churner:${GIT_SHA}",
-                "${REGISTRY}/eigenda-churner:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-churner:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-churner:${GIT_SHA}",
+    "${REGISTRY}/eigenda-churner:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "traffic-generator" {
@@ -145,10 +194,11 @@ target "traffic-generator" {
 
 target "traffic-generator-internal" {
   inherits = ["traffic-generator"]
-  tags       = ["${REGISTRY}/eigenda-traffic-generator:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-traffic-generator:${GIT_SHA}",
-                "${REGISTRY}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-traffic-generator:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-traffic-generator:${GIT_SHA}",
+    "${REGISTRY}/eigenda-traffic-generator:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "traffic-generator2" {
@@ -160,9 +210,26 @@ target "traffic-generator2" {
 
 target "traffic-generator2-internal" {
   inherits = ["traffic-generator2"]
-  tags       = ["${REGISTRY}/eigenda-traffic-generator2:${BUILD_TAG}",
+  tags     = [
+    "${REGISTRY}/eigenda-traffic-generator2:${BUILD_TAG}",
     "${REGISTRY}/eigenda-traffic-generator2:${GIT_SHA}",
-    "${REGISTRY}/eigenda-traffic-generator2:sha-${GIT_SHORT_SHA}",
+    "${REGISTRY}/eigenda-traffic-generator2:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "relay" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "relay"
+  tags       = ["${REGISTRY}/${REPO}/relay:${BUILD_TAG}"]
+}
+
+target "relay-internal" {
+  inherits = ["relay"]
+  tags     = [
+    "${REGISTRY}/eigenda-relay:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-relay:${GIT_SHA}",
+    "${REGISTRY}/eigenda-relay:sha-${GIT_SHORT_SHA}"
   ]
 }
 
@@ -175,19 +242,34 @@ target "dataapi" {
 
 target "dataapi-internal" {
   inherits = ["dataapi"]
-  tags       = ["${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
-                "${REGISTRY}/eigenda-dataapi:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
+    "${REGISTRY}/eigenda-dataapi:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "controller" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/controller:${BUILD_TAG}"]
+}
+
+target "controller-internal" {
+  inherits = ["controller"]
+  tags     = [
+    "${REGISTRY}/eigenda-controller:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-controller:${GIT_SHA}",
+    "${REGISTRY}/eigenda-controller:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 # NODE TARGETS
-
 target "node" {
   context    = "."
   dockerfile = "./Dockerfile"
   target     = "node"
-  args = {
+  args       = {
     SEMVER    = "${SEMVER}"
     GITCOMMIT = "${GIT_SHORT_SHA}"
     GITDATE   = "${GITDATE}"
@@ -197,10 +279,11 @@ target "node" {
 
 target "node-internal" {
   inherits = ["node"]
-  tags       = ["${REGISTRY}/eigenda-node:${BUILD_TAG}",
-                "${REGISTRY}/eigenda-node:${GIT_SHA}",
-                "${REGISTRY}/eigenda-node:sha-${GIT_SHORT_SHA}",
-               ]
+  tags     = [
+    "${REGISTRY}/eigenda-node:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-node:${GIT_SHA}",
+    "${REGISTRY}/eigenda-node:sha-${GIT_SHORT_SHA}"
+  ]
 }
 
 target "nodeplugin" {
@@ -211,7 +294,6 @@ target "nodeplugin" {
 }
 
 # PUBLIC RELEASE TARGETS
-
 target "_release" {
   platforms = ["linux/amd64", "linux/arm64"]
 }

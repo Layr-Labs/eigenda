@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"net"
 	"time"
 
@@ -59,7 +60,7 @@ type Server struct {
 	chainReader core.Reader
 
 	// metrics encapsulates the metrics for the relay server.
-	metrics *RelayMetrics
+	metrics *metrics.RelayMetrics
 }
 
 type Config struct {
@@ -130,7 +131,8 @@ func NewServer(
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
-	ics core.IndexedChainState) (*Server, error) {
+	ics core.IndexedChainState,
+) (*Server, error) {
 
 	if chainReader == nil {
 		return nil, errors.New("chainReader is required")
@@ -141,9 +143,9 @@ func NewServer(
 		return nil, fmt.Errorf("error fetching blob params: %w", err)
 	}
 
-	metrics, err := NewRelayMetrics(logger, config.MetricsPort)
+	relayMetrics, err := metrics.NewRelayMetrics(logger, config.MetricsPort)
 	if err != nil {
-		return nil, fmt.Errorf("error creating metrics: %w", err)
+		return nil, fmt.Errorf("error creating relayMetrics: %w", err)
 	}
 
 	mp, err := newMetadataProvider(
@@ -155,7 +157,7 @@ func NewServer(
 		config.RelayIDs,
 		config.Timeouts.InternalGetMetadataTimeout,
 		v2.NewBlobVersionParameterMap(blobParams),
-		metrics.MetadataCacheMetrics)
+		relayMetrics.MetadataCacheMetrics)
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata provider: %w", err)
@@ -168,7 +170,7 @@ func NewServer(
 		config.BlobCacheBytes,
 		config.BlobMaxConcurrency,
 		config.Timeouts.InternalGetBlobTimeout,
-		metrics.BlobCacheMetrics)
+		relayMetrics.BlobCacheMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("error creating blob provider: %w", err)
 	}
@@ -181,7 +183,7 @@ func NewServer(
 		config.ChunkMaxConcurrency,
 		config.Timeouts.InternalGetProofsTimeout,
 		config.Timeouts.InternalGetCoefficientsTimeout,
-		metrics.ChunkCacheMetrics)
+		relayMetrics.ChunkCacheMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("error creating chunk provider: %w", err)
 	}
@@ -204,10 +206,10 @@ func NewServer(
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
-		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, metrics.GetBlobRateLimited),
-		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, metrics.GetChunksRateLimited),
+		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
+		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
 		authenticator:    authenticator,
-		metrics:          metrics,
+		metrics:          relayMetrics,
 	}, nil
 }
 
@@ -346,8 +348,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf("error gathering chunk data: %w", err)
 	}
 
-	finishedFetchingData := time.Now()
-	s.metrics.GetChunksDataLatency.ReportLatency(finishedFetchingData.Sub(finishedFetchingMetadata))
+	s.metrics.GetChunksDataLatency.ReportLatency(time.Since(finishedFetchingMetadata))
 	s.metrics.GetChunksLatency.ReportLatency(time.Since(start))
 
 	return &pb.GetChunksReply{

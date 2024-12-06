@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
@@ -16,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
+
+const MinNumBins int32 = 3
 
 type OffchainStore struct {
 	dynamoClient         commondynamodb.Client
@@ -236,4 +239,98 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 
 	return prevPayment, nextPayment, nextDataLength, nil
+}
+
+func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, binIndex uint32) ([MinNumBins]*pb.BinRecord, error) {
+	// Fetch the 3 bins start from the current bin
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.reservationTableName),
+		KeyConditionExpression: aws.String("AccountID = :account AND BinIndex > :binIndex"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":account":  &types.AttributeValueMemberS{Value: accountID},
+			":binIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
+		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(MinNumBins),
+	}
+	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+	}
+
+	records := [MinNumBins]*pb.BinRecord{}
+	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
+		binRecord, err := parseBinRecord(bins[i])
+		if err != nil {
+			return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+		}
+		records[i] = binRecord
+	}
+
+	return records, nil
+}
+
+func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID string) (*big.Int, error) {
+	// Fetch the largest cumulative payment
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.onDemandTableName),
+		KeyConditionExpression: aws.String("AccountID = :account"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":account": &types.AttributeValueMemberS{Value: accountID},
+		},
+		ScanIndexForward: aws.Bool(false),
+		Limit:            aws.Int32(1),
+	}
+	payments, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query payments for account: %w", err)
+	}
+
+	if len(payments) == 0 {
+		return nil, nil
+	}
+
+	payment, err := strconv.ParseUint(payments[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse payment: %w", err)
+	}
+
+	return new(big.Int).SetUint64(payment), nil
+}
+
+func parseBinRecord(bin map[string]types.AttributeValue) (*pb.BinRecord, error) {
+	binIndex, ok := bin["BinIndex"]
+	if !ok {
+		return nil, errors.New("BinIndex is not present in the response")
+	}
+
+	binIndexAttr, ok := binIndex.(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for BinIndex: %T", binIndex)
+	}
+
+	binIndexValue, err := strconv.ParseUint(binIndexAttr.Value, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse BinIndex: %w", err)
+	}
+
+	binUsage, ok := bin["BinUsage"]
+	if !ok {
+		return nil, errors.New("BinUsage is not present in the response")
+	}
+
+	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+	}
+
+	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
+	}
+
+	return &pb.BinRecord{
+		Index: uint32(binIndexValue),
+		Usage: uint64(binUsageValue),
+	}, nil
 }

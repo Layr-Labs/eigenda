@@ -2,6 +2,7 @@ package node_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
@@ -189,6 +190,6 @@ func createStoreV2(t *testing.T) (node.StoreV2, kvstore.TableStore) {
 	config.Schema = []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}
 	tStore, err := tablestore.Start(logger, config)
 	require.NoError(t, err)
-	s := node.NewLevelDBStoreV2(tStore, logger)
+	s := node.NewLevelDBStoreV2(tStore, logger, 10*time.Second)
 	return s, tStore
 }

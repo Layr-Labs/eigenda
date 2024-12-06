@@ -48,9 +48,6 @@ type cacheAccessor[K comparable, V any] struct {
 	// cache is the underlying cache that this wrapper manages.
 	cache Cache[K, V]
 
-	// weightCalculator is the function used to calculate the weight of a key-value pair.
-	calculator WeightCalculator[K, V]
-
 	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
 	concurrencyLimiter chan struct{}
 
@@ -59,10 +56,6 @@ type cacheAccessor[K comparable, V any] struct {
 
 	// accessor is the function used to fetch values that are not in the cache.
 	accessor Accessor[K, V]
-
-	// insertionTimes is a map of keys to the time they were inserted into the cache. Used to calculate the average
-	// lifespan of items in the cache.
-	insertionTimes map[K]time.Time
 
 	// metrics is used to record metrics about the cache accessor's performance.
 	metrics *CacheAccessorMetrics
@@ -77,8 +70,7 @@ type cacheAccessor[K comparable, V any] struct {
 // If metrics is not nil, it will be used to record metrics about the cache accessor's performance.
 // If nil, no metrics will be recorded.
 func NewCacheAccessor[K comparable, V any](
-	calculator WeightCalculator[K, V],
-	maxWeight uint64,
+	cache Cache[K, V],
 	concurrencyLimit int,
 	accessor Accessor[K, V],
 	metrics *CacheAccessorMetrics) (CacheAccessor[K, V], error) {
@@ -90,29 +82,11 @@ func NewCacheAccessor[K comparable, V any](
 		concurrencyLimiter = make(chan struct{}, concurrencyLimit)
 	}
 
-	insertionTimes := make(map[K]time.Time)
-	var evictionHandler func(K, V)
-	if metrics != nil {
-		// If metrics are enabled, track the amount of time each item spends in the cache.
-		// Thread safety is provided by the cacheLock.
-		evictionHandler = func(key K, _ V) {
-			if insertionTime, ok := insertionTimes[key]; ok {
-				lifespan := time.Since(insertionTime).Milliseconds()
-				metrics.lifespan.Set(float64(lifespan))
-				delete(insertionTimes, key)
-			}
-		}
-	}
-
-	cache := NewFIFOCache(maxWeight, calculator, evictionHandler)
-
 	return &cacheAccessor[K, V]{
 		cache:              cache,
-		calculator:         calculator,
 		concurrencyLimiter: concurrencyLimiter,
 		accessor:           accessor,
 		lookupsInProgress:  lookupsInProgress,
-		insertionTimes:     insertionTimes,
 		metrics:            metrics,
 	}, nil
 }
@@ -207,7 +181,6 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 			c.cache.Put(key, value)
 
 			if c.metrics != nil {
-				c.insertionTimes[key] = time.Now()
 				size := c.cache.Size()
 				weight := c.cache.Weight()
 				c.metrics.size.Set(float64(size))

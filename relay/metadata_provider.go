@@ -76,8 +76,7 @@ func newMetadataProvider(
 	server.blobParamsMap.Store(blobParamsMap)
 
 	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
-		nil,
-		uint64(metadataCacheSize),
+		cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil),
 		maxIOConcurrency,
 		server.fetchMetadata,
 		metrics)
