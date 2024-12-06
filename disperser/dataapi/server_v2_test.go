@@ -37,9 +37,13 @@ var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *dataapi.ServerV2
 
-	logger             = logging.NewNoopLogger()
+	logger = logging.NewNoopLogger()
+
+	// Local stack
+	localStackPort     = "4566"
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
+	deployLocalStack   bool
 )
 
 func TestMain(m *testing.M) {
@@ -50,17 +54,24 @@ func TestMain(m *testing.M) {
 }
 
 func teardown() {
-	deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	if deployLocalStack {
+		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
 }
 
 func setup(m *testing.M) {
 	// Start localstack
-	localStackPort := "4455"
-	var err error
-	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
-	if err != nil {
-		teardown()
-		panic("failed to start localstack container")
+	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	if !deployLocalStack {
+		localStackPort = os.Getenv("LOCALSTACK_PORT")
+	}
+	if deployLocalStack {
+		var err error
+		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+		if err != nil {
+			teardown()
+			panic("failed to start localstack container")
+		}
 	}
 
 	// Create DynamoDB table
@@ -71,7 +82,7 @@ func setup(m *testing.M) {
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 	metadataTableName := fmt.Sprintf("test-BlobMetadata-%v", uuid.New())
-	_, err = test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
+	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())
