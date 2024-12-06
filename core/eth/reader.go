@@ -671,14 +671,10 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		reservationsMap[accountIDs[i]] = &reservation
-	}
-
-	// filter out all zero-valued reservations
-	for accountID, reservation := range reservationsMap {
-		if isZeroValuedReservation(*reservation) {
-			delete(reservationsMap, accountID)
+		if isZeroValuedReservation(reservation) {
+			delete(reservationsMap, accountIDs[i])
 		}
+		reservationsMap[accountIDs[i]] = &reservation
 	}
 
 	return reservationsMap, nil
@@ -714,15 +710,11 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 
 	// since payments are returned in the same order as the accountIDs, we can directly map them
 	for i, payment := range payments {
+		if payment.Cmp(big.NewInt(0)) == 0 {
+			delete(paymentsMap, accountIDs[i])
+		}
 		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
 			CumulativePayment: payment,
-		}
-	}
-
-	// filter out all zero-valued payments
-	for accountID, payment := range paymentsMap {
-		if payment.CumulativePayment.Cmp(big.NewInt(0)) == 0 {
-			delete(paymentsMap, accountID)
 		}
 	}
 
@@ -739,7 +731,7 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 	if err != nil {
 		return nil, err
 	}
-	if onDemandPayment == big.NewInt(0) {
+	if onDemandPayment.Cmp(big.NewInt(0)) == 0 {
 		return nil, errors.New("ondemand payment does not exist for given account")
 	}
 	return &core.OnDemandPayment{

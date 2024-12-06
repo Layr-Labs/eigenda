@@ -599,8 +599,6 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 	}
 }
 
-// OperatorInfo contains information about an operator which is stored on the blockchain state,
-// corresponding to a particular quorum
 type ActiveReservation = paymentvault.IPaymentVaultReservation
 
 type OnDemandPayment struct {

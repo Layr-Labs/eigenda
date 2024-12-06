@@ -146,6 +146,8 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 
 // GetActiveReservationByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+	pcs.ReservationsLock.RLock()
+	defer pcs.ReservationsLock.RUnlock()
 	if reservation, ok := (pcs.ActiveReservations)[accountID]; ok {
 		return reservation, nil
 	}
@@ -172,6 +174,8 @@ func (pcs *OnchainPaymentState) GetActiveReservationByAccountOnChain(ctx context
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	pcs.OnDemandLocks.RLock()
+	defer pcs.OnDemandLocks.RUnlock()
 	if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
 		return payment, nil
 	}
