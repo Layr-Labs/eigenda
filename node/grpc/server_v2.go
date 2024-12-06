@@ -110,7 +110,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return
 		}
 
-		s.metrics.StoreChunksDataSize.Set(float64(size))
+		s.metrics.ReportStoreChunksDataSize(size)
 
 		storeChan <- storeResult{
 			keys: keys,
@@ -137,7 +137,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	sig := s.node.KeyPair.SignMessage(batchHeaderHash).Bytes()
 
 	timeElapsed := time.Since(start)
-	s.metrics.StoreChunksLatency.ReportLatency(timeElapsed)
+	s.metrics.ReportStoreChunksLatency(timeElapsed)
 
 	return &pb.StoreChunksReply{
 		Signature: sig[:],
@@ -187,10 +187,10 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	for _, chunk := range chunks {
 		size += uint64(len(chunk))
 	}
-	s.metrics.GetChunksDataSize.Set(float64(size))
+	s.metrics.ReportGetChunksDataSize(size)
 
 	elapsed := time.Since(start)
-	s.metrics.GetChunksLatency.ReportLatency(elapsed)
+	s.metrics.ReportGetChunksLatency(elapsed)
 
 	return &pb.GetChunksReply{
 		Chunks: chunks,

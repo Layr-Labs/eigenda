@@ -24,10 +24,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 		return errors.New("node V2 server is not configured")
 	}
 
-	err := serverV2.metrics.Start()
-	if err != nil {
-		return fmt.Errorf("failed to start metrics: %v", err)
-	}
+	serverV2.metrics.Start()
 
 	go func() {
 		for {
