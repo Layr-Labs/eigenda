@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -38,7 +37,7 @@ type OnchainPaymentState struct {
 	ReservationsLock sync.RWMutex
 	OnDemandLocks    sync.RWMutex
 
-	PaymentVaultParams *PaymentVaultParams
+	PaymentVaultParams atomic.Pointer[PaymentVaultParams]
 }
 
 type PaymentVaultParams struct {
@@ -50,18 +49,21 @@ type PaymentVaultParams struct {
 	OnDemandQuorumNumbers  []uint8
 }
 
-func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (OnchainPaymentState, error) {
+func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (*OnchainPaymentState, error) {
 	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
 	if err != nil {
-		return OnchainPaymentState{}, err
+		return nil, err
 	}
 
-	return OnchainPaymentState{
+	state := OnchainPaymentState{
 		tx:                 tx,
 		ActiveReservations: make(map[gethcommon.Address]*core.ActiveReservation),
 		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
-		PaymentVaultParams: paymentVaultParams,
-	}, nil
+		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
+	}
+	state.PaymentVaultParams.Store(paymentVaultParams)
+
+	return &state, nil
 }
 
 func GetPaymentVaultParams(ctx context.Context, tx *eth.Reader) (*PaymentVaultParams, error) {
@@ -111,7 +113,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		return err
 	}
 	// These parameters should be rarely updated, but we refresh them anyway
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&pcs.PaymentVaultParams)), unsafe.Pointer(paymentVaultParams))
+	pcs.PaymentVaultParams.Store(paymentVaultParams)
 
 	pcs.ReservationsLock.Lock()
 	accountIDs := make([]gethcommon.Address, 0, len(pcs.ActiveReservations))
@@ -202,21 +204,21 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 }
 
 func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
-	return pcs.PaymentVaultParams.GlobalSymbolsPerSecond
+	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
 }
 
 func (pcs *OnchainPaymentState) GetGlobalRateBinInterval() uint64 {
-	return pcs.PaymentVaultParams.GlobalRateBinInterval
+	return pcs.PaymentVaultParams.Load().GlobalRateBinInterval
 }
 
 func (pcs *OnchainPaymentState) GetMinNumSymbols() uint32 {
-	return pcs.PaymentVaultParams.MinNumSymbols
+	return pcs.PaymentVaultParams.Load().MinNumSymbols
 }
 
 func (pcs *OnchainPaymentState) GetPricePerSymbol() uint32 {
-	return pcs.PaymentVaultParams.PricePerSymbol
+	return pcs.PaymentVaultParams.Load().PricePerSymbol
 }
 
 func (pcs *OnchainPaymentState) GetReservationWindow() uint32 {
-	return pcs.PaymentVaultParams.ReservationWindow
+	return pcs.PaymentVaultParams.Load().ReservationWindow
 }

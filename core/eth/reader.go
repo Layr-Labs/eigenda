@@ -728,7 +728,7 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 		return nil, err
 	}
 	if onDemandPayment == big.NewInt(0) {
-		return nil, errors.New("on-demand payment is zero-valued")
+		return nil, errors.New("ondemand payment does not exist for given account")
 	}
 	return &core.OnDemandPayment{
 		CumulativePayment: onDemandPayment,
