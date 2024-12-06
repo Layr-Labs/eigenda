@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"log"
 	"math"
 	"math/big"
@@ -418,7 +419,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2 := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
+		serverV2, err := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
+		require.NoError(t, err)
 
 		ops[id] = TestOperator{
 			Node:     n,
