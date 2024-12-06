@@ -174,6 +174,7 @@ func (m *V2Metrics) Start() {
 
 // Stop stops the metrics server.
 func (m *V2Metrics) Stop() error {
+	m.isAlive.Store(false)
 	return m.server.Close()
 }
 
