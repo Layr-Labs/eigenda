@@ -19,5 +19,5 @@ lightnode/docker/args.sh
 
 icicle/*
 
-# Just to make sure somebody doesn't accidentally commit the disperser's private TLS key.
-eigenda-disperser-private.key
+# Just to make sure somebody doesn't accidentally commit the disperser's private key.
+eigenda-disperser-private.pem
