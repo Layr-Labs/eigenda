@@ -953,7 +953,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                 </tr>
               
                 <tr>
-                  <td>bin_index</td>
+                  <td>reservation_period</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
                   <td><p> </p></td>
@@ -962,6 +962,13 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                 <tr>
                   <td>cumulative_payment</td>
                   <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -1713,7 +1720,7 @@ corresponding to the key used by the client to sign the BlobAuthHeader. </p></td
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p>Payment header contains AccountID, BinIndex, and CumulativePayment </p></td>
+                  <td><p>Payment header contains AccountID, ReservationPeriod, and CumulativePayment </p></td>
                 </tr>
               
                 <tr>
