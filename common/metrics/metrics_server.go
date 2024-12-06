@@ -24,8 +24,8 @@ type metrics struct {
 	// logger is the logger used to log messages.
 	logger logging.Logger
 
-	// config is the configuration for the metrics.
-	config *Config
+	// namespace is prepended to all metric names.
+	namespace string
 
 	// registry is the prometheus registry used to report metrics.
 	registry *prometheus.Registry
@@ -55,13 +55,13 @@ type metrics struct {
 }
 
 // NewMetrics creates a new Metrics instance.
-func NewMetrics(logger logging.Logger, config *Config) Metrics {
+func NewMetrics(logger logging.Logger, namespace string, port int) Metrics {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 
-	logger.Infof("Starting metrics server at port %d", config.HTTPPort)
-	addr := fmt.Sprintf(":%d", config.HTTPPort)
+	logger.Infof("Starting metrics server at port %d", port)
+	addr := fmt.Sprintf(":%d", port)
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(
 		reg,
@@ -74,7 +74,7 @@ func NewMetrics(logger logging.Logger, config *Config) Metrics {
 
 	m := &metrics{
 		logger:       logger,
-		config:       config,
+		namespace:    namespace,
 		registry:     reg,
 		metricMap:    make(map[metricID]Metric),
 		isAlive:      atomic.Bool{},
@@ -198,7 +198,7 @@ func (m *metrics) NewLatencyMetric(
 	metric, err := newLatencyMetric(
 		m.logger,
 		m.registry,
-		m.config.Namespace,
+		m.namespace,
 		name,
 		description,
 		objectives,
@@ -238,7 +238,7 @@ func (m *metrics) NewCountMetric(
 	metric, err := newCountMetric(
 		m.logger,
 		m.registry,
-		m.config.Namespace,
+		m.namespace,
 		name, description,
 		labelTemplate)
 
@@ -287,7 +287,7 @@ func (m *metrics) newGaugeMetricUnsafe(
 	metric, err := newGaugeMetric(
 		m.logger,
 		m.registry,
-		m.config.Namespace,
+		m.namespace,
 		name,
 		unit,
 		description,
@@ -368,7 +368,7 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 	}
 	slices.SortFunc(metricIDs, sortFunc)
 
-	sb.Write([]byte(fmt.Sprintf("# Metrics Documentation for namespace '%s'\n\n", m.config.Namespace)))
+	sb.Write([]byte(fmt.Sprintf("# Metrics Documentation for namespace '%s'\n\n", m.namespace)))
 	sb.Write([]byte(fmt.Sprintf("This documentation was automatically generated at time `%s`\n\n",
 		time.Now().Format(time.RFC3339))))
 
@@ -402,7 +402,7 @@ func (m *metrics) GenerateMetricsDocumentation() string {
 			sb.Write([]byte(fmt.Sprintf("| **Quantiles** | %s |\n", m.quantilesMap[*id])))
 		}
 		sb.Write([]byte(fmt.Sprintf("| **Fully Qualified Name** | `%s_%s_%s` |\n",
-			m.config.Namespace, id.name, id.unit)))
+			m.namespace, id.name, id.unit)))
 	}
 
 	return sb.String()
@@ -427,4 +427,8 @@ func (m *metrics) WriteMetricsDocumentation(fileName string) error {
 	}
 
 	return nil
+}
+
+func (m *metrics) RegisterExternalMetrics(collectors ...prometheus.Collector) {
+	m.registry.MustRegister(collectors...)
 }

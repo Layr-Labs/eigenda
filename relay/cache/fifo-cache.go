@@ -18,8 +18,15 @@ type FIFOCache[K comparable, V any] struct {
 	expirationQueue queues.Queue
 }
 
-// NewFIFOCache creates a new FIFOCache.
-func NewFIFOCache[K comparable, V any](maxWeight uint64, calculator WeightCalculator[K, V]) *FIFOCache[K, V] {
+// NewFIFOCache creates a new FIFOCache. If the calculator is nil, the weight of each key-value pair will be 1.
+func NewFIFOCache[K comparable, V any](
+	maxWeight uint64,
+	calculator WeightCalculator[K, V]) Cache[K, V] {
+
+	if calculator == nil {
+		calculator = func(K, V) uint64 { return 1 }
+	}
+
 	return &FIFOCache[K, V]{
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
