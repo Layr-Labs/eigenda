@@ -71,30 +71,27 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	quorums := []uint8{0, 1}
 
 	header, err := accountant.AccountBlob(ctx, symbolLength, quorums)
-	metadata := core.ConvertPaymentHeader(header)
 
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(time.Now().Unix()), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	symbolLength = uint64(700)
 
 	header, err = accountant.AccountBlob(ctx, symbolLength, quorums)
-	metadata = core.ConvertPaymentHeader(header)
 
 	assert.NoError(t, err)
 	assert.NotEqual(t, 0, header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1200, 0, 200}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Second call should use on-demand payment
 	header, err = accountant.AccountBlob(ctx, 300, quorums)
-	metadata = core.ConvertPaymentHeader(header)
 
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, big.NewInt(300), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(300), header.CumulativePayment)
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
@@ -124,10 +121,9 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, numSymbols, quorums)
 	assert.NoError(t, err)
 
-	metadata := core.ConvertPaymentHeader(header)
 	expectedPayment := big.NewInt(int64(numSymbols * uint64(pricePerSymbol)))
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, expectedPayment, metadata.CumulativePayment)
+	assert.Equal(t, expectedPayment, header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{0, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 	assert.Equal(t, expectedPayment, accountant.cumulativePayment)
 }
@@ -180,24 +176,21 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	// First call: Use reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
-	metadata := core.ConvertPaymentHeader(header)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
 	header, err = accountant.AccountBlob(ctx, 300, quorums)
-	metadata = core.ConvertPaymentHeader(header)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
 	header, err = accountant.AccountBlob(ctx, 500, quorums)
-	metadata = core.ConvertPaymentHeader(header)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, big.NewInt(500), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Fourth call: Insufficient on-demand
 	_, err = accountant.AccountBlob(ctx, 600, quorums)
@@ -321,23 +314,20 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	metadata := core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Second call: Allow one overflow
 	header, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
-	metadata = core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Third call: Should use on-demand payment
 	header, err = accountant.AccountBlob(ctx, 200, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	metadata = core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(200), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)
 }
 
@@ -373,8 +363,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
-	metadata := core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(500), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Wait for next reservation duration
 	time.Sleep(time.Duration(reservationWindow) * time.Second)
