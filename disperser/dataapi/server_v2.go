@@ -188,14 +188,12 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-
 	response := &BlobResponse{
 		BlobHeader:    metadata.BlobHeader,
 		Status:        metadata.BlobStatus.String(),
 		DispersedAt:   metadata.RequestedAt,
 		BlobSizeBytes: metadata.BlobSize,
 	}
-
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
 	s.metrics.ObserveLatency("FetchBlob", float64(time.Since(start).Milliseconds()))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
@@ -244,7 +242,6 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	s.metrics.ObserveLatency("FetchBatch", float64(time.Since(start).Milliseconds()))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, batchResponse)
-
 }
 
 func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {

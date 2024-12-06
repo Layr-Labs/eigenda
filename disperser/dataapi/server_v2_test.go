@@ -59,6 +59,7 @@ func setup(m *testing.M) {
 	var err error
 	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
 	if err != nil {
+		teardown()
 		panic("failed to start localstack container")
 	}
 
@@ -72,12 +73,14 @@ func setup(m *testing.M) {
 	metadataTableName := fmt.Sprintf("test-BlobMetadata-%v", uuid.New())
 	_, err = test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
+		teardown()
 		panic("failed to create dynamodb table: " + err.Error())
 	}
 
 	// Create BlobMetadataStore
 	dynamoClient, err := dynamodb.NewClient(cfg, logger)
 	if err != nil {
+		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
@@ -113,7 +116,7 @@ func makeCommitment(t *testing.T) encoding.BlobCommitments {
 	}
 }
 
-// makeBlobHeaderV2 returns a test V2 BlobHeader
+// makeBlobHeaderV2 returns a test hardcoded V2 BlobHeader
 func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
