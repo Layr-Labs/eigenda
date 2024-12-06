@@ -143,31 +143,33 @@ func (m *V2Metrics) Start() {
 		}
 	}()
 
-	if m.dbSizePollPeriod.Nanoseconds() > 0 {
-		go func() {
-			ticker := time.NewTicker(m.dbSizePollPeriod)
-
-			for m.isAlive.Load() {
-				var size int64
-				err := filepath.Walk(m.dbDir, func(_ string, info os.FileInfo, err error) error {
-					if err != nil {
-						return err
-					}
-					if !info.IsDir() {
-						size += info.Size()
-					}
-					return err
-				})
-
-				if err != nil {
-					m.logger.Errorf("failed to get database size: %v", err)
-				} else {
-					m.dbSize.WithLabelValues().Set(float64(size))
-				}
-				<-ticker.C
-			}
-		}()
+	if m.dbSizePollPeriod.Nanoseconds() == 0 {
+		return
 	}
+	go func() {
+		ticker := time.NewTicker(m.dbSizePollPeriod)
+
+		for m.isAlive.Load() {
+			var size int64
+			err := filepath.Walk(m.dbDir, func(_ string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					size += info.Size()
+				}
+				return err
+			})
+
+			if err != nil {
+				m.logger.Errorf("failed to get database size: %v", err)
+			} else {
+				m.dbSize.WithLabelValues().Set(float64(size))
+			}
+			<-ticker.C
+		}
+	}()
+
 }
 
 // Stop stops the metrics server.
