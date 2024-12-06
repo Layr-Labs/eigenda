@@ -164,7 +164,7 @@ message Reservation {
   uint32 start_timestamp = 2;
   uint32 end_timestamp = 3;
   repeated uint32 quorum_numbers = 4;
-  repeated uint32 quorum_split = 5;
+  repeated uint32 quorum_splits = 5;
 }
 
 // BinRecord is the usage record of an account in a bin. The API should return the active bin 
