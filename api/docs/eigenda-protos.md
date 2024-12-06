@@ -281,8 +281,9 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  |  |
-| bin_index | [uint32](#uint32) |  |  |
+| reservation_period | [uint32](#uint32) |  |  |
 | cumulative_payment | [bytes](#bytes) |  |  |
+| salt | [uint32](#uint32) |  |  |
 
 
 
@@ -638,7 +639,7 @@ BlobStatusRequest is used to query the status of a blob.
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
 | quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, BinIndex, and CumulativePayment |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, ReservationPeriod, and CumulativePayment |
 | payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 
