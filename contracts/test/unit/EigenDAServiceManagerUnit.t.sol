@@ -11,6 +11,7 @@ import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManage
 import "../../src/interfaces/IEigenDAStructs.sol";
 import {IEigenDAThresholdRegistry} from "../../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     using BN254 for BN254.G1Point;
@@ -40,7 +41,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             IEigenDAThresholdRegistry(address(0)),
-            IEigenDARelayRegistry(address(0))
+            IEigenDARelayRegistry(address(0)),
+            IPaymentVault(address(0))
         );
 
         address[] memory confirmers = new address[](1);
