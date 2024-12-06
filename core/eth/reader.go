@@ -658,6 +658,9 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 }
 
 func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
 	reservationsMap := make(map[gethcommon.Address]*core.ActiveReservation)
 	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
 		Context: ctx,
@@ -682,6 +685,9 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 }
 
 func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
@@ -695,6 +701,9 @@ func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID ge
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
 	payments, err := t.bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
 		Context: ctx,
@@ -721,6 +730,9 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
 	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandAmount(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
@@ -736,6 +748,9 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 }
 
 func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
 	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
 		Context: ctx,
 	})
@@ -746,6 +761,9 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 }
 
 func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
 	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
 		Context: ctx,
 	})
@@ -756,6 +774,9 @@ func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
 }
 
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
 	minNumSymbols, err := t.bindings.PaymentVault.MinNumSymbols(&bind.CallOpts{
 		Context: ctx,
 	})
@@ -766,6 +787,9 @@ func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
 	pricePerSymbol, err := t.bindings.PaymentVault.PricePerSymbol(&bind.CallOpts{
 		Context: ctx,
 	})
@@ -776,6 +800,9 @@ func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
 	reservationWindow, err := t.bindings.PaymentVault.ReservationBinInterval(&bind.CallOpts{
 		Context: ctx,
 	})
