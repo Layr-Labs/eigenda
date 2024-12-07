@@ -48,9 +48,8 @@ var (
 
 func TestMain(m *testing.M) {
 	setup(m)
-	code := m.Run()
+	m.Run()
 	teardown()
-	os.Exit(code)
 }
 
 func teardown() {
