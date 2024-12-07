@@ -949,7 +949,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | start_timestamp | [uint32](#uint32) |  |  |
 | end_timestamp | [uint32](#uint32) |  |  |
 | quorum_numbers | [uint32](#uint32) | repeated |  |
-| quorum_split | [uint32](#uint32) | repeated |  |
+| quorum_splits | [uint32](#uint32) | repeated |  |
 
 
 

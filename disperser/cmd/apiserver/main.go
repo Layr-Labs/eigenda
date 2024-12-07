@@ -124,7 +124,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		// add some default sensible configs
 		meterer = mt.NewMeterer(
 			mtConfig,
-			&paymentChainState,
+			paymentChainState,
 			offchainStore,
 			logger,
 			// metrics.NewNoopMetrics(),
