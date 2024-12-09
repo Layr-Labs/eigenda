@@ -31,6 +31,7 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 var (
@@ -48,8 +49,12 @@ var (
 
 func TestMain(m *testing.M) {
 	setup(m)
-	m.Run()
+	goleak.VerifyTestMain(m, goleak.Cleanup(cleanup))
+}
+
+func cleanup(code int) {
 	teardown()
+	os.Exit(code)
 }
 
 func teardown() {
