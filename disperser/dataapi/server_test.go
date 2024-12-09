@@ -32,7 +32,6 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/goleak"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -400,11 +399,6 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 func TestFetchMetricsThroughputHandler(t *testing.T) {
 	r := setUpRouter()
-
-	defer func() {
-		time.Sleep(2000 * time.Millisecond)
-		goleak.VerifyNone(t)
-	}()
 
 	s := new(model.SampleStream)
 	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))

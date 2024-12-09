@@ -49,13 +49,8 @@ var (
 func TestMain(m *testing.M) {
 	setup(m)
 	m.Run()
-	// goleak.VerifyTestMain(m, goleak.Cleanup(cleanup))
+	teardown()
 }
-
-// func cleanup(code int) {
-// 	teardown()
-// 	os.Exit(code)
-// }
 
 func teardown() {
 	if deployLocalStack {
