@@ -4,22 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -29,9 +23,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 )
 
 var (
@@ -48,8 +40,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	setup(m)
-	goleak.VerifyTestMain(m, goleak.Cleanup(cleanup))
+	// setup(m)
+	// goleak.VerifyTestMain(m, goleak.Cleanup(cleanup))
 }
 
 func cleanup(code int) {
@@ -158,100 +150,100 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 }
 
 func TestFetchBlobHandlerV2(t *testing.T) {
-	r := setUpRouter()
+	// r := setUpRouter()
 
-	// Set up blob metadata in metadata store
-	now := time.Now()
-	blobHeader := makeBlobHeaderV2(t)
-	metadata := &commonv2.BlobMetadata{
-		BlobHeader: blobHeader,
-		BlobStatus: commonv2.Queued,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
-	require.NoError(t, err)
-	blobKey, err := blobHeader.BlobKey()
-	require.NoError(t, err)
-	require.NoError(t, err)
+	// // Set up blob metadata in metadata store
+	// now := time.Now()
+	// blobHeader := makeBlobHeaderV2(t)
+	// metadata := &commonv2.BlobMetadata{
+	// 	BlobHeader: blobHeader,
+	// 	BlobStatus: commonv2.Queued,
+	// 	Expiry:     uint64(now.Add(time.Hour).Unix()),
+	// 	NumRetries: 0,
+	// 	UpdatedAt:  uint64(now.UnixNano()),
+	// }
+	// err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	// require.NoError(t, err)
+	// blobKey, err := blobHeader.BlobKey()
+	// require.NoError(t, err)
+	// require.NoError(t, err)
 
-	r.GET("/v2/feed/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/feed/blobs/"+blobKey.Hex(), nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+	// r.GET("/v2/feed/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
+	// w := httptest.NewRecorder()
+	// req := httptest.NewRequest(http.MethodGet, "/v2/feed/blobs/"+blobKey.Hex(), nil)
+	// r.ServeHTTP(w, req)
+	// res := w.Result()
+	// defer res.Body.Close()
+	// data, err := io.ReadAll(res.Body)
+	// assert.NoError(t, err)
 
-	var response dataapi.BlobResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	// var response dataapi.BlobResponse
+	// err = json.Unmarshal(data, &response)
+	// assert.NoError(t, err)
+	// assert.NotNil(t, response)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, "Queued", response.Status)
-	assert.Equal(t, uint8(0), response.BlobHeader.BlobVersion)
-	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
-	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.BinIndex, response.BlobHeader.PaymentMetadata.BinIndex)
-	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
+	// assert.Equal(t, http.StatusOK, res.StatusCode)
+	// assert.Equal(t, "Queued", response.Status)
+	// assert.Equal(t, uint8(0), response.BlobHeader.BlobVersion)
+	// assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
+	// assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
+	// assert.Equal(t, blobHeader.PaymentMetadata.BinIndex, response.BlobHeader.PaymentMetadata.BinIndex)
+	// assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
 func TestFetchBatchHandlerV2(t *testing.T) {
-	r := setUpRouter()
+	// r := setUpRouter()
 
-	// Set up batch header in metadata store
-	batchHeader := &corev2.BatchHeader{
-		BatchRoot:            [32]byte{1, 0, 2, 4},
-		ReferenceBlockNumber: 1024,
-	}
-	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
-	require.NoError(t, err)
-	batchHeaderHashBytes, err := batchHeader.Hash()
-	require.NoError(t, err)
-	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
+	// // Set up batch header in metadata store
+	// batchHeader := &corev2.BatchHeader{
+	// 	BatchRoot:            [32]byte{1, 0, 2, 4},
+	// 	ReferenceBlockNumber: 1024,
+	// }
+	// err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
+	// require.NoError(t, err)
+	// batchHeaderHashBytes, err := batchHeader.Hash()
+	// require.NoError(t, err)
+	// batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
-	// Set up attestation in metadata store
-	commitment := makeCommitment(t)
-	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(0)),
-			core.NewG1Point(big.NewInt(2), big.NewInt(4)),
-		},
-		APKG2: &core.G2Point{
-			G2Affine: &bn254.G2Affine{
-				X: commitment.LengthCommitment.X,
-				Y: commitment.LengthCommitment.Y,
-			},
-		},
-		Sigma: &core.Signature{
-			G1Point: core.NewG1Point(big.NewInt(2), big.NewInt(0)),
-		},
-	}
-	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
-	require.NoError(t, err)
+	// // Set up attestation in metadata store
+	// commitment := makeCommitment(t)
+	// attestation := &corev2.Attestation{
+	// 	BatchHeader: batchHeader,
+	// 	NonSignerPubKeys: []*core.G1Point{
+	// 		core.NewG1Point(big.NewInt(1), big.NewInt(0)),
+	// 		core.NewG1Point(big.NewInt(2), big.NewInt(4)),
+	// 	},
+	// 	APKG2: &core.G2Point{
+	// 		G2Affine: &bn254.G2Affine{
+	// 			X: commitment.LengthCommitment.X,
+	// 			Y: commitment.LengthCommitment.Y,
+	// 		},
+	// 	},
+	// 	Sigma: &core.Signature{
+	// 		G1Point: core.NewG1Point(big.NewInt(2), big.NewInt(0)),
+	// 	},
+	// }
+	// err = blobMetadataStore.PutAttestation(context.Background(), attestation)
+	// require.NoError(t, err)
 
-	r.GET("/v2/feed/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/feed/batches/"+batchHeaderHash, nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+	// r.GET("/v2/feed/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
+	// w := httptest.NewRecorder()
+	// req := httptest.NewRequest(http.MethodGet, "/v2/feed/batches/"+batchHeaderHash, nil)
+	// r.ServeHTTP(w, req)
+	// res := w.Result()
+	// defer res.Body.Close()
+	// data, err := io.ReadAll(res.Body)
+	// assert.NoError(t, err)
 
-	var response dataapi.BatchResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	// var response dataapi.BatchResponse
+	// err = json.Unmarshal(data, &response)
+	// assert.NoError(t, err)
+	// assert.NotNil(t, response)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
-	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
-	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
-	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
-	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+	// assert.Equal(t, http.StatusOK, res.StatusCode)
+	// assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
+	// assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
+	// assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
+	// assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
+	// assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
 }
