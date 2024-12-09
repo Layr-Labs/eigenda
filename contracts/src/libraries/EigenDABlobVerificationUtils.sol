@@ -402,7 +402,7 @@ library EigenDABlobVerificationUtils {
     ) internal view {
         for (uint i = 0; i < relayKeys.length; ++i) {
             require(
-                eigenDARelayRegistry.getRelayAddress(relayKeys[i]) != address(0),
+                eigenDARelayRegistry.relayKeyToAddress(relayKeys[i]) != address(0),
                 "EigenDABlobVerificationUtils._verifyRelayKeysSet: relay key is not set"
             );
         }
