@@ -377,8 +377,9 @@ func TestFetchMetricsHandler(t *testing.T) {
 
 	r.GET("/v1/metrics", testDataApiServer.FetchMetricsHandler)
 
-	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/metrics", nil)
+	req.Close = true
+	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	res := w.Result()
