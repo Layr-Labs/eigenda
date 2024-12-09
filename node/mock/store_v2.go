@@ -19,12 +19,12 @@ func NewMockStoreV2() *MockStoreV2 {
 	return &MockStoreV2{}
 }
 
-func (m *MockStoreV2) StoreBatch(batch *corev2.Batch, rawBundles []*node.RawBundles) ([]kvstore.Key, error) {
+func (m *MockStoreV2) StoreBatch(batch *corev2.Batch, rawBundles []*node.RawBundles) ([]kvstore.Key, uint64, error) {
 	args := m.Called(batch, rawBundles)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, 0, args.Error(1)
 	}
-	return args.Get(0).([]kvstore.Key), args.Error(1)
+	return args.Get(0).([]kvstore.Key), 0, args.Error(1)
 }
 
 func (m *MockStoreV2) DeleteKeys(keys []kvstore.Key) error {
