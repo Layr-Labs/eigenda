@@ -3,6 +3,7 @@ package apiserver
 import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"time"
 )
@@ -33,7 +34,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
-	getBlobCommitmentLatency := prometheus.NewSummaryVec(
+	getBlobCommitmentLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_blob_commitment_latency_ms",
@@ -43,7 +44,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	getPaymentStateLatency := prometheus.NewSummaryVec(
+	getPaymentStateLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_payment_state_latency_ms",
@@ -53,7 +54,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	disperseBlobLatency := prometheus.NewSummaryVec(
+	disperseBlobLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "disperse_blob_latency_ms",
@@ -63,7 +64,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	disperseBlobSize := prometheus.NewGaugeVec(
+	disperseBlobSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "disperse_blob_size_bytes",
@@ -72,7 +73,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	validateDispersalRequestLatency := prometheus.NewSummaryVec(
+	validateDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "validate_dispersal_request_latency_ms",
@@ -82,7 +83,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	storeBlobLatency := prometheus.NewSummaryVec(
+	storeBlobLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "store_blob_latency_ms",
@@ -92,7 +93,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		[]string{},
 	)
 
-	getBlobStatusLatency := prometheus.NewSummaryVec(
+	getBlobStatusLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_blob_status_latency_ms",
