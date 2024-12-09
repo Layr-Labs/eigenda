@@ -2,11 +2,13 @@ package dataapi
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -17,12 +19,32 @@ import (
 	ginswagger "github.com/swaggo/gin-swagger"
 )
 
+type (
+	SignedBatch struct {
+		BatchHeader *corev2.BatchHeader `json:"batch_header"`
+		Attestation *corev2.Attestation `json:"attestation"`
+	}
+
+	BlobResponse struct {
+		BlobHeader    *corev2.BlobHeader `json:"blob_header"`
+		Status        string             `json:"status"`
+		DispersedAt   uint64             `json:"dispersed_at"`
+		BlobSizeBytes uint64             `json:"blob_size_bytes"`
+	}
+
+	BatchResponse struct {
+		BatchHeaderHash       string                         `json:"batch_header_hash"`
+		SignedBatch           *SignedBatch                   `json:"signed_batch"`
+		BlobVerificationInfos []*corev2.BlobVerificationInfo `json:"blob_verification_infos"`
+	}
+)
+
 type ServerInterface interface {
 	Start() error
 	Shutdown() error
 }
 
-type serverv2 struct {
+type ServerV2 struct {
 	serverMode   string
 	socketAddr   string
 	allowOrigins []string
@@ -47,8 +69,8 @@ func NewServerV2(
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *Metrics,
-) *serverv2 {
-	return &serverv2{
+) *ServerV2 {
+	return &ServerV2{
 		logger:            logger.With("component", "DataAPIServerV2"),
 		serverMode:        config.ServerMode,
 		socketAddr:        config.SocketAddr,
@@ -63,7 +85,7 @@ func NewServerV2(
 	}
 }
 
-func (s *serverv2) Start() error {
+func (s *ServerV2) Start() error {
 	if s.serverMode == gin.ReleaseMode {
 		// optimize performance and disable debug features.
 		gin.SetMode(gin.ReleaseMode)
@@ -133,46 +155,115 @@ func (s *serverv2) Start() error {
 	return <-errChan
 }
 
-func (s *serverv2) Shutdown() error {
+func (s *ServerV2) Shutdown() error {
 	return nil
 }
 
-func (s *serverv2) FetchBlobsHandler(c *gin.Context) {
+func (s *ServerV2) FetchBlobsHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchBlobsHandler unimplemented"))
 }
 
-func (s *serverv2) FetchBlobHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBlobHandler unimplemented"))
+// FetchBlobHandler godoc
+//
+//	@Summary	Fetch blob metadata by blob key
+//	@Tags		Feed
+//	@Produce	json
+//	@Param		blob_key	path		string	true	"Blob key in hex string"
+//	@Success	200			{object}	BlobResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/feed/blobs/{blob_key} [get]
+func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
+	start := time.Now()
+	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlob")
+		errorResponse(c, err)
+		return
+	}
+	metadata, err := s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlob")
+		errorResponse(c, err)
+		return
+	}
+	response := &BlobResponse{
+		BlobHeader:    metadata.BlobHeader,
+		Status:        metadata.BlobStatus.String(),
+		DispersedAt:   metadata.RequestedAt,
+		BlobSizeBytes: metadata.BlobSize,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
+	s.metrics.ObserveLatency("FetchBlob", float64(time.Since(start).Milliseconds()))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, response)
 }
 
-func (s *serverv2) FetchBatchesHandler(c *gin.Context) {
+func (s *ServerV2) FetchBatchesHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchBatchesHandler unimplemented"))
 }
 
-func (s *serverv2) FetchBatchHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBatchHandler unimplemented"))
+// FetchBatchHandler godoc
+//
+//	@Summary	Fetch batch by the batch header hash
+//	@Tags		Feed
+//	@Produce	json
+//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
+//	@Success	200					{object}	BlobResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/feed/batches/{batch_header_hash} [get]
+func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
+	start := time.Now()
+	batchHeaderHashHex := c.Param("batch_header_hash")
+	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBatch")
+		errorResponse(c, errors.New("invalid batch header hash"))
+		return
+	}
+	batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBatch")
+		errorResponse(c, err)
+		return
+	}
+	// TODO: support fetch of blob verification info
+	batchResponse := &BatchResponse{
+		BatchHeaderHash: batchHeaderHashHex,
+		SignedBatch: &SignedBatch{
+			BatchHeader: batchHeader,
+			Attestation: attestation,
+		},
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
+	s.metrics.ObserveLatency("FetchBatch", float64(time.Since(start).Milliseconds()))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, batchResponse)
 }
 
-func (s *serverv2) FetchOperatorsStake(c *gin.Context) {
+func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	errorResponse(c, errors.New("FetchOperatorsStake unimplemented"))
 }
 
-func (s *serverv2) FetchOperatorsNodeInfo(c *gin.Context) {
+func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	errorResponse(c, errors.New("FetchOperatorsNodeInfo unimplemented"))
 }
 
-func (s *serverv2) CheckOperatorsReachability(c *gin.Context) {
+func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 	errorResponse(c, errors.New("CheckOperatorsReachability unimplemented"))
 }
 
-func (s *serverv2) FetchNonSingers(c *gin.Context) {
+func (s *ServerV2) FetchNonSingers(c *gin.Context) {
 	errorResponse(c, errors.New("FetchNonSingers unimplemented"))
 }
 
-func (s *serverv2) FetchMetricsOverviewHandler(c *gin.Context) {
+func (s *ServerV2) FetchMetricsOverviewHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchMetricsOverviewHandler unimplemented"))
 }
 
-func (s *serverv2) FetchMetricsThroughputHandler(c *gin.Context) {
+func (s *ServerV2) FetchMetricsThroughputHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchMetricsThroughputHandler unimplemented"))
 }
