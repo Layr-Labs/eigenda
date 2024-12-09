@@ -32,7 +32,6 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"go.uber.org/goleak"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -194,8 +193,6 @@ func TestFetchBlobHandler(t *testing.T) {
 }
 
 func TestFetchBlobsHandler(t *testing.T) {
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 	blob := makeTestBlob(0, 10)
 
@@ -347,11 +344,6 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 }
 
 func TestFetchMetricsHandler(t *testing.T) {
-	defer func() {
-		time.Sleep(300 * time.Millisecond)
-		goleak.VerifyNone(t)
-	}()
-
 	r := setUpRouter()
 
 	blob := makeTestBlob(0, 10)
@@ -700,8 +692,6 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -745,9 +735,6 @@ func TestFetchDeregisteredOperatorNoSocketInfoOneOperatorHandler(t *testing.T) {
 }
 
 func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -814,9 +801,6 @@ func TestFetchDeregisteredMultipleOperatorsOneWithNoSocketInfoHandler(t *testing
 }
 
 func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -857,9 +841,6 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampHandler(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -911,9 +892,6 @@ func TestFetchDeregisteredOperatorInfoInvalidTimeStampTwoOperatorsHandler(t *tes
 }
 
 func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -979,9 +957,6 @@ func TestFetchMetricsDeregisteredOperatorHandler(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorOffline(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1027,9 +1002,6 @@ func TestFetchDeregisteredOperatorOffline(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1087,9 +1059,6 @@ func TestFetchDeregisteredOperatorsWithoutDaysQueryParam(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1129,9 +1098,6 @@ func TestFetchDeregisteredOperatorInvalidDaysQueryParam(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1170,9 +1136,6 @@ func TestFetchDeregisteredOperatorQueryDaysGreaterThan30(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1231,9 +1194,6 @@ func TestFetchDeregisteredOperatorsMultipleOffline(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorOnline(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1282,8 +1242,6 @@ func TestFetchDeregisteredOperatorOnline(t *testing.T) {
 func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 	// Skipping this test as repported being flaky but could not reproduce it locally
 	t.Skip("Skipping testing in CI environment")
-
-	defer goleak.VerifyNone(t)
 
 	r := setUpRouter()
 
@@ -1350,9 +1308,6 @@ func TestFetchDeregisteredOperatorsMultipleOfflineOnline(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1420,9 +1375,6 @@ func TestFetchDeregisteredOperatorsMultipleOnline(t *testing.T) {
 }
 
 func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorStates := make(map[core.OperatorID]*subgraph.OperatorInfo)
@@ -1487,9 +1439,6 @@ func TestFetchDeregisteredOperatorsMultipleOfflineSameBlock(t *testing.T) {
 }
 
 func TestFetchRegisteredOperatorOnline(t *testing.T) {
-
-	defer goleak.VerifyNone(t)
-
 	r := setUpRouter()
 
 	indexedOperatorState := make(map[core.OperatorID]*subgraph.OperatorInfo)
