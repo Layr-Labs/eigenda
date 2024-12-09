@@ -39,7 +39,7 @@ type Dispatcher struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
-	metrics           *dispatcherMetrics // TODO instiantiate
+	metrics           *dispatcherMetrics
 
 	cursor *blobstore.StatusIndexCursor
 }
