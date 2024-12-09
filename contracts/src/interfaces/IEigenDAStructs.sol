@@ -70,7 +70,6 @@ struct BlobVerificationProofV2 {
 
 struct BlobCertificate {
     BlobHeaderV2 blobHeader;
-    uint32 referenceBlockNumber;
     uint32[] relayKeys;
 }
 
