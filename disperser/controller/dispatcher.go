@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"time"
 
@@ -38,6 +39,7 @@ type Dispatcher struct {
 	aggregator        core.SignatureAggregator
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
+	metrics           *dispatcherMetrics // TODO instiantiate
 
 	cursor *blobstore.StatusIndexCursor
 }
@@ -57,6 +59,7 @@ func NewDispatcher(
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
+	registry *prometheus.Registry,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -73,6 +76,7 @@ func NewDispatcher(
 		aggregator:        aggregator,
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
+		metrics:           newDispatcherMetrics(registry),
 
 		cursor: nil,
 	}, nil
@@ -101,7 +105,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 					}
 					continue
 				}
-
 				go func() {
 					err := d.HandleSignatures(ctx, batchData, sigChan)
 					if err != nil {
@@ -118,6 +121,8 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 }
 
 func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage, *batchData, error) {
+	start := time.Now()
+
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -148,6 +153,8 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 			continue
 		}
 
+		submissionStart := time.Now()
+
 		d.pool.Submit(func() {
 
 			req := &corev2.DispersalRequest{
@@ -158,15 +165,24 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 				DispersedAt:     uint64(time.Now().UnixNano()),
 				BatchHeader:     *batch.BatchHeader,
 			}
+			putDispersalRequestStart := time.Now()
 			err := d.blobMetadataStore.PutDispersalRequest(ctx, req)
 			if err != nil {
 				d.logger.Error("failed to put dispersal request", "err", err)
 				return
 			}
 
-			for i := 0; i < d.NumRequestRetries+1; i++ {
+			d.metrics.reportPutDispersalRequestLatency(time.Since(putDispersalRequestStart))
+
+			var i int
+			for i = 0; i < d.NumRequestRetries+1; i++ {
+				sendChunksStart := time.Now()
 				sig, err := d.sendChunks(ctx, client, batch)
 				if err == nil {
+
+					sendChunksFinished := time.Now()
+					d.metrics.reportSendChunksLatency(sendChunksFinished.Sub(sendChunksStart))
+
 					storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 						DispersalRequest: req,
 						RespondedAt:      uint64(time.Now().UnixNano()),
@@ -176,6 +192,8 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 					if storeErr != nil {
 						d.logger.Error("failed to put dispersal response", "err", storeErr)
 					}
+
+					d.metrics.reportPutDispersalResponseLatency(time.Since(sendChunksFinished))
 
 					sigChan <- core.SigningMessage{
 						Signature:            sig,
@@ -191,18 +209,28 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 				d.logger.Warn("failed to send chunks", "operator", opID, "NumAttempts", i, "err", err)
 				time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
 			}
+			d.metrics.reportSendChunksRetryCount(float64(i))
 		})
+
+		d.metrics.reportPoolSubmissionLatency(time.Since(submissionStart))
 	}
+
+	d.metrics.reportHandleBatchLatency(time.Since(start))
 
 	return sigChan, batchData, nil
 }
 
 // HandleSignatures receives signatures from operators, validates, and aggregates them
 func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData, sigChan chan core.SigningMessage) error {
+	handleSignaturesStart := time.Now()
+
 	quorumAttestation, err := d.aggregator.ReceiveSignatures(ctx, batchData.OperatorState, batchData.BatchHeaderHash, sigChan)
 	if err != nil {
 		return fmt.Errorf("failed to receive and validate signatures: %w", err)
 	}
+	receiveSignaturesFinished := time.Now()
+	d.metrics.reportReceiveSignaturesLatency(receiveSignaturesFinished.Sub(handleSignaturesStart))
+
 	quorums := make([]core.QuorumID, len(quorumAttestation.QuorumResults))
 	i := 0
 	for quorumID := range quorumAttestation.QuorumResults {
@@ -213,6 +241,9 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 	if err != nil {
 		return fmt.Errorf("failed to aggregate signatures: %w", err)
 	}
+	aggregateSignaturesFinished := time.Now()
+	d.metrics.reportAggregateSignaturesLatency(aggregateSignaturesFinished.Sub(receiveSignaturesFinished))
+
 	err = d.blobMetadataStore.PutAttestation(ctx, &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
@@ -225,11 +256,17 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 	if err != nil {
 		return fmt.Errorf("failed to put attestation: %w", err)
 	}
+	putAttestationFinished := time.Now()
+	d.metrics.reportPutAttestationLatency(putAttestationFinished.Sub(aggregateSignaturesFinished))
 
 	err = d.updateBatchStatus(ctx, batchData.BlobKeys, v2.Certified)
 	if err != nil {
 		return fmt.Errorf("failed to mark blobs as certified: %w", err)
 	}
+	updateBatchStatusFinished := time.Now()
+	d.metrics.reportUpdateBatchStatusLatency(updateBatchStatusFinished.Sub(putAttestationFinished))
+
+	d.metrics.reportHandleSignaturesLatency(updateBatchStatusFinished.Sub(handleSignaturesStart))
 
 	return nil
 }
@@ -237,10 +274,16 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
 func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) (*batchData, error) {
+
+	newBatchStart := time.Now()
+
 	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, d.cursor, d.MaxBatchSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
+
+	getBlobMetadataFinished := time.Now()
+	d.metrics.reportGetBlobMetadataLatency(getBlobMetadataFinished.Sub(newBatchStart))
 
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
@@ -250,6 +293,9 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state: %w", err)
 	}
+
+	getOperatorStateFinished := time.Now()
+	d.metrics.reportGetOperatorStateLatency(getOperatorStateFinished.Sub(getBlobMetadataFinished))
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	for i, metadata := range blobMetadatas {
@@ -267,6 +313,9 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob certificates: %w", err)
 	}
+
+	getBlobCertificatesFinished := time.Now()
+	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(getOperatorStateFinished))
 
 	if len(certs) != len(keys) {
 		return nil, fmt.Errorf("blob certificates not found for all blob keys")
@@ -308,10 +357,16 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
 
+	buildMerkleTreeFinished := time.Now()
+	d.metrics.reportBuildMerkleTreeLatency(buildMerkleTreeFinished.Sub(getBlobCertificatesFinished))
+
 	err = d.blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch header: %w", err)
 	}
+
+	putBatchHeaderFinished := time.Now()
+	d.metrics.reportPutBatchHeaderLatency(putBatchHeaderFinished.Sub(buildMerkleTreeFinished))
 
 	// accumulate verification infos in a map to avoid duplicate entries
 	// batch write operation fails if there are duplicate entries
@@ -338,6 +393,9 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		}
 	}
 
+	proofGenerationFinished := time.Now()
+	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchHeaderFinished))
+
 	verificationInfos := make([]*corev2.BlobVerificationInfo, len(verificationInfoMap))
 	i := 0
 	for _, v := range verificationInfoMap {
@@ -349,9 +407,14 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put blob verification infos: %w", err)
 	}
 
+	putBlobVerificationInfosFinished := time.Now()
+	d.metrics.reportPutVerificationInfosLatency(putBlobVerificationInfosFinished.Sub(proofGenerationFinished))
+
 	if cursor != nil {
 		d.cursor = cursor
 	}
+
+	d.metrics.reportNewBatchLatency(time.Since(newBatchStart))
 
 	return &batchData{
 		Batch: &corev2.Batch{
