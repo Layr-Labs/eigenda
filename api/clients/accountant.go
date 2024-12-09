@@ -77,7 +77,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 	relativeBinRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
-	binLimit := a.reservation.SymbolsPerSec * uint64(a.reservationWindow)
+	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativeBinRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
@@ -166,7 +166,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("reservation cannot be nil")
 	} else if paymentState.GetReservation().GetQuorumNumbers() == nil {
 		return fmt.Errorf("reservation quorum numbers cannot be nil")
-	} else if paymentState.GetReservation().GetQuorumSplit() == nil {
+	} else if paymentState.GetReservation().GetQuorumSplits() == nil {
 		return fmt.Errorf("reservation quorum split cannot be nil")
 	} else if paymentState.GetBinRecords() == nil {
 		return fmt.Errorf("bin records cannot be nil")
@@ -177,7 +177,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	a.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
 	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
 
-	a.reservation.SymbolsPerSec = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
+	a.reservation.SymbolsPerSecond = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
 	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
 	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
 	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
@@ -188,11 +188,11 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 	a.reservation.QuorumNumbers = quorumNumbers
 
-	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
-	for i, quorum := range paymentState.Reservation.QuorumSplit {
-		quorumSplit[i] = uint8(quorum)
+	quorumSplits := make([]uint8, len(paymentState.Reservation.QuorumSplits))
+	for i, quorum := range paymentState.Reservation.QuorumSplits {
+		quorumSplits[i] = uint8(quorum)
 	}
-	a.reservation.QuorumSplit = quorumSplit
+	a.reservation.QuorumSplits = quorumSplits
 
 	binRecords := make([]BinRecord, len(paymentState.BinRecords))
 	for i, record := range paymentState.BinRecords {

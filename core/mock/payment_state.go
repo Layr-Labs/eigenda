@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -29,20 +30,20 @@ func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context
 	return args.Error(0)
 }
 
-func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID string) (core.ActiveReservation, error) {
+func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
 	args := m.Called(ctx, accountID)
-	var value core.ActiveReservation
+	var value *core.ActiveReservation
 	if args.Get(0) != nil {
-		value = args.Get(0).(core.ActiveReservation)
+		value = args.Get(0).(*core.ActiveReservation)
 	}
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID string) (core.OnDemandPayment, error) {
+func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
 	args := m.Called(ctx, accountID)
-	var value core.OnDemandPayment
+	var value *core.OnDemandPayment
 	if args.Get(0) != nil {
-		value = args.Get(0).(core.OnDemandPayment)
+		value = args.Get(0).(*core.OnDemandPayment)
 	}
 	return value, args.Error(1)
 }
@@ -57,6 +58,11 @@ func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) 
 }
 
 func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
+	args := m.Called()
+	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetGlobalRateBinInterval() uint64 {
 	args := m.Called()
 	return args.Get(0).(uint64)
 }

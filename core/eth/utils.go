@@ -2,11 +2,13 @@ package eth
 
 import (
 	"math/big"
+	"reflect"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -125,4 +127,10 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 		}
 	}
 	return bytesArray
+}
+
+func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+	zeroReservation := paymentvault.IPaymentVaultReservation{}
+
+	return reflect.DeepEqual(reservation, zeroReservation)
 }
