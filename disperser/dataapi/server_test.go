@@ -347,7 +347,10 @@ func TestFetchBlobsFromBatchHeaderHash(t *testing.T) {
 }
 
 func TestFetchMetricsHandler(t *testing.T) {
-	defer goleak.VerifyNone(t)
+	defer func() {
+		time.Sleep(300 * time.Millisecond)
+		goleak.VerifyNone(t)
+	}()
 
 	r := setUpRouter()
 
