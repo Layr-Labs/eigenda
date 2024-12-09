@@ -38,18 +38,22 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     }
 
     function updateQuorumAdversaryThresholdPercentages(bytes memory _quorumAdversaryThresholdPercentages) external onlyOwner {
+        emit QuorumAdversaryThresholdPercentagesUpdated(quorumAdversaryThresholdPercentages, _quorumAdversaryThresholdPercentages);
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
     }
 
     function updateQuorumConfirmationThresholdPercentages(bytes memory _quorumConfirmationThresholdPercentages) external onlyOwner {
+        emit QuorumConfirmationThresholdPercentagesUpdated(quorumConfirmationThresholdPercentages, _quorumConfirmationThresholdPercentages);
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
     }
 
     function updateQuorumNumbersRequired(bytes memory _quorumNumbersRequired) external onlyOwner {
+        emit QuorumNumbersRequiredUpdated(quorumNumbersRequired, _quorumNumbersRequired);
         quorumNumbersRequired = _quorumNumbersRequired;
     }
 
     function updateDefaultSecurityThresholdsV2(SecurityThresholds memory _defaultSecurityThresholdsV2) external onlyOwner {
+        emit DefaultSecurityThresholdsV2Updated(defaultSecurityThresholdsV2, _defaultSecurityThresholdsV2);
         defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
     }
 

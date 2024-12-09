@@ -7,6 +7,14 @@ interface IEigenDAThresholdRegistry {
 
     event VersionedBlobParamsAdded(uint16 indexed version, VersionedBlobParams versionedBlobParams);
 
+    event QuorumAdversaryThresholdPercentagesUpdated(bytes previousQuorumAdversaryThresholdPercentages, bytes newQuorumAdversaryThresholdPercentages);
+
+    event QuorumConfirmationThresholdPercentagesUpdated(bytes previousQuorumConfirmationThresholdPercentages, bytes newQuorumConfirmationThresholdPercentages);
+
+    event QuorumNumbersRequiredUpdated(bytes previousQuorumNumbersRequired, bytes newQuorumNumbersRequired);
+
+    event DefaultSecurityThresholdsV2Updated(SecurityThresholds previousDefaultSecurityThresholdsV2, SecurityThresholds newDefaultSecurityThresholdsV2);
+
     ///////////////////////// V1 ///////////////////////////////
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
