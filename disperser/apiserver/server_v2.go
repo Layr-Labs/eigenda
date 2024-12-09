@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"sync/atomic"
 	"time"
@@ -12,8 +13,7 @@ import (
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common"
-	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -55,22 +55,23 @@ type DispersalServerV2 struct {
 	onchainState                atomic.Pointer[OnchainState]
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
+
+	metrics *metricsV2
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
-	rateConfig RateConfig,
 	blobStore *blobstore.BlobStore,
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	chainReader core.Reader,
-	ratelimiter common.RateLimiter,
 	meterer *meterer.Meterer,
 	authenticator corev2.BlobRequestAuthenticator,
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
+	registry *prometheus.Registry,
 ) *DispersalServerV2 {
 	logger := _logger.With("component", "DispersalServerV2")
 
@@ -87,6 +88,8 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+
+		metrics: newAPIServerV2Metrics(registry),
 	}
 }
 
@@ -100,7 +103,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 
 	opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
 
-	gs := grpc.NewServer(opt)
+	gs := grpc.NewServer(opt, s.metrics.grpcServerOption)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
 
@@ -141,6 +144,11 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 }
 
 func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobCommitmentRequest) (*pb.BlobCommitmentReply, error) {
+	start := time.Now()
+	defer func() {
+		s.metrics.reportGetBlobCommitmentLatency(time.Since(start))
+	}()
+
 	if s.prover == nil {
 		return nil, api.NewErrorUnimplemented()
 	}
@@ -222,6 +230,11 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 }
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	start := time.Now()
+	defer func() {
+		s.metrics.reportGetPaymentStateLatency(time.Since(start))
+	}()
+
 	// validate the signature
 	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
