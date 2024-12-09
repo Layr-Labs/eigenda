@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"net"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/relay/metrics"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -138,77 +139,81 @@ func NewServer(
 		return nil, errors.New("chainReader is required")
 	}
 
-	blobParams, err := chainReader.GetAllVersionedBlobParams(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching blob params: %w", err)
-	}
+	/*
+		blobParams, err := chainReader.GetAllVersionedBlobParams(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching blob params: %w", err)
+		}
+	*/
 
 	relayMetrics, err := metrics.NewRelayMetrics(logger, config.MetricsPort)
 	if err != nil {
 		return nil, fmt.Errorf("error creating relayMetrics: %w", err)
 	}
 
-	mp, err := newMetadataProvider(
-		ctx,
-		logger,
-		metadataStore,
-		config.MetadataCacheSize,
-		config.MetadataMaxConcurrency,
-		config.RelayIDs,
-		config.Timeouts.InternalGetMetadataTimeout,
-		v2.NewBlobVersionParameterMap(blobParams),
-		relayMetrics.MetadataCacheMetrics)
-
-	if err != nil {
-		return nil, fmt.Errorf("error creating metadata provider: %w", err)
-	}
-
-	bp, err := newBlobProvider(
-		ctx,
-		logger,
-		blobStore,
-		config.BlobCacheBytes,
-		config.BlobMaxConcurrency,
-		config.Timeouts.InternalGetBlobTimeout,
-		relayMetrics.BlobCacheMetrics)
-	if err != nil {
-		return nil, fmt.Errorf("error creating blob provider: %w", err)
-	}
-
-	cp, err := newChunkProvider(
-		ctx,
-		logger,
-		chunkReader,
-		config.ChunkCacheSize,
-		config.ChunkMaxConcurrency,
-		config.Timeouts.InternalGetProofsTimeout,
-		config.Timeouts.InternalGetCoefficientsTimeout,
-		relayMetrics.ChunkCacheMetrics)
-	if err != nil {
-		return nil, fmt.Errorf("error creating chunk provider: %w", err)
-	}
-
-	var authenticator auth.RequestAuthenticator
-	if !config.AuthenticationDisabled {
-		authenticator, err = auth.NewRequestAuthenticator(
+	/*
+		mp, err := newMetadataProvider(
 			ctx,
-			ics,
-			config.AuthenticationKeyCacheSize,
-			config.AuthenticationTimeout)
+			logger,
+			metadataStore,
+			config.MetadataCacheSize,
+			config.MetadataMaxConcurrency,
+			config.RelayIDs,
+			config.Timeouts.InternalGetMetadataTimeout,
+			v2.NewBlobVersionParameterMap(blobParams),
+			relayMetrics.MetadataCacheMetrics)
+
 		if err != nil {
-			return nil, fmt.Errorf("error creating authenticator: %w", err)
+			return nil, fmt.Errorf("error creating metadata provider: %w", err)
 		}
-	}
+
+		bp, err := newBlobProvider(
+			ctx,
+			logger,
+			blobStore,
+			config.BlobCacheBytes,
+			config.BlobMaxConcurrency,
+			config.Timeouts.InternalGetBlobTimeout,
+			relayMetrics.BlobCacheMetrics)
+		if err != nil {
+			return nil, fmt.Errorf("error creating blob provider: %w", err)
+		}
+
+		cp, err := newChunkProvider(
+			ctx,
+			logger,
+			chunkReader,
+			config.ChunkCacheSize,
+			config.ChunkMaxConcurrency,
+			config.Timeouts.InternalGetProofsTimeout,
+			config.Timeouts.InternalGetCoefficientsTimeout,
+			relayMetrics.ChunkCacheMetrics)
+		if err != nil {
+			return nil, fmt.Errorf("error creating chunk provider: %w", err)
+		}
+
+		var authenticator auth.RequestAuthenticator
+		if !config.AuthenticationDisabled {
+			authenticator, err = auth.NewRequestAuthenticator(
+				ctx,
+				ics,
+				config.AuthenticationKeyCacheSize,
+				config.AuthenticationTimeout)
+			if err != nil {
+				return nil, fmt.Errorf("error creating authenticator: %w", err)
+			}
+		}
+	*/
 
 	return &Server{
 		config:           config,
 		logger:           logger,
-		metadataProvider: mp,
-		blobProvider:     bp,
-		chunkProvider:    cp,
+		metadataProvider: nil, //mp,
+		blobProvider:     nil, //bp,
+		chunkProvider:    nil, //cp,
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
-		authenticator:    authenticator,
+		authenticator:    nil, //authenticator,
 		metrics:          relayMetrics,
 	}, nil
 }
