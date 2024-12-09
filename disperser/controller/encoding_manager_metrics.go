@@ -18,7 +18,6 @@ type encodingManagerMetrics struct {
 	batchSize               *prometheus.GaugeVec
 	batchDataSize           *prometheus.GaugeVec
 	batchRetryCount         *prometheus.GaugeVec
-	batchSleepTime          *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
 }
 
@@ -101,15 +100,6 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
-	batchSleepTime := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: encodingManagerNamespace,
-			Name:      "batch_sleep_time_ms",
-			Help:      "The time slept during while waiting to retry encoding a blob.",
-		},
-		[]string{},
-	)
-
 	failSubmissionCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: encodingManagerNamespace,
@@ -128,7 +118,6 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		batchSize:               batchSize,
 		batchDataSize:           batchDataSize,
 		batchRetryCount:         batchRetryCount,
-		batchSleepTime:          batchSleepTime,
 		failedSubmissionCount:   failSubmissionCount,
 	}
 }
@@ -163,10 +152,6 @@ func (m *encodingManagerMetrics) reportBatchDataSize(size uint64) {
 
 func (m *encodingManagerMetrics) reportBatchRetryCount(count int) {
 	m.batchRetryCount.WithLabelValues().Set(float64(count))
-}
-
-func (m *encodingManagerMetrics) reportBatchSleepTime(duration time.Duration) {
-	m.batchSleepTime.WithLabelValues().Set(float64(duration.Nanoseconds()) / float64(time.Millisecond))
 }
 
 func (m *encodingManagerMetrics) reportFailedSubmission() {

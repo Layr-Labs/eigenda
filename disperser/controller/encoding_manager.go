@@ -182,7 +182,6 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		e.pool.Submit(func() {
 			start := time.Now()
 
-			totalSlept := time.Duration(0)
 			var i int
 			var finishedEncodingTime time.Time
 			var finishedPutBlobCertificateTime time.Time
@@ -233,12 +232,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				e.logger.Error("failed to update blob status to Encoded", "blobKey", blobKey.Hex(), "err", err)
 				sleepTime := time.Duration(math.Pow(2, float64(i))) * time.Second
-				totalSlept += sleepTime
 				time.Sleep(sleepTime) // Wait before retrying
 			}
 
 			e.metrics.reportBatchRetryCount(i)
-			e.metrics.reportBatchSleepTime(totalSlept)
 
 			if success {
 				e.metrics.reportEncodingLatency(finishedEncodingTime.Sub(start))
