@@ -3,6 +3,14 @@ package relay
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -27,13 +35,6 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
 )
 
 var (
@@ -182,7 +183,7 @@ func newMockChainReader() *coremock.MockWriter {
 	return w
 }
 
-func mockBlobParamsMap() map[uint8]*core.BlobVersionParameters {
+func mockBlobParamsMap() map[v2.BlobVersion]*core.BlobVersionParameters {
 	blobParams := &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
