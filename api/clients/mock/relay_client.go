@@ -19,7 +19,7 @@ func NewRelayClient() *MockRelayClient {
 }
 
 func (c *MockRelayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error) {
-	args := c.Called(blobKey)
+	args := c.Called(ctx, relayKey, blobKey)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

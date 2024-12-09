@@ -108,3 +108,8 @@ func RandomString(length int) string {
 	}
 	return string(b)
 }
+
+// RandomUint16 generates a random uint16
+func RandomUint16() uint16 {
+	return uint16(rand.Uint32())
+}
