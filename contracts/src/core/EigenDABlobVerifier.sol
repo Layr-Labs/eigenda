@@ -58,26 +58,6 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     }
 
     /**
-     * @notice Verifies that a blob is valid for the required quorums and additional quorums
-     * @param blobHeader The blob header to verify
-     * @param blobVerificationProof The blob verification proof to verify the blob against
-     * @param additionalQuorumNumbersRequired The additional required quorum numbers 
-     */
-    function verifyBlobV1(
-        BlobHeader calldata blobHeader,
-        BlobVerificationProof calldata blobVerificationProof,
-        bytes calldata additionalQuorumNumbersRequired 
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV1ForQuorums(
-            eigenDAThresholdRegistry,
-            eigenDABatchMetadataStorage, 
-            blobHeader, 
-            blobVerificationProof, 
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
-        );
-    }
-
-    /**
      * @notice Verifies a batch of blobs for the required quorums
      * @param blobHeaders The blob headers to verify
      * @param blobVerificationProofs The blob verification proofs to verify the blobs against
@@ -92,26 +72,6 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobHeaders, 
             blobVerificationProofs, 
             quorumNumbersRequired()
-        );
-    }
-
-    /**
-     * @notice Verifies a batch of blobs for the required quorums and additional quorums
-     * @param blobHeaders The blob headers to verify
-     * @param blobVerificationProofs The blob verification proofs to verify the blobs against
-     * @param additionalQuorumNumbersRequired The additional required quorum numbers
-     */
-    function verifyBlobsV1(
-        BlobHeader[] calldata blobHeaders,
-        BlobVerificationProof[] calldata blobVerificationProofs,
-        bytes calldata additionalQuorumNumbersRequired
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobsV1ForQuorums(
-            eigenDAThresholdRegistry,
-            eigenDABatchMetadataStorage, 
-            blobHeaders, 
-            blobVerificationProofs, 
-            bytes.concat(quorumNumbersRequired(), additionalQuorumNumbersRequired)
         );
     }
 
@@ -141,87 +101,6 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
     }
 
     /**
-     * @notice Verifies a blob for a defined set of quorums and the default security thresholds
-     * @param batchHeader The batch header of the blob
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2(
-        BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
-        bytes calldata quorumNumbersRequired 
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            batchHeader,
-            blobVerificationProof,
-            nonSignerStakesAndSignature,
-            getDefaultSecurityThresholdsV2(),
-            quorumNumbersRequired
-        );
-    }
-
-    /**
-     * @notice Verifies a blob for a defined set of quorums and a custom security threshold
-     * @param batchHeader The batch header of the blob
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
-     * @param securityThreshold The custom security threshold to verify the blob against
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2(
-        BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
-        SecurityThresholds memory securityThreshold,
-        bytes calldata quorumNumbersRequired
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorums(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            batchHeader,
-            blobVerificationProof,
-            nonSignerStakesAndSignature,
-            securityThreshold,
-            quorumNumbersRequired
-        );
-    }
-
-    /**
-     * @notice Verifies a blob for a defined set of quorums and a set of custom security thresholds
-     * @param batchHeader The batch header of the blob
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
-     * @param securityThresholds The set of custom security thresholds to verify the blob against
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2(
-        BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
-        SecurityThresholds[] memory securityThresholds,
-        bytes calldata quorumNumbersRequired
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsForThresholds(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            batchHeader,
-            blobVerificationProof,
-            nonSignerStakesAndSignature,
-            securityThresholds,
-            quorumNumbersRequired
-        );
-    }
-
-    ///////////////////////// V2 FROM SIGNED BATCH ///////////////////////////////
-
-    /**
      * @notice Verifies a blob for the base required quorums and the default security thresholds
      * @param signedBatch The signed batch to verify the blob against
      * @param blobVerificationProof The blob verification proof for the blob
@@ -240,82 +119,6 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobVerificationProof,
             getDefaultSecurityThresholdsV2(),
             quorumNumbersRequired()
-        );
-    }
-
-    /**
-     * @notice Verifies a blob for a defined set of quorums and the default security thresholds
-     * @param signedBatch The signed batch to verify the blob against
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2FromSignedBatch(
-        SignedBatch calldata signedBatch,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        bytes calldata quorumNumbersRequired 
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsFromSignedBatch(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            operatorStateRetriever,
-            registryCoordinator,
-            signedBatch,
-            blobVerificationProof,
-            getDefaultSecurityThresholdsV2(),
-            quorumNumbersRequired
-        );
-    }
-
-    /**
-     * @notice Verifies a blob for a defined set of quorums and a custom security threshold
-     * @param signedBatch The signed batch to verify the blob against
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param securityThreshold The custom security threshold to verify the blob against
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2FromSignedBatch(
-        SignedBatch calldata signedBatch,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        SecurityThresholds memory securityThreshold,
-        bytes calldata quorumNumbersRequired
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsFromSignedBatch(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            operatorStateRetriever,
-            registryCoordinator,
-            signedBatch,
-            blobVerificationProof,
-            securityThreshold,
-            quorumNumbersRequired
-        );
-    }
-
-    /**
-     * @notice Verifies a blob for a defined set of quorums and a set of custom security thresholds
-     * @param signedBatch The signed batch to verify the blob against
-     * @param blobVerificationProof The blob verification proof for the blob
-     * @param securityThresholds The set of custom security thresholds to verify the blob against
-     * @param quorumNumbersRequired The required quorum numbers
-     */
-    function verifyBlobV2FromSignedBatch(
-        SignedBatch calldata signedBatch,
-        BlobVerificationProofV2 calldata blobVerificationProof,
-        SecurityThresholds[] memory securityThresholds,
-        bytes calldata quorumNumbersRequired
-    ) external view {
-        EigenDABlobVerificationUtils._verifyBlobV2ForQuorumsForThresholdsFromSignedBatch(
-            eigenDAThresholdRegistry,
-            eigenDASignatureVerifier,
-            eigenDARelayRegistry,
-            operatorStateRetriever,
-            registryCoordinator,
-            signedBatch,
-            blobVerificationProof,
-            securityThresholds,
-            quorumNumbersRequired
         );
     }
 
