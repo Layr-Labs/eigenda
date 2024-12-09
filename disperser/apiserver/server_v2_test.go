@@ -25,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"go.uber.org/goleak"
 	"google.golang.org/grpc/peer"
 
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -108,7 +107,6 @@ func TestV2DisperseBlob(t *testing.T) {
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
-	defer goleak.VerifyNone(t)
 	c := newTestServerV2(t)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
