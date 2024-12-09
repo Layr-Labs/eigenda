@@ -5,15 +5,6 @@ import (
 	"time"
 )
 
-// TODO
-//  - time to call send chunks
-
-//
-//  - total handle signatures time
-//  - time to aggregate signatures
-//  - time to put attestation
-//  - time to update batch status
-
 const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
