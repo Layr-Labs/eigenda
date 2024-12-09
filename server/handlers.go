@@ -21,14 +21,14 @@ func (svr *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 // GET ROUTES
 // =================================================================================================
 
-// handleGetSimpleCommitment handles the GET request for simple commitments.
-func (svr *Server) handleGetSimpleCommitment(w http.ResponseWriter, r *http.Request) error {
+// handleGetStdCommitment handles the GET request for std commitments.
+func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request) error {
 	versionByte, err := parseVersionByte(w, r)
 	if err != nil {
 		return fmt.Errorf("error parsing version byte: %w", err)
 	}
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.SimpleCommitmentMode,
+		Mode:        commitments.Standard,
 		CertVersion: versionByte,
 	}
 
@@ -118,10 +118,10 @@ func (svr *Server) handleGetShared(ctx context.Context, w http.ResponseWriter, c
 // POST ROUTES
 // =================================================================================================
 
-// handlePostSimpleCommitment handles the POST request for simple commitments.
-func (svr *Server) handlePostSimpleCommitment(w http.ResponseWriter, r *http.Request) error {
+// handlePostStdCommitment handles the POST request for std commitments.
+func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.SimpleCommitmentMode,
+		Mode:        commitments.Standard,
 		CertVersion: byte(commitments.CertV0), // TODO: hardcoded for now
 	}
 	return svr.handlePostShared(w, r, nil, commitmentMeta)

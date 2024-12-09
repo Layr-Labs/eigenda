@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	simpleCommitmentPrefix = "\x00"
+	stdCommitmentPrefix = "\x00"
 
 	// [alt-da, da layer, cert version]
 	opGenericPrefixStr = "\x01\x00\x00"
@@ -145,14 +145,14 @@ func TestHandlerPutSuccess(t *testing.T) {
 			expectedBody: "",
 		},
 		{
-			name: "Success Simple Commitment Mode",
-			url:  "/put?commitment_mode=simple",
+			name: "Success Standard Commitment Mode",
+			url:  "/put?commitment_mode=standard",
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
 				mockStorageMgr.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
-			expectedBody: simpleCommitmentPrefix + testCommitStr,
+			expectedBody: stdCommitmentPrefix + testCommitStr,
 		},
 	}
 
@@ -198,8 +198,8 @@ func TestHandlerPutErrors(t *testing.T) {
 			url:  fmt.Sprintf("/put/0x00%s", testCommitStr),
 		},
 		{
-			name: "Simple Commitment Mode",
-			url:  "/put?commitment_mode=simple",
+			name: "Standard Commitment Mode",
+			url:  "/put?commitment_mode=standard",
 		},
 	}
 

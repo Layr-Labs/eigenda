@@ -13,9 +13,9 @@ type CommitmentMeta struct {
 type CommitmentMode string
 
 const (
-	OptimismKeccak       CommitmentMode = "optimism_keccak256"
-	OptimismGeneric      CommitmentMode = "optimism_generic"
-	SimpleCommitmentMode CommitmentMode = "simple"
+	OptimismKeccak  CommitmentMode = "optimism_keccak256"
+	OptimismGeneric CommitmentMode = "optimism_generic"
+	Standard        CommitmentMode = "standard"
 )
 
 func StringToCommitmentMode(s string) (CommitmentMode, error) {
@@ -24,8 +24,8 @@ func StringToCommitmentMode(s string) (CommitmentMode, error) {
 		return OptimismKeccak, nil
 	case string(OptimismGeneric):
 		return OptimismGeneric, nil
-	case string(SimpleCommitmentMode):
-		return SimpleCommitmentMode, nil
+	case string(Standard):
+		return Standard, nil
 	default:
 		return "", fmt.Errorf("unknown commitment mode: %s", s)
 	}
@@ -42,7 +42,7 @@ func EncodeCommitment(b []byte, c CommitmentMode) ([]byte, error) {
 		altDACommit := NewGenericCommitment(svcCommit).Encode()
 		return altDACommit, nil
 
-	case SimpleCommitmentMode:
+	case Standard:
 		return NewV0CertCommitment(b).Encode(), nil
 	}
 

@@ -192,8 +192,8 @@ Both `keccak256` (i.e, S3 storage using hash of pre-image for commitment value) 
 
 OP Stack itself only has a conception of the first byte (`commit type`) and does no semantical interpretation of any subsequent bytes within the encoding. The `da layer type` byte for EigenDA is always `0x00`. However it is currently unused by OP Stack with name space values still being actively [discussed](https://github.com/ethereum-optimism/specs/discussions/135#discussioncomment-9271282).
 
-### Simple Commitment Mode
-For simple clients communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
+### Standard Commitment Mode
+For standard clients (i.e, `client/client.go`) communicating with proxy (e.g, arbitrum nitro), the following commitment schema is supported:
 
 ```
  0         1                 N

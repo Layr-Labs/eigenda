@@ -121,7 +121,7 @@ func TestProxyClientMalformedInputCases(t *testing.T) {
 
 	t.Run("get data edge cases - huge cert", func(t *testing.T) {
 		// TODO: we need to add the 0 version byte at the beginning.
-		// should this not be done automatically by the simple_commitment client?
+		// should this not be done automatically by the std_commitment client?
 		testCert := append([]byte{0}, e2e.RandBytes(10000)...)
 		_, err := daClient.GetData(ts.Ctx, testCert)
 		require.Error(t, err)

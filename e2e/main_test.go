@@ -65,8 +65,8 @@ func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.Bac
 	require.True(t, readCount > 0)
 }
 
-// requireSimpleClientSetGet ... ensures that simple proxy client can disperse and read a blob
-func requireSimpleClientSetGet(t *testing.T, ts e2e.TestSuite, blob []byte) {
+// requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
+func requireStandardClientSetGet(t *testing.T, ts e2e.TestSuite, blob []byte) {
 	cfg := &client.Config{
 		URL: ts.Address(),
 	}

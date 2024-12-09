@@ -16,13 +16,13 @@ const (
 
 func (svr *Server) registerRoutes(r *mux.Router) {
 	subrouterGET := r.Methods("GET").PathPrefix("/get").Subrouter()
-	// simple commitments (for nitro)
+	// std commitments (for nitro)
 	subrouterGET.HandleFunc("/"+
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 		"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
 		"{"+routingVarNameRawCommitmentHex+":[0-9a-fA-F]*}",
-		withLogging(withMetrics(svr.handleGetSimpleCommitment, svr.m, commitments.SimpleCommitmentMode), svr.log),
-	).Queries("commitment_mode", "simple")
+		withLogging(withMetrics(svr.handleGetStdCommitment, svr.m, commitments.Standard), svr.log),
+	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
 	subrouterGET.HandleFunc("/"+
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
@@ -51,13 +51,13 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 			commitType := mux.Vars(r)[routingVarNameCommitTypeByteHex]
 			http.Error(w, fmt.Sprintf("unsupported commitment type %s", commitType), http.StatusBadRequest)
 		},
-	).MatcherFunc(notCommitmentModeSimple)
+	).MatcherFunc(notCommitmentModeStandard)
 
 	subrouterPOST := r.Methods("POST").PathPrefix("/put").Subrouter()
-	// simple commitments (for nitro)
+	// std commitments (for nitro)
 	subrouterPOST.HandleFunc("", // commitment is calculated by the server using the body data
-		withLogging(withMetrics(svr.handlePostSimpleCommitment, svr.m, commitments.SimpleCommitmentMode), svr.log),
-	).Queries("commitment_mode", "simple")
+		withLogging(withMetrics(svr.handlePostStdCommitment, svr.m, commitments.Standard), svr.log),
+	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
 	subrouterPOST.HandleFunc("/"+
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
@@ -80,7 +80,7 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")
 }
 
-func notCommitmentModeSimple(r *http.Request, _ *mux.RouteMatch) bool {
+func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {
 	commitmentMode := r.URL.Query().Get("commitment_mode")
-	return commitmentMode == "" || commitmentMode != "simple"
+	return commitmentMode == "" || commitmentMode != "standard"
 }

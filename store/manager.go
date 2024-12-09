@@ -22,7 +22,7 @@ type IManager interface {
 type Manager struct {
 	log log.Logger
 	// primary storage backends
-	eigenda common.GeneratedKeyStore   // ALT DA commitment type for OP mode && simple commitment mode for standard /client
+	eigenda common.GeneratedKeyStore   // ALT DA commitment type for OP mode && std commitment mode for standard /client
 	s3      common.PrecomputedKeyStore // OP commitment mode && keccak256 commitment type
 
 	// secondary storage backends (caching and fallbacks)
@@ -63,7 +63,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		}
 		return value, nil
 
-	case commitments.SimpleCommitmentMode, commitments.OptimismGeneric:
+	case commitments.Standard, commitments.OptimismGeneric:
 		if m.eigenda == nil {
 			return nil, errors.New("expected EigenDA backend for DA commitment type, but none configured")
 		}
@@ -117,7 +117,7 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 	switch cm {
 	case commitments.OptimismKeccak: // caching and fallbacks are unsupported for this commitment mode
 		return m.putKeccak256Mode(ctx, key, value)
-	case commitments.OptimismGeneric, commitments.SimpleCommitmentMode:
+	case commitments.OptimismGeneric, commitments.Standard:
 		commit, err = m.putEigenDAMode(ctx, value)
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
