@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"math/rand"
 	"sync/atomic"
@@ -57,6 +58,8 @@ type EncodingManager struct {
 	// state
 	cursor                *blobstore.StatusIndexCursor
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	metrics *encodingManagerMetrics
 }
 
 func NewEncodingManager(
@@ -66,6 +69,7 @@ func NewEncodingManager(
 	encodingClient disperser.EncoderClientV2,
 	chainReader core.Reader,
 	logger logging.Logger,
+	registry *prometheus.Registry,
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
 		len(config.AvailableRelays) == 0 ||
@@ -82,8 +86,8 @@ func NewEncodingManager(
 		encodingClient:        encodingClient,
 		chainReader:           chainReader,
 		logger:                logger.With("component", "EncodingManager"),
-
-		cursor: nil,
+		cursor:                nil,
+		metrics:               newEncodingManagerMetrics(registry),
 	}, nil
 }
 
@@ -151,6 +155,15 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return fmt.Errorf("blob version parameters is nil")
 	}
 
+	e.metrics.reportBatchSize(len(blobMetadatas))
+	batchSizeBytes := uint64(0)
+	for _, blob := range blobMetadatas {
+		batchSizeBytes += blob.BlobSize
+	}
+	e.metrics.reportBatchDataSize(batchSizeBytes)
+
+	submissionStart := time.Now()
+
 	for _, blob := range blobMetadatas {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
@@ -167,7 +180,15 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 		// Encode the blobs
 		e.pool.Submit(func() {
-			for i := 0; i < e.NumEncodingRetries+1; i++ {
+			start := time.Now()
+
+			var i int
+			var finishedEncodingTime time.Time
+			var finishedPutBlobCertificateTime time.Time
+			var finishedUpdateBlobStatusTime time.Time
+			var success bool
+
+			for i = 0; i < e.NumEncodingRetries+1; i++ {
 				encodingCtx, cancel := context.WithTimeout(ctx, e.EncodingRequestTimeout)
 				fragmentInfo, err := e.encodeBlob(encodingCtx, blobKey, blob, blobParams)
 				cancel()
@@ -175,6 +196,9 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to encode blob", "blobKey", blobKey.Hex(), "err", err)
 					continue
 				}
+
+				finishedEncodingTime = time.Now()
+
 				relayKeys, err := GetRelayKeys(e.NumRelayAssignment, e.AvailableRelays)
 				if err != nil {
 					e.logger.Error("failed to get relay keys", "err", err)
@@ -194,27 +218,45 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					continue
 				}
 
+				finishedPutBlobCertificateTime = time.Now()
+
 				storeCtx, cancel = context.WithTimeout(ctx, e.StoreTimeout)
 				err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Encoded)
+				finishedUpdateBlobStatusTime = time.Now()
 				cancel()
 				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
-					return
+					success = true
+					break
 				}
 
 				e.logger.Error("failed to update blob status to Encoded", "blobKey", blobKey.Hex(), "err", err)
-				time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
+				sleepTime := time.Duration(math.Pow(2, float64(i))) * time.Second
+				time.Sleep(sleepTime) // Wait before retrying
 			}
 
-			storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
-			err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
-			cancel()
-			if err != nil {
-				e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
-				return
+			e.metrics.reportBatchRetryCount(i)
+
+			if success {
+				e.metrics.reportEncodingLatency(finishedEncodingTime.Sub(start))
+				e.metrics.reportPutBlobCertLatency(finishedPutBlobCertificateTime.Sub(finishedEncodingTime))
+				e.metrics.reportUpdateBlobStatusLatency(
+					finishedUpdateBlobStatusTime.Sub(finishedPutBlobCertificateTime))
+				e.metrics.reportBlobHandleLatency(time.Since(start))
+			} else {
+				e.metrics.reportFailedSubmission()
+				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
+				err = e.blobMetadataStore.UpdateBlobStatus(storeCtx, blobKey, v2.Failed)
+				cancel()
+				if err != nil {
+					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
+					return
+				}
 			}
 		})
 	}
+
+	e.metrics.reportBatchSubmissionLatency(time.Since(submissionStart))
 
 	if cursor != nil {
 		e.cursor = cursor
