@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"math/rand"
 	"testing"
-	"time"
 )
 
 type ClientV2Tester struct {
@@ -32,7 +31,7 @@ func (c *ClientV2Tester) assertExpectations(t *testing.T) {
 func buildClientV2Tester(t *testing.T) ClientV2Tester {
 	tu.InitializeRandom()
 	logger := logging.NewNoopLogger()
-	clientConfig := &clients.EigenDAClientConfig{}
+	clientConfig := &clients.EigenDAClientConfigV2{}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	mockCodec := codecsmock.BlobCodec{}
@@ -265,20 +264,9 @@ func TestGetCodec(t *testing.T) {
 
 // TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
 func TestBuilder(t *testing.T) {
-	clientConfig := &clients.EigenDAClientConfig{
-		StatusQueryTimeout:           10 * time.Minute,
-		StatusQueryRetryInterval:     50 * time.Millisecond,
-		ResponseTimeout:              10 * time.Second,
-		ConfirmationTimeout:          5 * time.Second,
-		CustomQuorumIDs:              []uint{},
-		SignerPrivateKeyHex:          "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
-		DisableTLS:                   false,
+	clientConfig := &clients.EigenDAClientConfigV2{
 		PutBlobEncodingVersion:       codecs.DefaultBlobEncoding,
 		DisablePointVerificationMode: false,
-		WaitForFinalization:          true,
-		RPC:                          "http://localhost:8080",
-		EthRpcUrl:                    "http://localhost:8545",
-		SvcManagerAddr:               "0x1234567890123456789012345678901234567890",
 	}
 
 	relayClientConfig := &clients.RelayClientConfig{

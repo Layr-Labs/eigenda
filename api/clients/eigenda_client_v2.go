@@ -15,7 +15,7 @@ type EigenDAClientV2 struct {
 	log logging.Logger
 	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
 	random      *rand.Rand
-	config      *EigenDAClientConfig
+	config      *EigenDAClientConfigV2
 	codec       codecs.BlobCodec
 	relayClient RelayClient
 }
@@ -23,13 +23,8 @@ type EigenDAClientV2 struct {
 // BuildEigenDAClientV2 builds an EigenDAClientV2 from config structs.
 func BuildEigenDAClientV2(
 	log logging.Logger,
-	config *EigenDAClientConfig,
+	config *EigenDAClientConfigV2,
 	relayClientConfig *RelayClientConfig) (*EigenDAClientV2, error) {
-
-	err := config.CheckAndSetDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("check and set client config defaults: %w", err)
-	}
 
 	relayClient, err := NewRelayClient(relayClientConfig, log)
 	if err != nil {
@@ -48,7 +43,7 @@ func BuildEigenDAClientV2(
 func NewEigenDAClientV2(
 	log logging.Logger,
 	random *rand.Rand,
-	config *EigenDAClientConfig,
+	config *EigenDAClientConfigV2,
 	relayClient RelayClient,
 	codec codecs.BlobCodec) (*EigenDAClientV2, error) {
 
@@ -92,6 +87,7 @@ func (c *EigenDAClientV2) GetBlob(
 	for _, val := range indices {
 		relayKey := blobCertificate.RelayKeys[val]
 
+		// TODO: does this need a timeout?
 		data, err := c.relayClient.GetBlob(ctx, relayKey, blobKey)
 
 		// if GetBlob returned an error, try calling a different relay
@@ -138,7 +134,7 @@ func (c *EigenDAClientV2) Close() error {
 }
 
 // createCodec creates the codec based on client config values
-func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
+func createCodec(config *EigenDAClientConfigV2) (codecs.BlobCodec, error) {
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create low level codec: %w", err)
