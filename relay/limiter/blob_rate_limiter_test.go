@@ -38,7 +38,7 @@ func TestConcurrentBlobOperations(t *testing.T) {
 	// Make the burstiness limit high enough that we won't be rate limited
 	config.GetBlobOpsBurstiness = concurrencyLimit * 100
 
-	limiter := NewBlobRateLimiter(config)
+	limiter := NewBlobRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -69,7 +69,7 @@ func TestGetBlobOpRateLimit(t *testing.T) {
 	config.GetBlobOpsBurstiness = int(config.MaxGetBlobOpsPerSecond) + rand.Intn(10)
 	config.MaxConcurrentGetBlobOps = 1
 
-	limiter := NewBlobRateLimiter(config)
+	limiter := NewBlobRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -129,7 +129,7 @@ func TestGetBlobBandwidthLimit(t *testing.T) {
 	config.MaxGetBlobBytesPerSecond = float64(1024 + rand.Intn(1024*1024))
 	config.GetBlobBytesBurstiness = int(config.MaxGetBlobBytesPerSecond) + rand.Intn(1024*1024)
 
-	limiter := NewBlobRateLimiter(config)
+	limiter := NewBlobRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()

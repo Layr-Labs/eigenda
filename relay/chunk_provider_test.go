@@ -52,7 +52,8 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		1024*1024*32,
 		32,
 		10*time.Second,
-		10*time.Second)
+		10*time.Second,
+		nil)
 	require.NoError(t, err)
 
 	// Read it back.
@@ -139,7 +140,8 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 		1024*1024*32,
 		32,
 		10*time.Second,
-		10*time.Second)
+		10*time.Second,
+		nil)
 	require.NoError(t, err)
 
 	// Read it back.
