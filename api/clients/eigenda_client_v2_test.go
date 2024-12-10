@@ -12,13 +12,13 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/exp/rand"
+	"math/rand"
 	"testing"
 	"time"
 )
 
 type ClientV2Tester struct {
-	ClientV2        clients.EigenDAClientV2
+	ClientV2        *clients.EigenDAClientV2
 	MockRelayClient *clientsmock.MockRelayClient
 	MockCodec       *codecsmock.BlobCodec
 }
@@ -32,13 +32,17 @@ func (c *ClientV2Tester) assertExpectations(t *testing.T) {
 func buildClientV2Tester(t *testing.T) ClientV2Tester {
 	tu.InitializeRandom()
 	logger := logging.NewNoopLogger()
-	clientConfig := clients.EigenDAClientConfig{}
+	clientConfig := &clients.EigenDAClientConfig{}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	mockCodec := codecsmock.BlobCodec{}
 
+	// TODO (litt3): use TestRandom once the PR merges https://github.com/Layr-Labs/eigenda/pull/976
+	random := rand.New(rand.NewSource(rand.Int63()))
+
 	client, err := clients.NewEigenDAClientV2(
 		logger,
+		random,
 		clientConfig,
 		&mockRelayClient,
 		&mockCodec)
@@ -61,7 +65,7 @@ func TestGetBlobSuccess(t *testing.T) {
 	blobBytes := tu.RandomBytes(100)
 
 	relayKeys := make([]v2.RelayKey, 1)
-	relayKeys[0] = tu.RandomUint16()
+	relayKeys[0] = rand.Uint32()
 	blobCert := v2.BlobCertificate{
 		RelayKeys: relayKeys,
 	}
@@ -88,7 +92,7 @@ func TestRandomRelayRetries(t *testing.T) {
 	relayCount := 100
 	relayKeys := make([]v2.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = tu.RandomUint16()
+		relayKeys[i] = rand.Uint32()
 	}
 	blobCert := v2.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -135,7 +139,7 @@ func TestNoRelayResponse(t *testing.T) {
 	relayCount := 10
 	relayKeys := make([]v2.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = tu.RandomUint16()
+		relayKeys[i] = rand.Uint32()
 	}
 	blobCert := v2.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -177,7 +181,7 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	relayCount := 10
 	relayKeys := make([]v2.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = tu.RandomUint16()
+		relayKeys[i] = rand.Uint32()
 	}
 	blobCert := v2.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -207,7 +211,7 @@ func TestFailedDecoding(t *testing.T) {
 	relayCount := 10
 	relayKeys := make([]v2.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = tu.RandomUint16()
+		relayKeys[i] = rand.Uint32()
 	}
 	blobCert := v2.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -261,7 +265,7 @@ func TestGetCodec(t *testing.T) {
 
 // TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
 func TestBuilder(t *testing.T) {
-	clientConfig := clients.EigenDAClientConfig{
+	clientConfig := &clients.EigenDAClientConfig{
 		StatusQueryTimeout:           10 * time.Minute,
 		StatusQueryRetryInterval:     50 * time.Millisecond,
 		ResponseTimeout:              10 * time.Second,
@@ -277,7 +281,7 @@ func TestBuilder(t *testing.T) {
 		SvcManagerAddr:               "0x1234567890123456789012345678901234567890",
 	}
 
-	relayClientConfig := clients.RelayClientConfig{
+	relayClientConfig := &clients.RelayClientConfig{
 		Sockets:           make(map[v2.RelayKey]string),
 		UseSecureGrpcFlag: true,
 	}

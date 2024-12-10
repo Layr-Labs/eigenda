@@ -6,66 +6,58 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/hashicorp/go-multierror"
+	"github.com/cockroachdb/errors/join"
 	"math/rand"
 )
 
 // EigenDAClientV2 provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
-type EigenDAClientV2 interface {
-	// GetBlob iteratively attempts to retrieve a given blob with key blobKey from the relays listed in the blobCertificate.
-	GetBlob(ctx context.Context, blobKey corev2.BlobKey, blobCertificate corev2.BlobCertificate) ([]byte, error)
-	GetCodec() codecs.BlobCodec
-	Close() error
+type EigenDAClientV2 struct {
+	log logging.Logger
+	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
+	random      *rand.Rand
+	config      *EigenDAClientConfig
+	codec       codecs.BlobCodec
+	relayClient RelayClient
 }
-
-type eigenDAClientV2 struct {
-	clientConfig EigenDAClientConfig
-	log          logging.Logger
-	relayClient  RelayClient
-	codec        codecs.BlobCodec
-}
-
-var _ EigenDAClientV2 = &eigenDAClientV2{}
 
 // BuildEigenDAClientV2 builds an EigenDAClientV2 from config structs.
 func BuildEigenDAClientV2(
 	log logging.Logger,
-	clientConfig EigenDAClientConfig,
-	relayClientConfig RelayClientConfig) (EigenDAClientV2, error) {
+	config *EigenDAClientConfig,
+	relayClientConfig *RelayClientConfig) (*EigenDAClientV2, error) {
 
-	err := clientConfig.CheckAndSetDefaults()
+	err := config.CheckAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set client config defaults: %w", err)
+	}
+
+	relayClient, err := NewRelayClient(relayClientConfig, log)
+	if err != nil {
+		return nil, fmt.Errorf("new relay client: %w", err)
+	}
+
+	codec, err := createCodec(config)
 	if err != nil {
 		return nil, err
 	}
 
-	relayClient, err := NewRelayClient(&relayClientConfig, log)
-
-	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(clientConfig.PutBlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create low level codec: %w", err)
-	}
-	var codec codecs.BlobCodec
-	if clientConfig.DisablePointVerificationMode {
-		codec = codecs.NewNoIFFTCodec(lowLevelCodec)
-	} else {
-		codec = codecs.NewIFFTCodec(lowLevelCodec)
-	}
-
-	return NewEigenDAClientV2(log, clientConfig, relayClient, codec)
+	return NewEigenDAClientV2(log, rand.New(rand.NewSource(rand.Int63())), config, relayClient, codec)
 }
 
 // NewEigenDAClientV2 assembles an EigenDAClientV2 from subcomponents that have already been constructed and initialized.
 func NewEigenDAClientV2(
 	log logging.Logger,
-	clientConfig EigenDAClientConfig,
+	random *rand.Rand,
+	config *EigenDAClientConfig,
 	relayClient RelayClient,
-	codec codecs.BlobCodec) (EigenDAClientV2, error) {
+	codec codecs.BlobCodec) (*EigenDAClientV2, error) {
 
-	return &eigenDAClientV2{
-		clientConfig: clientConfig,
-		log:          log,
-		relayClient:  relayClient,
-		codec:        codec,
+	return &EigenDAClientV2{
+		log:         log,
+		random:      random,
+		config:      config,
+		codec:       codec,
+		relayClient: relayClient,
 	}, nil
 }
 
@@ -74,15 +66,23 @@ func NewEigenDAClientV2(
 // The relays are attempted in random order.
 //
 // The returned blob is decoded.
-func (c *eigenDAClientV2) GetBlob(ctx context.Context, blobKey corev2.BlobKey, blobCertificate corev2.BlobCertificate) ([]byte, error) {
-	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
-	random := rand.New(rand.NewSource(rand.Int63()))
+func (c *EigenDAClientV2) GetBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobCertificate corev2.BlobCertificate) ([]byte, error) {
+
 	relayKeyCount := len(blobCertificate.RelayKeys)
+
+	if relayKeyCount == 0 {
+		return nil, fmt.Errorf("relay key count is zero")
+	}
+
 	var indices []int
+	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
 	for i := 0; i < relayKeyCount; i++ {
 		indices = append(indices, i)
 	}
-	random.Shuffle(len(indices), func(i int, j int) {
+	c.random.Shuffle(len(indices), func(i int, j int) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
@@ -96,22 +96,20 @@ func (c *eigenDAClientV2) GetBlob(ctx context.Context, blobKey corev2.BlobKey, b
 
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
-			// TODO: should this log type be downgraded to debug to avoid log spam? I'm not sure how frequent retrieval
-			//  from a relay will fail in practice (?)
-			c.log.Info("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey)
+			c.log.Warn("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
 		// An honest relay should never send an empty blob
 		if len(data) == 0 {
-			c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey)
+			c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
 		// An honest relay should never send a blob which cannot be decoded
 		decodedData, err := c.codec.DecodeBlob(data)
 		if err != nil {
-			c.log.Warn("error decoding blob", "blobKey", blobKey, "relayKey", relayKey)
+			c.log.Warn("error decoding blob", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
@@ -121,22 +119,34 @@ func (c *eigenDAClientV2) GetBlob(ctx context.Context, blobKey corev2.BlobKey, b
 	return nil, fmt.Errorf("unable to retrieve blob from any relay")
 }
 
-func (c *eigenDAClientV2) GetCodec() codecs.BlobCodec {
+// GetCodec returns the codec the client uses for encoding and decoding blobs
+func (c *EigenDAClientV2) GetCodec() codecs.BlobCodec {
 	return c.codec
 }
 
-func (c *eigenDAClientV2) Close() error {
-	var errList *multierror.Error
-
-	// TODO: this is using a multierror, since there will be more subcomponents requiring closing after adding PUT functionality
+// Close is responsible for calling close on all internal clients. This method will do its best to close all internal
+// clients, even if some closes fail.
+//
+// Any and all errors returned from closing internal clients will be joined and returned.
+//
+// This method should only be called once.
+func (c *EigenDAClientV2) Close() error {
 	relayClientErr := c.relayClient.Close()
-	if relayClientErr != nil {
-		errList = multierror.Append(errList, relayClientErr)
+
+	// TODO: this is using join, since there will be more subcomponents requiring closing after adding PUT functionality
+	return join.Join(relayClientErr)
+}
+
+// createCodec creates the codec based on client config values
+func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
+	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
+	if err != nil {
+		return nil, fmt.Errorf("create low level codec: %w", err)
 	}
 
-	if errList != nil {
-		return errList.ErrorOrNil()
+	if config.DisablePointVerificationMode {
+		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
+	} else {
+		return codecs.NewIFFTCodec(lowLevelCodec), nil
 	}
-
-	return nil
 }
