@@ -601,13 +601,13 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
 type ActiveReservation struct {
-	SymbolsPerSec uint64 // reserve number of symbols per second
+	SymbolsPerSecond uint64 // reserve number of symbols per second
 	//TODO: we are not using start and end timestamp, add check or remove
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
 	EndTimestamp   uint64
 
 	QuorumNumbers []uint8 // allowed quorums
-	QuorumSplit   []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	QuorumSplits  []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
 }
 
 type OnDemandPayment struct {
