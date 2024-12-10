@@ -270,12 +270,9 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			// for j := 0; j < 5; j++ {
-			// fmt.Println("request ", i)
 			_, err := accountant.AccountBlob(ctx, 100, quorums, salt)
 			assert.NoError(t, err)
 			time.Sleep(500 * time.Millisecond)
-			// }
 		}()
 	}
 
@@ -314,19 +311,22 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	// Okay reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums, salt)
 	assert.NoError(t, err)
+	assert.Equal(t, salt, header.Salt)
 	assert.Equal(t, meterer.GetReservationPeriod(uint64(now), reservationWindow), header.ReservationPeriod)
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Second call: Allow one overflow
-	header, err = accountant.AccountBlob(ctx, 500, quorums, salt)
+	header, err = accountant.AccountBlob(ctx, 500, quorums, salt+1)
 	assert.NoError(t, err)
+	assert.Equal(t, salt+1, header.Salt)
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Third call: Should use on-demand payment
-	header, err = accountant.AccountBlob(ctx, 200, quorums, salt)
+	header, err = accountant.AccountBlob(ctx, 200, quorums, salt+2)
 	assert.NoError(t, err)
+	assert.Equal(t, salt+2, header.Salt)
 	assert.Equal(t, uint32(0), header.ReservationPeriod)
 	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)

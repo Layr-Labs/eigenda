@@ -280,10 +280,10 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  |  |
-| reservation_period | [uint32](#uint32) |  |  |
-| cumulative_payment | [bytes](#bytes) |  |  |
-| salt | [uint32](#uint32) |  |  |
+| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
+| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
 
 
 
@@ -639,7 +639,7 @@ BlobStatusRequest is used to query the status of a blob.
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
 | quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, ReservationPeriod, and CumulativePayment |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, ReservationPeriod, CumulativePayment, and Salt |
 | payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 

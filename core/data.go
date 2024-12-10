@@ -579,26 +579,6 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
 	}
 }
 
-// ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
-func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
-	return &PaymentMetadata{
-		AccountID:         header.AccountId,
-		ReservationPeriod: header.ReservationPeriod,
-		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
-		Salt:              header.Salt,
-	}
-}
-
-// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader {
-	return &commonpb.PaymentHeader{
-		AccountId:         pm.AccountID,
-		ReservationPeriod: pm.ReservationPeriod,
-		CumulativePayment: pm.CumulativePayment.Bytes(),
-		Salt:              pm.Salt,
-	}
-}
-
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
 func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 	return &PaymentMetadata{

@@ -155,10 +155,15 @@ type PaymentHeader struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	AccountId         string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+	// corresponding to the key used by the client to sign the BlobHeader.
+	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// The reservation period of the dispersal request.
 	ReservationPeriod uint32 `protobuf:"varint,2,opt,name=reservation_period,json=reservationPeriod,proto3" json:"reservation_period,omitempty"`
+	// The cumulative payment of the dispersal request.
 	CumulativePayment []byte `protobuf:"bytes,3,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
-	Salt              uint32 `protobuf:"varint,4,opt,name=salt,proto3" json:"salt,omitempty"`
+	// The salt of the disperser request. This is used to ensure that the payment header is intentionally unique.
+	Salt uint32 `protobuf:"varint,4,opt,name=salt,proto3" json:"salt,omitempty"`
 }
 
 func (x *PaymentHeader) Reset() {

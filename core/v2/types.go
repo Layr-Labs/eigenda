@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -109,11 +108,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		quorumNumbers[i] = core.QuorumID(q)
 	}
 
-	paymentMetadata := core.PaymentMetadata{
-		AccountID:         proto.GetPaymentHeader().GetAccountId(),
-		ReservationPeriod: proto.GetPaymentHeader().GetReservationPeriod(),
-		CumulativePayment: new(big.Int).SetBytes(proto.GetPaymentHeader().GetCumulativePayment()),
-	}
+	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
 
 	return &BlobHeader{
 		BlobVersion: BlobVersion(proto.GetVersion()),
@@ -124,7 +119,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 			Length:           uint(proto.GetCommitment().GetLength()),
 		},
 		QuorumNumbers:   quorumNumbers,
-		PaymentMetadata: paymentMetadata,
+		PaymentMetadata: *paymentMetadata,
 		Signature:       proto.GetSignature(),
 	}, nil
 }

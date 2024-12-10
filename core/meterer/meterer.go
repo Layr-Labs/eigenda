@@ -22,7 +22,7 @@ type Config struct {
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
-// with payments information (CumulativePayments, ReservationPeriod, and Signature). Disperser will pass the blob header to the meterer, which will check if the
+// with payments information (CumulativePayments, ReservationPeriod, Salt, and Signature). Disperser will pass the blob header to the meterer, which will check if the
 // payments information is valid.
 type Meterer struct {
 	Config
