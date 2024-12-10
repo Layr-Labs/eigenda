@@ -26,29 +26,27 @@ func main() {
 	//readpoints()
 }
 
-/*
-func readpoints() {
-	kzgConfig := &kzg.KzgConfig{
-		G1Path:          "../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../inabox/resources/kzg/g2.point",
-		CacheDir:        "SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 3000,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-	}
-
-	// create encoding object
-	kzgGroup, _ := prover.NewProver(kzgConfig, true)
-	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
-	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
-
-		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
-	}
-	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
-		fmt.Println("start with gen")
-	}
-}
-*/
+// func readpoints() {
+// 	kzgConfig := &kzg.KzgConfig{
+//		G1Path:          "../../inabox/resources/kzg/g1.point",
+//		G2Path:          "../../inabox/resources/kzg/g2.point",
+//		CacheDir:        "SRSTables",
+//		SRSOrder:        3000,
+//		SRSNumberToLoad: 3000,
+//		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+//	}
+//
+//	// create encoding object
+//	kzgGroup, _ := prover.NewProver(kzgConfig, true)
+//	fmt.Println("there are ", len(kzgGroup.Srs.G1), "points")
+//	for i := 0; i < len(kzgGroup.Srs.G1); i++ {
+//
+//		fmt.Printf("%v %v\n", i, string(kzgGroup.Srs.G1[i].String()))
+//	}
+//	if kzgGroup.Srs.G1[0].X == kzg.GenG1.X && kzgGroup.Srs.G1[0].Y == kzg.GenG1.Y {
+//		fmt.Println("start with gen")
+//	}
+// }
 
 func TestKzgRs() {
 	numSymbols := 1024
