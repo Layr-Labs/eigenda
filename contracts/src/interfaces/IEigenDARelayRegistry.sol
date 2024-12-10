@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import "./IEigenDAStructs.sol";
+
 interface IEigenDARelayRegistry {
 
-    event RelayAdded(address indexed relay, uint32 indexed id, string relayURL);
+    event RelayAdded(address indexed relay, uint32 indexed key, string relayURL);
 
-    function setRelayURL(address relay, uint32 id, string memory relayURL) external;
+    function addRelayInfo(RelayInfo memory relayInfo) external returns (uint32);
 
-    function getRelayURL(uint32 id) external view returns (string memory);
+    function relayKeyToAddress(uint32 key) external view returns (address);
 
-    function getRelayId(address relay) external view returns (uint32);
-
-    function getRelayAddress(uint32 id) external view returns (address);
+    function relayKeyToUrl(uint32 key) external view returns (string memory);
 }

@@ -152,24 +152,19 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
-    /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
-        return eigenDAThresholdRegistry.getBlobParams(version);
-    }
-
     /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
-        return hex"212121";
+        return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
     }
 
     /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
     function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
-        return hex"373737";
+        return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
     }
 
     /// @notice Returns the bytes array of quorumsNumbersRequired
     function quorumNumbersRequired() external view returns (bytes memory) {
-        return hex"0001";
+        return eigenDAThresholdRegistry.quorumNumbersRequired();
     }
 
     function getQuorumAdversaryThresholdPercentage(
@@ -195,5 +190,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     /// @notice Gets the default security thresholds for V2
     function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
         return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
+    }
+
+    /// @notice Returns the blob params for a given blob version
+    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+        return eigenDAThresholdRegistry.getBlobParams(version);
     }
 }
