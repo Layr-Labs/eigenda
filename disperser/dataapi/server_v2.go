@@ -97,14 +97,15 @@ func (s *ServerV2) Start() error {
 	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
 	v2 := router.Group(basePath)
 	{
-		feed := v2.Group("/feed")
+		blob := v2.Group("/blob")
 		{
-			// Blob feed
-			feed.GET("/blobs", s.FetchBlobsHandler)
-			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
-			// Batch feed
-			feed.GET("/batches", s.FetchBatchesHandler)
-			feed.GET("/batches/:batch_header_hash", s.FetchBatchHandler)
+			blob.GET("/blob/feed", s.FetchBlobFeedHandler)
+			blob.GET("/blob/:blob_key", s.FetchBlobHandler)
+		}
+		batch := v2.Group("/batch")
+		{
+			batch.GET("/batch/feed", s.FetchBatchFeedHandler)
+			batch.GET("/batch/:batch_header_hash", s.FetchBatchHandler)
 		}
 		operators := v2.Group("/operators")
 		{
@@ -159,8 +160,8 @@ func (s *ServerV2) Shutdown() error {
 	return nil
 }
 
-func (s *ServerV2) FetchBlobsHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBlobsHandler unimplemented"))
+func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
+	errorResponse(c, errors.New("FetchBlobFeedHandler unimplemented"))
 }
 
 // FetchBlobHandler godoc
@@ -200,8 +201,8 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-func (s *ServerV2) FetchBatchesHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBatchesHandler unimplemented"))
+func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
+	errorResponse(c, errors.New("FetchBatchFeedHandler unimplemented"))
 }
 
 // FetchBatchHandler godoc
