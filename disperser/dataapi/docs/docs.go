@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/feed/batches/{batch_header_hash}": {
+        "/batch/{batch_header_hash}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -29,6 +29,52 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Batch header hash in hex string",
                         "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blob/{blob_key}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feed"
+                ],
+                "summary": "Fetch blob metadata by blob key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
                         "in": "path",
                         "required": true
                     }
@@ -176,7 +222,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Blob key in hex string",
+                        "description": "Blob Key",
                         "name": "blob_key",
                         "in": "path",
                         "required": true
@@ -186,7 +232,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobResponse"
+                            "$ref": "#/definitions/dataapi.BlobMetadataResponse"
                         }
                     },
                     "400": {

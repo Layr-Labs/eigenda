@@ -357,7 +357,7 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
-  /feed/batches/{batch_header_hash}:
+  /batch/{batch_header_hash}:
     get:
       parameters:
       - description: Batch header hash in hex string
@@ -385,6 +385,36 @@ paths:
           schema:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Fetch batch by the batch header hash
+      tags:
+      - Feed
+  /blob/{blob_key}:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch blob metadata by blob key
       tags:
       - Feed
   /feed/batches/{batch_header_hash}/blobs:
@@ -457,7 +487,7 @@ paths:
   /feed/blobs/{blob_key}:
     get:
       parameters:
-      - description: Blob key in hex string
+      - description: Blob Key
         in: path
         name: blob_key
         required: true
@@ -468,7 +498,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
+            $ref: '#/definitions/dataapi.BlobMetadataResponse'
         "400":
           description: 'error: Bad request'
           schema:
