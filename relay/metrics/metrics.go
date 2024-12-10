@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/metrics"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -12,12 +11,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"net/http"
+	"strings"
+	"time"
 )
 
-const namespace := "eigenda_relay"
+const namespace = "eigenda_relay"
 
 type RelayMetrics struct {
+	logger           logging.Logger
 	grpcServerOption grpc.ServerOption
+	server           *http.Server
 
 	// Cache metrics
 	MetadataCacheMetrics *cache.CacheAccessorMetrics
@@ -25,35 +28,35 @@ type RelayMetrics struct {
 	BlobCacheMetrics     *cache.CacheAccessorMetrics
 
 	// GetChunks metrics
-	GetChunksLatency               *prometheus.SummaryVec
-	GetChunksAuthenticationLatency *prometheus.SummaryVec
-	GetChunksMetadataLatency       *prometheus.SummaryVec
-	GetChunksDataLatency           *prometheus.SummaryVec
-	GetChunksAuthFailures          *prometheus.CounterVec
-	GetChunksRateLimited           *prometheus.CounterVec
-	GetChunksKeyCount              *prometheus.GaugeVec
-	GetChunksDataSize              *prometheus.GaugeVec
+	getChunksLatency               *prometheus.SummaryVec
+	getChunksAuthenticationLatency *prometheus.SummaryVec
+	getChunksMetadataLatency       *prometheus.SummaryVec
+	getChunksDataLatency           *prometheus.SummaryVec
+	getChunksAuthFailures          *prometheus.CounterVec
+	getChunksRateLimited           *prometheus.CounterVec
+	getChunksKeyCount              *prometheus.GaugeVec
+	getChunksDataSize              *prometheus.GaugeVec
 
 	// GetBlob metrics
-	GetBlobLatency         *prometheus.SummaryVec
-	GetBlobMetadataLatency *prometheus.SummaryVec
-	GetBlobDataLatency     *prometheus.SummaryVec
-	GetBlobRateLimited     *prometheus.CounterVec
-	GetBlobDataSize        *prometheus.GaugeVec
+	getBlobLatency         *prometheus.SummaryVec
+	getBlobMetadataLatency *prometheus.SummaryVec
+	getBlobDataLatency     *prometheus.SummaryVec
+	getBlobRateLimited     *prometheus.CounterVec
+	getBlobDataSize        *prometheus.GaugeVec
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
-func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
+func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-	reg.MustRegister(collectors.NewGoCollector())
+	registry := prometheus.NewRegistry()
+	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	registry.MustRegister(collectors.NewGoCollector())
 
 	logger.Infof("Starting metrics server at port %d", port)
 	addr := fmt.Sprintf(":%d", port)
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.HandlerFor(
-		reg,
+		registry,
 		promhttp.HandlerOpts{},
 	))
 	server := &http.Server{
@@ -62,29 +65,18 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 	}
 
 	grpcMetrics := grpcprom.NewServerMetrics()
-	reg.MustRegister(grpcMetrics)
+	registry.MustRegister(grpcMetrics)
 	grpcServerOption := grpc.UnaryInterceptor(
 		grpcMetrics.UnaryServerInterceptor(),
 	)
 
-	metadataCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "metadata")
-	if err != nil {
-		return nil, err
-	}
-
-	chunkCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "chunk")
-	if err != nil {
-		return nil, err
-	}
-
-	blobCacheMetrics, err := cache.NewCacheAccessorMetrics(server, "blob")
-	if err != nil {
-		return nil, err
-	}
+	metadataCacheMetrics := cache.NewCacheAccessorMetrics(registry, "metadata")
+	chunkCacheMetrics := cache.NewCacheAccessorMetrics(registry, "chunk")
+	blobCacheMetrics := cache.NewCacheAccessorMetrics(registry, "blob")
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
-	getChunksLatency := promauto.With(reg).NewSummaryVec(
+	getChunksLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_latency_ms",
@@ -94,7 +86,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksAuthenticationLatency := promauto.With(reg).NewSummaryVec(
+	getChunksAuthenticationLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_authentication_latency_ms",
@@ -104,7 +96,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksMetadataLatency := promauto.With(reg).NewSummaryVec(
+	getChunksMetadataLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_metadata_latency_ms",
@@ -114,7 +106,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksDataLatency := promauto.With(reg).NewSummaryVec(
+	getChunksDataLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_data_latency_ms",
@@ -124,7 +116,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksAuthFailures := promauto.With(reg).NewCounterVec(
+	getChunksAuthFailures := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_auth_failure_count",
@@ -133,7 +125,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksRateLimited := promauto.With(reg).NewCounterVec(
+	getChunksRateLimited := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_rate_limited_count",
@@ -142,7 +134,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{"reason"},
 	)
 
-	getChunksKeyCount := promauto.With(reg).NewGaugeVec(
+	getChunksKeyCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_key_count",
@@ -151,7 +143,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getChunksDataSize := promauto.With(reg).NewGaugeVec(
+	getChunksDataSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_data_size_bytes",
@@ -160,7 +152,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getBlobLatency := promauto.With(reg).NewSummaryVec(
+	getBlobLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_blob_latency_ms",
@@ -170,7 +162,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getBlobMetadataLatency := promauto.With(reg).NewSummaryVec(
+	getBlobMetadataLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_blob_metadata_latency_ms",
@@ -180,7 +172,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getBlobDataLatency := promauto.With(reg).NewSummaryVec(
+	getBlobDataLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_blob_data_latency_ms",
@@ -190,7 +182,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{},
 	)
 
-	getBlobRateLimited := promauto.With(reg).NewCounterVec(
+	getBlobRateLimited := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "get_blob_rate_limited_count",
@@ -199,7 +191,7 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 		[]string{"reason"},
 	)
 
-	getBlobDataSize := promauto.With(reg).NewGaugeVec(
+	getBlobDataSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "get_blob_data_size_bytes",
@@ -209,34 +201,41 @@ func NewRelayMetrics(logger logging.Logger, port int) (*RelayMetrics, error) {
 	)
 
 	return &RelayMetrics{
-		grpcServerOption: grpcServerOption,
-		MetadataCacheMetrics: metadataCacheMetrics,
-		ChunkCacheMetrics:    chunkCacheMetrics,
-		BlobCacheMetrics:     blobCacheMetrics,
-		GetChunksLatency:               getChunksLatency,
-		GetChunksAuthenticationLatency: getChunksAuthenticationLatency,
-		GetChunksMetadataLatency:       getChunksMetadataLatency,
-		GetChunksDataLatency:           getChunksDataLatency,
-		GetChunksAuthFailures:          getChunksAuthFailures,
-		GetChunksRateLimited:           getChunksRateLimited,
-		GetChunksKeyCount:              getChunksKeyCount,
-		GetChunksDataSize:              getChunksDataSize,
-		GetBlobLatency:                 getBlobLatency,
-		GetBlobMetadataLatency:         getBlobMetadataLatency,
-		GetBlobDataLatency:             getBlobDataLatency,
-		GetBlobRateLimited:             getBlobRateLimited,
-		GetBlobDataSize:                getBlobDataSize,
-	}, nil
+		logger:                         logger,
+		grpcServerOption:               grpcServerOption,
+		server:                         server,
+		MetadataCacheMetrics:           metadataCacheMetrics,
+		ChunkCacheMetrics:              chunkCacheMetrics,
+		BlobCacheMetrics:               blobCacheMetrics,
+		getChunksLatency:               getChunksLatency,
+		getChunksAuthenticationLatency: getChunksAuthenticationLatency,
+		getChunksMetadataLatency:       getChunksMetadataLatency,
+		getChunksDataLatency:           getChunksDataLatency,
+		getChunksAuthFailures:          getChunksAuthFailures,
+		getChunksRateLimited:           getChunksRateLimited,
+		getChunksKeyCount:              getChunksKeyCount,
+		getChunksDataSize:              getChunksDataSize,
+		getBlobLatency:                 getBlobLatency,
+		getBlobMetadataLatency:         getBlobMetadataLatency,
+		getBlobDataLatency:             getBlobDataLatency,
+		getBlobRateLimited:             getBlobRateLimited,
+		getBlobDataSize:                getBlobDataSize,
+	}
 }
 
 // Start starts the metrics server.
-func (m *RelayMetrics) Start() error {
-	return m.metricsServer.Start()
+func (m *RelayMetrics) Start() {
+	go func() {
+		err := m.server.ListenAndServe()
+		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+			m.logger.Errorf("metrics server error: %v", err)
+		}
+	}()
 }
 
 // Stop stops the metrics server.
 func (m *RelayMetrics) Stop() error {
-	return m.metricsServer.Stop()
+	return m.server.Close()
 }
 
 // GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
@@ -244,7 +243,55 @@ func (m *RelayMetrics) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-// WriteMetricsDocumentation writes the metrics for the churner to a markdown file.
-func (m *RelayMetrics) WriteMetricsDocumentation() error {
-	return m.metricsServer.WriteMetricsDocumentation("relay/mdoc/relay-metrics.md")
+func (m *RelayMetrics) ReportChunkLatency(duration time.Duration) {
+	m.getChunksLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportChunkAuthenticationLatency(duration time.Duration) {
+	m.getChunksAuthenticationLatency.WithLabelValues().Observe(
+		float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportChunkMetadataLatency(duration time.Duration) {
+	m.getChunksMetadataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportChunkDataLatency(duration time.Duration) {
+	m.getChunksDataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportChunkAuthFailure() {
+	m.getChunksAuthFailures.WithLabelValues().Inc()
+}
+
+func (m *RelayMetrics) ReportChunkRateLimited(reason string) {
+	m.getChunksRateLimited.WithLabelValues(reason).Inc()
+}
+
+func (m *RelayMetrics) ReportChunkKeyCount(count int) {
+	m.getChunksKeyCount.WithLabelValues().Set(float64(count))
+}
+
+func (m *RelayMetrics) ReportChunkDataSize(size int) {
+	m.getChunksDataSize.WithLabelValues().Set(float64(size))
+}
+
+func (m *RelayMetrics) ReportBlobLatency(duration time.Duration) {
+	m.getBlobLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportBlobMetadataLatency(duration time.Duration) {
+	m.getBlobMetadataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportBlobDataLatency(duration time.Duration) {
+	m.getBlobDataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+}
+
+func (m *RelayMetrics) ReportBlobRateLimited(reason string) {
+	m.getBlobRateLimited.WithLabelValues(reason).Inc()
+}
+
+func (m *RelayMetrics) ReportBlobDataSize(size int) {
+	m.getBlobDataSize.WithLabelValues().Set(float64(size))
 }
