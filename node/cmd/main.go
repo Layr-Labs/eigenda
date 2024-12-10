@@ -85,8 +85,11 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	// Creates the GRPC server.
+
+	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
+	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
-	serverV2, err := nodegrpc.NewServerV2(config, node, logger, ratelimiter)
+	serverV2, err := nodegrpc.NewServerV2(config, node, logger, ratelimiter, reg)
 	if err != nil {
 		return fmt.Errorf("failed to create server v2: %v", err)
 	}

@@ -12,6 +12,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
 	"runtime"
 	"time"
@@ -34,9 +35,10 @@ func NewServerV2(
 	config *node.Config,
 	node *node.Node,
 	logger logging.Logger,
-	ratelimiter common.RateLimiter) (*ServerV2, error) {
+	ratelimiter common.RateLimiter,
+	registry *prometheus.Registry) (*ServerV2, error) {
 
-	metrics, err := NewV2Metrics(logger, config.MetricsPort, config.DbPath, config.DBSizePollPeriod)
+	metrics, err := NewV2Metrics(logger, registry, config.DbPath, config.DBSizePollPeriod)
 	if err != nil {
 		return nil, err
 	}

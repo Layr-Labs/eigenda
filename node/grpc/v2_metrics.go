@@ -1,18 +1,14 @@
 package grpc
 
 import (
-	"fmt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -24,7 +20,6 @@ type V2Metrics struct {
 	logger logging.Logger
 
 	registry         *prometheus.Registry
-	server           *http.Server
 	grpcServerOption grpc.ServerOption
 
 	storeChunksLatency  *prometheus.SummaryVec
@@ -43,25 +38,12 @@ type V2Metrics struct {
 // If set to 0, the database size is not polled.
 func NewV2Metrics(
 	logger logging.Logger,
-	port int,
+	registry *prometheus.Registry,
 	dbDir string,
 	dbSizePollPeriod time.Duration) (*V2Metrics, error) {
 
-	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
-
-	logger.Infof("Starting metrics server at port %d", port)
-	addr := fmt.Sprintf(":%d", port)
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.HandlerFor(
-		registry,
-		promhttp.HandlerOpts{},
-	))
-	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
-	}
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
@@ -121,7 +103,6 @@ func NewV2Metrics(
 	return &V2Metrics{
 		logger:              logger,
 		registry:            registry,
-		server:              server,
 		grpcServerOption:    grpcServerOption,
 		storeChunksLatency:  storeChunksLatency,
 		storeChunksDataSize: storeChunksDataSize,
@@ -136,13 +117,6 @@ func NewV2Metrics(
 
 // Start starts the metrics server.
 func (m *V2Metrics) Start() {
-	go func() {
-		err := m.server.ListenAndServe()
-		if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
-			m.logger.Errorf("metrics server error: %v", err)
-		}
-	}()
-
 	if m.dbSizePollPeriod.Nanoseconds() == 0 {
 		return
 	}
@@ -173,9 +147,8 @@ func (m *V2Metrics) Start() {
 }
 
 // Stop stops the metrics server.
-func (m *V2Metrics) Stop() error {
+func (m *V2Metrics) Stop() {
 	m.isAlive.Store(false)
-	return m.server.Close()
 }
 
 // GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
