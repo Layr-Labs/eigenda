@@ -99,7 +99,7 @@ message DispersePaidBlobRequest {
 	// The quorums to which the blob to be sent
 	repeated uint32 quorum_numbers = 2;
 	
-	// Payment header contains AccountID, ReservationPeriod, and CumulativePayment
+	// Payment header contains AccountID, ReservationPeriod, CumulativePayment, and Salt
 	common.PaymentHeader payment_header = 3;
 	// signature of payment_header
 	bytes payment_signature = 4;
