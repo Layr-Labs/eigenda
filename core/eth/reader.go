@@ -673,9 +673,10 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 	for i, reservation := range reservations {
 		res, err := ConvertToActiveReservation(reservation)
 		if err != nil {
-			delete(reservationsMap, accountIDs[i])
+			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
 			continue
 		}
+
 		reservationsMap[accountIDs[i]] = res
 	}
 
@@ -710,7 +711,8 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 	// since payments are returned in the same order as the accountIDs, we can directly map them
 	for i, payment := range payments {
 		if payment.Cmp(big.NewInt(0)) == 0 {
-			delete(paymentsMap, accountIDs[i])
+			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i], "err", err)
+			continue
 		}
 		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
 			CumulativePayment: payment,
