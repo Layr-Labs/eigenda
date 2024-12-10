@@ -3,7 +3,6 @@ package eth
 import (
 	"fmt"
 	"math/big"
-	"reflect"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -131,9 +130,11 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 }
 
 func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
-	zeroReservation := paymentvault.IPaymentVaultReservation{}
-
-	return reflect.DeepEqual(reservation, zeroReservation)
+	return reservation.SymbolsPerSecond == 0 &&
+		reservation.StartTimestamp == 0 &&
+		reservation.EndTimestamp == 0 &&
+		len(reservation.QuorumNumbers) == 0 &&
+		len(reservation.QuorumSplits) == 0
 }
 
 // ConvertToActiveReservation converts a upstream binding data structure to local definition.
