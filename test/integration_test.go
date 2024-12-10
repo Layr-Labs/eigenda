@@ -419,7 +419,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2, err := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
+		serverV2, err := nodegrpc.NewServerV2(config, n, logger, ratelimiter, prometheus.NewRegistry())
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{

@@ -82,7 +82,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		RelayClient: atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-	server, err := grpc.NewServerV2(config, node, logger, ratelimiter)
+	server, err := grpc.NewServerV2(config, node, logger, ratelimiter, prometheus.NewRegistry())
 	require.NoError(t, err)
 	return &testComponents{
 		server:      server,
