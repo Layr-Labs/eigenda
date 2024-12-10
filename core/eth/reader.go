@@ -671,10 +671,12 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		if isZeroValuedReservation(reservation) {
+		res, err := ConvertToActiveReservation(reservation)
+		if err != nil {
 			delete(reservationsMap, accountIDs[i])
+			continue
 		}
-		reservationsMap[accountIDs[i]] = &reservation
+		reservationsMap[accountIDs[i]] = res
 	}
 
 	return reservationsMap, nil
@@ -690,10 +692,7 @@ func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID ge
 	if err != nil {
 		return nil, err
 	}
-	if isZeroValuedReservation(reservation) {
-		return nil, errors.New("reservation does not exist for given account")
-	}
-	return &reservation, nil
+	return ConvertToActiveReservation(reservation)
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
