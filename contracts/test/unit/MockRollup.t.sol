@@ -14,6 +14,7 @@ import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 import {IEigenDAThresholdRegistry} from "../../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import "forge-std/StdStorage.sol";
 
 contract MockRollupTest is BLSMockAVSDeployer {
@@ -60,7 +61,8 @@ contract MockRollupTest is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             IEigenDAThresholdRegistry(address(0)),
-            IEigenDARelayRegistry(address(0))
+            IEigenDARelayRegistry(address(0)),
+            IPaymentVault(address(0))
         );
 
         address[] memory confirmers = new address[](1);
