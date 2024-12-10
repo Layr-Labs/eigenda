@@ -1,4 +1,4 @@
-package testutils
+package random
 
 import (
 	"github.com/stretchr/testify/assert"
