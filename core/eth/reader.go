@@ -168,16 +168,18 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
+	var contractSocketRegistry *socketreg.ContractSocketRegistry
 	socketRegistryAddr, err := contractIRegistryCoordinator.SocketRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch SocketRegistry address", "err", err)
-		return err
-	}
-
-	contractSocketRegistry, err := socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
-	if err != nil {
-		t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
-		return err
+		t.logger.Warn("Failed to fetch SocketRegistry address", "err", err)
+		// TODO: don't panic until there is socket registry deployment
+		// return err
+	} else {
+		contractSocketRegistry, err = socketreg.NewContractSocketRegistry(socketRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch SocketRegistry contract", "err", err)
+			return err
+		}
 	}
 
 	var contractRelayRegistry *relayreg.ContractIEigenDARelayRegistry
@@ -693,6 +695,9 @@ func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
+	if t.bindings.SocketRegistry == nil {
+		return "", errors.New("socket registry not enabled")
+	}
 	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
 		Context: ctx,
 	}, [32]byte(operatorId))
@@ -705,7 +710,7 @@ func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.Operator
 	return socket, nil
 }
 
-func (t *Reader) GetRelayURL(ctx context.Context, key uint16) (string, error) {
+func (t *Reader) GetRelayURL(ctx context.Context, key uint32) (string, error) {
 	if t.bindings.RelayRegistry == nil {
 		return "", errors.New("relay registry not deployed")
 	}
@@ -715,13 +720,13 @@ func (t *Reader) GetRelayURL(ctx context.Context, key uint16) (string, error) {
 	}, uint32(key))
 }
 
-func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint16]string, error) {
+func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 	if t.bindings.RelayRegistry == nil {
 		return nil, errors.New("relay registry not deployed")
 	}
 
-	res := make(map[uint16]string)
-	relayKey := uint16(0)
+	res := make(map[uint32]string)
+	relayKey := uint32(0)
 	for {
 		url, err := t.bindings.RelayRegistry.GetRelayURL(&bind.CallOpts{
 			Context: ctx,

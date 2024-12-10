@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	"math/big"
 	"testing"
 	"time"
@@ -323,7 +324,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		NodeRequestTimeout:     1 * time.Second,
 		NumRequestRetries:      3,
 		MaxBatchSize:           maxBatchSize,
-	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger)
+	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry())
 	require.NoError(t, err)
 	return &dispatcherComponents{
 		Dispatcher:        d,

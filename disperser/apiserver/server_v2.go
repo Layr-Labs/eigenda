@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	healthcheck "github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -30,6 +31,11 @@ type OnchainState struct {
 	RequiredQuorums       []core.QuorumID
 	BlobVersionParameters *corev2.BlobVersionParameterMap
 	TTL                   time.Duration
+}
+
+// Include disperser v1 protos to support grpcurl/reflection of v1 APIs
+type DispersalServerV1 struct {
+	pbv1.UnimplementedDisperserServer
 }
 
 type DispersalServerV2 struct {
@@ -97,6 +103,9 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	gs := grpc.NewServer(opt)
 	reflection.Register(gs)
 	pb.RegisterDisperserServer(gs, s)
+
+	// Unimplemented v1 server for grpcurl/reflection support
+	pbv1.RegisterDisperserServer(gs, &DispersalServerV1{})
 
 	// Register Server for Health Checks
 	name := pb.Disperser_ServiceDesc.ServiceName
@@ -255,6 +264,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	for i, v := range reservation.QuorumNumbers {
 		quorumNumbers[i] = uint32(v)
 	}
+	quorumSplit := make([]uint32, len(reservation.QuorumSplit))
+	for i, v := range reservation.QuorumSplit {
+		quorumSplit[i] = uint32(v)
+	}
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams: &paymentGlobalParams,
@@ -264,6 +277,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			StartTimestamp:   uint32(reservation.StartTimestamp),
 			EndTimestamp:     uint32(reservation.EndTimestamp),
 			QuorumNumbers:    quorumNumbers,
+			QuorumSplit:      quorumSplit,
 		},
 		CumulativePayment:        largestCumulativePayment.Bytes(),
 		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),

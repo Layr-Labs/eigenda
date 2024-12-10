@@ -58,11 +58,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "ENABLE_METRICS"),
 	}
 	/* Optional Flags*/
-	MetricsHTTPPort = cli.IntFlag{
+	MetricsHTTPPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
 		Required: false,
-		Value:    9100,
+		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
 	ChurnApprovalInterval = cli.DurationFlag{

@@ -2,17 +2,17 @@ package main
 
 import (
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/operators/churner"
+	"github.com/Layr-Labs/eigenda/relay/metrics"
 )
 
-// main generates documentation for churner metrics.
+// main generates documentation for relay metrics.
 func main() {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	if err != nil {
 		panic(err)
 	}
 
-	metrics, err := churner.NewMetrics(0, logger)
+	metrics, err := metrics.NewRelayMetrics(logger, 0)
 	if err != nil {
 		panic(err)
 	}

@@ -1,0 +1,4135 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <title>Protocol Documentation</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Ubuntu:400,700,400italic"/>
+    <style>
+      body {
+        width: 60em;
+        margin: 1em auto;
+        color: #222;
+        font-family: "Ubuntu", sans-serif;
+        padding-bottom: 4em;
+      }
+
+      h1 {
+        font-weight: normal;
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+      }
+
+      h2 {
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+        margin: 1.5em 0;
+      }
+
+      h3 {
+        font-weight: normal;
+        border-bottom: 1px solid #aaa;
+        padding-bottom: 0.5ex;
+      }
+
+      a {
+        text-decoration: none;
+        color: #567e25;
+      }
+
+      table {
+        width: 100%;
+        font-size: 80%;
+        border-collapse: collapse;
+      }
+
+      thead {
+        font-weight: 700;
+        background-color: #dcdcdc;
+      }
+
+      tbody tr:nth-child(even) {
+        background-color: #fbfbfb;
+      }
+
+      td {
+        border: 1px solid #ccc;
+        padding: 0.5ex 2ex;
+      }
+
+      td p {
+        text-indent: 1em;
+        margin: 0;
+      }
+
+      td p:nth-child(1) {
+        text-indent: 0;  
+      }
+
+       
+      .field-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .field-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .field-table td:nth-child(3) {  
+        width: 6em;
+      }
+      .field-table td:nth-child(4) {  
+        width: auto;
+      }
+
+       
+      .extension-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(3) {  
+        width: 10em;
+      }
+      .extension-table td:nth-child(4) {  
+        width: 5em;
+      }
+      .extension-table td:nth-child(5) {  
+        width: auto;
+      }
+
+       
+      .enum-table td:nth-child(1) {  
+        width: 10em;
+      }
+      .enum-table td:nth-child(2) {  
+        width: 10em;
+      }
+      .enum-table td:nth-child(3) {  
+        width: auto;
+      }
+
+       
+      .scalar-value-types-table tr {
+        height: 3em;
+      }
+
+       
+      #toc-container ul {
+        list-style-type: none;
+        padding-left: 1em;
+        line-height: 180%;
+        margin: 0;
+      }
+      #toc > li > a {
+        font-weight: bold;
+      }
+
+       
+      .file-heading {
+        width: 100%;
+        display: table;
+        border-bottom: 1px solid #aaa;
+        margin: 4em 0 1.5em 0;
+      }
+      .file-heading h2 {
+        border: none;
+        display: table-cell;
+      }
+      .file-heading a {
+        text-align: right;
+        display: table-cell;
+      }
+
+       
+      .badge {
+        width: 1.6em;
+        height: 1.6em;
+        display: inline-block;
+
+        line-height: 1.6em;
+        text-align: center;
+        font-weight: bold;
+        font-size: 60%;
+
+        color: #89ba48;
+        background-color: #dff0c8;
+
+        margin: 0.5ex 1em 0.5ex -1em;
+        border: 1px solid #fbfbfb;
+        border-radius: 1ex;
+      }
+    </style>
+
+    
+    <link rel="stylesheet" type="text/css" href="stylesheet.css"/>
+  </head>
+
+  <body>
+
+    <h1 id="title">Protocol Documentation</h1>
+
+    <h2>Table of Contents</h2>
+
+    <div id="toc-container">
+      <ul id="toc">
+        
+          
+          <li>
+            <a href="#churner%2fchurner.proto">churner/churner.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#churner.ChurnReply"><span class="badge">M</span>ChurnReply</a>
+                </li>
+              
+                <li>
+                  <a href="#churner.ChurnRequest"><span class="badge">M</span>ChurnRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#churner.OperatorToChurn"><span class="badge">M</span>OperatorToChurn</a>
+                </li>
+              
+                <li>
+                  <a href="#churner.SignatureWithSaltAndExpiry"><span class="badge">M</span>SignatureWithSaltAndExpiry</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#churner.Churner"><span class="badge">S</span>Churner</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#common%2fcommon.proto">common/common.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#common.BlobCommitment"><span class="badge">M</span>BlobCommitment</a>
+                </li>
+              
+                <li>
+                  <a href="#common.G1Commitment"><span class="badge">M</span>G1Commitment</a>
+                </li>
+              
+                <li>
+                  <a href="#common.PaymentHeader"><span class="badge">M</span>PaymentHeader</a>
+                </li>
+              
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#common%2fv2%2fcommon.proto">common/v2/common.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#common.v2.Batch"><span class="badge">M</span>Batch</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.BatchHeader"><span class="badge">M</span>BatchHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.BlobCertificate"><span class="badge">M</span>BlobCertificate</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.BlobHeader"><span class="badge">M</span>BlobHeader</a>
+                </li>
+              
+              
+              
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#disperser%2fdisperser.proto">disperser/disperser.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#disperser.AuthenticatedReply"><span class="badge">M</span>AuthenticatedReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.AuthenticatedRequest"><span class="badge">M</span>AuthenticatedRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.AuthenticationData"><span class="badge">M</span>AuthenticationData</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BatchHeader"><span class="badge">M</span>BatchHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BatchMetadata"><span class="badge">M</span>BatchMetadata</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobAuthHeader"><span class="badge">M</span>BlobAuthHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobHeader"><span class="badge">M</span>BlobHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobInfo"><span class="badge">M</span>BlobInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobQuorumParam"><span class="badge">M</span>BlobQuorumParam</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobStatusReply"><span class="badge">M</span>BlobStatusReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobStatusRequest"><span class="badge">M</span>BlobStatusRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.BlobVerificationProof"><span class="badge">M</span>BlobVerificationProof</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.DisperseBlobReply"><span class="badge">M</span>DisperseBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.DisperseBlobRequest"><span class="badge">M</span>DisperseBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.DispersePaidBlobRequest"><span class="badge">M</span>DispersePaidBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.RetrieveBlobReply"><span class="badge">M</span>RetrieveBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.RetrieveBlobRequest"><span class="badge">M</span>RetrieveBlobRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#disperser.BlobStatus"><span class="badge">E</span>BlobStatus</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#disperser.Disperser"><span class="badge">S</span>Disperser</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#disperser%2fv2%2fdisperser_v2.proto">disperser/v2/disperser_v2.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#disperser.v2.Attestation"><span class="badge">M</span>Attestation</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BinRecord"><span class="badge">M</span>BinRecord</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BlobCommitmentReply"><span class="badge">M</span>BlobCommitmentReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BlobCommitmentRequest"><span class="badge">M</span>BlobCommitmentRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BlobStatusReply"><span class="badge">M</span>BlobStatusReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BlobStatusRequest"><span class="badge">M</span>BlobStatusRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.BlobVerificationInfo"><span class="badge">M</span>BlobVerificationInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.DisperseBlobReply"><span class="badge">M</span>DisperseBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.DisperseBlobRequest"><span class="badge">M</span>DisperseBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateReply"><span class="badge">M</span>GetPaymentStateReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateRequest"><span class="badge">M</span>GetPaymentStateRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentGlobalParams"><span class="badge">M</span>PaymentGlobalParams</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.Reservation"><span class="badge">M</span>Reservation</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.SignedBatch"><span class="badge">M</span>SignedBatch</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#disperser.v2.BlobStatus"><span class="badge">E</span>BlobStatus</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#disperser.v2.Disperser"><span class="badge">S</span>Disperser</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#node%2fnode.proto">node/node.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#node.AttestBatchReply"><span class="badge">M</span>AttestBatchReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.AttestBatchRequest"><span class="badge">M</span>AttestBatchRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.BatchHeader"><span class="badge">M</span>BatchHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#node.Blob"><span class="badge">M</span>Blob</a>
+                </li>
+              
+                <li>
+                  <a href="#node.BlobHeader"><span class="badge">M</span>BlobHeader</a>
+                </li>
+              
+                <li>
+                  <a href="#node.BlobQuorumInfo"><span class="badge">M</span>BlobQuorumInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#node.Bundle"><span class="badge">M</span>Bundle</a>
+                </li>
+              
+                <li>
+                  <a href="#node.G2Commitment"><span class="badge">M</span>G2Commitment</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetBlobHeaderReply"><span class="badge">M</span>GetBlobHeaderReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetBlobHeaderRequest"><span class="badge">M</span>GetBlobHeaderRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.MerkleProof"><span class="badge">M</span>MerkleProof</a>
+                </li>
+              
+                <li>
+                  <a href="#node.NodeInfoReply"><span class="badge">M</span>NodeInfoReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.NodeInfoRequest"><span class="badge">M</span>NodeInfoRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.RetrieveChunksReply"><span class="badge">M</span>RetrieveChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.RetrieveChunksRequest"><span class="badge">M</span>RetrieveChunksRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.StoreBlobsReply"><span class="badge">M</span>StoreBlobsReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.StoreBlobsRequest"><span class="badge">M</span>StoreBlobsRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#node.ChunkEncodingFormat"><span class="badge">E</span>ChunkEncodingFormat</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#node.Dispersal"><span class="badge">S</span>Dispersal</a>
+                </li>
+              
+                <li>
+                  <a href="#node.Retrieval"><span class="badge">S</span>Retrieval</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#node%2fv2%2fnode_v2.proto">node/v2/node_v2.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#node.v2.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.NodeInfoReply"><span class="badge">M</span>NodeInfoReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.NodeInfoRequest"><span class="badge">M</span>NodeInfoRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#node.v2.Dispersal"><span class="badge">S</span>Dispersal</a>
+                </li>
+              
+                <li>
+                  <a href="#node.v2.Retrieval"><span class="badge">S</span>Retrieval</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#relay%2frelay.proto">relay/relay.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#node.ChunkRequest"><span class="badge">M</span>ChunkRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.ChunkRequestByIndex"><span class="badge">M</span>ChunkRequestByIndex</a>
+                </li>
+              
+                <li>
+                  <a href="#node.ChunkRequestByRange"><span class="badge">M</span>ChunkRequestByRange</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetBlobReply"><span class="badge">M</span>GetBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetBlobRequest"><span class="badge">M</span>GetBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#node.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#node.Relay"><span class="badge">S</span>Relay</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#retriever%2fretriever.proto">retriever/retriever.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#retriever.BlobReply"><span class="badge">M</span>BlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#retriever.BlobRequest"><span class="badge">M</span>BlobRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#retriever.Retriever"><span class="badge">S</span>Retriever</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+        <li><a href="#scalar-value-types">Scalar Value Types</a></li>
+      </ul>
+    </div>
+
+    
+      
+      <div class="file-heading">
+        <h2 id="churner/churner.proto">churner/churner.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="churner.ChurnReply">ChurnReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature_with_salt_and_expiry</td>
+                  <td><a href="#churner.SignatureWithSaltAndExpiry">SignatureWithSaltAndExpiry</a></td>
+                  <td></td>
+                  <td><p>The signature signed by the Churner. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operators_to_churn</td>
+                  <td><a href="#churner.OperatorToChurn">OperatorToChurn</a></td>
+                  <td>repeated</td>
+                  <td><p>A list of existing operators that get churned out.
+This list will contain all quorums specified in the ChurnRequest even if some quorums
+may not have any churned out operators. If a quorum has available space, OperatorToChurn
+object will contain the quorum ID and empty operator and pubkey. The smart contract should
+only churn out the operators for quorums that are full.
+
+For example, if the ChurnRequest specifies quorums 0 and 1 where quorum 0 is full
+and quorum 1 has available space, the ChurnReply will contain two OperatorToChurn objects
+with the respective quorums. OperatorToChurn for quorum 0 will contain the operator to churn
+out and OperatorToChurn for quorum 1 will contain empty operator (zero address) and pubkey.
+The smart contract should only churn out the operators for quorum 0 because quorum 1
+has available space without having any operators churned.
+Note: it&#39;s possible an operator gets churned out just for one or more quorums
+(rather than entirely churned out for all quorums). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="churner.ChurnRequest">ChurnRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>operator_address</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The Ethereum address (in hex like &#34;0x123abcdef...&#34;) of the operator. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator_to_register_pubkey_g1</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The operator making the churn request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator_to_register_pubkey_g2</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator_request_signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The operator&#39;s BLS signature signed on the keccak256 hash of
+concat(&#34;ChurnRequest&#34;, operator address, g1, g2, salt). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The salt used as part of the message to sign on for operator_request_signature. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_ids</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>The quorums to register for.
+Note:
+  - If any of the quorum here has already been registered, this entire request
+    will fail to proceed.
+  - If any of the quorum fails to register, this entire request will fail.
+  - Regardless of whether the specified quorums are full or not, the Churner
+    will return parameters for all quorums specified here. The smart contract will
+    determine whether it needs to churn out existing operators based on whether
+    the quorums have available space.
+The IDs must be in range [0, 254]. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="churner.OperatorToChurn">OperatorToChurn</h3>
+        <p>This describes an operator to churn out for a quorum.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The ID of the quorum of the operator to churn out. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The address of the operator. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>pubkey</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>BLS pubkey (G1 point) of the operator. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="churner.SignatureWithSaltAndExpiry">SignatureWithSaltAndExpiry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Churner&#39;s signature on the Operator&#39;s attributes. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Salt is the keccak256 hash of
+concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#39;s ECDSA private key) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>expiry</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>When this churn decision will expire. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="churner.Churner">Churner</h3>
+        <p>The Churner is a service that handles churn requests from new operators trying to</p><p>join the EigenDA network.</p><p>When the EigenDA network reaches the maximum number of operators, any new operator</p><p>trying to join will have to make a churn request to this Churner, which acts as the</p><p>sole decision maker to decide whether this new operator could join, and if so, which</p><p>existing operator will be churned out (so the max number of operators won't be</p><p>exceeded).</p><p>The max number of operators, as well as the rules to make churn decisions, are</p><p>defined onchain, see details in OperatorSetParam at:</p><p>https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>Churn</td>
+                <td><a href="#churner.ChurnRequest">ChurnRequest</a></td>
+                <td><a href="#churner.ChurnReply">ChurnReply</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="common/common.proto">common/common.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="common.BlobCommitment">BlobCommitment</h3>
+        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_commitment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.G1Commitment">G1Commitment</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>x</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>y</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.PaymentHeader">PaymentHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bin_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="common/v2/common.proto">common/v2/common.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="common.v2.Batch">Batch</h3>
+        <p>Batch is a batch of blob certificates</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>header</td>
+                  <td><a href="#common.v2.BatchHeader">BatchHeader</a></td>
+                  <td></td>
+                  <td><p>header contains metadata about the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_certificates</td>
+                  <td><a href="#common.v2.BlobCertificate">BlobCertificate</a></td>
+                  <td>repeated</td>
+                  <td><p>blob_certificates is the list of blob certificates in the batch </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.BatchHeader">BatchHeader</h3>
+        <p>BatchHeader is the header of a batch of blobs</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_root</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>batch_root is the root of the merkle tree of the hashes of blob certificates in the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reference_block_number is the block number that the state of the batch is based on for attestation </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
+        <p>BlobCertificate is what gets attested by the network</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_header</td>
+                  <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>relays</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.BlobHeader">BlobHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>version</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Blob version </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payment_header</td>
+                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+    
+      
+      <div class="file-heading">
+        <h2 id="disperser/disperser.proto">disperser/disperser.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="disperser.AuthenticatedReply">AuthenticatedReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_auth_header</td>
+                  <td><a href="#disperser.BlobAuthHeader">BlobAuthHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disperse_reply</td>
+                  <td><a href="#disperser.DisperseBlobReply">DisperseBlobReply</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.AuthenticatedRequest">AuthenticatedRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>disperse_request</td>
+                  <td><a href="#disperser.DisperseBlobRequest">DisperseBlobRequest</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>authentication_data</td>
+                  <td><a href="#disperser.AuthenticationData">AuthenticationData</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.AuthenticationData">AuthenticationData</h3>
+        <p>AuthenticationData contains the signature of the BlobAuthHeader.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>authentication_data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BatchHeader">BatchHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_root</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The root of the merkle tree with the hashes of blob headers as leaves. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>All quorums associated with blobs in this batch. Sorted in ascending order.
+Ex. [0, 2, 1] =&gt; 0x000102 </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_signed_percentages</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The percentage of stake that has signed for this batch.
+The quorum_signed_percentages[i] is percentage for the quorum_numbers[i]. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The Ethereum block number at which the batch was created.
+The Disperser will encode and disperse the blobs based on the onchain info
+(e.g. operator stakes) at this block number. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BatchMetadata">BatchMetadata</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header</td>
+                  <td><a href="#disperser.BatchHeader">BatchHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signatory_record_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The hash of all public keys of the operators that did not sign the batch. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fee</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The fee payment paid by users for dispersing this batch. It&#39;s the bytes
+representation of a big.Int value. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>confirmation_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The Ethereum block number at which the batch is confirmed onchain. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>batch_header_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>This is the hash of the ReducedBatchHeader defined onchain, see:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+The is the message that the operators will sign their signatures on. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobAuthHeader">BlobAuthHeader</h3>
+        <p>BlobAuthHeader contains information about the blob for the client to verify and sign.</p><p>- Once payments are enabled, the BlobAuthHeader will contain the KZG commitment to the blob, which the client</p><p>will verify and sign. Having the client verify the KZG commitment instead of calculating it avoids</p><p>the need for the client to have the KZG structured reference string (SRS), which can be large.</p><p>The signed KZG commitment prevents the disperser from sending a different blob to the DA Nodes</p><p>than the one the client sent.</p><p>- In the meantime, the BlobAuthHeader contains a simple challenge parameter is used to prevent</p><p>replay attacks in the event that a signature is leaked.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>challenge_parameter</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobHeader">BlobHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#common.G1Commitment">common.G1Commitment</a></td>
+                  <td></td>
+                  <td><p>KZG commitment of the blob. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>data_length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The length of the blob in symbols (each symbol is 32 bytes). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_quorum_params</td>
+                  <td><a href="#disperser.BlobQuorumParam">BlobQuorumParam</a></td>
+                  <td>repeated</td>
+                  <td><p>The params of the quorums that this blob participates in. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobInfo">BlobInfo</h3>
+        <p>BlobInfo contains information needed to confirm the blob against the EigenDA contracts</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_header</td>
+                  <td><a href="#disperser.BlobHeader">BlobHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_verification_proof</td>
+                  <td><a href="#disperser.BlobVerificationProof">BlobVerificationProof</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobQuorumParam">BlobQuorumParam</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>quorum_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The ID of the quorum. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>adversary_threshold_percentage</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The max percentage of stake within the quorum that can be held by or delegated
+to adversarial operators. Currently, this and the next parameter are standardized
+across the quorum using values read from the EigenDA contracts. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>confirmation_threshold_percentage</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The min percentage of stake that must attest in order to consider
+the dispersal is successful. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The length of each chunk. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobStatusReply">BlobStatusReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#disperser.BlobStatus">BlobStatus</a></td>
+                  <td></td>
+                  <td><p>The status of the blob. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>info</td>
+                  <td><a href="#disperser.BlobInfo">BlobInfo</a></td>
+                  <td></td>
+                  <td><p>The blob info needed for clients to confirm the blob against the EigenDA contracts. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobStatusRequest">BlobStatusRequest</h3>
+        <p>BlobStatusRequest is used to query the status of a blob.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.BlobVerificationProof">BlobVerificationProof</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>batch_id is an incremental ID assigned to a batch by EigenDAServiceManager </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The index of the blob in the batch (which is logically an ordered list of blobs). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>batch_metadata</td>
+                  <td><a href="#disperser.BatchMetadata">BatchMetadata</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>inclusion_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>inclusion_proof is a merkle proof for a blob header&#39;s inclusion in a batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_indexes</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>indexes of quorums in BatchHeader.quorum_numbers that match the quorums in BlobHeader.blob_quorum_params
+Ex. BlobHeader.blob_quorum_params = [
+	{
+		quorum_number = 0,
+		...
+	},
+	{
+		quorum_number = 3,
+		...
+	},
+	{
+		quorum_number = 5,
+		...
+	},
+]
+BatchHeader.quorum_numbers = [0, 5, 3] =&gt; 0x000503
+Then, quorum_indexes = [0, 2, 1] =&gt; 0x000201 </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.DisperseBlobReply">DisperseBlobReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#disperser.BlobStatus">BlobStatus</a></td>
+                  <td></td>
+                  <td><p>The status of the blob associated with the request_id. Will always be PROCESSING. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>request_id</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The request ID generated by the disperser.
+Once a request is accepted (although not processed), a unique request ID will be
+generated.
+Two different DisperseBlobRequests (determined by the hash of the DisperseBlobRequest)
+will have different IDs, and the same DisperseBlobRequest sent repeatedly at different
+times will also have different IDs.
+The client should use this ID to query the processing status of the request (via
+the GetBlobStatus API). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.DisperseBlobRequest">DisperseBlobRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The data to be dispersed.
+The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
+where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
+as a field element on the bn254 curve. The valid range is
+0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617
+If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>custom_quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>The quorums to which the blob will be sent, in addition to the required quorums which are configured
+on the EigenDA smart contract. If required quorums are included here, an error will be returned.
+The disperser will ensure that the encoded blobs for each quorum are all processed
+within the same batch. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The account ID of the client. This should be a hex-encoded string of the ECSDA public key
+corresponding to the key used by the client to sign the BlobAuthHeader. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.DispersePaidBlobRequest">DispersePaidBlobRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The data to be dispersed. Same requirements as DisperseBlobRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>The quorums to which the blob to be sent </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payment_header</td>
+                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
+                  <td></td>
+                  <td><p>Payment header contains AccountID, BinIndex, and CumulativePayment </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payment_signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>signature of payment_header </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.RetrieveBlobReply">RetrieveBlobReply</h3>
+        <p>RetrieveBlobReply contains the retrieved blob data</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.RetrieveBlobRequest">RetrieveBlobRequest</h3>
+        <p>RetrieveBlobRequest contains parameters to retrieve the blob.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="disperser.BlobStatus">BlobStatus</h3>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- PROCESSING</p><p>- DISPERSING</p><p>- CONFIRMED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- FAILED</p><p>- FINALIZED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>PROCESSING</td>
+                <td>1</td>
+                <td><p>PROCESSING means that the blob is currently being processed by the disperser</p></td>
+              </tr>
+            
+              <tr>
+                <td>CONFIRMED</td>
+                <td>2</td>
+                <td><p>CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed
+batch containing the blob has been confirmed onchain</p></td>
+              </tr>
+            
+              <tr>
+                <td>FAILED</td>
+                <td>3</td>
+                <td><p>FAILED means that the blob has failed permanently (for reasons other than insufficient
+signatures, which is a separate state). This status is somewhat of a catch-all category,
+containg (but not necessarily exclusively as errors can be added in the future):
+ - blob has expired
+ - internal logic error while requesting encoding
+ - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
+ Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.</p></td>
+              </tr>
+            
+              <tr>
+                <td>FINALIZED</td>
+                <td>4</td>
+                <td><p>FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum</p></td>
+              </tr>
+            
+              <tr>
+                <td>INSUFFICIENT_SIGNATURES</td>
+                <td>5</td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+for at least one quorum.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DISPERSING</td>
+                <td>6</td>
+                <td><p>The DISPERSING state is comprised of two separate phases:
+ - Dispersing to DA nodes and collecting signature
+ - Submitting the transaction on chain and waiting for tx receipt</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="disperser.Disperser">Disperser</h3>
+        <p>Disperser defines the public APIs for dispersing blobs.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>DisperseBlob</td>
+                <td><a href="#disperser.DisperseBlobRequest">DisperseBlobRequest</a></td>
+                <td><a href="#disperser.DisperseBlobReply">DisperseBlobReply</a></td>
+                <td><p>DisperseBlob accepts a single blob to be dispersed.
+This executes the dispersal async, i.e. it returns once the request
+is accepted. The client should use GetBlobStatus() API to poll the
+processing status of the blob.
+
+If DisperseBlob returns the following error codes:
+INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg.
+RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg.
+                          user should retry after the specified duration.
+INTERNAL (500): serious error, user should NOT retry.</p></td>
+              </tr>
+            
+              <tr>
+                <td>DisperseBlobAuthenticated</td>
+                <td><a href="#disperser.AuthenticatedRequest">AuthenticatedRequest</a> stream</td>
+                <td><a href="#disperser.AuthenticatedReply">AuthenticatedReply</a> stream</td>
+                <td><p>DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
+client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
+2. The Disperser sends back a BlobAuthHeader message containing information for the client to
+   verify and sign.
+3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
+	  AuthenticationData message.
+4. The Disperser verifies the signature and returns a DisperseBlobReply message.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetBlobStatus</td>
+                <td><a href="#disperser.BlobStatusRequest">BlobStatusRequest</a></td>
+                <td><a href="#disperser.BlobStatusReply">BlobStatusReply</a></td>
+                <td><p>This API is meant to be polled for the blob status.</p></td>
+              </tr>
+            
+              <tr>
+                <td>RetrieveBlob</td>
+                <td><a href="#disperser.RetrieveBlobRequest">RetrieveBlobRequest</a></td>
+                <td><a href="#disperser.RetrieveBlobReply">RetrieveBlobReply</a></td>
+                <td><p>This retrieves the requested blob from the Disperser&#39;s backend.
+This is a more efficient way to retrieve blobs than directly retrieving
+from the DA Nodes (see detail about this approach in
+api/proto/retriever/retriever.proto).
+The blob should have been initially dispersed via this Disperser service
+for this API to work.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="disperser/v2/disperser_v2.proto">disperser/v2/disperser_v2.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="disperser.v2.Attestation">Attestation</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>non_signer_pubkeys</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>Serialized bytes of non signer public keys (G1 points) </p></td>
+                </tr>
+              
+                <tr>
+                  <td>apk_g2</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Serialized bytes of G2 point that represents aggregate public key of all signers </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_apks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum </p></td>
+                </tr>
+              
+                <tr>
+                  <td>sigma</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Serialized bytes of aggregate signature </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>Relevant quorum numbers for the attestation </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BinRecord">BinRecord</h3>
+        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>usage</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_commitment</td>
+                  <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</h3>
+        <p>Utility method used to generate the commitment of blob given its data.</p><p>This can be used to construct BlobHeader.commitment</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobStatusReply">BlobStatusReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>status</td>
+                  <td><a href="#disperser.v2.BlobStatus">BlobStatus</a></td>
+                  <td></td>
+                  <td><p>The status of the blob. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signed_batch</td>
+                  <td><a href="#disperser.v2.SignedBatch">SignedBatch</a></td>
+                  <td></td>
+                  <td><p>The signed batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_verification_info</td>
+                  <td><a href="#disperser.v2.BlobVerificationInfo">BlobVerificationInfo</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobStatusRequest">BlobStatusRequest</h3>
+        <p>BlobStatusRequest is used to query the status of a blob.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobVerificationInfo">BlobVerificationInfo</h3>
+        <p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_certificate</td>
+                  <td><a href="#common.v2.BlobCertificate">common.v2.BlobCertificate</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>blob_index is the index of the blob in the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>inclusion_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>inclusion_proof is the inclusion proof of the blob in the batch </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.DisperseBlobReply">DisperseBlobReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>result</td>
+                  <td><a href="#disperser.v2.BlobStatus">BlobStatus</a></td>
+                  <td></td>
+                  <td><p>The status of the blob associated with the blob key. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.DisperseBlobRequest">DisperseBlobRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The data to be dispersed.
+The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
+where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
+as a field element on the bn254 curve. The valid range is
+0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617
+If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_header</td>
+                  <td><a href="#common.v2.BlobHeader">common.v2.BlobHeader</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetPaymentStateReply">GetPaymentStateReply</h3>
+        <p>GetPaymentStateReply contains the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payment_global_params</td>
+                  <td><a href="#disperser.v2.PaymentGlobalParams">PaymentGlobalParams</a></td>
+                  <td></td>
+                  <td><p>global payment vault parameters </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bin_records</td>
+                  <td><a href="#disperser.v2.BinRecord">BinRecord</a></td>
+                  <td>repeated</td>
+                  <td><p>off-chain account reservation usage records </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation</td>
+                  <td><a href="#disperser.v2.Reservation">Reservation</a></td>
+                  <td></td>
+                  <td><p>on-chain account reservation setting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>off-chain on-demand payment usage </p></td>
+                </tr>
+              
+                <tr>
+                  <td>onchain_cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>on-chain on-demand payment deposited </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</h3>
+        <p>GetPaymentStateRequest contains parameters to query the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Signature over the account ID
+TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentGlobalParams">PaymentGlobalParams</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>global_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>min_num_symbols</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>price_per_symbol</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_window</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.Reservation">Reservation</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>start_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_split</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.SignedBatch">SignedBatch</h3>
+        <p>SignedBatch is a batch of blobs with a signature.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>header</td>
+                  <td><a href="#common.v2.BatchHeader">common.v2.BatchHeader</a></td>
+                  <td></td>
+                  <td><p>header contains metadata about the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>attestation</td>
+                  <td><a href="#disperser.v2.Attestation">Attestation</a></td>
+                  <td></td>
+                  <td><p>attestation on the batch </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>QUEUED</td>
+                <td>1</td>
+                <td><p>QUEUED means that the blob has been queued by the disperser for processing</p></td>
+              </tr>
+            
+              <tr>
+                <td>ENCODED</td>
+                <td>2</td>
+                <td><p>ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes</p></td>
+              </tr>
+            
+              <tr>
+                <td>CERTIFIED</td>
+                <td>3</td>
+                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes</p></td>
+              </tr>
+            
+              <tr>
+                <td>FAILED</td>
+                <td>4</td>
+                <td><p>FAILED means that the blob has failed permanently (for reasons other than insufficient
+signatures, which is a separate state)</p></td>
+              </tr>
+            
+              <tr>
+                <td>INSUFFICIENT_SIGNATURES</td>
+                <td>5</td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+for at least one quorum.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="disperser.v2.Disperser">Disperser</h3>
+        <p>Disperser defines the public APIs for dispersing blobs.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>DisperseBlob</td>
+                <td><a href="#disperser.v2.DisperseBlobRequest">DisperseBlobRequest</a></td>
+                <td><a href="#disperser.v2.DisperseBlobReply">DisperseBlobReply</a></td>
+                <td><p>DisperseBlob accepts blob to disperse from clients.
+This executes the dispersal asynchronously, i.e. it returns once the request
+is accepted. The client could use GetBlobStatus() API to poll the the
+processing status of the blob.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetBlobStatus</td>
+                <td><a href="#disperser.v2.BlobStatusRequest">BlobStatusRequest</a></td>
+                <td><a href="#disperser.v2.BlobStatusReply">BlobStatusReply</a></td>
+                <td><p>GetBlobStatus is meant to be polled for the blob status.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetBlobCommitment</td>
+                <td><a href="#disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</a></td>
+                <td><a href="#disperser.v2.BlobCommitmentReply">BlobCommitmentReply</a></td>
+                <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetPaymentState</td>
+                <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
+                <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
+                <td><p>GetPaymentState is a utility method to get the payment state of a given account.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="node/node.proto">node/node.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="node.AttestBatchReply">AttestBatchReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.AttestBatchRequest">AttestBatchRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header</td>
+                  <td><a href="#node.BatchHeader">BatchHeader</a></td>
+                  <td></td>
+                  <td><p>header of the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_header_hashes</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>the header hashes of all blobs in the batch </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.BatchHeader">BatchHeader</h3>
+        <p>BatchHeader (see core/data.go#BatchHeader)</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_root</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The root of the merkle tree with hashes of blob headers as leaves. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The Ethereum block number at which the batch is dispersed. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.Blob">Blob</h3>
+        <p>In EigenDA, the original blob to disperse is encoded as a polynomial via taking</p><p>taking different point evaluations (i.e. erasure coding). These points are split</p><p>into disjoint subsets which are assigned to different operator nodes in the EigenDA</p><p>network.</p><p>The data in this message is a subset of these points that are assigned to a</p><p>single operator node.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>header</td>
+                  <td><a href="#node.BlobHeader">BlobHeader</a></td>
+                  <td></td>
+                  <td><p>Which (original) blob this is for. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bundles</td>
+                  <td><a href="#node.Bundle">Bundle</a></td>
+                  <td>repeated</td>
+                  <td><p>Each bundle contains all chunks for a single quorum of the blob.
+The number of bundles must be equal to the total number of quorums associated
+with the blob, and the ordering must be the same as BlobHeader.quorum_headers.
+Note: an operator may be in some but not all of the quorums; in that case the
+bundle corresponding to that quorum will be empty. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.BlobHeader">BlobHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#common.G1Commitment">common.G1Commitment</a></td>
+                  <td></td>
+                  <td><p>The KZG commitment to the polynomial representing the blob. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_commitment</td>
+                  <td><a href="#node.G2Commitment">G2Commitment</a></td>
+                  <td></td>
+                  <td><p>The KZG commitment to the polynomial representing the blob on G2, it is used
+for proving the degree of the polynomial </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_proof</td>
+                  <td><a href="#node.G2Commitment">G2Commitment</a></td>
+                  <td></td>
+                  <td><p>The low degree proof. It&#39;s the KZG commitment to the polynomial shifted to
+the largest SRS degree. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The length of the original blob in number of symbols (in the field where
+the polynomial is defined). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_headers</td>
+                  <td><a href="#node.BlobQuorumInfo">BlobQuorumInfo</a></td>
+                  <td>repeated</td>
+                  <td><p>The params of the quorums that this blob participates in. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The ID of the user who is dispersing this blob to EigenDA. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The reference block number whose state is used to encode the blob </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.BlobQuorumInfo">BlobQuorumInfo</h3>
+        <p>See BlobQuorumParam as defined in</p><p>api/proto/disperser/disperser.proto</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>adversary_threshold</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>confirmation_threshold</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ratelimit</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.Bundle">Bundle</h3>
+        <p>A Bundle is the collection of chunks associated with a single blob, for a single</p><p>operator and a single quorum.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>Each chunk corresponds to a collection of points on the polynomial.
+Each chunk has same number of points. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>bundle</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>All chunks of the bundle encoded in a byte array. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.G2Commitment">G2Commitment</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>x_a0</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The A0 element of the X coordinate of G2 point. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>x_a1</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The A1 element of the X coordinate of G2 point. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>y_a0</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The A0 element of the Y coordinate of G2 point. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>y_a1</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The A1 element of the Y coordinate of G2 point. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetBlobHeaderReply">GetBlobHeaderReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_header</td>
+                  <td><a href="#node.BlobHeader">BlobHeader</a></td>
+                  <td></td>
+                  <td><p>The header of the blob requested per GetBlobHeaderRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>proof</td>
+                  <td><a href="#node.MerkleProof">MerkleProof</a></td>
+                  <td></td>
+                  <td><p>Merkle proof that returned blob header belongs to the batch and is
+the batch&#39;s MerkleProof.index-th blob.
+This can be checked against the batch root on chain. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetBlobHeaderRequest">GetBlobHeaderRequest</h3>
+        <p>See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.MerkleProof">MerkleProof</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>hashes</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>The proof itself. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which index (the leaf of the Merkle tree) this proof is for. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.NodeInfoReply">NodeInfoReply</h3>
+        <p>Node info reply</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>semver</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>num_cpu</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mem_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.NodeInfoRequest">NodeInfoRequest</h3>
+        <p>Node info request</p>
+
+        
+
+        
+      
+        <h3 id="node.RetrieveChunksReply">RetrieveChunksReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_encoding_format</td>
+                  <td><a href="#node.ChunkEncodingFormat">ChunkEncodingFormat</a></td>
+                  <td></td>
+                  <td><p>How the above chunks are encoded. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.RetrieveChunksRequest">RetrieveChunksRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The hash of the ReducedBatchHeader defined onchain, see:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+This identifies which batch to retrieve for. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which blob in the batch to retrieve for (note: a batch is logically an ordered
+list of blobs). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which quorum of the blob to retrieve for (note: a blob can have multiple
+quorums and the chunks for different quorums at a Node can be different).
+The ID must be in range [0, 254]. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.StoreBlobsReply">StoreBlobsReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signatures</td>
+                  <td><a href="#google.protobuf.BytesValue">google.protobuf.BytesValue</a></td>
+                  <td>repeated</td>
+                  <td><p>The operator&#39;s BLS sgnature signed on the blob header hashes.
+The ordering of the signatures must match the ordering of the blobs sent
+in the request, with empty signatures in the places for discarded blobs. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.StoreBlobsRequest">StoreBlobsRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blobs</td>
+                  <td><a href="#node.Blob">Blob</a></td>
+                  <td>repeated</td>
+                  <td><p>Blobs to store </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The reference block number whose state is used to encode the blobs </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.StoreChunksReply">StoreChunksReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The operator&#39;s BLS signature signed on the batch header hash. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.StoreChunksRequest">StoreChunksRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header</td>
+                  <td><a href="#node.BatchHeader">BatchHeader</a></td>
+                  <td></td>
+                  <td><p>Which batch this request is for. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blobs</td>
+                  <td><a href="#node.Blob">Blob</a></td>
+                  <td>repeated</td>
+                  <td><p>The chunks for each blob in the batch to be stored in an EigenDA Node. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="node.ChunkEncodingFormat">ChunkEncodingFormat</h3>
+        <p>This describes how the chunks returned in RetrieveChunksReply are encoded.</p><p>Used to facilitate the decoding of chunks.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GNARK</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GOB</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="node.Dispersal">Dispersal</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>StoreChunks</td>
+                <td><a href="#node.StoreChunksRequest">StoreChunksRequest</a></td>
+                <td><a href="#node.StoreChunksReply">StoreChunksReply</a></td>
+                <td><p>StoreChunks validates that the chunks match what the Node is supposed to receive (
+different Nodes are responsible for different chunks, as EigenDA is horizontally
+sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
+according to the EigenDA protocol. It also stores the chunks along with metadata
+for the protocol-defined length of custody. It will return a signature at the
+end to attest to the data in this request it has processed.</p></td>
+              </tr>
+            
+              <tr>
+                <td>StoreBlobs</td>
+                <td><a href="#node.StoreBlobsRequest">StoreBlobsRequest</a></td>
+                <td><a href="#node.StoreBlobsReply">StoreBlobsReply</a></td>
+                <td><p>StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
+StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method.
+DEPRECATED: StoreBlobs method is not used</p></td>
+              </tr>
+            
+              <tr>
+                <td>AttestBatch</td>
+                <td><a href="#node.AttestBatchRequest">AttestBatchRequest</a></td>
+                <td><a href="#node.AttestBatchReply">AttestBatchReply</a></td>
+                <td><p>AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
+It will return a signature at the end to attest to the aggregated batch.
+DEPRECATED: AttestBatch method is not used</p></td>
+              </tr>
+            
+              <tr>
+                <td>NodeInfo</td>
+                <td><a href="#node.NodeInfoRequest">NodeInfoRequest</a></td>
+                <td><a href="#node.NodeInfoReply">NodeInfoReply</a></td>
+                <td><p>Retrieve node info metadata</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="node.Retrieval">Retrieval</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>RetrieveChunks</td>
+                <td><a href="#node.RetrieveChunksRequest">RetrieveChunksRequest</a></td>
+                <td><a href="#node.RetrieveChunksReply">RetrieveChunksReply</a></td>
+                <td><p>RetrieveChunks retrieves the chunks for a blob custodied at the Node.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetBlobHeader</td>
+                <td><a href="#node.GetBlobHeaderRequest">GetBlobHeaderRequest</a></td>
+                <td><a href="#node.GetBlobHeaderReply">GetBlobHeaderReply</a></td>
+                <td><p>GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.</p></td>
+              </tr>
+            
+              <tr>
+                <td>NodeInfo</td>
+                <td><a href="#node.NodeInfoRequest">NodeInfoRequest</a></td>
+                <td><a href="#node.NodeInfoReply">NodeInfoReply</a></td>
+                <td><p>Retrieve node info metadata</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="node/v2/node_v2.proto">node/v2/node_v2.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which quorum of the blob to retrieve for (note: a blob can have multiple
+quorums and the chunks for different quorums at a Node can be different).
+The ID must be in range [0, 254]. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.v2.NodeInfoReply">NodeInfoReply</h3>
+        <p>Node info reply</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>semver</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>num_cpu</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mem_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.v2.NodeInfoRequest">NodeInfoRequest</h3>
+        <p>Node info request</p>
+
+        
+
+        
+      
+        <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.v2.StoreChunksRequest">StoreChunksRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch</td>
+                  <td><a href="#common.v2.Batch">common.v2.Batch</a></td>
+                  <td></td>
+                  <td><p>batch of blobs to store </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="node.v2.Dispersal">Dispersal</h3>
+        <p>WARNING: the following RPCs are experimental and subject to change.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>StoreChunks</td>
+                <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
+                <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>NodeInfo</td>
+                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
+                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="node.v2.Retrieval">Retrieval</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetChunks</td>
+                <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
+                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node.</p></td>
+              </tr>
+            
+              <tr>
+                <td>NodeInfo</td>
+                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
+                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
+                <td><p>Retrieve node info metadata</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="relay/relay.proto">relay/relay.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="node.ChunkRequest">ChunkRequest</h3>
+        <p>A request for chunks within a specific blob. Requests are fulfilled in all-or-nothing fashion. If any of the</p><p>requested chunks are not found or are unable to be fetched, the entire request will fail.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>by_index</td>
+                  <td><a href="#node.ChunkRequestByIndex">ChunkRequestByIndex</a></td>
+                  <td></td>
+                  <td><p>Request chunks by their individual indices. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>by_range</td>
+                  <td><a href="#node.ChunkRequestByRange">ChunkRequestByRange</a></td>
+                  <td></td>
+                  <td><p>Request chunks by a range of indices. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.ChunkRequestByIndex">ChunkRequestByIndex</h3>
+        <p>A request for chunks within a specific blob. Each chunk is requested individually by its index.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The blob key. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_indices</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>The index of the chunk within the blob. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.ChunkRequestByRange">ChunkRequestByRange</h3>
+        <p>A request for chunks within a specific blob. Each chunk is requested a range of indices.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The blob key. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>start_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The first index to start fetching chunks from. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>One past the last index to fetch chunks from. Similar semantics to golang slices. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetBlobReply">GetBlobReply</h3>
+        <p>The reply to a GetBlobs request.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The blob requested. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetBlobRequest">GetBlobRequest</h3>
+        <p>A request to fetch one or more blobs.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The key of the blob to fetch. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetChunksReply">GetChunksReply</h3>
+        <p>The reply to a GetChunks request.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>The chunks requested. The order of these chunks will be the same as the order of the requested chunks.
+data is the raw data of the bundle (i.e. serialized byte array of the frames) </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="node.GetChunksRequest">GetChunksRequest</h3>
+        <p>Request chunks from blobs stored by this relay.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunk_requests</td>
+                  <td><a href="#node.ChunkRequest">ChunkRequest</a></td>
+                  <td>repeated</td>
+                  <td><p>The chunk requests. Chunks are returned in the same order as they are requested. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator_id</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>If this is an authenticated request, this should hold the ID of the operator. If this
+is an unauthenticated request, this field should be empty. Relays may choose to reject
+unauthenticated requests. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>operator_signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>If this is an authenticated request, this field will hold a BLS signature by the requester
+on the hash of this request. Relays may choose to reject unauthenticated requests.
+
+The following describes the schema for computing the hash of this request
+This algorithm is implemented in golang using relay.auth.HashGetChunksRequest().
+
+All integers are encoded as unsigned 4 byte big endian values.
+
+Perform a keccak256 hash on the following data in the following order:
+1. the operator id
+2. for each chunk request:
+   a. if the chunk request is a request by index:
+      i.   a one byte ASCII representation of the character &#34;i&#34; (aka Ox69)
+      ii.  the blob key
+      iii. the start index
+      iv.  the end index
+   b. if the chunk request is a request by range:
+      i.   a one byte ASCII representation of the character &#34;r&#34; (aka Ox72)
+      ii.  the blob key
+      iii. each requested chunk index, in order </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="node.Relay">Relay</h3>
+        <p>Relay is a service that provides access to public relay functionality.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetBlob</td>
+                <td><a href="#node.GetBlobRequest">GetBlobRequest</a></td>
+                <td><a href="#node.GetBlobReply">GetBlobReply</a></td>
+                <td><p>GetBlob retrieves a blob stored by the relay.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetChunks</td>
+                <td><a href="#node.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#node.GetChunksReply">GetChunksReply</a></td>
+                <td><p>GetChunks retrieves chunks from blobs stored by the relay.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="retriever/retriever.proto">retriever/retriever.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="retriever.BlobReply">BlobReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="retriever.BlobRequest">BlobRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch_header_hash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The hash of the ReducedBatchHeader defined onchain, see:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+This identifies the batch that this blob belongs to. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which blob in the batch this is requesting for (note: a batch is logically an
+ordered list of blobs). </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reference_block_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The Ethereum block number at which the batch for this blob was constructed. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which quorum of the blob this is requesting for (note a blob can participate in
+multiple quorums). </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="retriever.Retriever">Retriever</h3>
+        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA:</p><p>1) Retrieve from the Disperser that the user initially used for dispersal: the API</p><p>is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the</p><p>Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the Disperser, with the downside of</p><p>worse cost and performance.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>RetrieveBlob</td>
+                <td><a href="#retriever.BlobRequest">BlobRequest</a></td>
+                <td><a href="#retriever.BlobReply">BlobReply</a></td>
+                <td><p>This fans out request to EigenDA Nodes to retrieve the chunks and returns the
+reconstructed original blob in response.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+
+    <h2 id="scalar-value-types">Scalar Value Types</h2>
+    <table class="scalar-value-types-table">
+      <thead>
+        <tr><td>.proto Type</td><td>Notes</td><td>C++</td><td>Java</td><td>Python</td><td>Go</td><td>C#</td><td>PHP</td><td>Ruby</td></tr>
+      </thead>
+      <tbody>
+        
+          <tr id="double">
+            <td>double</td>
+            <td></td>
+            <td>double</td>
+            <td>double</td>
+            <td>float</td>
+            <td>float64</td>
+            <td>double</td>
+            <td>float</td>
+            <td>Float</td>
+          </tr>
+        
+          <tr id="float">
+            <td>float</td>
+            <td></td>
+            <td>float</td>
+            <td>float</td>
+            <td>float</td>
+            <td>float32</td>
+            <td>float</td>
+            <td>float</td>
+            <td>Float</td>
+          </tr>
+        
+          <tr id="int32">
+            <td>int32</td>
+            <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="int64">
+            <td>int64</td>
+            <td>Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="uint32">
+            <td>uint32</td>
+            <td>Uses variable-length encoding.</td>
+            <td>uint32</td>
+            <td>int</td>
+            <td>int/long</td>
+            <td>uint32</td>
+            <td>uint</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="uint64">
+            <td>uint64</td>
+            <td>Uses variable-length encoding.</td>
+            <td>uint64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>uint64</td>
+            <td>ulong</td>
+            <td>integer/string</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sint32">
+            <td>sint32</td>
+            <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sint64">
+            <td>sint64</td>
+            <td>Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="fixed32">
+            <td>fixed32</td>
+            <td>Always four bytes. More efficient than uint32 if values are often greater than 2^28.</td>
+            <td>uint32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>uint32</td>
+            <td>uint</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="fixed64">
+            <td>fixed64</td>
+            <td>Always eight bytes. More efficient than uint64 if values are often greater than 2^56.</td>
+            <td>uint64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>uint64</td>
+            <td>ulong</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="sfixed32">
+            <td>sfixed32</td>
+            <td>Always four bytes.</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>int</td>
+            <td>int32</td>
+            <td>int</td>
+            <td>integer</td>
+            <td>Bignum or Fixnum (as required)</td>
+          </tr>
+        
+          <tr id="sfixed64">
+            <td>sfixed64</td>
+            <td>Always eight bytes.</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>int/long</td>
+            <td>int64</td>
+            <td>long</td>
+            <td>integer/string</td>
+            <td>Bignum</td>
+          </tr>
+        
+          <tr id="bool">
+            <td>bool</td>
+            <td></td>
+            <td>bool</td>
+            <td>boolean</td>
+            <td>boolean</td>
+            <td>bool</td>
+            <td>bool</td>
+            <td>boolean</td>
+            <td>TrueClass/FalseClass</td>
+          </tr>
+        
+          <tr id="string">
+            <td>string</td>
+            <td>A string must always contain UTF-8 encoded or 7-bit ASCII text.</td>
+            <td>string</td>
+            <td>String</td>
+            <td>str/unicode</td>
+            <td>string</td>
+            <td>string</td>
+            <td>string</td>
+            <td>String (UTF-8)</td>
+          </tr>
+        
+          <tr id="bytes">
+            <td>bytes</td>
+            <td>May contain any arbitrary sequence of bytes.</td>
+            <td>string</td>
+            <td>ByteString</td>
+            <td>str</td>
+            <td>[]byte</td>
+            <td>ByteString</td>
+            <td>string</td>
+            <td>String (ASCII-8BIT)</td>
+          </tr>
+        
+      </tbody>
+    </table>
+  </body>
+</html>
+

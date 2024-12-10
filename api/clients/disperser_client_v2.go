@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -30,12 +29,13 @@ type DisperserClientV2 interface {
 }
 
 type disperserClientV2 struct {
-	config   *DisperserClientV2Config
-	signer   corev2.BlobRequestSigner
-	initOnce sync.Once
-	conn     *grpc.ClientConn
-	client   disperser_rpc.DisperserClient
-	prover   encoding.Prover
+	config     *DisperserClientV2Config
+	signer     corev2.BlobRequestSigner
+	initOnce   sync.Once
+	conn       *grpc.ClientConn
+	client     disperser_rpc.DisperserClient
+	prover     encoding.Prover
+	accountant *Accountant
 }
 
 var _ DisperserClientV2 = &disperserClientV2{}
@@ -60,7 +60,7 @@ var _ DisperserClientV2 = &disperserClientV2{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobRequestSigner, prover encoding.Prover) (*disperserClientV2, error) {
+func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClientV2, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -75,11 +75,26 @@ func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobReq
 	}
 
 	return &disperserClientV2{
-		config: config,
-		signer: signer,
-		prover: prover,
+		config:     config,
+		signer:     signer,
+		prover:     prover,
+		accountant: accountant,
 		// conn and client are initialized lazily
 	}, nil
+}
+
+// PopulateAccountant populates the accountant with the payment state from the disperser.
+func (c *disperserClientV2) PopulateAccountant(ctx context.Context) error {
+	paymentState, err := c.GetPaymentState(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
+	}
+
+	err = c.accountant.SetPaymentState(paymentState)
+	if err != nil {
+		return fmt.Errorf("error setting payment state for accountant: %w", err)
+	}
+	return nil
 }
 
 // Close closes the grpc connection to the disperser server.
@@ -108,16 +123,15 @@ func (c *disperserClientV2) DisperseBlob(
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
-
-	var payment core.PaymentMetadata
-	accountId, err := c.signer.GetAccountID()
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
+	if c.accountant == nil {
+		return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
 	}
-	payment.AccountID = accountId
-	// TODO: add payment metadata
-	payment.BinIndex = 0
-	payment.CumulativePayment = big.NewInt(0)
+
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums)
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+	}
 
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
@@ -160,7 +174,7 @@ func (c *disperserClientV2) DisperseBlob(
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: payment,
+		PaymentMetadata: *payment,
 	}
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
@@ -200,6 +214,30 @@ func (c *disperserClientV2) GetBlobStatus(ctx context.Context, blobKey corev2.Bl
 		BlobKey: blobKey[:],
 	}
 	return c.client.GetBlobStatus(ctx, request)
+}
+
+// GetPaymentState returns the payment state of the disperser client
+func (c *disperserClientV2) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, api.NewErrorInternal(err.Error())
+	}
+
+	accountID, err := c.signer.GetAccountID()
+	if err != nil {
+		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
+	}
+
+	signature, err := c.signer.SignPaymentStateRequest()
+	if err != nil {
+		return nil, fmt.Errorf("error signing payment state request: %w", err)
+	}
+
+	request := &disperser_rpc.GetPaymentStateRequest{
+		AccountId: accountID,
+		Signature: signature,
+	}
+	return c.client.GetPaymentState(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.

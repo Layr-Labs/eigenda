@@ -132,6 +132,13 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
 	}
+	DataApiServerVersionFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dataapi-version"),
+		Usage:    "DataApi server version. Options are 1 and 2.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -156,6 +163,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
+	DataApiServerVersionFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

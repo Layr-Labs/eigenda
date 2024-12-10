@@ -3,7 +3,7 @@ package parser_test
 import (
 	"testing"
 
-	"github.com/bxue-l2/srs-verification/parser"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/parser"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

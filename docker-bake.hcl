@@ -43,7 +43,9 @@ group "all" {
     "retriever",
     "churner",
     "dataapi",
-    "traffic-generator"
+    "traffic-generator",
+    "controller",
+    "relay"
   ]
 }
 
@@ -65,7 +67,9 @@ group "ci-release" {
     "encoder",
     "retriever",
     "churner",
-    "dataapi"
+    "dataapi",
+    "controller",
+    "relay"
   ]
 }
 
@@ -79,7 +83,9 @@ group "internal-release" {
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
-    "traffic-generator-internal"
+    "traffic-generator-internal",
+    "controller-internal",
+    "relay-internal"
   ]
 }
 
@@ -211,6 +217,22 @@ target "traffic-generator2-internal" {
   ]
 }
 
+target "relay" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "relay"
+  tags       = ["${REGISTRY}/${REPO}/relay:${BUILD_TAG}"]
+}
+
+target "relay-internal" {
+  inherits = ["relay"]
+  tags     = [
+    "${REGISTRY}/eigenda-relay:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-relay:${GIT_SHA}",
+    "${REGISTRY}/eigenda-relay:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
 target "dataapi" {
   context    = "."
   dockerfile = "./Dockerfile"
@@ -224,6 +246,21 @@ target "dataapi-internal" {
     "${REGISTRY}/eigenda-dataapi:${BUILD_TAG}",
     "${REGISTRY}/eigenda-dataapi:${GIT_SHA}",
     "${REGISTRY}/eigenda-dataapi:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "controller" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  tags       = ["${REGISTRY}/${REPO}/controller:${BUILD_TAG}"]
+}
+
+target "controller-internal" {
+  inherits = ["controller"]
+  tags     = [
+    "${REGISTRY}/eigenda-controller:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-controller:${GIT_SHA}",
+    "${REGISTRY}/eigenda-controller:sha-${GIT_SHORT_SHA}"
   ]
 }
 
