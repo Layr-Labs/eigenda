@@ -711,7 +711,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 	// since payments are returned in the same order as the accountIDs, we can directly map them
 	for i, payment := range payments {
 		if payment.Cmp(big.NewInt(0)) == 0 {
-			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i], "err", err)
+			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i])
 			continue
 		}
 		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{

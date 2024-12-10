@@ -141,7 +141,7 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 // Returns an error if the input reservation is zero-valued.
 func ConvertToActiveReservation(reservation paymentvault.IPaymentVaultReservation) (*core.ActiveReservation, error) {
 	if isZeroValuedReservation(reservation) {
-		return nil, fmt.Errorf("reservation does not exist for given account")
+		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
 
 	return &core.ActiveReservation{
