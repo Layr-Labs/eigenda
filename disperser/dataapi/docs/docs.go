@@ -15,6 +15,52 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/feed/batches/{batch_header_hash}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feed"
+                ],
+                "summary": "Fetch batch by the batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/feed/batches/{batch_header_hash}/blobs": {
             "get": {
                 "produces": [
@@ -130,7 +176,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Blob Key",
+                        "description": "Blob key in hex string",
                         "name": "blob_key",
                         "in": "path",
                         "required": true
@@ -140,7 +186,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobMetadataResponse"
+                            "$ref": "#/definitions/dataapi.BlobResponse"
                         }
                     },
                     "400": {
@@ -750,6 +796,27 @@ const docTemplate = `{
         "big.Int": {
             "type": "object"
         },
+        "core.PaymentMetadata": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "description": "AccountID is the ETH account address for the payer",
+                    "type": "string"
+                },
+                "bin_index": {
+                    "description": "BinIndex represents the range of time at which the dispersal is made",
+                    "type": "integer"
+                },
+                "cumulative_payment": {
+                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/big.Int"
+                        }
+                    ]
+                }
+            }
+        },
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -819,6 +886,23 @@ const docTemplate = `{
                     }
                 },
                 "signatory_record_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "dataapi.BlobResponse": {
+            "type": "object",
+            "properties": {
+                "blob_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "blob_size_bytes": {
+                    "type": "integer"
+                },
+                "dispersed_at": {
+                    "type": "integer"
+                },
+                "status": {
                     "type": "string"
                 }
             }
@@ -1060,7 +1144,7 @@ const docTemplate = `{
                 "semver": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer"
+                        "$ref": "#/definitions/semver.SemverMetrics"
                     }
                 }
             }
@@ -1145,6 +1229,39 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobHeader": {
+            "type": "object",
+            "properties": {
+                "blobCommitments": {
+                    "$ref": "#/definitions/encoding.BlobCommitments"
+                },
+                "blobVersion": {
+                    "type": "integer"
+                },
+                "paymentMetadata": {
+                    "description": "PaymentMetadata contains the payment information for the blob",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.PaymentMetadata"
+                        }
+                    ]
+                },
+                "quorumNumbers": {
+                    "description": "QuorumNumbers contains the quorums the blob is dispersed to",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "signature": {
+                    "description": "Signature is the signature of the blob header by the account ID",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_disperser.BlobStatus": {
             "type": "integer",
             "enum": [
@@ -1171,6 +1288,29 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "integer"
+                    }
+                }
+            }
+        },
+        "semver.SemverMetrics": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "semver": {
+                    "type": "string"
+                },
+                "stake_percentage": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
                     }
                 }
             }

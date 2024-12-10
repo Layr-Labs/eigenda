@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
+	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -107,6 +109,15 @@ func TestV2DisperseBlob(t *testing.T) {
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
+
+	// TODO do not merge this
+	defer func() {
+		fmt.Printf("---- writing goroutine profile ----\n")
+		err := pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+		fmt.Printf("---- end goroutine profile ----\n")
+		require.NoError(t, err)
+	}()
+
 	c := newTestServerV2(t)
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
