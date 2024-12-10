@@ -160,6 +160,7 @@ func RunController(ctx *cli.Context) error {
 		sigAgg,
 		nodeClientManager,
 		logger,
+		metricsRegistry,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
