@@ -136,8 +136,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	sig := s.node.KeyPair.SignMessage(batchHeaderHash).Bytes()
 
-	timeElapsed := time.Since(start)
-	s.metrics.ReportStoreChunksLatency(timeElapsed)
+	s.metrics.ReportStoreChunksLatency(time.Since(start))
 
 	return &pb.StoreChunksReply{
 		Signature: sig[:],
@@ -183,9 +182,9 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
 	}
 
-	var size uint64
-	for _, chunk := range chunks {
-		size += uint64(len(chunk))
+	size := 0
+	if len(chunks) > 0 {
+		size = len(chunks[0]) * len(chunks)
 	}
 	s.metrics.ReportGetChunksDataSize(size)
 

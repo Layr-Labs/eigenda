@@ -197,6 +197,6 @@ func (m *V2Metrics) ReportGetChunksLatency(latency time.Duration) {
 		float64(latency.Nanoseconds()) / float64(time.Millisecond))
 }
 
-func (m *V2Metrics) ReportGetChunksDataSize(size uint64) {
+func (m *V2Metrics) ReportGetChunksDataSize(size int) {
 	m.getChunksDataSize.WithLabelValues().Set(float64(size))
 }
