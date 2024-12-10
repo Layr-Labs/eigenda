@@ -25,6 +25,7 @@ func TestPaymentHash(t *testing.T) {
 		AccountID:         "0x123",
 		ReservationPeriod: 5,
 		CumulativePayment: big.NewInt(100),
+		Salt:              0,
 	}
 	hash, err := pm.Hash()
 	assert.NoError(t, err)

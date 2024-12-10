@@ -258,21 +258,20 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 
 // ValidateReservationPeriod checks if the provided bin index is valid
 func (m *Meterer) ValidateGlobalReservationPeriod(header core.PaymentMetadata) (uint32, error) {
-	// Deterministic function: local clock -> index (1second intervals)
-	currentReservationPeriod := uint32(time.Now().Unix())
+	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRateBinInterval())
 
 	// Valid bin indexes are either the current bin or the previous bin (allow this second or prev sec)
-	if header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1) {
+	if header.ReservationPeriod != globalPeriod && header.ReservationPeriod != (globalPeriod-1) {
 		return 0, fmt.Errorf("invalid bin index for on-demand request")
 	}
-	return currentReservationPeriod, nil
+	return globalPeriod, nil
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
-	//TODO: edit globalIndex based on bin interval in a subsequent PR
-	globalIndex := uint64(time.Now().Unix())
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, symbolsCharged)
+	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRateBinInterval())
+
+	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
