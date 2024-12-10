@@ -132,7 +132,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	binIndex, err := rand.Int(rand.Reader, big.NewInt(42))
+	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(42))
+	require.NoError(t, err)
+	salt, err := rand.Int(rand.Reader, big.NewInt(1000))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
 	require.NoError(t, err)
@@ -145,8 +147,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: makeCommitment(t),
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          uint32(binIndex.Int64()),
+			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
+			Salt:              uint32(salt.Int64()),
 		},
 		Signature: sig,
 	}
@@ -190,7 +193,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	assert.Equal(t, uint8(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.BinIndex, response.BlobHeader.PaymentMetadata.BinIndex)
+	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
