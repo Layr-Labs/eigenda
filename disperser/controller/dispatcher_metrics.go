@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
 )
 
@@ -36,7 +37,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
-	handleBatchLatency := prometheus.NewSummaryVec(
+	handleBatchLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "handle_batch_latency_ms",
@@ -46,7 +47,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	newBatchLatency := prometheus.NewSummaryVec(
+	newBatchLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "new_batch_latency_ms",
@@ -56,7 +57,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	getBlobMetadataLatency := prometheus.NewSummaryVec(
+	getBlobMetadataLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "get_blob_metadata_latency_ms",
@@ -66,7 +67,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	getOperatorStateLatency := prometheus.NewSummaryVec(
+	getOperatorStateLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "get_operator_state_latency_ms",
@@ -76,7 +77,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	getBlobCertificatesLatency := prometheus.NewSummaryVec(
+	getBlobCertificatesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "get_blob_certificates_latency_ms",
@@ -86,7 +87,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	buildMerkleTreeLatency := prometheus.NewSummaryVec(
+	buildMerkleTreeLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "build_merkle_tree_latency_ms",
@@ -96,7 +97,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putBatchHeaderLatency := prometheus.NewSummaryVec(
+	putBatchHeaderLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "put_batch_header_latency_ms",
@@ -106,7 +107,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	proofLatency := prometheus.NewSummaryVec(
+	proofLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "proof_latency_ms",
@@ -116,7 +117,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putVerificationInfosLatency := prometheus.NewSummaryVec(
+	putVerificationInfosLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "put_verification_infos_latency_ms",
@@ -126,7 +127,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	poolSubmissionLatency := prometheus.NewSummaryVec(
+	poolSubmissionLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "pool_submission_latency_ms",
@@ -136,7 +137,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putDispersalRequestLatency := prometheus.NewSummaryVec(
+	putDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: dispatcherNamespace,
 			Name:      "put_dispersal_latency_ms",
@@ -145,7 +146,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	sendChunksLatency := prometheus.NewSummaryVec(
+	sendChunksLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "send_chunks_latency_ms",
@@ -155,7 +156,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	sendChunksRetryCount := prometheus.NewGaugeVec(
+	sendChunksRetryCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: dispatcherNamespace,
 			Name:      "send_chunks_retry_count",
@@ -164,7 +165,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putDispersalResponseLatency := prometheus.NewSummaryVec(
+	putDispersalResponseLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: dispatcherNamespace,
 			Name:      "put_dispersal_response_latency_ms",
@@ -173,7 +174,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	handleSignaturesLatency := prometheus.NewSummaryVec(
+	handleSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "handle_signatures_latency_ms",
@@ -183,7 +184,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	receiveSignaturesLatency := prometheus.NewSummaryVec(
+	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "receive_signatures_latency_ms",
@@ -193,7 +194,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	aggregateSignaturesLatency := prometheus.NewSummaryVec(
+	aggregateSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "aggregate_signatures_latency_ms",
@@ -203,7 +204,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putAttestationLatency := prometheus.NewSummaryVec(
+	putAttestationLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "put_attestation_latency_ms",
@@ -213,7 +214,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	updateBatchStatusLatency := prometheus.NewSummaryVec(
+	updateBatchStatusLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "update_batch_status_latency_ms",
