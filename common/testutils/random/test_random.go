@@ -29,11 +29,6 @@ func NewTestRandom(fixedSeed ...int64) *TestRandom {
 	}
 }
 
-// GetRand returns the underlying random instance
-func (r *TestRandom) GetRand() *rand.Rand {
-	return r.Rand
-}
-
 // RandomBytes generates a random byte slice of a given length.
 func (r *TestRandom) RandomBytes(length int) []byte {
 	bytes := make([]byte, length)
