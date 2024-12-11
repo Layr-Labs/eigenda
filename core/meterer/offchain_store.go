@@ -184,7 +184,15 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 	prevPayment := big.NewInt(0)
 	if len(smallerResult) > 0 {
-		setPrevPayment, success := prevPayment.SetString(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		cumulativePaymentsAttr, ok := smallerResult[0]["CumulativePayments"]
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("CumulativePayments field not found in result")
+		}
+		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("CumulativePayments has invalid type")
+		}
+		setPrevPayment, success := prevPayment.SetString(cumulativePaymentsNum.Value, 10)
 		if !success {
 			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
@@ -209,14 +217,31 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	nextPayment := big.NewInt(0)
 	nextDataLength := uint32(0)
 	if len(largerResult) > 0 {
-		setNextPayment, success := nextPayment.SetString(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		cumulativePaymentsAttr, ok := largerResult[0]["CumulativePayments"]
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("CumulativePayments field not found in result")
+		}
+		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("CumulativePayments has invalid type")
+		}
+		setNextPayment, success := nextPayment.SetString(cumulativePaymentsNum.Value, 10)
 		if !success {
 			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
 		nextPayment = setNextPayment
-		dataLength, err := strconv.ParseUint(largerResult[0]["DataLength"].(*types.AttributeValueMemberN).Value, 10, 32)
+
+		dataLengthAttr, ok := largerResult[0]["DataLength"]
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("DataLength field not found in result")
+		}
+		dataLengthNum, ok := dataLengthAttr.(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, nil, 0, fmt.Errorf("DataLength has invalid type")
+		}
+		dataLength, err := strconv.ParseUint(dataLengthNum.Value, 10, 32)
 		if err != nil {
-			return nil, nil, 0, fmt.Errorf("failed to parse blob size: %w", err)
+			return nil, nil, 0, fmt.Errorf("failed to parse data length: %w", err)
 		}
 		nextDataLength = uint32(dataLength)
 	}

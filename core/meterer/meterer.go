@@ -244,7 +244,9 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 
 // PaymentCharged returns the chargeable price for a given data length
 func (m *Meterer) PaymentCharged(numSymbols uint) *big.Int {
-	return big.NewInt(int64(m.SymbolsCharged(numSymbols) * m.ChainPaymentState.GetPricePerSymbol()))
+	symbolsCharged := big.NewInt(int64(m.SymbolsCharged(numSymbols)))
+	pricePerSymbol := big.NewInt(int64(m.ChainPaymentState.GetPricePerSymbol()))
+	return symbolsCharged.Mul(symbolsCharged, pricePerSymbol)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
