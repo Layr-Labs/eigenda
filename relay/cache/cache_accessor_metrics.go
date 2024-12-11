@@ -2,77 +2,82 @@ package cache
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/metrics"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"time"
 )
+
+const namespace = "eigenda_relay"
 
 // CacheAccessorMetrics provides metrics for a CacheAccessor.
 type CacheAccessorMetrics struct {
-	cacheHits        metrics.CountMetric
-	cacheMisses      metrics.CountMetric
-	size             metrics.GaugeMetric
-	weight           metrics.GaugeMetric
-	averageWeight    metrics.GaugeMetric
-	cacheMissLatency metrics.LatencyMetric
+	cacheHits        *prometheus.CounterVec
+	cacheMisses      *prometheus.CounterVec
+	size             *prometheus.GaugeVec
+	weight           *prometheus.GaugeVec
+	averageWeight    *prometheus.GaugeVec
+	cacheMissLatency *prometheus.SummaryVec
 }
 
 // NewCacheAccessorMetrics creates a new CacheAccessorMetrics.
 func NewCacheAccessorMetrics(
-	server metrics.Metrics,
-	cacheName string) (*CacheAccessorMetrics, error) {
+	registry *prometheus.Registry,
+	cacheName string) *CacheAccessorMetrics {
 
-	cacheHits, err := server.NewCountMetric(
-		fmt.Sprintf("%s_cache_hit", cacheName),
-		fmt.Sprintf("Number of cache hits in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
+	cacheHits := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_hit_count", cacheName),
+			Help:      "Number of cache hits",
+		},
+		[]string{},
+	)
 
-	cacheMisses, err := server.NewCountMetric(
-		fmt.Sprintf("%s_cache_miss", cacheName),
-		fmt.Sprintf("Number of cache misses in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
+	cacheMisses := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_miss_count", cacheName),
+			Help:      "Number of cache misses",
+		},
+		[]string{},
+	)
 
-	size, err := server.NewGaugeMetric(
-		fmt.Sprintf("%s_cache", cacheName),
-		"size",
-		fmt.Sprintf("Number of items in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
+	size := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_size", cacheName),
+			Help:      "Number of items in the cache",
+		},
+		[]string{},
+	)
 
-	weight, err := server.NewGaugeMetric(
-		fmt.Sprintf("%s_cache", cacheName),
-		"weight",
-		fmt.Sprintf("Total weight of items in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
+	weight := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_weight", cacheName),
+			Help:      "Total weight of items in the cache",
+		},
+		[]string{},
+	)
 
-	averageWeight, err := server.NewGaugeMetric(
-		fmt.Sprintf("%s_cache_item", cacheName),
-		"weight",
-		fmt.Sprintf("Weight of each item currently in the %s cache", cacheName),
-		nil)
-	if err != nil {
-		return nil, err
-	}
+	averageWeight := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_average_weight", cacheName),
+			Help:      "Weight of each item currently in the cache",
+		},
+		[]string{},
+	)
 
-	cacheMissLatency, err := server.NewLatencyMetric(
-		fmt.Sprintf("%s_cache_miss_latency", cacheName),
-		fmt.Sprintf("Latency of cache misses in the %s cache", cacheName),
-		nil,
-		&metrics.Quantile{Quantile: 0.5, Error: 0.05},
-		&metrics.Quantile{Quantile: 0.9, Error: 0.05},
-		&metrics.Quantile{Quantile: 0.99, Error: 0.05})
-	if err != nil {
-		return nil, err
-	}
+	cacheMissLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  namespace,
+			Name:       fmt.Sprintf("%s_cache_miss_latency_ms", cacheName),
+			Help:       "Latency of cache misses",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.05, 0.99: 0.01},
+		},
+		[]string{},
+	)
 
 	return &CacheAccessorMetrics{
 		cacheHits:        cacheHits,
@@ -81,5 +86,29 @@ func NewCacheAccessorMetrics(
 		weight:           weight,
 		averageWeight:    averageWeight,
 		cacheMissLatency: cacheMissLatency,
-	}, nil
+	}
+}
+
+func (m *CacheAccessorMetrics) ReportCacheHit() {
+	m.cacheHits.WithLabelValues().Inc()
+}
+
+func (m *CacheAccessorMetrics) ReportCacheMiss() {
+	m.cacheMisses.WithLabelValues().Inc()
+}
+
+func (m *CacheAccessorMetrics) ReportSize(size int) {
+	m.size.WithLabelValues().Set(float64(size))
+}
+
+func (m *CacheAccessorMetrics) ReportWeight(weight uint64) {
+	m.weight.WithLabelValues().Set(float64(weight))
+}
+
+func (m *CacheAccessorMetrics) ReportAverageWeight(averageWeight float64) {
+	m.averageWeight.WithLabelValues().Set(averageWeight)
+}
+
+func (m *CacheAccessorMetrics) ReportCacheMissLatency(duration time.Duration) {
+	m.cacheMissLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
 }

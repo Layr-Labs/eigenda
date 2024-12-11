@@ -98,7 +98,7 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 
 	if l.globalOperationsInFlight >= l.config.MaxConcurrentGetChunkOps {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "global concurrency"})
+			l.relayMetrics.ReportChunkRateLimited("global concurrency")
 		}
 		return fmt.Errorf(
 			"global concurrent request limit %d exceeded for GetChunks operations, try again later",
@@ -106,21 +106,21 @@ func (l *ChunkRateLimiter) BeginGetChunkOperation(
 	}
 	if l.globalOpLimiter.TokensAt(now) < 1 {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "global rate"})
+			l.relayMetrics.ReportChunkRateLimited("global rate")
 		}
 		return fmt.Errorf("global rate limit %0.1fhz exceeded for GetChunks operations, try again later",
 			l.config.MaxGetChunkOpsPerSecond)
 	}
 	if l.perClientOperationsInFlight[requesterID] >= l.config.MaxConcurrentGetChunkOpsClient {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "client concurrency"})
+			l.relayMetrics.ReportChunkRateLimited("client concurrency")
 		}
 		return fmt.Errorf("client concurrent request limit %d exceeded for GetChunks",
 			l.config.MaxConcurrentGetChunkOpsClient)
 	}
 	if l.perClientOpLimiter[requesterID].TokensAt(now) < 1 {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "client rate"})
+			l.relayMetrics.ReportChunkRateLimited("client rate")
 		}
 		return fmt.Errorf("client rate limit %0.1fhz exceeded for GetChunks, try again later",
 			l.config.MaxGetChunkOpsPerSecondClient)
@@ -159,7 +159,7 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 	allowed := l.globalBandwidthLimiter.AllowN(now, bytes)
 	if !allowed {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "global bandwidth"})
+			l.relayMetrics.ReportChunkRateLimited("global bandwidth")
 		}
 		return fmt.Errorf("global rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
 			int(l.config.MaxGetChunkBytesPerSecond/1024/1024))
@@ -173,7 +173,7 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 	if !allowed {
 		l.globalBandwidthLimiter.AllowN(now, -bytes)
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetChunksRateLimited.Increment(metrics.RateLimitLabel{Reason: "client bandwidth"})
+			l.relayMetrics.ReportChunkRateLimited("client bandwidth")
 		}
 		return fmt.Errorf("client rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
 			int(l.config.MaxGetChunkBytesPerSecondClient/1024/1024))

@@ -143,10 +143,7 @@ func NewServer(
 		return nil, fmt.Errorf("error fetching blob params: %w", err)
 	}
 
-	relayMetrics, err := metrics.NewRelayMetrics(logger, config.MetricsPort)
-	if err != nil {
-		return nil, fmt.Errorf("error creating relayMetrics: %w", err)
-	}
+	relayMetrics := metrics.NewRelayMetrics(logger, config.MetricsPort)
 
 	mp, err := newMetadataProvider(
 		ctx,
@@ -246,7 +243,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 
 	finishedFetchingMetadata := time.Now()
-	s.metrics.GetBlobMetadataLatency.ReportLatency(finishedFetchingMetadata.Sub(start))
+	s.metrics.ReportBlobMetadataLatency(finishedFetchingMetadata.Sub(start))
 
 	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes)
 	if err != nil {
@@ -258,9 +255,9 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
 	}
 
-	s.metrics.GetBlobDataSize.Set(float64(len(data)))
-	s.metrics.GetBlobDataLatency.ReportLatency(time.Since(finishedFetchingMetadata))
-	s.metrics.GetBlobLatency.ReportLatency(time.Since(start))
+	s.metrics.ReportBlobDataSize(len(data))
+	s.metrics.ReportBlobDataLatency(time.Since(finishedFetchingMetadata))
+	s.metrics.ReportBlobLatency(time.Since(start))
 
 	reply := &pb.GetBlobReply{
 		Blob: data,
@@ -285,7 +282,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf(
 			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
 	}
-	s.metrics.GetChunksKeyCount.Set(float64(len(request.ChunkRequests)))
+	s.metrics.ReportChunkKeyCount(len(request.ChunkRequests))
 
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
@@ -296,14 +293,14 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
-			s.metrics.GetChunksAuthFailures.Increment()
+			s.metrics.ReportChunkAuthFailure()
 			return nil, fmt.Errorf("auth failed: %w", err)
 		}
 	}
 
 	finishedAuthenticating := time.Now()
 	if s.authenticator != nil {
-		s.metrics.GetChunksAuthenticationLatency.ReportLatency(finishedAuthenticating.Sub(start))
+		s.metrics.ReportChunkAuthenticationLatency(finishedAuthenticating.Sub(start))
 	}
 
 	clientID := string(request.OperatorId)
@@ -326,7 +323,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 
 	finishedFetchingMetadata := time.Now()
-	s.metrics.GetChunksMetadataLatency.ReportLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
+	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
 	if err != nil {
@@ -336,7 +333,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	s.metrics.GetChunksDataSize.Set(float64(requiredBandwidth))
+	s.metrics.ReportChunkDataSize(requiredBandwidth)
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
@@ -348,8 +345,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, fmt.Errorf("error gathering chunk data: %w", err)
 	}
 
-	s.metrics.GetChunksDataLatency.ReportLatency(time.Since(finishedFetchingMetadata))
-	s.metrics.GetChunksLatency.ReportLatency(time.Since(start))
+	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
+	s.metrics.ReportChunkLatency(time.Since(start))
 
 	return &pb.GetChunksReply{
 		Data: bytesToSend,
@@ -470,10 +467,7 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start(ctx context.Context) error {
-	err := s.metrics.Start()
-	if err != nil {
-		return fmt.Errorf("error starting metrics server: %w", err)
-	}
+	s.metrics.Start()
 
 	if s.chainReader != nil && s.metadataProvider != nil {
 		go func() {
