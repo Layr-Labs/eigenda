@@ -43,8 +43,6 @@ func ReadPublicECDSAKeyFile(publicKeyFile string) (*ecdsa.PublicKey, error) {
 
 // ReadPrivateECDSAKeyFile reads a private ECDSA key from a .pem file.
 func ReadPrivateECDSAKeyFile(privateKeyFile string) (*ecdsa.PrivateKey, error) {
-	//publicKey, err := ReadPublicECDSAKeyFile(publicKeyFile)
-
 	file, err := os.Open(privateKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error opening private key file: %w", err)

@@ -3496,6 +3496,13 @@ The ID must be in range [0, 254]. </p></td>
                 </tr>
               
                 <tr>
+                  <td>disperserID</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>ID of the disperser that is requesting the storage of the batch. </p></td>
+                </tr>
+              
+                <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -3522,6 +3529,7 @@ https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.
   j. digest certificate.BlobHeader.Signature
   k. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
+4. digest disperserID (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>

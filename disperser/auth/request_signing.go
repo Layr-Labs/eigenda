@@ -12,6 +12,28 @@ import (
 	"hash"
 )
 
+// TODO test these methods
+
+// SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
+// write the signature into the request.
+func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
+	requestHash := HashStoreChunksRequest(request)
+
+	signature, err := ecdsa.SignASN1(rand.Reader, key, requestHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	return signature, nil
+}
+
+// VerifyStoreChunksRequest verifies the given signature of the given StoreChunksRequest with the given
+// public key.
+func VerifyStoreChunksRequest(key *ecdsa.PublicKey, request *grpc.StoreChunksRequest, signature []byte) bool {
+	requestHash := HashStoreChunksRequest(request)
+	return ecdsa.VerifyASN1(key, requestHash, signature)
+}
+
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 	hasher := sha3.NewLegacyKeccak256()
@@ -20,6 +42,7 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 	for _, blobCertificate := range request.Batch.BlobCertificates {
 		hashBlobCertificate(hasher, blobCertificate)
 	}
+	hashUint32(hasher, request.DisperserID)
 
 	return hasher.Sum(nil)
 }
@@ -69,17 +92,4 @@ func hashUint64(hasher hash.Hash, value uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, value)
 	hasher.Write(bytes)
-}
-
-// SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
-// write the signature into the request.
-func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
-	requestHash := HashStoreChunksRequest(request)
-
-	signature, err := ecdsa.SignASN1(rand.Reader, key, requestHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign request: %w", err)
-	}
-
-	return signature, nil
 }
