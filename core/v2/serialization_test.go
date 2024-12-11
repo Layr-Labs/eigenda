@@ -25,11 +25,12 @@ func TestPaymentHash(t *testing.T) {
 		AccountID:         "0x123",
 		ReservationPeriod: 5,
 		CumulativePayment: big.NewInt(100),
+		Salt:              42,
 	}
 	hash, err := pm.Hash()
 	assert.NoError(t, err)
-	// 0xf5894a8e9281b5687c0c7757d3d45fb76152bf659e6e61b1062f4c6bcb69c449 verified in solidity
-	assert.Equal(t, "f5894a8e9281b5687c0c7757d3d45fb76152bf659e6e61b1062f4c6bcb69c449", hex.EncodeToString(hash[:]))
+	// 0xd0c8a7a362a45a875d9eb78ef577d563d759e3a615a5f81f71bfc5e85f6bcf59 verified in solidity
+	assert.Equal(t, "d0c8a7a362a45a875d9eb78ef577d563d759e3a615a5f81f71bfc5e85f6bcf59", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobKeyFromHeader(t *testing.T) {
@@ -52,8 +53,8 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 0x40efb7273649f39590b27550ea06eeb81efd6ae4d719385a302fbd93173a395d verified in solidity
-	assert.Equal(t, "40efb7273649f39590b27550ea06eeb81efd6ae4d719385a302fbd93173a395d", blobKey.Hex())
+	// 0x1354b29d9dd9a332959795d17f456c219566417fdbf1a7b4f5d118f5c2a36bbd verified in solidity
+	assert.Equal(t, "1354b29d9dd9a332959795d17f456c219566417fdbf1a7b4f5d118f5c2a36bbd", blobKey.Hex())
 }
 
 func TestBatchHeaderHash(t *testing.T) {
@@ -109,8 +110,8 @@ func TestBlobCertHash(t *testing.T) {
 
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
-	// 0x3719a91e2a294feafdd624c1c88a6f1db1a5c79ee0863b352255bc9162f02751 verified in solidity
-	assert.Equal(t, "3719a91e2a294feafdd624c1c88a6f1db1a5c79ee0863b352255bc9162f02751", hex.EncodeToString(hash[:]))
+	// 0xad938e477d0bc1f9f4e8de7c5cd837560bdbb2dc7094207a7ad53e7442611a43 verified in solidity
+	assert.Equal(t, "ad938e477d0bc1f9f4e8de7c5cd837560bdbb2dc7094207a7ad53e7442611a43", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
