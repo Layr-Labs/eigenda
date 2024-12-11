@@ -272,7 +272,6 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 			defer wg.Done()
 			_, err := accountant.AccountBlob(ctx, 100, quorums, salt)
 			assert.NoError(t, err)
-			time.Sleep(500 * time.Millisecond)
 		}()
 	}
 

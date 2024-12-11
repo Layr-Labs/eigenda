@@ -639,7 +639,7 @@ BlobStatusRequest is used to query the status of a blob.
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
 | quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, ReservationPeriod, CumulativePayment, and Salt |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains account_id, reservation_period, cumulative_payment, and salt |
 | payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 

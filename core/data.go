@@ -567,6 +567,11 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	}
 	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
+	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 32)
+	if err != nil {
+		return fmt.Errorf("failed to parse Salt: %w", err)
+	}
+	pm.Salt = uint32(salt)
 	return nil
 }
 
