@@ -7,16 +7,15 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/tools/traffic"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-
 	"github.com/stretchr/testify/mock"
 )
 
 func TestTrafficGenerator(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	trafficGenerator := &traffic.TrafficGenerator{
 		Logger: logger,
 		Config: &traffic.Config{
@@ -43,7 +42,7 @@ func TestTrafficGenerator(t *testing.T) {
 
 func TestTrafficGeneratorAuthenticated(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	trafficGenerator := &traffic.TrafficGenerator{
 		Logger: logger,

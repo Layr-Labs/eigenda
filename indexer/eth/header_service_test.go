@@ -7,10 +7,9 @@ import (
 	"testing"
 
 	cm "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigenda/indexer/eth"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -20,7 +19,7 @@ import (
 )
 
 var (
-	logger            = logging.NewNoopLogger()
+	logger            = testutils.GetLogger()
 	blockNumber int64 = 17320293
 )
 

@@ -17,6 +17,7 @@ import (
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -62,6 +63,7 @@ func NewWriter(
 func (t *Writer) RegisterOperator(
 	ctx context.Context,
 	keypair *core.KeyPair,
+	signer sdkSigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -69,7 +71,7 @@ func (t *Writer) RegisterOperator(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -102,6 +104,7 @@ func (t *Writer) RegisterOperator(
 func (t *Writer) RegisterOperatorWithChurn(
 	ctx context.Context,
 	keypair *core.KeyPair,
+	signer sdkSigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -110,7 +113,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 	churnReply *churner.ChurnReply,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err

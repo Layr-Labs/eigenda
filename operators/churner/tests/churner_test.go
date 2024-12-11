@@ -14,6 +14,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -23,6 +24,8 @@ import (
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +40,7 @@ var (
 	testConfig                     *deploy.Config
 	templateName                   string
 	testName                       string
-	logger                         = logging.NewNoopLogger()
+	logger                         = testutils.GetLogger()
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -103,8 +106,15 @@ func TestChurner(t *testing.T) {
 	var tx *eth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
 	var keyPair *dacore.KeyPair
+	var signer sdkSigner.Signer
 	for i, op := range testConfig.Operators {
 		socket := fmt.Sprintf("%s:%s:%s", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT, op.NODE_RETRIEVAL_PORT)
+		opSigner, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+			Path:       op.NODE_BLS_KEY_FILE,
+			Password:   op.NODE_BLS_KEY_PASSWORD,
+			SignerType: sdkSignerTypes.Local,
+		})
+		assert.NoError(t, err)
 		kp, err := bls.ReadPrivateKeyFromFile(op.NODE_BLS_KEY_FILE, op.NODE_BLS_KEY_PASSWORD)
 		assert.NoError(t, err)
 		g1point := &core.G1Point{
@@ -130,10 +140,11 @@ func TestChurner(t *testing.T) {
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
 			keyPair = opKeyPair
+			signer = opSigner
 			operatorPrivateKey = sk.PrivateKey
 			break
 		}
-		err = tx.RegisterOperator(ctx, opKeyPair, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
+		err = tx.RegisterOperator(ctx, opKeyPair, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
 		assert.NoError(t, err)
 	}
 	assert.Greater(t, len(lowestStakeOperatorAddr), 0)
@@ -183,7 +194,7 @@ func TestChurner(t *testing.T) {
 	salt32 := [32]byte{}
 	copy(salt32[:], salt)
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-	err = tx.RegisterOperatorWithChurn(ctx, keyPair, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
+	err = tx.RegisterOperatorWithChurn(ctx, keyPair, signer, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
 	assert.NoError(t, err)
 }
 

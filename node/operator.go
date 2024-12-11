@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -21,6 +22,7 @@ type Operator struct {
 	Timeout             time.Duration
 	PrivKey             *ecdsa.PrivateKey
 	KeyPair             *core.KeyPair
+	Signer              sdkSigner.Signer
 	OperatorId          core.OperatorID
 	QuorumIDs           []core.QuorumID
 	RegisterNodeAtStart bool
@@ -84,21 +86,21 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 
 	// if we should call the churner, call it
 	if shouldCallChurner {
-		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.KeyPair, quorumsToRegister)
+		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.KeyPair, operator.Signer, quorumsToRegister)
 		if err != nil {
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
+		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
 	}
 }
 
 // DeregisterOperator deregisters the operator with the given public key from the specified quorums that it is registered with at the supplied block number.
 // If the operator isn't registered with any of the specified quorums, this function will return error, and no quorum will be deregistered.
-func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.KeyPair, transactor core.Writer) error {
+func DeregisterOperator(ctx context.Context, operator *Operator, pubKeyG1 *core.G1Point, transactor core.Writer) error {
 	if len(operator.QuorumIDs) > 1+core.MaxQuorumID {
 		return fmt.Errorf("cannot provide more than %d quorums", 1+core.MaxQuorumID)
 	}
@@ -106,7 +108,7 @@ func DeregisterOperator(ctx context.Context, operator *Operator, KeyPair *core.K
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
-	return transactor.DeregisterOperator(ctx, KeyPair.GetPubKeyG1(), blockNumber, operator.QuorumIDs)
+	return transactor.DeregisterOperator(ctx, pubKeyG1, blockNumber, operator.QuorumIDs)
 }
 
 // UpdateOperatorSocket updates the socket for the given operator

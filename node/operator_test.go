@@ -2,24 +2,32 @@ package node_test
 
 import (
 	"context"
+
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestRegisterOperator(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	signer, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+		PrivateKey: keyPair.PrivKey.String(),
+		SignerType: sdkSignerTypes.PrivateKey,
+	})
 	assert.NoError(t, err)
 	// Create a new operator
 	operator := &node.Operator{
@@ -28,6 +36,7 @@ func TestRegisterOperator(t *testing.T) {
 		Timeout:             10 * time.Second,
 		PrivKey:             nil,
 		KeyPair:             keyPair,
+		Signer:              signer,
 		OperatorId:          operatorID,
 		QuorumIDs:           []core.QuorumID{0, 1},
 		RegisterNodeAtStart: false,
@@ -41,7 +50,7 @@ func TestRegisterOperator(t *testing.T) {
 			ChurnBIPsOfTotalStake:    20000,
 		}, nil)
 		tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(0), nil)
-		tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return tx
 
 	}
@@ -58,7 +67,7 @@ func TestRegisterOperator(t *testing.T) {
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -80,10 +89,10 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 		ChurnBIPsOfTotalStake:    20000,
 	}, nil)
 	tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(1), nil)
-	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	churnerClient := &nodemock.ChurnerClient{}
 	churnerClient.On("Churn").Return(nil, nil)
 	err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger)
 	assert.NoError(t, err)
-	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

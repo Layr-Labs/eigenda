@@ -3,12 +3,13 @@ package geth_test
 import (
 	"context"
 	"fmt"
+
 	"math/big"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/geth"
 	damock "github.com/Layr-Labs/eigenda/common/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ func (j *JsonError) Error() string  { return "json error" }
 func (j *JsonError) ErrorCode() int { return -32000 }
 
 func makeTestMultihomingClient(numRetries int, designatedError error) (*geth.MultiHomingClient, error) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	ethClientCfg := geth.EthClientConfig{
 		RPCURLs:          rpcURLs,
