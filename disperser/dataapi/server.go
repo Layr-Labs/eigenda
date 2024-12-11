@@ -18,7 +18,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
@@ -208,6 +207,8 @@ type (
 		batcherHealthEndpt        string
 		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
+
+		operatorHandler *operatorHandler
 	}
 )
 
@@ -239,8 +240,10 @@ func NewServer(
 		eigenDAHttpServiceChecker = &HttpServiceAvailability{}
 	}
 
+	l := logger.With("component", "DataAPIServer")
+
 	return &server{
-		logger:                    logger.With("component", "DataAPIServer"),
+		logger:                    l,
 		serverMode:                config.ServerMode,
 		socketAddr:                config.SocketAddr,
 		allowOrigins:              config.AllowOrigins,
@@ -256,6 +259,7 @@ func NewServer(
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
+		operatorHandler:           newOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
 	}
 }
 
@@ -726,50 +730,11 @@ func (s *server) OperatorsStake(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
 
-	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
+	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("OperatorsStake")
-		errorResponse(c, fmt.Errorf("failed to fetch current block number - %s", err))
+		errorResponse(c, fmt.Errorf("failed to get operator stake - %s", err))
 		return
-	}
-	state, err := s.chainState.GetOperatorState(c, currentBlock, []core.QuorumID{0, 1, 2})
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("OperatorsStake")
-		errorResponse(c, fmt.Errorf("failed to fetch indexed operator state - %s", err))
-		return
-	}
-
-	tqs, quorumsStake := operators.GetRankedOperators(state)
-	s.metrics.UpdateOperatorsStake(tqs, quorumsStake)
-
-	stakeRanked := make(map[string][]*OperatorStake)
-	for q, operators := range quorumsStake {
-		quorum := fmt.Sprintf("%d", q)
-		stakeRanked[quorum] = make([]*OperatorStake, 0)
-		for i, op := range operators {
-			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
-				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
-					QuorumId:        quorum,
-					OperatorId:      op.OperatorId.Hex(),
-					StakePercentage: op.StakeShare / 100.0,
-					Rank:            i + 1,
-				})
-			}
-		}
-	}
-	stakeRanked["total"] = make([]*OperatorStake, 0)
-	for i, op := range tqs {
-		if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
-			stakeRanked["total"] = append(stakeRanked["total"], &OperatorStake{
-				QuorumId:        "total",
-				OperatorId:      op.OperatorId.Hex(),
-				StakePercentage: op.StakeShare / 100.0,
-				Rank:            i + 1,
-			})
-		}
-	}
-	operatorsStakeResponse := &OperatorsStakeResponse{
-		StakeRankedOperators: stakeRanked,
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("OperatorsStake")
@@ -956,7 +921,7 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.probeOperatorPorts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -988,7 +953,7 @@ func (s *server) SemverScan(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	report, err := s.scanOperatorsHostInfo(c.Request.Context())
+	report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("SemverScan")

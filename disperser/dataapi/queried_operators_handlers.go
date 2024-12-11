@@ -2,7 +2,6 @@ package dataapi
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"net"
 	"sort"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
@@ -245,90 +243,6 @@ func ValidOperatorIP(address string, logger logging.Logger) bool {
 	logger.Debug("Operator IP validation", "address", address, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
 
 	return isValid
-}
-
-func (s *server) probeOperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
-	operatorInfo, err := s.getOperatorInfo(ctx, operatorId)
-	if err != nil {
-		s.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return &OperatorPortCheckResponse{}, err
-	}
-
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-	retrievalSocket := operatorSocket.GetRetrievalSocket()
-	retrievalOnline := checkIsOperatorOnline(retrievalSocket, 3, s.logger)
-
-	dispersalSocket := operatorSocket.GetDispersalSocket()
-	dispersalOnline := checkIsOperatorOnline(dispersalSocket, 3, s.logger)
-
-	// Create the metadata regardless of online status
-	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:      operatorId,
-		DispersalSocket: dispersalSocket,
-		RetrievalSocket: retrievalSocket,
-		DispersalOnline: dispersalOnline,
-		RetrievalOnline: retrievalOnline,
-	}
-
-	// Log the online status
-	s.logger.Info("operator port check response", "response", portCheckResponse)
-
-	// Send the metadata to the results channel
-	return portCheckResponse, nil
-}
-
-func (s *server) getOperatorInfo(ctx context.Context, operatorId string) (*core.IndexedOperatorInfo, error) {
-	operatorInfo, err := s.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
-	if err != nil {
-		s.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return nil, fmt.Errorf("operator info not found for operatorId %s", operatorId)
-	}
-	return operatorInfo, nil
-}
-
-func (s *server) scanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
-	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch current block number - %s", err)
-	}
-	operators, err := s.indexedChainState.GetIndexedOperators(context.Background(), currentBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indexed operator info - %s", err)
-	}
-
-	// check operator socket registration against the indexed state
-	for operatorID, operatorInfo := range operators {
-		socket, err := s.chainState.GetOperatorSocket(context.Background(), currentBlock, operatorID)
-		if err != nil {
-			s.logger.Warn("failed to get operator socket", "operatorId", operatorID.Hex(), "error", err)
-			continue
-		}
-		if socket != operatorInfo.Socket {
-			s.logger.Warn("operator socket mismatch", "operatorId", operatorID.Hex(), "socket", socket, "operatorInfo", operatorInfo.Socket)
-		}
-	}
-
-	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
-	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch operator state - %s", err)
-	}
-
-	nodeInfoWorkers := 20
-	nodeInfoTimeout := time.Duration(1 * time.Second)
-	useRetrievalClient := false
-	semvers := semver.ScanOperators(operators, operatorState, useRetrievalClient, nodeInfoWorkers, nodeInfoTimeout, s.logger)
-
-	// Create HostInfoReportResponse instance
-	semverReport := &SemverReportResponse{
-		Semver: semvers,
-	}
-
-	// Publish semver report metrics
-	s.metrics.UpdateSemverCounts(semvers)
-
-	s.logger.Info("Semver scan completed", "semverReport", semverReport)
-	return semverReport, nil
 }
 
 // method to check if operator is online via socket dial
