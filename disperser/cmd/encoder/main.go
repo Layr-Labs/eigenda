@@ -10,11 +10,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/encoder/flags"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -69,9 +70,23 @@ func RunEncoderServer(ctx *cli.Context) error {
 		reg.MustRegister(grpcMetrics)
 	}
 
+	backendType, err := encoding.ParseBackendType(config.ServerConfig.Backend)
+	if err != nil {
+		return err
+	}
+
+	// Set the encoding config
+	encodingConfig := &encoding.Config{
+		BackendType: backendType,
+		GPUEnable:   config.ServerConfig.GPUEnable,
+		NumWorker:   config.EncoderConfig.NumWorker,
+	}
+
 	if config.EncoderVersion == V2 {
-		// We no longer compute the commitments in the encoder, so we don't need to load the G2 points
-		prover, err := prover.NewProver(&config.EncoderConfig, false)
+		// We no longer load the G2 points in V2 because the KZG commitments are computed
+		// on the API server side.
+		config.EncoderConfig.LoadG2Points = false
+		prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
@@ -82,6 +97,10 @@ func RunEncoderServer(ctx *cli.Context) error {
 		}
 
 		blobStoreBucketName := config.BlobStoreConfig.BucketName
+		if blobStoreBucketName == "" {
+			return fmt.Errorf("blob store bucket name is required")
+		}
+
 		blobStore := blobstorev2.NewBlobStore(blobStoreBucketName, s3Client, logger)
 		logger.Info("Blob store", "bucket", blobStoreBucketName)
 
@@ -101,7 +120,8 @@ func RunEncoderServer(ctx *cli.Context) error {
 		return server.Start()
 	}
 
-	prover, err := prover.NewProver(&config.EncoderConfig, true)
+	config.EncoderConfig.LoadG2Points = true
+	prover, err := prover.NewProver(&config.EncoderConfig, encodingConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder: %w", err)
 	}
@@ -109,5 +129,4 @@ func RunEncoderServer(ctx *cli.Context) error {
 	server := encoder.NewEncoderServer(*config.ServerConfig, logger, prover, metrics, grpcMetrics)
 
 	return server.Start()
-
 }

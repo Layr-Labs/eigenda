@@ -67,13 +67,19 @@ func ParsePtauChallenge(config Config) {
 			fmt.Println("main err", err)
 		}
 
-		WriteG1PointsForEigenDA(g1Points, from, to)
+		err = WriteG1PointsForEigenDA(g1Points, from, to)
+		if err != nil {
+			fmt.Println("main err", err)
+		}
 
 		g2Points, err := ParseG2PointSection(config.PtauPath, p, 1)
 		if err != nil {
 			fmt.Println("main err", err)
 		}
-		WriteG2PointsForEigenDA(g2Points, from, to)
+		err = WriteG2PointsForEigenDA(g2Points, from, to)
+		if err != nil {
+			fmt.Println("main err", err)
+		}
 		fmt.Printf("Batch %v takes %v\n", i, time.Since(batchBegin))
 	}
 

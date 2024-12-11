@@ -58,7 +58,8 @@ func newMetadataProvider(
 	maxIOConcurrency int,
 	relayIDs []v2.RelayKey,
 	fetchTimeout time.Duration,
-	blobParamsMap *v2.BlobVersionParameterMap) (*metadataProvider, error) {
+	blobParamsMap *v2.BlobVersionParameterMap,
+	metrics *cache.CacheAccessorMetrics) (*metadataProvider, error) {
 
 	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
 	for _, id := range relayIDs {
@@ -74,15 +75,11 @@ func newMetadataProvider(
 	}
 	server.blobParamsMap.Store(blobParamsMap)
 
-	c := cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize),
-		func(key v2.BlobKey, value *blobMetadata) uint64 {
-			return uint64(1)
-		})
-
 	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
-		c,
+		cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil),
 		maxIOConcurrency,
-		server.fetchMetadata)
+		server.fetchMetadata,
+		metrics)
 	if err != nil {
 		return nil, fmt.Errorf("error creating metadata cache: %w", err)
 	}

@@ -39,12 +39,12 @@ func ReadDesiredBytes(reader *bufio.Reader, numBytesToRead uint64) ([]byte, erro
 }
 
 // Read the n-th G1 point from SRS.
-func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
-	if n >= g.SRSOrder {
-		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+func ReadG1Point(n uint64, srsOrder uint64, g1Path string) (bn254.G1Affine, error) {
+	if n >= srsOrder {
+		return bn254.G1Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, srsOrder)
 	}
 
-	g1point, err := ReadG1PointSection(g.G1Path, n, n+1, 1)
+	g1point, err := ReadG1PointSection(g1Path, n, n+1, 1)
 	if err != nil {
 		return bn254.G1Affine{}, fmt.Errorf("error read g1 point section %w", err)
 	}
@@ -53,12 +53,12 @@ func ReadG1Point(n uint64, g *KzgConfig) (bn254.G1Affine, error) {
 }
 
 // Read the n-th G2 point from SRS.
-func ReadG2Point(n uint64, g *KzgConfig) (bn254.G2Affine, error) {
-	if n >= g.SRSOrder {
-		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, g.SRSOrder)
+func ReadG2Point(n uint64, srsOrder uint64, g2Path string) (bn254.G2Affine, error) {
+	if n >= srsOrder {
+		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than SRSOrder %v", n, srsOrder)
 	}
 
-	g2point, err := ReadG2PointSection(g.G2Path, n, n+1, 1)
+	g2point, err := ReadG2PointSection(g2Path, n, n+1, 1)
 	if err != nil {
 		return bn254.G2Affine{}, fmt.Errorf("error read g2 point section %w", err)
 	}
@@ -66,7 +66,7 @@ func ReadG2Point(n uint64, g *KzgConfig) (bn254.G2Affine, error) {
 }
 
 // Read g2 points from power of 2 file
-func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error) {
+func ReadG2PointOnPowerOf2(exponent uint64, srsOrder uint64, g2PowerOf2Path string) (bn254.G2Affine, error) {
 
 	// the powerOf2 file, only [tau^exp] are stored.
 	// exponent    0,    1,       2,    , ..
@@ -79,18 +79,18 @@ func ReadG2PointOnPowerOf2(exponent uint64, g *KzgConfig) (bn254.G2Affine, error
 	// if a actual SRS order is 15, the file will contain four symbols (1,2,4,8) with indices [0,1,2,3]
 	// if a actual SRS order is 16, the file will contain five symbols (1,2,4,8,16) with indices [0,1,2,3,4]
 
-	actualPowerOfTau := g.SRSOrder - 1
+	actualPowerOfTau := srsOrder - 1
 	largestPowerofSRS := uint64(math.Log2(float64(actualPowerOfTau)))
 	if exponent > largestPowerofSRS {
 		return bn254.G2Affine{}, fmt.Errorf("requested power %v is larger than largest power of SRS %v",
 			uint64(math.Pow(2, float64(exponent))), largestPowerofSRS)
 	}
 
-	if len(g.G2PowerOf2Path) == 0 {
+	if len(g2PowerOf2Path) == 0 {
 		return bn254.G2Affine{}, errors.New("G2PathPowerOf2 path is empty")
 	}
 
-	g2point, err := ReadG2PointSection(g.G2PowerOf2Path, exponent, exponent+1, 1)
+	g2point, err := ReadG2PointSection(g2PowerOf2Path, exponent, exponent+1, 1)
 	if err != nil {
 		return bn254.G2Affine{}, fmt.Errorf("error read g2 point on power of 2 %w", err)
 	}
@@ -120,7 +120,6 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 	if err != nil {
 		return nil, err
 	}
-
 	// measure reading time
 	t := time.Now()
 	elapsed := t.Sub(startTimer)
@@ -159,6 +158,7 @@ func ReadG1Points(filepath string, n uint64, numWorker uint64) ([]bn254.G1Affine
 	t = time.Now()
 	elapsed = t.Sub(startTimer)
 	log.Println("    Parsing takes", elapsed)
+
 	return s1Outs, nil
 }
 
@@ -328,6 +328,7 @@ func ReadG2Points(filepath string, n uint64, numWorker uint64) ([]bn254.G2Affine
 	t = time.Now()
 	elapsed = t.Sub(startTimer)
 	log.Println("    Parsing takes", elapsed)
+
 	return s2Outs, nil
 }
 

@@ -3,10 +3,12 @@ package apiserver
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -14,14 +16,24 @@ import (
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+	start := time.Now()
+	defer func() {
+		s.metrics.reportDisperseBlobLatency(time.Since(start))
+	}()
+
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
 
-	if err := s.validateDispersalRequest(req, onchainState); err != nil {
+	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
 		return nil, err
 	}
+
+	finishedValidation := time.Now()
+	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
+
+	s.metrics.reportDisperseBlobSize(len(req.GetData()))
 
 	data := req.GetData()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
@@ -30,12 +42,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	// TODO(ian-shim): handle payments and check rate limits
-
 	blobKey, err := s.StoreBlob(ctx, data, blobHeader, time.Now(), onchainState.TTL)
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
 	return &pb.DisperseBlobReply{
 		Result:  dispv2.Queued.ToProfobuf(),
@@ -66,7 +78,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 	return blobKey, err
 }
 
-func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
+func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
 	data := req.GetData()
 	blobSize := len(data)
 	if blobSize == 0 {
@@ -117,6 +129,26 @@ func (s *DispersalServerV2) validateDispersalRequest(req *pb.DisperseBlobRequest
 
 	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
 		return api.NewErrorInvalidArg("invalid payment metadata")
+	}
+
+	// handle payments and check rate limits
+	if blobHeaderProto.GetPaymentHeader() != nil {
+		binIndex := blobHeaderProto.GetPaymentHeader().GetBinIndex()
+		cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
+		accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+
+		paymentHeader := core.PaymentMetadata{
+			AccountID:         accountID,
+			BinIndex:          binIndex,
+			CumulativePayment: cumulativePayment,
+		}
+
+		err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+		if err != nil {
+			return api.NewErrorResourceExhausted(err.Error())
+		}
+	} else {
+		return api.NewErrorInvalidArg("payment header is required")
 	}
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)

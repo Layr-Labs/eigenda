@@ -88,6 +88,7 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 
 	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
 
+	// TODO: create a dedicated reservation for traffic generator
 	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer)
 	if err != nil {
 		cancel()
@@ -178,7 +179,8 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
 
-	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, true)
+	config.RetrievalClientConfig.EncoderConfig.LoadG2Points = true
+	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to build statusTracker: %s", err))
 	}

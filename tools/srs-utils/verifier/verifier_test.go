@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/bxue-l2/srs-verification/verifier"
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/verifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -64,7 +64,7 @@ func TestCheckG1(t *testing.T) {
 func TestCheckG2(t *testing.T) {
 	numSRS := uint64(10)
 	g1SRS, g2SRS := GetGeneratorPoints(numSRS)
-	
+
 	numWorker := 1
 	results := make(chan error, numWorker)
 	go verifier.G2CheckWorker(g1SRS, g2SRS, &g1SRS[0], &g2SRS[0], 0, 10, results)

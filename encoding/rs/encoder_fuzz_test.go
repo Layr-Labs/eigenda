@@ -1,15 +1,11 @@
 package rs_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func FuzzOnlySystematic(f *testing.F) {
@@ -18,27 +14,14 @@ func FuzzOnlySystematic(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
 
 		params := encoding.ParamsFromSysPar(10, 3, uint64(len(input)))
-		enc, err := rs.NewEncoder(params, true)
+		cfg := encoding.DefaultConfig()
+		enc, err := rs.NewEncoder(cfg)
 		if err != nil {
 			t.Errorf("Error making rs: %q", err)
 		}
 
-		n := uint8(math.Log2(float64(enc.NumEvaluations())))
-		if enc.ChunkLength == 1 {
-			n = uint8(math.Log2(float64(2 * enc.NumChunks)))
-		}
-		fs := fft.NewFFTSettings(n)
-
-		RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-			Fs:             fs,
-			EncodingParams: params,
-		}
-
-		enc.Computer = RsComputeDevice
-		require.NotNil(t, enc)
-
 		//encode the data
-		frames, _, err := enc.EncodeBytes(input)
+		frames, _, err := enc.EncodeBytes(input, params)
 		if err != nil {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}
@@ -46,7 +29,7 @@ func FuzzOnlySystematic(f *testing.F) {
 		//sample the correct systematic frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
-		data, err := enc.Decode(samples, indices, uint64(len(input)))
+		data, err := enc.Decode(samples, indices, uint64(len(input)), params)
 		if err != nil {
 			t.Errorf("Error Decoding:\n Data:\n %q \n Err: %q", input, err)
 		}

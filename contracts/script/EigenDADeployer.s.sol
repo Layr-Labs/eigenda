@@ -16,16 +16,21 @@ import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.
 import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
-import {ISocketRegistry, SocketRegistry} from "eigenlayer-middleware/SocketRegistry.sol";
+import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
+import {EigenDABlobVerifier} from "../src/core/EigenDABlobVerifier.sol";
 import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
 import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "../src/payments/PaymentVault.sol";
-
+import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
+import {ISocketRegistry, SocketRegistry} from "eigenlayer-middleware/SocketRegistry.sol";
 import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import "../src/interfaces/IEigenDAStructs.sol";
 
 // # To load the variables in the .env file
 // source .env
@@ -38,18 +43,23 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
+    EigenDAThresholdRegistry public eigenDAThresholdRegistry;
+    EigenDABlobVerifier public eigenDABlobVerifier;
     RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
     ISocketRegistry public socketRegistry;
     OperatorStateRetriever public operatorStateRetriever;
     IPaymentVault public paymentVault;
+    EigenDARelayRegistry public eigenDARelayRegistry;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
     IRegistryCoordinator public registryCoordinatorImplementation;
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
+    EigenDAThresholdRegistry public eigenDAThresholdRegistryImplementation;
+    EigenDARelayRegistry public eigenDARelayRegistryImplementation;
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
 
@@ -104,9 +114,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         }
 
         emptyContract = new EmptyContract();
-
-        // hard-coded inputs
-
+        
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
@@ -114,6 +122,13 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
+        eigenDAThresholdRegistry = EigenDAThresholdRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+        eigenDARelayRegistry = EigenDARelayRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+
         registryCoordinator = RegistryCoordinator(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -239,8 +254,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             rewardsCoordinator,
             registryCoordinator,
             stakeRegistry,
-            IEigenDAThresholdRegistry(address(0)),
-            IEigenDARelayRegistry(address(0)),
+            eigenDAThresholdRegistry,
+            eigenDARelayRegistry,
             paymentVault
         );
 
@@ -261,6 +276,42 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             )
         );
 
+        eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
+
+        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
+        SecurityThresholds memory defaultSecurityThresholds = SecurityThresholds(33, 55);
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            address(eigenDAThresholdRegistryImplementation),
+            abi.encodeWithSelector(
+                EigenDAThresholdRegistry.initialize.selector,
+                addressConfig.eigenDACommunityMultisig,
+                hex"212121",
+                hex"373737",
+                hex"0001",
+                versionedBlobParams,
+                defaultSecurityThresholds
+            )
+        );
+
         operatorStateRetriever = new OperatorStateRetriever();
+
+        eigenDABlobVerifier = new EigenDABlobVerifier(
+            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+            IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            IEigenDARelayRegistry(address(eigenDARelayRegistry)),
+            OperatorStateRetriever(address(operatorStateRetriever)),
+            IRegistryCoordinator(address(registryCoordinator))
+        );
+
+        eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            address(eigenDARelayRegistryImplementation),
+            abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
+        );
     }
 }

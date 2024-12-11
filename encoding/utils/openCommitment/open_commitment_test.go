@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	kzgProver "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	oc "github.com/Layr-Labs/eigenda/encoding/utils/openCommitment"
@@ -38,6 +38,7 @@ func TestOpenCommitment(t *testing.T) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
 	// input evaluation
@@ -57,8 +58,8 @@ func TestOpenCommitment(t *testing.T) {
 	}
 
 	// we need prover only to access kzg SRS, and get kzg commitment of encoding
-	group, err := kzgProver.NewProver(kzgConfig, true)
-	require.Nil(t, err)
+	group, err := prover.NewProver(kzgConfig, nil)
+	require.NoError(t, err)
 
 	// get root of unit for blob
 	numNode = 4
@@ -69,10 +70,14 @@ func TestOpenCommitment(t *testing.T) {
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(validInput)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)
-	rootOfUnities := enc.Fs.ExpandedRootsOfUnity[:len(enc.Fs.ExpandedRootsOfUnity)-1]
+
+	rs, err := enc.GetRsEncoder(params)
+	require.NoError(t, err)
+
+	rootOfUnities := rs.Fs.ExpandedRootsOfUnity[:len(rs.Fs.ExpandedRootsOfUnity)-1]
 
 	// Lagrange basis SRS in normal order, not butterfly
-	lagrangeG1SRS, err := enc.Fs.FFTG1(group.Srs.G1[:len(paddedInputFr)], true)
+	lagrangeG1SRS, err := rs.Fs.FFTG1(group.Srs.G1[:len(paddedInputFr)], true)
 	require.Nil(t, err)
 
 	// commit in lagrange form

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -19,11 +18,11 @@ const numBins = uint32(3)
 
 func TestNewAccountant(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  100,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 100,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -34,9 +33,8 @@ func TestNewAccountant(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	assert.NotNil(t, accountant)
 	assert.Equal(t, reservation, accountant.reservation)
@@ -50,11 +48,11 @@ func TestNewAccountant(t *testing.T) {
 
 func TestAccountBlob_Reservation(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  200,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 200,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -65,48 +63,44 @@ func TestAccountBlob_Reservation(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	symbolLength := uint64(500)
 	quorums := []uint8{0, 1}
 
-	header, _, err := accountant.AccountBlob(ctx, symbolLength, quorums)
-	metadata := core.ConvertPaymentHeader(header)
+	header, err := accountant.AccountBlob(ctx, symbolLength, quorums)
 
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(time.Now().Unix()), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	symbolLength = uint64(700)
 
-	header, _, err = accountant.AccountBlob(ctx, symbolLength, quorums)
-	metadata = core.ConvertPaymentHeader(header)
+	header, err = accountant.AccountBlob(ctx, symbolLength, quorums)
 
 	assert.NoError(t, err)
 	assert.NotEqual(t, 0, header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1200, 0, 200}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Second call should use on-demand payment
-	header, _, err = accountant.AccountBlob(ctx, 300, quorums)
-	metadata = core.ConvertPaymentHeader(header)
+	header, err = accountant.AccountBlob(ctx, 300, quorums)
 
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, big.NewInt(300), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(300), header.CumulativePayment)
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  200,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 200,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
@@ -117,21 +111,19 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	numSymbols := uint64(1500)
 	quorums := []uint8{0, 1}
 
-	header, _, err := accountant.AccountBlob(ctx, numSymbols, quorums)
+	header, err := accountant.AccountBlob(ctx, numSymbols, quorums)
 	assert.NoError(t, err)
 
-	metadata := core.ConvertPaymentHeader(header)
 	expectedPayment := big.NewInt(int64(numSymbols * uint64(pricePerSymbol)))
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, expectedPayment, metadata.CumulativePayment)
+	assert.Equal(t, expectedPayment, header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{0, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 	assert.Equal(t, expectedPayment, accountant.cumulativePayment)
 }
@@ -147,25 +139,24 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	numSymbols := uint64(2000)
 	quorums := []uint8{0, 1}
 
-	_, _, err = accountant.AccountBlob(ctx, numSymbols, quorums)
+	_, err = accountant.AccountBlob(ctx, numSymbols, quorums)
 	assert.Contains(t, err.Error(), "neither reservation nor on-demand payment is available")
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  200,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 200,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -176,48 +167,44 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 	now := time.Now().Unix()
 
 	// First call: Use reservation
-	header, _, err := accountant.AccountBlob(ctx, 800, quorums)
-	metadata := core.ConvertPaymentHeader(header)
+	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
-	header, _, err = accountant.AccountBlob(ctx, 300, quorums)
-	metadata = core.ConvertPaymentHeader(header)
+	header, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
-	header, _, err = accountant.AccountBlob(ctx, 500, quorums)
-	metadata = core.ConvertPaymentHeader(header)
+	header, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	assert.Equal(t, big.NewInt(500), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Fourth call: Insufficient on-demand
-	_, _, err = accountant.AccountBlob(ctx, 600, quorums)
+	_, err = accountant.AccountBlob(ctx, 600, quorums)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "neither reservation nor on-demand payment is available")
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  1000,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 1000,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -225,17 +212,17 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	reservationWindow := uint32(1) // Set to 1 second for testing
 	pricePerSymbol := uint32(1)
 	minNumSymbols := uint32(100)
+
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// First call
-	_, _, err = accountant.AccountBlob(ctx, 800, quorums)
+	_, err = accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
@@ -243,23 +230,23 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Second call
-	_, _, err = accountant.AccountBlob(ctx, 300, quorums)
+	_, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 300, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Third call
-	_, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	_, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 800, 0}, mapRecordUsage(accountant.binRecords)), true)
 }
 
 func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  1000,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 1000,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -270,9 +257,8 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -285,7 +271,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 			defer wg.Done()
 			// for j := 0; j < 5; j++ {
 			// fmt.Println("request ", i)
-			_, _, err := accountant.AccountBlob(ctx, 100, quorums)
+			_, err := accountant.AccountBlob(ctx, 100, quorums)
 			assert.NoError(t, err)
 			time.Sleep(500 * time.Millisecond)
 			// }
@@ -302,11 +288,11 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  200,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 200,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -317,44 +303,41 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 	now := time.Now().Unix()
 
 	// Okay reservation
-	header, _, err := accountant.AccountBlob(ctx, 800, quorums)
+	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetBinIndex(uint64(now), reservationWindow), header.BinIndex)
-	metadata := core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Second call: Allow one overflow
-	header, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	header, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
-	metadata = core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(0), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)
 
 	// Third call: Should use on-demand payment
-	header, _, err = accountant.AccountBlob(ctx, 200, quorums)
+	header, err = accountant.AccountBlob(ctx, 200, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(0), header.BinIndex)
-	metadata = core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(200), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.binRecords)), true)
 }
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	reservation := &core.ActiveReservation{
-		SymbolsPerSec:  1000,
-		StartTimestamp: 100,
-		EndTimestamp:   200,
-		QuorumSplit:    []byte{50, 50},
-		QuorumNumbers:  []uint8{0, 1},
+		SymbolsPerSecond: 1000,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -365,30 +348,28 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	paymentSigner, err := auth.NewPaymentSigner(hex.EncodeToString(privateKey1.D.Bytes()))
-	assert.NoError(t, err)
-	accountant := NewAccountant(reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, paymentSigner, numBins)
+	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// full reservation
-	_, _, err = accountant.AccountBlob(ctx, 1000, quorums)
+	_, err = accountant.AccountBlob(ctx, 1000, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
 
 	// no overflow
-	header, _, err := accountant.AccountBlob(ctx, 500, quorums)
+	header, err := accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.binRecords)), true)
-	metadata := core.ConvertPaymentHeader(header)
-	assert.Equal(t, big.NewInt(500), metadata.CumulativePayment)
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Wait for next reservation duration
 	time.Sleep(time.Duration(reservationWindow) * time.Second)
 
 	// Third call: Should use new bin and allow overflow again
-	_, _, err = accountant.AccountBlob(ctx, 500, quorums)
+	_, err = accountant.AccountBlob(ctx, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 500, 0}, mapRecordUsage(accountant.binRecords)), true)
 }

@@ -103,6 +103,9 @@ type Reader interface {
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
 
+	// GetNumBlobVersions returns the number of blob versions.
+	GetNumBlobVersions(ctx context.Context) (uint16, error)
+
 	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
 	GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*BlobVersionParameters, error)
 
@@ -110,22 +113,25 @@ type Reader interface {
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*BlobVersionParameters, error)
 
 	// GetActiveReservations returns active reservations (end timestamp > current timestamp)
-	GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]ActiveReservation, error)
+	GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*ActiveReservation, error)
 
 	// GetActiveReservationByAccount returns active reservation by account ID
-	GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (ActiveReservation, error)
+	GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*ActiveReservation, error)
 
 	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]OnDemandPayment, error)
+	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
 
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
-	GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (OnDemandPayment, error)
+	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+
+	// GetNumRelays returns the number of registered relays.
+	GetNumRelays(ctx context.Context) (uint32, error)
 
 	// GetRelayURL returns the relay URL address for the given key.
-	GetRelayURL(ctx context.Context, key uint16) (string, error)
+	GetRelayURL(ctx context.Context, key uint32) (string, error)
 
 	// GetRelayURLs returns the relay URL addresses for all relays.
-	GetRelayURLs(ctx context.Context) (map[uint16]string, error)
+	GetRelayURLs(ctx context.Context) (map[uint32]string, error)
 }
 
 type Writer interface {

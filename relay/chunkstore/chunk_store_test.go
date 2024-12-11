@@ -2,7 +2,6 @@ package chunkstore
 
 import (
 	"context"
-	"math"
 	"math/rand"
 	"os"
 	"testing"
@@ -14,14 +13,13 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
-	rs_cpu "github.com/Layr-Labs/eigenda/encoding/rs/cpu"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -190,8 +188,8 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
-func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int) []*rs.Frame {
-	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)))
+func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int, params encoding.EncodingParams) []*rs.Frame {
+	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)), params)
 	result := make([]*rs.Frame, len(frames))
 	require.NoError(t, err)
 
@@ -208,22 +206,10 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)
-
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
-	encoder, _ := rs.NewEncoder(params, true)
-
-	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
-	if encoder.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
-	}
-
-	encoder.Computer = RsComputeDevice
+	cfg := encoding.DefaultConfig()
+	encoder, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -236,7 +222,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	for i := 0; i < 100; i++ {
 		key := corev2.BlobKey(tu.RandomBytes(32))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
 		expectedValues[key] = coefficients
 
 		metadata, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
@@ -282,20 +268,9 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 	fragmentSize := int(chunkSize / 2)
 
 	params := encoding.ParamsFromSysPar(3, 1, chunkSize)
-	encoder, _ := rs.NewEncoder(params, true)
-
-	n := uint8(math.Log2(float64(encoder.NumEvaluations())))
-	if encoder.ChunkLength == 1 {
-		n = uint8(math.Log2(float64(2 * encoder.NumChunks)))
-	}
-	fs := fft.NewFFTSettings(n)
-
-	RsComputeDevice := &rs_cpu.RsCpuComputeDevice{
-		Fs:             fs,
-		EncodingParams: params,
-	}
-
-	encoder.Computer = RsComputeDevice
+	cfg := encoding.DefaultConfig()
+	encoder, err := rs.NewEncoder(cfg)
+	assert.Nil(t, err)
 	require.NotNil(t, encoder)
 
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
@@ -308,7 +283,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, writer.ProofExists(ctx, key))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize))
+		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
 		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
 		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)

@@ -49,9 +49,9 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 		SRSOrder:        300000,
 		SRSNumberToLoad: numPoint,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    false,
 	}
-
-	p, err := prover.NewProver(kzgConfig, false)
+	p, err := prover.NewProver(kzgConfig, nil)
 
 	return p, err
 }
@@ -59,7 +59,7 @@ func makeTestProver(numPoint uint64) (encoding.Prover, error) {
 func TestEncodeBlob(t *testing.T) {
 	const (
 		testDataSize   = 16 * 1024
-		timeoutSeconds = 30
+		timeoutSeconds = 60
 		randSeed       = uint64(42)
 	)
 
@@ -176,6 +176,12 @@ func TestEncodeBlob(t *testing.T) {
 		// Create and execute encoding request again
 		resp, err := server.EncodeBlob(ctx, req)
 		assert.NoError(t, err)
+
+		if !assert.NotNil(t, resp, "Response should not be nil") {
+			t.FailNow() // Stop the test here to prevent nil pointer panic
+			return
+		}
+
 		assert.Equal(t, uint32(294916), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
 		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)

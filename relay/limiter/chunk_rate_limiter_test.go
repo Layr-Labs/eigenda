@@ -22,7 +22,7 @@ func TestConcurrentGetChunksOperations(t *testing.T) {
 
 	userID := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -56,7 +56,7 @@ func TestGetChunksRateLimit(t *testing.T) {
 
 	userID := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -120,7 +120,7 @@ func TestGetChunksBandwidthLimit(t *testing.T) {
 
 	userID := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -170,7 +170,7 @@ func TestPerClientConcurrencyLimit(t *testing.T) {
 	userID1 := tu.RandomString(64)
 	userID2 := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -218,7 +218,7 @@ func TestOpLimitPerClient(t *testing.T) {
 	userID1 := tu.RandomString(64)
 	userID2 := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()
@@ -276,7 +276,7 @@ func TestBandwidthLimitPerClient(t *testing.T) {
 	userID1 := tu.RandomString(64)
 	userID2 := tu.RandomString(64)
 
-	limiter := NewChunkRateLimiter(config)
+	limiter := NewChunkRateLimiter(config, nil)
 
 	// time starts at current time, but advances manually afterward
 	now := time.Now()

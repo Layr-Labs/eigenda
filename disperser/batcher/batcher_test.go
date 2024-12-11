@@ -58,9 +58,10 @@ func makeTestProver() (encoding.Prover, error) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	return prover.NewProver(config, true)
+	return prover.NewProver(config, nil)
 }
 
 func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {

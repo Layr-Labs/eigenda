@@ -37,7 +37,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{
-			HTTPPort:      ctx.GlobalInt(flags.MetricsHTTPPort.Name),
+			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
 	}, nil

@@ -82,9 +82,6 @@ jobs:
       - name: eigenda-client
         run: go test -v ./api/clients --testnet-integration
 
-      - name: Graph Indexer
-        run: make build && go test -v ./core/thegraph
-
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e
 
