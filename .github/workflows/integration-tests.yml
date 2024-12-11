@@ -8,8 +8,8 @@ on:
       - master
 
 jobs:
-  integration-tests:
-    name: Integration Tests
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Add LocalStack AWS Credentials
@@ -64,6 +64,19 @@ jobs:
         run: |
           cd contracts && forge build
 
+  client-test:
+    name: Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: eigenda-client
+        run: go test -v ./api/clients --testnet-integration
+
+  integration-tests:
+    name: Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
       # TODO: add back DA contracts if we will need them in tests.
       # - name: Compile contracts
       #   run: |
@@ -78,9 +91,6 @@ jobs:
 
       - name: Node Plugin
         run: go test -v ./node/plugin/tests
-
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
 
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e
