@@ -949,21 +949,29 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               
                 <tr>
-                  <td>bin_index</td>
+                  <td>reservation_period</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The reservation period of the dispersal request. </p></td>
                 </tr>
               
                 <tr>
                   <td>cumulative_payment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The cumulative payment of the dispersal request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. </p></td>
                 </tr>
               
             </tbody>
@@ -1713,7 +1721,7 @@ corresponding to the key used by the client to sign the BlobAuthHeader. </p></td
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p>Payment header contains AccountID, BinIndex, and CumulativePayment </p></td>
+                  <td><p>Payment header contains account_id, reservation_period, cumulative_payment, and salt </p></td>
                 </tr>
               
                 <tr>

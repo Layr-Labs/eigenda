@@ -19,7 +19,13 @@ message BlobCommitment {
 }
 
 message PaymentHeader {
+  // The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+  // corresponding to the key used by the client to sign the BlobHeader.
   string account_id = 1;
-  uint32 bin_index = 2;
+  // The reservation period of the dispersal request.
+  uint32 reservation_period = 2;
+  // The cumulative payment of the dispersal request. 
   bytes cumulative_payment = 3;
+  // The salt of the disperser request. This is used to ensure that the payment header is intentionally unique.
+  uint32 salt = 4;
 }

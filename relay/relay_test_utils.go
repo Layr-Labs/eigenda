@@ -3,6 +3,14 @@ package relay
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -27,13 +35,6 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
 )
 
 var (
@@ -211,7 +212,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         tu.RandomString(10),
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}

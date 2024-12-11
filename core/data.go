@@ -490,11 +490,13 @@ type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID string `json:"account_id"`
 
-	// BinIndex represents the range of time at which the dispersal is made
-	BinIndex uint32 `json:"bin_index"`
+	// ReservationPeriod represents the range of time at which the dispersal is made
+	ReservationPeriod uint32 `json:"reservation_period"`
 	// TODO: we are thinking the contract can use uint128 for cumulative payment,
 	// but the definition on v2 uses uint64. Double check with team.
 	CumulativePayment *big.Int `json:"cumulative_payment"`
+	// Allow same blob to be dispersed multiple times within the same reservation period
+	Salt uint32 `json:"salt"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -505,12 +507,16 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "binIndex",
+			Name: "reservationPeriod",
 			Type: "uint32",
 		},
 		{
 			Name: "cumulativePayment",
 			Type: "uint256",
+		},
+		{
+			Name: "salt",
+			Type: "uint32",
 		},
 	})
 	if err != nil {
@@ -539,11 +545,12 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
-			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
-			"BinIndex":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.BinIndex)},
+			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.ReservationPeriod)},
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
+			"Salt": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Salt)},
 		},
 	}, nil
 }
@@ -554,38 +561,26 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
 	}
 	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
-	binIndex, err := strconv.ParseUint(m.Value["BinIndex"].(*types.AttributeValueMemberN).Value, 10, 32)
+	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
 	if err != nil {
-		return fmt.Errorf("failed to parse BinIndex: %w", err)
+		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
-	pm.BinIndex = uint32(binIndex)
+	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
+	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 32)
+	if err != nil {
+		return fmt.Errorf("failed to parse Salt: %w", err)
+	}
+	pm.Salt = uint32(salt)
 	return nil
 }
 
 func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
 	return &commonpb.PaymentHeader{
 		AccountId:         pm.AccountID,
-		BinIndex:          pm.BinIndex,
+		ReservationPeriod: pm.ReservationPeriod,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
-	}
-}
-
-// ConvertPaymentHeader converts a protobuf payment header to a PaymentMetadata
-func ConvertPaymentHeader(header *commonpb.PaymentHeader) *PaymentMetadata {
-	return &PaymentMetadata{
-		AccountID:         header.AccountId,
-		BinIndex:          header.BinIndex,
-		CumulativePayment: new(big.Int).SetBytes(header.CumulativePayment),
-	}
-}
-
-// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader {
-	return &commonpb.PaymentHeader{
-		AccountId:         pm.AccountID,
-		BinIndex:          pm.BinIndex,
-		CumulativePayment: pm.CumulativePayment.Bytes(),
+		Salt:              pm.Salt,
 	}
 }
 
@@ -593,8 +588,9 @@ func (pm *PaymentMetadata) ConvertToProtoPaymentHeader() *commonpb.PaymentHeader
 func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 	return &PaymentMetadata{
 		AccountID:         ph.AccountId,
-		BinIndex:          ph.BinIndex,
+		ReservationPeriod: ph.ReservationPeriod,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+		Salt:              ph.Salt,
 	}
 }
 

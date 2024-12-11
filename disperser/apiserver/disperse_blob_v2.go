@@ -127,19 +127,19 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
 		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
 	// handle payments and check rate limits
 	if blobHeaderProto.GetPaymentHeader() != nil {
-		binIndex := blobHeaderProto.GetPaymentHeader().GetBinIndex()
+		reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
 		cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 		accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 
 		paymentHeader := core.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          binIndex,
+			ReservationPeriod: reservationPeriod,
 			CumulativePayment: cumulativePayment,
 		}
 

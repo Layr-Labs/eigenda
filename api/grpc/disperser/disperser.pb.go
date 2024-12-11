@@ -458,7 +458,7 @@ type DispersePaidBlobRequest struct {
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	// The quorums to which the blob to be sent
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// Payment header contains AccountID, BinIndex, and CumulativePayment
+	// Payment header contains account_id, reservation_period, cumulative_payment, and salt
 	PaymentHeader *common.PaymentHeader `protobuf:"bytes,3,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`
 	// signature of payment_header
 	PaymentSignature []byte `protobuf:"bytes,4,opt,name=payment_signature,json=paymentSignature,proto3" json:"payment_signature,omitempty"`
