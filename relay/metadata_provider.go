@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"time"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"time"
 )
 
 // Metadata about a blob. The relay only needs a small subset of a blob's metadata.

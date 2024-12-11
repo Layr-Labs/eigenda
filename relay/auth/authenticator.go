@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/emirpasic/gods/queues"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"sync"
-	"time"
 )
 
 // RequestAuthenticator authenticates requests to the relay service. This object is thread safe.
@@ -104,6 +106,11 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	origin string,
 	request *pb.GetChunksRequest,
 	now time.Time) error {
+
+	if strings.HasPrefix(origin, "127.0.0.1") {
+		// TODO(ian-shim): Remove this block once we have a way to authenticate requests.
+		return nil
+	}
 
 	if a.isAuthenticationStillValid(now, origin) {
 		// We've recently authenticated this client. Do not authenticate again for a while.

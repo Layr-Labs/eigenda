@@ -39,10 +39,11 @@ func (env *Config) loadPrivateKeys() error {
 			names = append(names, fmt.Sprintf("%v%v", prefix, i))
 		}
 	}
-	addNames("dis", env.Services.Counts.NumDis)
+	addNames("dis", 2)
 	addNames("opr", env.Services.Counts.NumOpr)
 	addNames("staker", env.Services.Counts.NumOpr)
 	addNames("retriever", 1)
+	addNames("relay", env.Services.Counts.NumRelays)
 
 	log.Println("service names:", names)
 
@@ -110,7 +111,7 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 
 	for key, value := range env.Services.Variables["globals"] {
 		field := v.FieldByName(prefix + key)
-		if field.IsValid() && field.CanSet() {
+		if field.IsValid() && field.CanSet() && field.String() == "" {
 			field.SetString(value)
 		}
 	}
@@ -157,7 +158,7 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 }
 
 // Generates disperser .env
-func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath, grpcPort string) DisperserVars {
+func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
 	v := DisperserVars{
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata",
@@ -192,6 +193,43 @@ func (env *Config) generateDisperserVars(ind int, key, address, logPath, dbPath,
 
 	return v
 
+}
+
+func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
+	v := DisperserVars{
+		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
+		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata-v2",
+		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
+		DISPERSER_SERVER_RATE_BUCKET_STORE_SIZE: "100000",
+		DISPERSER_SERVER_GRPC_PORT:              grpcPort,
+		DISPERSER_SERVER_ENABLE_METRICS:         "true",
+		DISPERSER_SERVER_METRICS_HTTP_PORT:      "9093",
+		DISPERSER_SERVER_CHAIN_RPC:              "",
+		DISPERSER_SERVER_PRIVATE_KEY:            "123",
+		DISPERSER_SERVER_NUM_CONFIRMATIONS:      "0",
+
+		DISPERSER_SERVER_REGISTERED_QUORUM_ID:      "0,1",
+		DISPERSER_SERVER_TOTAL_UNAUTH_BYTE_RATE:    "10000000,10000000",
+		DISPERSER_SERVER_PER_USER_UNAUTH_BYTE_RATE: "32000,32000",
+		DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE:    "10,10",
+		DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE: "2,2",
+		DISPERSER_SERVER_ENABLE_RATELIMITER:        "true",
+
+		DISPERSER_SERVER_RETRIEVAL_BLOB_RATE: "4",
+		DISPERSER_SERVER_RETRIEVAL_BYTE_RATE: "10000000",
+
+		DISPERSER_SERVER_BUCKET_SIZES:       "5s",
+		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
+		DISPERSER_SERVER_COUNT_FAILED:       "true",
+
+		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
+		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
+		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
+	}
+
+	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
+
+	return v
 }
 
 // Generates batcher .env
@@ -252,6 +290,79 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	return v
 }
 
+func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
+	v := EncoderVars{
+		DISPERSER_ENCODER_AWS_REGION:              "",
+		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
+		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
+		DISPERSER_ENCODER_AWS_ENDPOINT_URL:        "",
+		DISPERSER_ENCODER_GRPC_PORT:               grpcPort,
+		DISPERSER_ENCODER_ENABLE_METRICS:          "true",
+		DISPERSER_ENCODER_G1_PATH:                 "",
+		DISPERSER_ENCODER_G2_PATH:                 "",
+		DISPERSER_ENCODER_SRS_ORDER:               "",
+		DISPERSER_ENCODER_SRS_LOAD:                "",
+		DISPERSER_ENCODER_CACHE_PATH:              "",
+		DISPERSER_ENCODER_VERBOSE:                 "",
+		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
+		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS: "16",
+		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
+		DISPERSER_ENCODER_ENCODER_VERSION:         "2",
+		DISPERSER_ENCODER_S3_BUCKET_NAME:          "test-eigenda-blobstore",
+	}
+
+	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
+
+	return v
+}
+
+func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
+	v := ControllerVars{
+		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
+		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
+		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
+		CONTROLLER_USE_GRAPH:                   "true",
+		CONTROLLER_GRAPH_URL:                   graphUrl,
+		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
+		CONTROLLER_AVAILABLE_RELAYS:            "0,1,2,3",
+		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "3s",
+		CONTROLLER_NODE_REQUEST_TIMEOUT:        "5s",
+		CONTROLLER_NUM_CONNECTIONS_TO_NODES:    "10",
+		CONTROLLER_CHAIN_RPC:                   "",
+		CONTROLLER_PRIVATE_KEY:                 "123",
+		CONTROLLER_NUM_CONFIRMATIONS:           "0",
+		CONTROLLER_INDEXER_PULL_INTERVAL:       "1s",
+		CONTROLLER_AWS_REGION:                  "",
+		CONTROLLER_AWS_ACCESS_KEY_ID:           "",
+		CONTROLLER_AWS_SECRET_ACCESS_KEY:       "",
+		CONTROLLER_AWS_ENDPOINT_URL:            "",
+		CONTROLLER_ENCODER_ADDRESS:             "0.0.0.0:34001",
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:    "0",
+	}
+	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
+
+	return v
+}
+
+func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVars {
+	v := RelayVars{
+		RELAY_GRPC_PORT:                             grpcPort,
+		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
+		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
+		RELAY_RELAY_IDS:                             fmt.Sprint(ind),
+		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetreiver,
+		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
+		RELAY_PRIVATE_KEY:                           "123",
+		RELAY_GRAPH_URL:                             graphUrl,
+		RELAY_ONCHAIN_STATE_REFRESH_INTERVAL:        "1s",
+		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
+		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
+	}
+	env.applyDefaults(&v, "RELAY", "relay", ind)
+
+	return v
+}
+
 // Generates DA node .env
 func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, metricsPort, nodeApiPort string) OperatorVars {
 
@@ -282,7 +393,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_METRICS_PORT:                metricsPort,
 		NODE_ENABLE_NODE_API:             "true",
 		NODE_API_PORT:                    nodeApiPort,
-		NODE_TIMEOUT:                     "10",
+		NODE_TIMEOUT:                     "10s",
 		NODE_QUORUM_ID_LIST:              "0,1",
 		NODE_DB_PATH:                     dbPath,
 		NODE_ENABLE_TEST_MODE:            "false", // using encrypted key in inabox
@@ -312,6 +423,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
 		NODE_NUM_CONFIRMATIONS:           "0",
 		NODE_ONCHAIN_METRICS_INTERVAL:    "-1",
+		NODE_ENABLE_V2:                   "true",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
@@ -342,6 +454,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
+		RETRIEVER_GRAPH_URL:           graphUrl,
 
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 	}
@@ -483,23 +596,34 @@ func (env *Config) GenerateAllVariables() {
 	churnerUrl := fmt.Sprintf("%s:%s", churnerConfig.CHURNER_HOSTNAME, churnerConfig.CHURNER_GRPC_PORT)
 
 	// Generate disperser nodes
-	for i := 0; i < env.Services.Counts.NumDis; i++ {
-		grpcPort := fmt.Sprint(port + 1)
-		port += 2
 
-		name := fmt.Sprintf("dis%v", i)
-		logPath, dbPath, filename, envFile := env.getPaths(name)
-		key, address := env.getKey(name)
+	grpcPort := fmt.Sprint(port + 1)
+	port += 2
 
-		// Convert key to address
-		disperserConfig := env.generateDisperserVars(i, key, address, logPath, dbPath, grpcPort)
-		writeEnv(disperserConfig.getEnvMap(), envFile)
-		env.Dispersers = append(env.Dispersers, disperserConfig)
+	name = "dis0"
+	logPath, dbPath, filename, envFile := env.getPaths(name)
+	disperserConfig := env.generateDisperserVars(0, logPath, dbPath, grpcPort)
+	writeEnv(disperserConfig.getEnvMap(), envFile)
+	env.Dispersers = append(env.Dispersers, disperserConfig)
+	env.genService(
+		compose, name, disImage,
+		filename, []string{grpcPort})
 
-		env.genService(
-			compose, name, disImage,
-			filename, []string{grpcPort})
-	}
+	// v2 disperser
+	grpcPort = fmt.Sprint(port + 1)
+	port += 2
+
+	name = "dis1"
+	logPath, dbPath, filename, envFile = env.getPaths(name)
+
+	// Convert key to address
+	disperserConfig = env.generateDisperserV2Vars(0, logPath, dbPath, grpcPort)
+	writeEnv(disperserConfig.getEnvMap(), envFile)
+	env.Dispersers = append(env.Dispersers, disperserConfig)
+
+	env.genService(
+		compose, name, disImage,
+		filename, []string{grpcPort})
 
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 		metricsPort := fmt.Sprint(port + 1) // port
@@ -545,6 +669,16 @@ func (env *Config) GenerateAllVariables() {
 		compose, name, encoderImage,
 		filename, []string{"34000"})
 
+	// v2 encoder
+	name = "enc1"
+	_, _, filename, envFile = env.getPaths(name)
+	encoderConfig = env.generateEncoderV2Vars(0, "34001")
+	writeEnv(encoderConfig.getEnvMap(), envFile)
+	env.Encoder = append(env.Encoder, encoderConfig)
+	env.genService(
+		compose, name, encoderImage,
+		filename, []string{"34001"})
+
 	// Stakers
 	for i := 0; i < env.Services.Counts.NumOpr; i++ {
 
@@ -559,18 +693,33 @@ func (env *Config) GenerateAllVariables() {
 		env.Stakers = append(env.Stakers, participant)
 	}
 
-	port += 2
+	// Relays
+	for i := 0; i < env.Services.Counts.NumRelays; i++ {
+		name := fmt.Sprintf("relay%v", i)
+		grpcPort := fmt.Sprint(port + 1)
+		port += 2
+		_, _, filename, envFile := env.getPaths(name)
+		relayConfig := env.generateRelayVars(i, graphUrl, grpcPort)
+		writeEnv(relayConfig.getEnvMap(), envFile)
+		env.Relays = append(env.Relays, relayConfig)
+		env.genService(
+			compose, name, relayImage,
+			filename, []string{grpcPort})
+	}
+
 	name = "retriever0"
 	key, _ = env.getKey(name)
-	logPath, _, filename, envFile = env.getPaths(name)
-	retrieverConfig := env.generateRetrieverVars(0, key, graphUrl, logPath, fmt.Sprint(port))
+	logPath, _, _, envFile = env.getPaths(name)
+	retrieverConfig := env.generateRetrieverVars(0, key, graphUrl, logPath, fmt.Sprint(port+1))
 	writeEnv(retrieverConfig.getEnvMap(), envFile)
 	env.Retriever = retrieverConfig
 
-	_ = filename
-	// env.genService(
-	// 	compose, name, retrieverImage,
-	// 	filename, []string{fmt.Sprint(port)})
+	// Controller
+	name = "controller0"
+	_, _, _, envFile = env.getPaths(name)
+	controllerConfig := env.generateControllerVars(0, graphUrl)
+	writeEnv(controllerConfig.getEnvMap(), envFile)
+	env.Controller = controllerConfig
 
 	if env.Environment.IsLocal() {
 

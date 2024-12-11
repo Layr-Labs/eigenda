@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"math/rand"
 	"sync/atomic"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -164,6 +165,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 	submissionStart := time.Now()
 
+	e.logger.Debug("request encoding", "numBlobs", len(blobMetadatas))
 	for _, blob := range blobMetadatas {
 		blob := blob
 		blobKey, err := blob.BlobHeader.BlobKey()
