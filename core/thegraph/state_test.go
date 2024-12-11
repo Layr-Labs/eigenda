@@ -80,7 +80,9 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 		}
 	}
 
-	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	assert.NoError(t, err)
+
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
@@ -148,7 +150,9 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 		}
 	}
 
-	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	assert.NoError(t, err)
+
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
@@ -229,7 +233,9 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 		}
 	}
 
-	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	assert.NoError(t, err)
+
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
@@ -283,7 +289,9 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 		}
 	}
 
-	cs := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	assert.NoError(t, err)
+
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
