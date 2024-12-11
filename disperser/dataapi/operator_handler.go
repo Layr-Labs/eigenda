@@ -112,11 +112,11 @@ func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId str
 func (s *operatorHandler) scanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
 	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch current block number: %s", err)
+		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
 	}
 	operators, err := s.indexedChainState.GetIndexedOperators(context.Background(), currentBlock)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch indexed operator info: %s", err)
+		return nil, fmt.Errorf("failed to fetch indexed operator info: %w", err)
 	}
 
 	// check operator socket registration against the indexed state
@@ -134,7 +134,7 @@ func (s *operatorHandler) scanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
 	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
 
 	nodeInfoWorkers := 20
