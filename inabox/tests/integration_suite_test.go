@@ -128,7 +128,6 @@ var _ = BeforeSuite(func() {
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
-		// set up thresholds and relay addresses
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
@@ -149,20 +148,25 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		NumConfirmations: numConfirmations,
 		NumRetries:       numRetries,
 	}
-	client, err := geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)
-	if err != nil {
-		return err
+	var err error
+	if ethClient == nil {
+		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)
+		if err != nil {
+			return err
+		}
 	}
-	rpcClient, err := ethrpc.Dial(testConfig.Deployers[0].RPC)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+	if rpcClient == nil {
+		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		if err != nil {
+			log.Fatalln("could not start tcp listener", err)
+		}
 	}
-	tx, err := eth.NewWriter(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
 
-	cs := eth.NewChainState(tx, client)
+	cs := eth.NewChainState(tx, ethClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
@@ -190,7 +194,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		&indexer.Config{
 			PullInterval: 100 * time.Millisecond,
 		},
-		client,
+		ethClient,
 		rpcClient,
 		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER,
 		logger,

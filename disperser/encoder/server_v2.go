@@ -146,7 +146,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 	if len(data) == 0 {
 		return nil, status.Error(codes.NotFound, "blob length is zero")
 	}
-	s.logger.Info("fetched blob", "duration", time.Since(fetchStart))
+	s.logger.Info("fetched blob", "duration", time.Since(fetchStart).String())
 
 	// Encode the data
 	encodingStart := time.Now()
@@ -155,7 +155,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
 	}
-	s.logger.Info("encoding frames", "duration", time.Since(encodingStart))
+	s.logger.Info("encoding frames", "duration", time.Since(encodingStart).String())
 
 	// Process and store results
 	return s.processAndStoreResults(ctx, blobKey, frames)
@@ -221,7 +221,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
-	s.logger.Info("stored proofs", "duration", time.Since(storeStart))
+	s.logger.Info("stored proofs", "duration", time.Since(storeStart).String())
 
 	// Store coefficients
 	coeffStart := time.Now()
@@ -229,7 +229,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
-	s.logger.Info("stored coefficients", "duration", time.Since(coeffStart))
+	s.logger.Info("stored coefficients", "duration", time.Since(coeffStart).String())
 
 	return &pb.EncodeBlobReply{
 		FragmentInfo: &pb.FragmentInfo{

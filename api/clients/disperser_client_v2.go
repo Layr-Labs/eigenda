@@ -180,7 +180,7 @@ func (c *disperserClientV2) DisperseBlob(
 		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
 	}
 	payment.AccountID = accountId
-	payment.BinIndex = 0
+	payment.ReservationPeriod = 0
 	payment.CumulativePayment = big.NewInt(0)
 	blobHeader := &corev2.BlobHeader{
 		BlobVersion:     blobVersion,

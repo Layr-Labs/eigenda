@@ -135,23 +135,19 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	// }
 
 	// handle payments and check rate limits
-	// if blobHeaderProto.GetPaymentHeader() != nil {
-	// 	reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
-	// 	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-	// 	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+	// reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
+	// cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
+	// accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 
-	// 	paymentHeader := core.PaymentMetadata{
-	// 		AccountID:         accountID,
-	// 		ReservationPeriod:          reservationPeriod,
-	// 		CumulativePayment: cumulativePayment,
-	// 	}
+	// paymentHeader := core.PaymentMetadata{
+	// 	AccountID:         accountID,
+	// 	ReservationPeriod:          reservationPeriod,
+	// 	CumulativePayment: cumulativePayment,
+	// }
 
-	// 	err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
-	// 	if err != nil {
-	// 		return api.NewErrorResourceExhausted(err.Error())
-	// 	}
-	// } else {
-	// 	return api.NewErrorInvalidArg("payment header is required")
+	// err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	// if err != nil {
+	// 	return api.NewErrorResourceExhausted(err.Error())
 	// }
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)

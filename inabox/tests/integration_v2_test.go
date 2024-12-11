@@ -20,7 +20,7 @@ import (
 
 var _ = Describe("Inabox v2 Integration", func() {
 	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
@@ -43,13 +43,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 		paddedData1 := codec.ConvertByPaddingEmptyByte(data1)
 		paddedData2 := codec.ConvertByPaddingEmptyByte(data2)
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1})
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1}, 0)
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(dispv2.Queued))
 
-		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0})
+		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0}, 0)
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))

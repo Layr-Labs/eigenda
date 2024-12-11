@@ -200,7 +200,7 @@ function start_detached {
 
     for i in "${!files[@]}"; do
         if [ $i -eq $last_index ]; then
-            sleep 5  # Sleep for 5 seconds before the last loop iteration
+            sleep 10  # Sleep for 10 seconds before the last loop iteration
         fi
         FILE=${files[$i]}
         set -a
