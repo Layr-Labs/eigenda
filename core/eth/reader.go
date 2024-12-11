@@ -10,9 +10,10 @@ import (
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
+	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
-	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDARelayRegistry"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
@@ -41,8 +42,9 @@ type ContractBindings struct {
 	EjectionManager       *ejectionmg.ContractEjectionManager
 	AVSDirectory          *avsdir.ContractAVSDirectory
 	SocketRegistry        *socketreg.ContractSocketRegistry
-	RelayRegistry         *relayreg.ContractIEigenDARelayRegistry
 	PaymentVault          *paymentvault.ContractPaymentVault
+	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
+	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
 }
 
 type Reader struct {
@@ -184,15 +186,27 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
-	var contractRelayRegistry *relayreg.ContractIEigenDARelayRegistry
+	var contractRelayRegistry *relayreg.ContractEigenDARelayRegistry
 	relayRegistryAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
 		// TODO(ian-shim): return err when the contract is deployed
 	} else {
-		contractRelayRegistry, err = relayreg.NewContractIEigenDARelayRegistry(relayRegistryAddr, t.ethClient)
+		contractRelayRegistry, err = relayreg.NewContractEigenDARelayRegistry(relayRegistryAddr, t.ethClient)
 		if err != nil {
 			t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
+		}
+	}
+
+	var contractThresholdRegistry *thresholdreg.ContractEigenDAThresholdRegistry
+	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch EigenDAThresholdRegistry contract", "err", err)
+		// TODO(ian-shim): return err when the contract is deployed
+	} else {
+		contractThresholdRegistry, err = thresholdreg.NewContractEigenDAThresholdRegistry(thresholdRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch EigenDAThresholdRegistry contract", "err", err)
 		}
 	}
 
@@ -211,6 +225,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		DelegationManager:     contractDelegationManager,
 		RelayRegistry:         contractRelayRegistry,
 		// PaymentVault:          contractPaymentVault,
+		ThresholdRegistry: contractThresholdRegistry,
 	}
 	return nil
 }
@@ -622,6 +637,16 @@ func (t *Reader) GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint3
 	return requiredQuorums, nil
 }
 
+func (t *Reader) GetNumBlobVersions(ctx context.Context) (uint16, error) {
+	if t.bindings.ThresholdRegistry == nil {
+		return 0, errors.New("threshold registry not deployed")
+	}
+
+	return t.bindings.ThresholdRegistry.NextBlobVersion(&bind.CallOpts{
+		Context: ctx,
+	})
+}
+
 func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
 	params, err := t.bindings.EigenDAServiceManager.GetBlobParams(&bind.CallOpts{
 		Context: ctx,
@@ -637,17 +662,25 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) 
 }
 
 func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+	if t.bindings.ThresholdRegistry == nil {
+		return nil, errors.New("threshold registry not deployed")
+	}
+
+	numBlobVersions, err := t.GetNumBlobVersions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	res := make(map[uint8]*core.BlobVersionParameters)
-	version := uint8(0)
-	for {
+	for version := uint8(0); version < uint8(numBlobVersions); version++ {
 		params, err := t.GetVersionedBlobParams(ctx, version)
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
 			break
 		} else if err != nil {
 			return nil, err
 		}
+
 		res[version] = params
-		version++
 	}
 
 	if len(res) == 0 {
@@ -821,12 +854,22 @@ func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.Operator
 	return socket, nil
 }
 
+func (t *Reader) GetNumRelays(ctx context.Context) (uint32, error) {
+	if t.bindings.RelayRegistry == nil {
+		return 0, errors.New("relay registry not deployed")
+	}
+
+	return t.bindings.RelayRegistry.NextRelayKey(&bind.CallOpts{
+		Context: ctx,
+	})
+}
+
 func (t *Reader) GetRelayURL(ctx context.Context, key uint32) (string, error) {
 	if t.bindings.RelayRegistry == nil {
 		return "", errors.New("relay registry not deployed")
 	}
 
-	return t.bindings.RelayRegistry.GetRelayURL(&bind.CallOpts{
+	return t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
 		Context: ctx,
 	}, uint32(key))
 }
@@ -836,10 +879,14 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 		return nil, errors.New("relay registry not deployed")
 	}
 
+	numRelays, err := t.GetNumRelays(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	res := make(map[uint32]string)
-	relayKey := uint32(0)
-	for {
-		url, err := t.bindings.RelayRegistry.GetRelayURL(&bind.CallOpts{
+	for relayKey := uint32(0); relayKey < uint32(numRelays); relayKey++ {
+		url, err := t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
 			Context: ctx,
 		}, uint32(relayKey))
 
@@ -850,7 +897,6 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 		}
 
 		res[relayKey] = url
-		relayKey++
 	}
 
 	if len(res) == 0 {

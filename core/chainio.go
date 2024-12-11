@@ -103,6 +103,9 @@ type Reader interface {
 	// GetRequiredQuorumNumbers returns set of required quorum numbers
 	GetRequiredQuorumNumbers(ctx context.Context, blockNumber uint32) ([]QuorumID, error)
 
+	// GetNumBlobVersions returns the number of blob versions.
+	GetNumBlobVersions(ctx context.Context) (uint16, error)
+
 	// GetVersionedBlobParams returns the blob version parameters for the given block number and blob version.
 	GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*BlobVersionParameters, error)
 
@@ -120,6 +123,9 @@ type Reader interface {
 
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+
+	// GetNumRelays returns the number of registered relays.
+	GetNumRelays(ctx context.Context) (uint32, error)
 
 	// GetRelayURL returns the relay URL address for the given key.
 	GetRelayURL(ctx context.Context, key uint32) (string, error)
