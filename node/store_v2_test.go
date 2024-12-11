@@ -42,7 +42,7 @@ func TestStoreBatchV2(t *testing.T) {
 	defer func() {
 		_ = db.Shutdown()
 	}()
-	keys, err := s.StoreBatch(batch, rawBundles)
+	keys, _, err := s.StoreBatch(batch, rawBundles)
 	require.NoError(t, err)
 	require.Len(t, keys, 10)
 
@@ -93,7 +93,7 @@ func TestStoreBatchV2(t *testing.T) {
 	}
 
 	// Try to store the same batch again
-	_, err = s.StoreBatch(batch, rawBundles)
+	_, _, err = s.StoreBatch(batch, rawBundles)
 	require.ErrorIs(t, err, node.ErrBatchAlreadyExist)
 
 	// Check deletion
@@ -152,7 +152,7 @@ func TestGetChunks(t *testing.T) {
 	defer func() {
 		_ = db.Shutdown()
 	}()
-	_, err := s.StoreBatch(batch, rawBundles)
+	_, _, err := s.StoreBatch(batch, rawBundles)
 	require.NoError(t, err)
 
 	chunks, err := s.GetChunks(blobKeys[0], 0)
