@@ -29,7 +29,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		disp, err := clients.NewDisperserClientV2(&clients.DisperserClientV2Config{
 			Hostname: "localhost",
 			Port:     "32005",
-		}, signer, nil)
+		}, signer, nil, nil)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 

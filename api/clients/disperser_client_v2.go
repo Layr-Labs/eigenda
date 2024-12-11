@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -124,15 +125,17 @@ func (c *disperserClientV2) DisperseBlob(
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
-	if c.accountant == nil {
-		return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
-	}
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
-	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
+	// TODO(hopeyen): uncomment this after the accountant is implemented
+	// if c.accountant == nil {
+	// 	return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
+	// }
+
+	// symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	// payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
+	// if err != nil {
+	// 	return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+	// }
 
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
@@ -171,17 +174,26 @@ func (c *disperserClientV2) DisperseBlob(
 		}
 	}
 
+	var payment core.PaymentMetadata
+	accountId, err := c.signer.GetAccountID()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
+	}
+	payment.AccountID = accountId
+	payment.BinIndex = 0
+	payment.CumulativePayment = big.NewInt(0)
 	blobHeader := &corev2.BlobHeader{
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: *payment,
+		PaymentMetadata: payment,
 	}
-	sig, err := c.signer.SignBlobRequest(blobHeader)
-	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
-	}
-	blobHeader.Signature = sig
+	// TODO(hopeyen): uncomment this and replace the payment metadata for authentication
+	// sig, err := c.signer.SignBlobRequest(blobHeader)
+	// if err != nil {
+	// 	return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
+	// }
+	// blobHeader.Signature = sig
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)

@@ -501,6 +501,9 @@ type PaymentMetadata struct {
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
 func (pm *PaymentMetadata) Hash() ([32]byte, error) {
+	if pm == nil {
+		return [32]byte{}, errors.New("payment metadata is nil")
+	}
 	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
 			Name: "accountID",
@@ -543,6 +546,10 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 }
 
 func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	if pm == nil {
+		return nil, errors.New("payment metadata is nil")
+	}
+
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
 			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
@@ -576,6 +583,9 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 }
 
 func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+	if pm == nil {
+		return nil
+	}
 	return &commonpb.PaymentHeader{
 		AccountId:         pm.AccountID,
 		ReservationPeriod: pm.ReservationPeriod,

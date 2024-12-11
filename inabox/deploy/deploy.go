@@ -161,7 +161,7 @@ func (env *Config) DeployExperiment() {
 	fmt.Println("Test environment has successfully deployed!")
 }
 
-func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint16]string {
+func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint32]string {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
@@ -202,10 +202,13 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 	if err != nil {
 		log.Panicf("Error: %s", err)
 	}
-	relays := map[uint16]string{}
+	relays := map[uint32]string{}
 	for i, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
-		txn, err := contractRelayRegistry.AddRelayURL(opts, gcommon.Address{0}, url)
+		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
+			RelayAddress: gcommon.Address{0},
+			RelayURL:     url,
+		})
 		if err != nil {
 			log.Panicf("Error: %s", err)
 		}
@@ -213,7 +216,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 		if err != nil {
 			log.Panicf("Error: %s", err)
 		}
-		relays[uint16(i)] = url
+		relays[uint32(i)] = url
 	}
 
 	return relays

@@ -454,6 +454,7 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
+		RETRIEVER_GRAPH_URL:           graphUrl,
 
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 	}
