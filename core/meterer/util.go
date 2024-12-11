@@ -19,7 +19,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
-				AttributeName: aws.String("BinIndex"),
+				AttributeName: aws.String("ReservationPeriod"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 		},
@@ -29,7 +29,7 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 				KeyType:       types.KeyTypeHash,
 			},
 			{
-				AttributeName: aws.String("BinIndex"),
+				AttributeName: aws.String("ReservationPeriod"),
 				KeyType:       types.KeyTypeRange,
 			},
 		},
@@ -47,22 +47,22 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
-				AttributeName: aws.String("BinIndex"),
+				AttributeName: aws.String("ReservationPeriod"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
-				AttributeName: aws.String("BinIndex"),
+				AttributeName: aws.String("ReservationPeriod"),
 				KeyType:       types.KeyTypeHash,
 			},
 		},
 		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
 			{
-				IndexName: aws.String("BinIndexIndex"),
+				IndexName: aws.String("ReservationPeriodIndex"),
 				KeySchema: []types.KeySchemaElement{
 					{
-						AttributeName: aws.String("BinIndex"),
+						AttributeName: aws.String("ReservationPeriod"),
 						KeyType:       types.KeyTypeHash,
 					},
 				},

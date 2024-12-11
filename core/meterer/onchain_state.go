@@ -20,7 +20,7 @@ type OnchainPayment interface {
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetGlobalSymbolsPerSecond() uint64
-	GetGlobalRateBinInterval() uint64
+	GetGlobalRateBinInterval() uint32
 	GetMinNumSymbols() uint32
 	GetPricePerSymbol() uint32
 	GetReservationWindow() uint32
@@ -42,7 +42,7 @@ type OnchainPaymentState struct {
 
 type PaymentVaultParams struct {
 	GlobalSymbolsPerSecond uint64
-	GlobalRateBinInterval  uint64
+	GlobalRateBinInterval  uint32
 	MinNumSymbols          uint32
 	PricePerSymbol         uint32
 	ReservationWindow      uint32
@@ -211,7 +211,7 @@ func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
 }
 
-func (pcs *OnchainPaymentState) GetGlobalRateBinInterval() uint64 {
+func (pcs *OnchainPaymentState) GetGlobalRateBinInterval() uint32 {
 	return pcs.PaymentVaultParams.Load().GlobalRateBinInterval
 }
 

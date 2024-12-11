@@ -23,8 +23,9 @@ func TestBlobKey(t *testing.T) {
 func TestPaymentHash(t *testing.T) {
 	pm := core.PaymentMetadata{
 		AccountID:         "0x123",
-		BinIndex:          5,
+		ReservationPeriod: 5,
 		CumulativePayment: big.NewInt(100),
+		Salt:              0,
 	}
 	hash, err := pm.Hash()
 	assert.NoError(t, err)
@@ -45,7 +46,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
@@ -99,7 +100,7 @@ func TestBlobCertHash(t *testing.T) {
 			QuorumNumbers:   []core.QuorumID{0, 1},
 			PaymentMetadata: core.PaymentMetadata{
 				AccountID:         "0x123",
-				BinIndex:          5,
+				ReservationPeriod: 5,
 				CumulativePayment: big.NewInt(100),
 			},
 			Signature: []byte{1, 2, 3},
@@ -127,7 +128,7 @@ func TestBlobCertSerialization(t *testing.T) {
 			QuorumNumbers:   []core.QuorumID{0, 1},
 			PaymentMetadata: core.PaymentMetadata{
 				AccountID:         "0x123",
-				BinIndex:          5,
+				ReservationPeriod: 5,
 				CumulativePayment: big.NewInt(100),
 			},
 			Signature: []byte{1, 2, 3},

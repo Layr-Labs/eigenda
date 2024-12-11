@@ -236,8 +236,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
-	currentBinIndex := meterer.GetBinIndex(now, reservationWindow)
-	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentBinIndex)
+	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
+	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}
@@ -266,7 +266,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	for i, v := range reservation.QuorumNumbers {
 		quorumNumbers[i] = uint32(v)
 	}
-
 	quorumSplits := make([]uint32, len(reservation.QuorumSplits))
 	for i, v := range reservation.QuorumSplits {
 		quorumSplits[i] = uint32(v)
@@ -279,8 +278,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   uint32(reservation.StartTimestamp),
 			EndTimestamp:     uint32(reservation.EndTimestamp),
-			QuorumNumbers:    quorumNumbers,
 			QuorumSplits:     quorumSplits,
+			QuorumNumbers:    quorumNumbers,
 		},
 		CumulativePayment:        largestCumulativePayment.Bytes(),
 		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
