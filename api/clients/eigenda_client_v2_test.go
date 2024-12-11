@@ -265,8 +265,8 @@ func TestGetCodec(t *testing.T) {
 // TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
 func TestBuilder(t *testing.T) {
 	clientConfig := &clients.EigenDAClientConfigV2{
-		PutBlobEncodingVersion:       codecs.DefaultBlobEncoding,
-		DisablePointVerificationMode: false,
+		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
+		PointVerificationMode: clients.IFFT,
 	}
 
 	relayClientConfig := &clients.RelayClientConfig{

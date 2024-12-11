@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -11,6 +12,8 @@ import (
 )
 
 // EigenDAClientV2 provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
+//
+// This struct is not threadsafe.
 type EigenDAClientV2 struct {
 	log logging.Logger
 	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
@@ -69,17 +72,11 @@ func (c *EigenDAClientV2) GetBlob(
 	relayKeyCount := len(blobCertificate.RelayKeys)
 
 	if relayKeyCount == 0 {
-		return nil, fmt.Errorf("relay key count is zero")
+		return nil, errors.New("relay key count is zero")
 	}
 
-	var indices []int
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
-	for i := 0; i < relayKeyCount; i++ {
-		indices = append(indices, i)
-	}
-	c.random.Shuffle(len(indices), func(i int, j int) {
-		indices[i], indices[j] = indices[j], indices[i]
-	})
+	indices := c.random.Perm(relayKeyCount)
 
 	// TODO (litt3): consider creating a utility which can deprioritize relays that fail to respond (or respond maliciously)
 
@@ -98,21 +95,21 @@ func (c *EigenDAClientV2) GetBlob(
 
 		// An honest relay should never send an empty blob
 		if len(data) == 0 {
-			c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey, "error", err)
+			c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey)
 			continue
 		}
 
 		// An honest relay should never send a blob which cannot be decoded
 		decodedData, err := c.codec.DecodeBlob(data)
 		if err != nil {
-			c.log.Warn("error decoding blob", "blobKey", blobKey, "relayKey", relayKey, "error", err)
+			c.log.Warn("error decoding blob from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
 		return decodedData, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve blob from any relay")
+	return nil, fmt.Errorf("unable to retrieve blob from any relay. relay count: %d", relayKeyCount)
 }
 
 // GetCodec returns the codec the client uses for encoding and decoding blobs
@@ -135,14 +132,17 @@ func (c *EigenDAClientV2) Close() error {
 
 // createCodec creates the codec based on client config values
 func createCodec(config *EigenDAClientConfigV2) (codecs.BlobCodec, error) {
-	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
+	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.BlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create low level codec: %w", err)
 	}
 
-	if config.DisablePointVerificationMode {
+	switch config.PointVerificationMode {
+	case NoIFFT:
 		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
-	} else {
+	case IFFT:
 		return codecs.NewIFFTCodec(lowLevelCodec), nil
+	default:
+		return nil, fmt.Errorf("unsupported point verification mode: %d", config.PointVerificationMode)
 	}
 }
