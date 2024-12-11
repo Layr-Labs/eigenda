@@ -86,10 +86,7 @@ func run(ctx *cli.Context) error {
 	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 	indexer := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
-	metrics, err := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
-	if err != nil {
-		log.Fatalf("failed to create metrics: %v", err)
-	}
+	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 
 	cn, err := churner.NewChurner(config, indexer, tx, logger, metrics)
 	if err != nil {
