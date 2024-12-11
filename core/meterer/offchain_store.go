@@ -182,12 +182,13 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
 	}
-	var prevPayment *big.Int
+	prevPayment := big.NewInt(0)
 	if len(smallerResult) > 0 {
-		_, success := prevPayment.SetString(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		setPrevPayment, success := prevPayment.SetString(smallerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
 		if !success {
 			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
+		prevPayment = setPrevPayment
 	}
 
 	// Fetch the smallest entry larger than the given cumulativePayment
@@ -205,13 +206,14 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
 	}
-	var nextPayment *big.Int
-	var nextDataLength uint32
+	nextPayment := big.NewInt(0)
+	nextDataLength := uint32(0)
 	if len(largerResult) > 0 {
-		_, success := nextPayment.SetString(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
+		setNextPayment, success := nextPayment.SetString(largerResult[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
 		if !success {
 			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
 		}
+		nextPayment = setNextPayment
 		dataLength, err := strconv.ParseUint(largerResult[0]["DataLength"].(*types.AttributeValueMemberN).Value, 10, 32)
 		if err != nil {
 			return nil, nil, 0, fmt.Errorf("failed to parse blob size: %w", err)
