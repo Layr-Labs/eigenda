@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"math/big"
 	"net"
 	"testing"
@@ -430,7 +431,6 @@ func newTestServerV2(t *testing.T) *testComponents {
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, v2MetadataTableName)
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chainReader := &mock.MockWriter{}
-	rateConfig := apiserver.RateConfig{}
 
 	// append test name to each table name for an unique store
 	mockState := &mock.MockOnchainPaymentState{}
@@ -491,10 +491,21 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
-	s := apiserver.NewDispersalServerV2(disperser.ServerConfig{
-		GrpcPort:    "51002",
-		GrpcTimeout: 1 * time.Second,
-	}, rateConfig, blobStore, blobMetadataStore, chainReader, nil, meterer, auth.NewAuthenticator(), prover, 10, time.Hour, logger)
+	s := apiserver.NewDispersalServerV2(
+		disperser.ServerConfig{
+			GrpcPort:    "51002",
+			GrpcTimeout: 1 * time.Second,
+		},
+		blobStore,
+		blobMetadataStore,
+		chainReader,
+		meterer,
+		auth.NewAuthenticator(),
+		prover,
+		10,
+		time.Hour,
+		logger,
+		prometheus.NewRegistry())
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
