@@ -256,7 +256,7 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 //	@Summary	Operator stake distribution query
 //	@Tags		OperatorsStake
 //	@Produce	json
-//	@Param		operator_id	query		string	true	"Operator ID in hex string"
+//	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorsStakeResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -312,7 +312,7 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 //	@Summary	Operator node reachability check
 //	@Tags		OperatorsReachability
 //	@Produce	json
-//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorPortCheckResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"

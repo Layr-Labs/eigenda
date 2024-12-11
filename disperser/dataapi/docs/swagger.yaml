@@ -918,10 +918,9 @@ paths:
   /operators/reachability:
     get:
       parameters:
-      - description: Operator ID
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
         in: query
         name: operator_id
-        required: true
         type: string
       produces:
       - application/json
@@ -948,10 +947,9 @@ paths:
   /operators/stake:
     get:
       parameters:
-      - description: Operator ID in hex string
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
         in: query
         name: operator_id
-        required: true
         type: string
       produces:
       - application/json

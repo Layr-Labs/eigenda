@@ -874,10 +874,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Operator ID",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
                         "name": "operator_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -920,10 +919,9 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Operator ID in hex string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
                         "name": "operator_id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
