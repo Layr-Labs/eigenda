@@ -57,6 +57,11 @@ struct SecurityThresholds {
     uint8 adversaryThreshold;
 }
 
+struct RelayInfo {
+    address relayAddress;
+    string relayURL;
+}
+
 struct BlobVerificationProofV2 {
     BlobCertificate blobCertificate;
     uint32 blobIndex;
@@ -65,7 +70,6 @@ struct BlobVerificationProofV2 {
 
 struct BlobCertificate {
     BlobHeaderV2 blobHeader;
-    uint32 referenceBlockNumber;
     uint32[] relayKeys;
 }
 

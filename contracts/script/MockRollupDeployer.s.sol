@@ -3,7 +3,7 @@
 pragma solidity ^0.8.9;
 
 import "forge-std/Script.sol";
-import "../src/rollup/MockRollup.sol";
+import "../test/rollup/MockRollup.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
 
 contract MockRollupDeployer is Script {
