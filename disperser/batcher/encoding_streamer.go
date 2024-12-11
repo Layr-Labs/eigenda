@@ -19,8 +19,6 @@ import (
 
 const encodingInterval = 2 * time.Second
 
-const operatorStateCacheSize = 32
-
 var errNoEncodedResults = errors.New("no encoded results")
 
 type EncodedSizeNotifier struct {
