@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"math"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -443,7 +444,7 @@ func (d *Dispatcher) GetOperatorState(ctx context.Context, metadatas []*v2.BlobM
 	return d.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
 }
 
-func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClientV2, batch *corev2.Batch) (*core.Signature, error) {
+func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClient, batch *corev2.Batch) (*core.Signature, error) {
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.NodeRequestTimeout)
 	defer cancel()
 
