@@ -836,6 +836,123 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/operators/nodeinfo": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsNodeInfo"
+                ],
+                "summary": "Active operator semver",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.SemverReportResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/reachability": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsReachability"
+                ],
+                "summary": "Operator node reachability check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID",
+                        "name": "operator_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/stake": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OperatorsStake"
+                ],
+                "summary": "Operator stake distribution query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string",
+                        "name": "operator_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.OperatorsStakeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -849,10 +966,6 @@ const docTemplate = `{
                     "description": "AccountID is the ETH account address for the payer",
                     "type": "string"
                 },
-                "bin_index": {
-                    "description": "BinIndex represents the range of time at which the dispersal is made",
-                    "type": "integer"
-                },
                 "cumulative_payment": {
                     "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
                     "allOf": [
@@ -860,6 +973,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/big.Int"
                         }
                     ]
+                },
+                "reservation_period": {
+                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                    "type": "integer"
+                },
+                "salt": {
+                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
+                    "type": "integer"
                 }
             }
         },

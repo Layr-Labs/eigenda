@@ -6,16 +6,20 @@ definitions:
       account_id:
         description: AccountID is the ETH account address for the payer
         type: string
-      bin_index:
-        description: BinIndex represents the range of time at which the dispersal
-          is made
-        type: integer
       cumulative_payment:
         allOf:
         - $ref: '#/definitions/big.Int'
         description: |-
           TODO: we are thinking the contract can use uint128 for cumulative payment,
           but the definition on v2 uses uint64. Double check with team.
+      reservation_period:
+        description: ReservationPeriod represents the range of time at which the dispersal
+          is made
+        type: integer
+      salt:
+        description: Allow same blob to be dispersed multiple times within the same
+          reservation period
+        type: integer
     type: object
   core.SecurityParam:
     properties:
@@ -895,6 +899,82 @@ paths:
       summary: Active operator semver scan
       tags:
       - OperatorsInfo
+  /operators/nodeinfo:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.SemverReportResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Active operator semver
+      tags:
+      - OperatorsNodeInfo
+  /operators/reachability:
+    get:
+      parameters:
+      - description: Operator ID
+        in: query
+        name: operator_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Operator node reachability check
+      tags:
+      - OperatorsReachability
+  /operators/stake:
+    get:
+      parameters:
+      - description: Operator ID in hex string
+        in: query
+        name: operator_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.OperatorsStakeResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Operator stake distribution query
+      tags:
+      - OperatorsStake
 schemes:
 - https
 - http

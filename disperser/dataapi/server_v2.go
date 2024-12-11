@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -15,6 +16,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	swaggerfiles "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
 )
@@ -57,6 +59,8 @@ type ServerV2 struct {
 	indexedChainState core.IndexedChainState
 	promClient        PrometheusClient
 	metrics           *Metrics
+
+	operatorHandler *operatorHandler
 }
 
 func NewServerV2(
@@ -70,8 +74,9 @@ func NewServerV2(
 	logger logging.Logger,
 	metrics *Metrics,
 ) *ServerV2 {
+	l := logger.With("component", "DataAPIServerV2")
 	return &ServerV2{
-		logger:            logger.With("component", "DataAPIServerV2"),
+		logger:            l,
 		serverMode:        config.ServerMode,
 		socketAddr:        config.SocketAddr,
 		allowOrigins:      config.AllowOrigins,
@@ -82,6 +87,7 @@ func NewServerV2(
 		chainState:        chainState,
 		indexedChainState: indexedChainState,
 		metrics:           metrics,
+		operatorHandler:   newOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
 	}
 }
 
@@ -245,16 +251,96 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, batchResponse)
 }
 
+// FetchOperatorsStake godoc
+//
+//	@Summary	Operator stake distribution query
+//	@Tags		OperatorsStake
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID in hex string"
+//	@Success	200			{object}	OperatorsStakeResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/stake [get]
 func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
-	errorResponse(c, errors.New("FetchOperatorsStake unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorsStake", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
+
+	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to get operator stake - %s", err))
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsStake")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
+	c.JSON(http.StatusOK, operatorsStakeResponse)
 }
 
+// FetchOperatorsNodeInfo godoc
+//
+//	@Summary	Active operator semver
+//	@Tags		OperatorsNodeInfo
+//	@Produce	json
+//	@Success	200	{object}	SemverReportResponse
+//	@Failure	500	{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/nodeinfo [get]
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
-	errorResponse(c, errors.New("FetchOperatorsNodeInfo unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorsNodeInfo", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
+	if err != nil {
+		s.logger.Error("failed to scan operators host info", "error", err)
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsNodeInfo")
+		errorResponse(c, err)
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, report)
 }
 
+// CheckOperatorsReachability godoc
+//
+//	@Summary	Operator node reachability check
+//	@Tags		OperatorsReachability
+//	@Produce	json
+//	@Param		operator_id	query		string	true	"Operator ID"
+//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/reachability [get]
 func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
-	errorResponse(c, errors.New("CheckOperatorsReachability unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	operatorId := c.DefaultQuery("operator_id", "")
+	s.logger.Info("checking operator ports", "operatorId", operatorId)
+	portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			err = errNotFound
+			s.logger.Warn("operator not found", "operatorId", operatorId)
+			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+		} else {
+			s.logger.Error("operator port check failed", "error", err)
+			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+		}
+		errorResponse(c, err)
+		return
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+	c.JSON(http.StatusOK, portCheckResponse)
 }
 
 func (s *ServerV2) FetchNonSingers(c *gin.Context) {
