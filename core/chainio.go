@@ -126,6 +126,9 @@ type Reader interface {
 
 	// GetRelayURLs returns the relay URL addresses for all relays.
 	GetRelayURLs(ctx context.Context) (map[uint32]string, error)
+
+	// GetDisperserAddress returns the disperser address with the given ID.
+	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
 }
 
 type Writer interface {

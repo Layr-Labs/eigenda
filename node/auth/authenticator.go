@@ -8,6 +8,7 @@ import (
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	dauth "github.com/Layr-Labs/eigenda/disperser/auth"
+	"github.com/ethereum/go-ethereum/crypto"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"time"
 )
@@ -34,7 +35,8 @@ type keyWithTimeout struct {
 var _ RequestAuthenticator = &requestAuthenticator{}
 
 type requestAuthenticator struct {
-	ics core.IndexedChainState
+	// chainReader is used to read the chain state.
+	chainReader core.Reader
 
 	// keyCache is used to cache the public keys of dispersers.
 	keyCache *lru.Cache[uint32, *keyWithTimeout]
@@ -55,7 +57,7 @@ type requestAuthenticator struct {
 // NewRequestAuthenticator creates a new RequestAuthenticator.
 func NewRequestAuthenticator(
 	ctx context.Context,
-	ics core.IndexedChainState,
+	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
 	authenticationTimeoutDuration time.Duration,
@@ -72,7 +74,7 @@ func NewRequestAuthenticator(
 	}
 
 	authenticator := &requestAuthenticator{
-		ics:                           ics,
+		chainReader:                   chainReader,
 		keyCache:                      keyCache,
 		keyTimeoutDuration:            keyTimeoutDuration,
 		authenticatedDispersers:       authenticatedDispersers,
@@ -89,13 +91,9 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// TODO (cody-littley): this will need to be updated for decentralized dispersers
-	key, err := a.getDisperserKey(ctx, now, 0)
+	_, err := a.getDisperserKey(ctx, now, 0)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
-	}
-
-	if key == nil {
-		return errors.New("key is nil")
 	}
 
 	return nil
@@ -141,25 +139,22 @@ func (a *requestAuthenticator) getDisperserKey(
 		}
 	}
 
-	// TODO add logic for fetching key
+	address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get disperser address: %w", err)
+	}
 
-	//blockNumber, err := a.ics.GetCurrentBlockNumber()
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to get current block number: %w", err)
-	//}
-	//operators, err := a.ics.GetIndexedOperators(ctx, blockNumber)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to get operators: %w", err)
-	//}
-	//
-	//operator, ok := operators[operatorID]
-	//if !ok {
-	//	return nil, errors.New("operator not found")
-	//}
-	//key = operator.PubkeyG2
-	//
-	//a.keyCache.Add(operatorID, key)
-	return nil, nil
+	ecdsaKey, err := crypto.UnmarshalPubkey(address.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal public key: %w", err)
+	}
+
+	a.keyCache.Add(disperserID, &keyWithTimeout{
+		key:        ecdsaKey,
+		expiration: now.Add(a.keyTimeoutDuration),
+	})
+
+	return ecdsaKey, nil
 }
 
 // saveAuthenticationResult saves the result of an auth.

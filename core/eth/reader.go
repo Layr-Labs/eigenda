@@ -748,3 +748,10 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 
 	return res, nil
 }
+
+func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
+	// TODO(cody-littley/arch): this is just a place holder until we register dispersers on chain
+	bytes := make([]byte, gethcommon.AddressLength)
+	address := gethcommon.BytesToAddress(bytes)
+	return address, nil
+}
