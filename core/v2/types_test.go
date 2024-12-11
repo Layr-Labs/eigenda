@@ -23,7 +23,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
@@ -34,7 +34,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x456",
-			BinIndex:          6,
+			ReservationPeriod: 6,
 			CumulativePayment: big.NewInt(200),
 		},
 		Signature: []byte{1, 2, 3},
@@ -79,7 +79,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
@@ -107,7 +107,7 @@ func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{1, 2, 3},
