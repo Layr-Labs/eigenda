@@ -733,7 +733,7 @@ func (s *server) OperatorsStake(c *gin.Context) {
 	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("OperatorsStake")
-		errorResponse(c, fmt.Errorf("failed to get operator stake - %s", err))
+		errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
 		return
 	}
 
