@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.1
 
 require (
-	github.com/Layr-Labs/eigensdk-go v0.1.13
+	github.com/Layr-Labs/eigensdk-go v0.1.14-0.20241211213446-c5ffb53d14b0
 	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20241211213446-c5ffb53d14b0
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.11
