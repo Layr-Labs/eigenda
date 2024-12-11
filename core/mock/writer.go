@@ -265,12 +265,18 @@ func (t *MockWriter) GetNumRelays(ctx context.Context) (uint32, error) {
 
 func (t *MockWriter) GetRelayURL(ctx context.Context, key uint32) (string, error) {
 	args := t.Called()
+	if args.Get(0) == nil {
+		return "", args.Error(1)
+	}
 	result := args.Get(0)
 	return result.(string), args.Error(1)
 }
 
 func (t *MockWriter) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 	args := t.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	result := args.Get(0)
 	if result == nil {
 		return nil, args.Error(1)
