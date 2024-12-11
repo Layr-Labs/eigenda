@@ -248,7 +248,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | start_timestamp | [uint32](#uint32) |  |  |
 | end_timestamp | [uint32](#uint32) |  |  |
 | quorum_numbers | [uint32](#uint32) | repeated |  |
-| quorum_split | [uint32](#uint32) | repeated |  |
+| quorum_splits | [uint32](#uint32) | repeated |  |
 
 
 
@@ -285,7 +285,6 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
-- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -293,8 +292,7 @@ Terminal states are states that will not be updated to a different state:
 | QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing |
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
-| FAILED | 4 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state) |
-| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
+| FAILED | 4 | FAILED means that the blob has failed permanently |
 
 
  

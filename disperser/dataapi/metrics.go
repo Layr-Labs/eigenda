@@ -127,6 +127,14 @@ func (g *Metrics) IncrementFailedRequestNum(method string) {
 	}).Inc()
 }
 
+// IncrementInvalidArgdRequestNum increments the number of failed requests with invalid args
+func (g *Metrics) IncrementInvalidArgRequestNum(method string) {
+	g.NumRequests.With(prometheus.Labels{
+		"status": "invalid_args",
+		"method": method,
+	}).Inc()
+}
+
 // IncrementNotFoundRequestNum increments the number of not found requests
 func (g *Metrics) IncrementNotFoundRequestNum(method string) {
 	g.NumRequests.With(prometheus.Labels{

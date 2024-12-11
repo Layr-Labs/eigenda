@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -71,21 +72,22 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
+	accountID := gethcommon.HexToAddress(header.AccountID)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, header.AccountID)
+		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, &reservation, numSymbols, quorumNumbers); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, reservation, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
-		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, numSymbols, quorumNumbers); err != nil {
+		if err := m.ServeOnDemandRequest(ctx, header, onDemandPayment, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}
@@ -268,6 +270,7 @@ func (m *Meterer) ValidateGlobalBinIndex(header core.PaymentMetadata) (uint32, e
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
+	//TODO: edit globalIndex based on bin interval in a subsequent PR
 	globalIndex := uint64(time.Now().Unix())
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, symbolsCharged)
 	if err != nil {
@@ -281,5 +284,5 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
-	return reservation.SymbolsPerSec * uint64(m.ChainPaymentState.GetReservationWindow())
+	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }

@@ -15,6 +15,7 @@ import (
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDARelayRegistry"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
@@ -41,6 +42,7 @@ type ContractBindings struct {
 	AVSDirectory          *avsdir.ContractAVSDirectory
 	SocketRegistry        *socketreg.ContractSocketRegistry
 	RelayRegistry         *relayreg.ContractIEigenDARelayRegistry
+	PaymentVault          *paymentvault.ContractPaymentVault
 }
 
 type Reader struct {
@@ -208,6 +210,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,
 		RelayRegistry:         contractRelayRegistry,
+		// PaymentVault:          contractPaymentVault,
 	}
 	return nil
 }
@@ -654,44 +657,152 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 	return res, nil
 }
 
-func (t *Reader) GetActiveReservations(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.ActiveReservation, error) {
-	// contract is not implemented yet
-	return map[string]core.ActiveReservation{}, nil
+func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	reservationsMap := make(map[gethcommon.Address]*core.ActiveReservation)
+	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
+		Context: ctx,
+	}, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// since reservations are returned in the same order as the accountIDs, we can directly map them
+	for i, reservation := range reservations {
+		res, err := ConvertToActiveReservation(reservation)
+		if err != nil {
+			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
+			continue
+		}
+
+		reservationsMap[accountIDs[i]] = res
+	}
+
+	return reservationsMap, nil
 }
 
-func (t *Reader) GetActiveReservationByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.ActiveReservation, error) {
-	// contract is not implemented yet
-	return core.ActiveReservation{}, nil
+func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
+		Context: ctx,
+	}, accountID)
+	if err != nil {
+		return nil, err
+	}
+	return ConvertToActiveReservation(reservation)
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, blockNumber uint32, accountIDs []string) (map[string]core.OnDemandPayment, error) {
-	// contract is not implemented yet
-	return map[string]core.OnDemandPayment{}, nil
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
+	payments, err := t.bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
+		Context: ctx,
+	}, accountIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// since payments are returned in the same order as the accountIDs, we can directly map them
+	for i, payment := range payments {
+		if payment.Cmp(big.NewInt(0)) == 0 {
+			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i])
+			continue
+		}
+		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
+			CumulativePayment: payment,
+		}
+	}
+
+	return paymentsMap, nil
 }
 
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, blockNumber uint32, accountID string) (core.OnDemandPayment, error) {
-	// contract is not implemented yet
-	return core.OnDemandPayment{}, nil
+func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandAmount(&bind.CallOpts{
+		Context: ctx,
+	}, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if onDemandPayment.Cmp(big.NewInt(0)) == 0 {
+		return nil, errors.New("ondemand payment does not exist for given account")
+	}
+	return &core.OnDemandPayment{
+		CumulativePayment: onDemandPayment,
+	}, nil
 }
 
 func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) {
-	// contract is not implemented yet
-	return 0, nil
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return globalSymbolsPerSecond.Uint64(), nil
+}
+
+func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
+	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return globalRateBinInterval.Uint64(), nil
 }
 
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
+	minNumSymbols, err := t.bindings.PaymentVault.MinNumSymbols(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(minNumSymbols.Uint64()), nil
 }
 
 func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
+	pricePerSymbol, err := t.bindings.PaymentVault.PricePerSymbol(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(pricePerSymbol.Uint64()), nil
 }
 
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
-	// contract is not implemented yet
-	return 0, nil
+	if t.bindings.PaymentVault == nil {
+		return 0, errors.New("payment vault not deployed")
+	}
+	reservationWindow, err := t.bindings.PaymentVault.ReservationBinInterval(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return uint32(reservationWindow.Uint64()), nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {

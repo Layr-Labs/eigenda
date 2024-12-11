@@ -16,6 +16,11 @@ import (
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+	start := time.Now()
+	defer func() {
+		s.metrics.reportDisperseBlobLatency(time.Since(start))
+	}()
+
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
@@ -24,6 +29,11 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
 		return nil, err
 	}
+
+	finishedValidation := time.Now()
+	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
+
+	s.metrics.reportDisperseBlobSize(len(req.GetData()))
 
 	data := req.GetData()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
@@ -36,6 +46,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
 	return &pb.DisperseBlobReply{
 		Result:  dispv2.Queued.ToProfobuf(),

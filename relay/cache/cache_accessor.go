@@ -108,7 +108,7 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 		c.cacheLock.Unlock()
 
 		if c.metrics != nil {
-			c.metrics.cacheHits.Increment()
+			c.metrics.ReportCacheHit()
 		}
 		return v, nil
 	}
@@ -123,7 +123,7 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 	c.cacheLock.Unlock()
 
 	if c.metrics != nil {
-		c.metrics.cacheMisses.Increment()
+		c.metrics.ReportCacheMiss()
 	}
 
 	if alreadyLoading {
@@ -170,7 +170,7 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 		if c.metrics != nil {
 			start := time.Now()
 			defer func() {
-				c.metrics.cacheMissLatency.ReportLatency(time.Since(start))
+				c.metrics.ReportCacheMissLatency(time.Since(start))
 			}()
 		}
 
@@ -183,13 +183,13 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 			if c.metrics != nil {
 				size := c.cache.Size()
 				weight := c.cache.Weight()
-				c.metrics.size.Set(float64(size))
-				c.metrics.weight.Set(float64(weight))
+				c.metrics.ReportSize(size)
+				c.metrics.ReportWeight(weight)
 				var averageWeight float64
 				if size > 0 {
 					averageWeight = float64(weight) / float64(size)
 				}
-				c.metrics.averageWeight.Set(averageWeight)
+				c.metrics.ReportAverageWeight(averageWeight)
 			}
 		}
 
