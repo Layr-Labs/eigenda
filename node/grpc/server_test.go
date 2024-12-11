@@ -78,13 +78,14 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 
 func makeConfig(t *testing.T) *node.Config {
 	return &node.Config{
-		Timeout:                   10 * time.Second,
-		ExpirationPollIntervalSec: 1,
-		QuorumIDList:              []core.QuorumID{0},
-		DbPath:                    t.TempDir(),
-		ID:                        opID,
-		NumBatchValidators:        runtime.GOMAXPROCS(0),
-		EnableV2:                  false,
+		Timeout:                        10 * time.Second,
+		ExpirationPollIntervalSec:      1,
+		QuorumIDList:                   []core.QuorumID{0},
+		DbPath:                         t.TempDir(),
+		ID:                             opID,
+		NumBatchValidators:             runtime.GOMAXPROCS(0),
+		EnableV2:                       false,
+		DisableDispersalAuthentication: true, // TODO re-enable
 	}
 }
 

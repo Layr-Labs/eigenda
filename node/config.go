@@ -3,7 +3,6 @@ package node
 import (
 	"errors"
 	"fmt"
-
 	"os"
 	"strconv"
 	"strings"
@@ -95,6 +94,20 @@ type Config struct {
 
 	PprofHttpPort string
 	EnablePprof   bool
+
+	// TODO update flags
+
+	// if true then the node will not authenticate StoreChunks requests from dispersers (v2 only)
+	DisableDispersalAuthentication bool
+	// the size of the cache for storing public keys of dispersers
+	DispersalAuthenticationKeyCacheSize int
+	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
+	DisperserKeyTimeout time.Duration
+	// the timeout for disperser authentication (set to 0 to disable), if enabled then a successful authentication
+	// of a StoreChunks request causes the node to skip validation for requests coming from the same IP address
+	// for this duration. Adds risk of disruptive behavior if an attacker is able to send requests from the same IP
+	// address as a legitimate disperser, but reduces performance overhead of StoreChunks validation.
+	DispersalAuthenticationTimeout time.Duration
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -199,50 +212,54 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	return &Config{
-		Hostname:                       ctx.GlobalString(flags.HostnameFlag.Name),
-		DispersalPort:                  ctx.GlobalString(flags.DispersalPortFlag.Name),
-		RetrievalPort:                  ctx.GlobalString(flags.RetrievalPortFlag.Name),
-		InternalDispersalPort:          internalDispersalFlag,
-		InternalRetrievalPort:          internalRetrievalFlag,
-		EnableNodeApi:                  ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
-		NodeApiPort:                    ctx.GlobalString(flags.NodeApiPortFlag.Name),
-		EnableMetrics:                  ctx.GlobalBool(flags.EnableMetricsFlag.Name),
-		MetricsPort:                    ctx.GlobalString(flags.MetricsPortFlag.Name),
-		OnchainMetricsInterval:         ctx.GlobalInt64(flags.OnchainMetricsIntervalFlag.Name),
-		Timeout:                        timeout,
-		RegisterNodeAtStart:            registerNodeAtStart,
-		ExpirationPollIntervalSec:      expirationPollIntervalSec,
-		ReachabilityPollIntervalSec:    reachabilityPollIntervalSec,
-		EnableTestMode:                 testMode,
-		OverrideBlockStaleMeasure:      ctx.GlobalInt64(flags.OverrideBlockStaleMeasureFlag.Name),
-		OverrideStoreDurationBlocks:    ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
-		QuorumIDList:                   ids,
-		DbPath:                         ctx.GlobalString(flags.DbPathFlag.Name),
-		PrivateBls:                     privateBls,
-		EthClientConfig:                ethClientConfig,
-		EncoderConfig:                  kzg.ReadCLIConfig(ctx),
-		LoggerConfig:                   *loggerConfig,
-		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		PubIPProvider:                  ctx.GlobalString(flags.PubIPProviderFlag.Name),
-		PubIPCheckInterval:             pubIPCheckInterval,
-		ChurnerUrl:                     ctx.GlobalString(flags.ChurnerUrlFlag.Name),
-		DataApiUrl:                     ctx.GlobalString(flags.DataApiUrlFlag.Name),
-		NumBatchValidators:             ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
-		NumBatchDeserializationWorkers: ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
-		EnableGnarkBundleEncoding:      ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
-		ClientIPHeader:                 ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
-		UseSecureGrpc:                  ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
-		DisableNodeInfoResources:       ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
-		BLSRemoteSignerUrl:             ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:                ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name),
-		BLSKeyPassword:                 ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
-		BLSSignerTLSCertFilePath:       ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
-		BLSRemoteSignerEnabled:         blsRemoteSignerEnabled,
-		EnableV2:                       ctx.GlobalBool(flags.EnableV2Flag.Name),
-		OnchainStateRefreshInterval:    ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
-		ChunkDownloadTimeout:           ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
-		PprofHttpPort:                  ctx.GlobalString(flags.PprofHttpPort.Name),
-		EnablePprof:                    ctx.GlobalBool(flags.EnablePprof.Name),
+		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
+		DispersalPort:                       ctx.GlobalString(flags.DispersalPortFlag.Name),
+		RetrievalPort:                       ctx.GlobalString(flags.RetrievalPortFlag.Name),
+		InternalDispersalPort:               internalDispersalFlag,
+		InternalRetrievalPort:               internalRetrievalFlag,
+		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
+		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
+		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
+		MetricsPort:                         ctx.GlobalString(flags.MetricsPortFlag.Name),
+		OnchainMetricsInterval:              ctx.GlobalInt64(flags.OnchainMetricsIntervalFlag.Name),
+		Timeout:                             timeout,
+		RegisterNodeAtStart:                 registerNodeAtStart,
+		ExpirationPollIntervalSec:           expirationPollIntervalSec,
+		ReachabilityPollIntervalSec:         reachabilityPollIntervalSec,
+		EnableTestMode:                      testMode,
+		OverrideBlockStaleMeasure:           ctx.GlobalInt64(flags.OverrideBlockStaleMeasureFlag.Name),
+		OverrideStoreDurationBlocks:         ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
+		QuorumIDList:                        ids,
+		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
+		PrivateBls:                          privateBls,
+		EthClientConfig:                     ethClientConfig,
+		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
+		LoggerConfig:                        *loggerConfig,
+		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		PubIPProvider:                       ctx.GlobalString(flags.PubIPProviderFlag.Name),
+		PubIPCheckInterval:                  pubIPCheckInterval,
+		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
+		DataApiUrl:                          ctx.GlobalString(flags.DataApiUrlFlag.Name),
+		NumBatchValidators:                  ctx.GlobalInt(flags.NumBatchValidatorsFlag.Name),
+		NumBatchDeserializationWorkers:      ctx.GlobalInt(flags.NumBatchDeserializationWorkersFlag.Name),
+		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
+		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
+		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
+		BLSRemoteSignerUrl:                  ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:                     ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name),
+		BLSKeyPassword:                      ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
+		BLSSignerTLSCertFilePath:            ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
+		BLSRemoteSignerEnabled:              blsRemoteSignerEnabled,
+		EnableV2:                            ctx.GlobalBool(flags.EnableV2Flag.Name),
+		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
+		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
+		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
+		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
+		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
+		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
+		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
+		DispersalAuthenticationTimeout:      ctx.GlobalDuration(flags.DispersalAuthenticationTimeoutFlag.Name),
 	}, nil
 }

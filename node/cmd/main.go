@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"log"
 	"os"
 	"time"
@@ -72,8 +74,14 @@ func NodeMain(ctx *cli.Context) error {
 
 	ratelimiter := ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 
+	rpcCallsCollector := rpccalls.NewCollector(node.AppName, reg)
+	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
+	if err != nil {
+		return fmt.Errorf("cannot create chain.Client: %w", err)
+	}
+
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, logger)
+	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
@@ -86,7 +94,11 @@ func NodeMain(ctx *cli.Context) error {
 
 	// Creates the GRPC server.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
-	serverV2 := nodegrpc.NewServerV2(config, node, logger, ratelimiter)
+	serverV2, err := nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, client)
+	if err != nil {
+		return fmt.Errorf("failed to create grpc v2 server: %w", err)
+	}
+
 	err = nodegrpc.RunServers(server, serverV2, config, logger)
 
 	return err

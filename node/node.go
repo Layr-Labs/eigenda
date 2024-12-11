@@ -42,7 +42,6 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
-	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
 	"github.com/gammazero/workerpool"
 
@@ -94,6 +93,7 @@ func NewNode(
 	reg *prometheus.Registry,
 	config *Config,
 	pubIPProvider pubip.Provider,
+	client *geth.InstrumentedEthClient,
 	logger logging.Logger,
 ) (*Node, error) {
 	// Setup metrics
@@ -105,17 +105,11 @@ func NewNode(
 	nodeLogger := logger.With("component", "Node")
 
 	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
-	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
 
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
-	}
-
-	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
 	chainID, err := client.ChainID(context.Background())

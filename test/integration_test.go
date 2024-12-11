@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"log"
 	"math"
 	"math/big"
@@ -349,19 +350,20 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		}
 
 		config := &node.Config{
-			Hostname:                  op.Host,
-			DispersalPort:             op.DispersalPort,
-			RetrievalPort:             op.RetrievalPort,
-			InternalRetrievalPort:     op.RetrievalPort,
-			InternalDispersalPort:     op.DispersalPort,
-			EnableMetrics:             false,
-			Timeout:                   10,
-			ExpirationPollIntervalSec: 10,
-			DbPath:                    dbPath,
-			LogPath:                   logPath,
-			PrivateBls:                string(op.KeyPair.GetPubKeyG1().Serialize()),
-			ID:                        id,
-			QuorumIDList:              registeredQuorums,
+			Hostname:                       op.Host,
+			DispersalPort:                  op.DispersalPort,
+			RetrievalPort:                  op.RetrievalPort,
+			InternalRetrievalPort:          op.RetrievalPort,
+			InternalDispersalPort:          op.DispersalPort,
+			EnableMetrics:                  false,
+			Timeout:                        10,
+			ExpirationPollIntervalSec:      10,
+			DbPath:                         dbPath,
+			LogPath:                        logPath,
+			PrivateBls:                     string(op.KeyPair.GetPubKeyG1().Serialize()),
+			ID:                             id,
+			QuorumIDList:                   registeredQuorums,
+			DisableDispersalAuthentication: true, // TODO re-enable
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
@@ -417,8 +419,12 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
+		// TODO enable request validation
+		var client common.EthClient
+
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2 := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
+		serverV2, err := nodegrpc.NewServerV2(context.Background(), config, n, logger, ratelimiter, client)
+		require.NoError(t, err)
 
 		ops[id] = TestOperator{
 			Node:     n,

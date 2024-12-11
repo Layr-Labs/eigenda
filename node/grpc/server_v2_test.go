@@ -82,7 +82,13 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		RelayClient: atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-	server := grpc.NewServerV2(config, node, logger, ratelimiter)
+
+	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
+	// TODO write test for StoreChunks validation
+	var client common.EthClient
+
+	server, err := grpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, client)
+	require.NoError(t, err)
 	return &testComponents{
 		server:      server,
 		node:        node,

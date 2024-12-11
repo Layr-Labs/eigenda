@@ -3,8 +3,13 @@ package grpc
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/node/auth"
+	"google.golang.org/grpc/peer"
 	"runtime"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
@@ -22,25 +27,53 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config      *node.Config
-	node        *node.Node
-	ratelimiter common.RateLimiter
-	logger      logging.Logger
+	config        *node.Config
+	node          *node.Node
+	ratelimiter   common.RateLimiter
+	authenticator auth.RequestAuthenticator
+
+	logger logging.Logger
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
 func NewServerV2(
+	ctx context.Context,
 	config *node.Config,
 	node *node.Node,
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
-) *ServerV2 {
-	return &ServerV2{
-		config:      config,
-		node:        node,
-		ratelimiter: ratelimiter,
-		logger:      logger,
+	client common.EthClient,
+) (*ServerV2, error) {
+	var authenticator auth.RequestAuthenticator
+	if !config.DisableDispersalAuthentication {
+		reader, err := coreeth.NewReader(
+			logger,
+			client,
+			config.BLSOperatorStateRetrieverAddr,
+			config.EigenDAServiceManagerAddr)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create eth.Reader: %w", err)
+		}
+
+		authenticator, err = auth.NewRequestAuthenticator(
+			ctx,
+			reader,
+			config.DispersalAuthenticationKeyCacheSize,
+			config.DisperserKeyTimeout,
+			config.DispersalAuthenticationTimeout,
+			time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create authenticator: %w", err)
+		}
 	}
+
+	return &ServerV2{
+		config:        config,
+		node:          node,
+		ratelimiter:   ratelimiter,
+		authenticator: authenticator,
+		logger:        logger,
+	}, nil
 }
 
 func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
@@ -60,6 +93,19 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
+	}
+
+	if s.authenticator != nil {
+		disperserPeer, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("could not get peer information")
+		}
+		disperserAddress := disperserPeer.Addr.String()
+
+		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("failed to authenticate request: %w", err)
+		}
 	}
 
 	if s.node.StoreV2 == nil {
