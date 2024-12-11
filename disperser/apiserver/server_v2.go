@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -235,6 +236,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
+	accountID := gethcommon.HexToAddress(req.AccountId)
+
 	// validate the signature
 	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
@@ -257,11 +260,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
 	}
 	// on-Chain account state
-	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, req.AccountId)
+	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, accountID)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}
-	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, req.AccountId)
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get on-demand payment")
 	}
@@ -277,20 +280,21 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	for i, v := range reservation.QuorumNumbers {
 		quorumNumbers[i] = uint32(v)
 	}
-	quorumSplit := make([]uint32, len(reservation.QuorumSplit))
-	for i, v := range reservation.QuorumSplit {
-		quorumSplit[i] = uint32(v)
+
+	quorumSplits := make([]uint32, len(reservation.QuorumSplits))
+	for i, v := range reservation.QuorumSplits {
+		quorumSplits[i] = uint32(v)
 	}
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams: &paymentGlobalParams,
 		BinRecords:          binRecords[:],
 		Reservation: &pb.Reservation{
-			SymbolsPerSecond: reservation.SymbolsPerSec,
+			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   uint32(reservation.StartTimestamp),
 			EndTimestamp:     uint32(reservation.EndTimestamp),
 			QuorumNumbers:    quorumNumbers,
-			QuorumSplit:      quorumSplit,
+			QuorumSplits:     quorumSplits,
 		},
 		CumulativePayment:        largestCumulativePayment.Bytes(),
 		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),

@@ -8,18 +8,19 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/mock"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 )
 
 var (
-	dummyActiveReservation = core.ActiveReservation{
-		SymbolsPerSec:  100,
-		StartTimestamp: 1000,
-		EndTimestamp:   2000,
-		QuorumSplit:    []byte{50, 50},
+	dummyActiveReservation = &core.ActiveReservation{
+		SymbolsPerSecond: 100,
+		StartTimestamp:   1000,
+		EndTimestamp:     2000,
+		QuorumSplits:     []byte{50, 50},
 	}
-	dummyOnDemandPayment = core.OnDemandPayment{
+	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 )
@@ -47,7 +48,7 @@ func TestGetActiveReservationByAccount(t *testing.T) {
 	ctx := context.Background()
 	mockState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
 
-	reservation, err := mockState.GetActiveReservationByAccount(ctx, "account1")
+	reservation, err := mockState.GetActiveReservationByAccount(ctx, gethcommon.Address{})
 	assert.NoError(t, err)
 	assert.Equal(t, dummyActiveReservation, reservation)
 }
@@ -55,10 +56,9 @@ func TestGetActiveReservationByAccount(t *testing.T) {
 func TestGetOnDemandPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	accountID := "account1"
 	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
 
-	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, accountID)
+	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, gethcommon.Address{})
 	assert.NoError(t, err)
 	assert.Equal(t, dummyOnDemandPayment, payment)
 }

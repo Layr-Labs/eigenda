@@ -758,15 +758,15 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetOnDemandQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetReservationWindow").Return(uint32(1), nil)
-	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(core.OnDemandPayment{
+	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{
 		CumulativePayment: big.NewInt(3000),
 	}, nil)
-	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(core.ActiveReservation{
-		SymbolsPerSec:  2048,
-		StartTimestamp: 0,
-		EndTimestamp:   math.MaxUint32,
-		QuorumNumbers:  []uint8{0, 1},
-		QuorumSplit:    []byte{50, 50},
+	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(&core.ActiveReservation{
+		SymbolsPerSecond: 2048,
+		StartTimestamp:   0,
+		EndTimestamp:     math.MaxUint32,
+		QuorumNumbers:    []uint8{0, 1},
+		QuorumSplits:     []byte{50, 50},
 	}, nil)
 	// append test name to each table name for an unique store
 	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
