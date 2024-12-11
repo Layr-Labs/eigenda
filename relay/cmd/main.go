@@ -79,7 +79,10 @@ func RunRelay(ctx *cli.Context) error {
 	}
 
 	cs := coreeth.NewChainState(tx, client)
-	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	ics, err := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create indexed chain state: %w", err)
+	}
 
 	server, err := relay.NewServer(
 		context.Background(),

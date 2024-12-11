@@ -91,6 +91,12 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
+	chainState := coreeth.NewChainState(tx, client)
+	indexedChainState, err := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+	if err != nil {
+		return err
+	}
+
 	var (
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
 		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)

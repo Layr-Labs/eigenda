@@ -62,7 +62,10 @@ func RunScan(ctx *cli.Context) error {
 	chainState := eth.NewChainState(tx, gethClient)
 
 	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+	ics, err := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create indexed chain state - %s", err)
+	}
 
 	currentBlock, err := ics.GetCurrentBlockNumber(context.Background())
 	if err != nil {
