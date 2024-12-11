@@ -12,7 +12,7 @@ import (
 	"hash"
 )
 
-// HashStoreChunksRequest hashes the given StoreChunksRequest. TODO document how
+// HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 	hasher := sha3.NewLegacyKeccak256()
 
@@ -74,9 +74,9 @@ func hashUint64(hasher hash.Hash, value uint64) {
 // SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
 // write the signature into the request.
 func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
-	hash := HashStoreChunksRequest(request)
+	requestHash := HashStoreChunksRequest(request)
 
-	signature, err := ecdsa.SignASN1(rand.Reader, key, hash)
+	signature, err := ecdsa.SignASN1(rand.Reader, key, requestHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
