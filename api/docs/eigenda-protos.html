@@ -351,10 +351,6 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.ReservationPeriodRecord"><span class="badge">M</span>ReservationPeriodRecord</a>
-                </li>
-              
-                <li>
                   <a href="#disperser.v2.BlobCommitmentReply"><span class="badge">M</span>BlobCommitmentReply</a>
                 </li>
               
@@ -396,6 +392,10 @@
               
                 <li>
                   <a href="#disperser.v2.Reservation"><span class="badge">M</span>Reservation</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.ReservationPeriodRecord"><span class="badge">M</span>ReservationPeriodRecord</a>
                 </li>
               
                 <li>
@@ -1983,37 +1983,6 @@ for this API to work.</p></td>
 
         
       
-        <h3 id="disperser.v2.ReservationPeriodRecord">ReservationPeriodRecord</h3>
-        <p>ReservationPeriodRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>usage</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
         <p></p>
 
@@ -2407,6 +2376,37 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
                   <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.ReservationPeriodRecord">ReservationPeriodRecord</h3>
+        <p>ReservationPeriodRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>usage</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
