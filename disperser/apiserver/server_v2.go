@@ -139,23 +139,6 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		}
 	}()
 
-	go func() {
-		ticker := time.NewTicker(s.OffchainPruneInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				prevPeriod := s.meterer.CurrentReservationPeriod() - 1
-				if err := s.meterer.OffchainStore.DeleteOldPeriods(ctx, prevPeriod); err != nil {
-					s.logger.Error("failed to delete old bins", "err", err)
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
 	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
 
 	if err := gs.Serve(listener); err != nil {

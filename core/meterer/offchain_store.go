@@ -67,61 +67,61 @@ func NewOffchainStore(
 	}, nil
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *OffchainStore) UpdateReservationPeriod(ctx context.Context, accountID string, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
+	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "PeriodUsage", size)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
 	}
 
-	binUsage, ok := res["BinUsage"]
+	periodUsage, ok := res["PeriodUsage"]
 	if !ok {
-		return 0, errors.New("BinUsage is not present in the response")
+		return 0, errors.New("PeriodUsage is not present in the response")
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	periodUsageAttr, ok := periodUsage.(*types.AttributeValueMemberN)
 	if !ok {
-		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+		return 0, fmt.Errorf("unexpected type for PeriodUsage: %T", periodUsage)
 	}
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	periodUsageValue, err := strconv.ParseUint(periodUsageAttr.Value, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
+		return 0, fmt.Errorf("failed to parse PeriodUsage: %w", err)
 	}
 
-	return binUsageValue, nil
+	return periodUsageValue, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *OffchainStore) UpdateGlobalPeriod(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
+	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "PeriodUsage", size)
 	if err != nil {
 		return 0, err
 	}
 
-	binUsage, ok := res["BinUsage"]
+	periodUsage, ok := res["PeriodUsage"]
 	if !ok {
 		return 0, nil
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	periodUsageAttr, ok := periodUsage.(*types.AttributeValueMemberN)
 	if !ok {
 		return 0, nil
 	}
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	periodUsageValue, err := strconv.ParseUint(periodUsageAttr.Value, 10, 32)
 	if err != nil {
 		return 0, err
 	}
 
-	return binUsageValue, nil
+	return periodUsageValue, nil
 }
 
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, symbolsCharged uint32) error {
@@ -408,23 +408,23 @@ func parseReservationPeriodRecord(bin map[string]types.AttributeValue) (*pb.Rese
 		return nil, fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
 
-	binUsage, ok := bin["BinUsage"]
+	periodUsage, ok := bin["PeriodUsage"]
 	if !ok {
-		return nil, errors.New("BinUsage is not present in the response")
+		return nil, errors.New("PeriodUsage is not present in the response")
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+	periodUsageAttr, ok := periodUsage.(*types.AttributeValueMemberN)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+		return nil, fmt.Errorf("unexpected type for PeriodUsage: %T", periodUsage)
 	}
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	periodUsageValue, err := strconv.ParseUint(periodUsageAttr.Value, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
+		return nil, fmt.Errorf("failed to parse PeriodUsage: %w", err)
 	}
 
 	return &pb.ReservationPeriodRecord{
 		Index: uint32(reservationPeriodValue),
-		Usage: uint64(binUsageValue),
+		Usage: uint64(periodUsageValue),
 	}, nil
 }

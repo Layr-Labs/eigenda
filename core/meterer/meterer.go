@@ -77,7 +77,9 @@ func (m *Meterer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.OffchainStore.DeleteOldPeriods(ctx, m.CurrentReservationPeriod()-uint32(MinNumPeriods)); err != nil {
+				now := uint64(time.Now().Unix())
+				reservationWindow := m.ChainPaymentState.GetReservationWindow()
+				if err := m.OffchainStore.DeleteOldPeriods(ctx, GetReservationPeriod(now, reservationWindow)-uint32(MinNumPeriods)); err != nil {
 					m.logger.Error("Failed to prune off-chain state", "error", err)
 				}
 			case <-ctx.Done():
@@ -119,12 +121,12 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 	if !m.ValidateReservationPeriod(header, reservation) {
-		return fmt.Errorf("invalid bin index for reservation")
+		return fmt.Errorf("invalid reservation period for reservation")
 	}
 
-	// Update bin usage atomically and check against reservation's data rate as the bin limit
-	if err := m.IncrementBinUsage(ctx, header, reservation, numSymbols); err != nil {
-		return fmt.Errorf("bin overflows: %w", err)
+	// Update reservation period usage atomically and check against reservation's data rate as the period limit
+	if err := m.IncrementReservatiionPeriodUsage(ctx, header, reservation, numSymbols); err != nil {
+		return fmt.Errorf("period overflows: %w", err)
 	}
 
 	return nil
@@ -149,55 +151,48 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 	return nil
 }
 
-// ValidateReservationPeriod checks if the provided bin index is valid
+// ValidateReservationPeriod checks if the provided reservation period is valid
 func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ActiveReservation) bool {
 	now := uint64(time.Now().Unix())
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
-	// Valid bin indexes are either the current bin or the previous bin
+	// Valid reservation periods are either the current period or the previous period
 	if (header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(reservation.StartTimestamp, reservationWindow) > header.ReservationPeriod || header.ReservationPeriod > GetReservationPeriod(reservation.EndTimestamp, reservationWindow)) {
 		return false
 	}
 	return true
 }
 
-// CurrentReservationPeriod returns the current bin index
-func (m *Meterer) CurrentReservationPeriod() uint32 {
-	now := uint64(time.Now().Unix())
-	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	return GetReservationPeriod(now, reservationWindow)
-}
-
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
+// IncrementReservatiionPeriodUsage increments the reservation period usage atomically and checks for overflow
+func (m *Meterer) IncrementReservatiionPeriodUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
+	newUsage, err := m.OffchainStore.UpdateReservationPeriod(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
 	if err != nil {
-		return fmt.Errorf("failed to increment bin usage: %w", err)
+		return fmt.Errorf("failed to increment reservation period usage: %w", err)
 	}
 
-	// metered usage stays within the bin limit
-	usageLimit := m.GetReservationBinLimit(reservation)
+	// metered usage stays within the period limit
+	usageLimit := m.GetReservationPeriodLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
 	} else if newUsage-uint64(numSymbols) >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
-		return fmt.Errorf("bin has already been filled")
+		return fmt.Errorf("period has already been filled")
 	}
 	if newUsage <= 2*usageLimit && header.ReservationPeriod+2 <= GetReservationPeriod(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
-		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod+2), newUsage-usageLimit)
+		_, err := m.OffchainStore.UpdateReservationPeriod(ctx, header.AccountID, uint64(header.ReservationPeriod+2), newUsage-usageLimit)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
-	return fmt.Errorf("overflow usage exceeds bin limit")
+	return fmt.Errorf("overflow usage exceeds period limit")
 }
 
-// GetReservationPeriod returns the current bin index by chunking time by the bin interval;
-// bin interval used by the disperser should be public information
-func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
-	return uint32(timestamp) / binInterval
+// GetReservationPeriod returns the current reservation period by chunking time by the period interval;
+// period interval used by the disperser should be public information
+func GetReservationPeriod(timestamp uint64, periodInterval uint32) uint32 {
+	return uint32(timestamp) / periodInterval
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
@@ -225,8 +220,8 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
+	// Update reservation period usage atomically and check against period capacity
+	if err := m.IncrementGlobalPeriodUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
 		if err != nil {
@@ -283,33 +278,33 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(m.ChainPaymentState.GetMinNumSymbols()))) * m.ChainPaymentState.GetMinNumSymbols()
 }
 
-// ValidateReservationPeriod checks if the provided bin index is valid
+// ValidateReservationPeriod checks if the provided reservation period is valid
 func (m *Meterer) ValidateGlobalReservationPeriod(header core.PaymentMetadata) (uint32, error) {
 	// Deterministic function: local clock -> index (1second intervals)
 	currentReservationPeriod := uint32(time.Now().Unix())
 
-	// Valid bin indexes are either the current bin or the previous bin (allow this second or prev sec)
+	// Valid reservation periods are either the current period or the previous period (allow this second or prev sec)
 	if header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1) {
-		return 0, fmt.Errorf("invalid bin index for on-demand request")
+		return 0, fmt.Errorf("invalid reservation period for on-demand request")
 	}
 	return currentReservationPeriod, nil
 }
 
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
-	//TODO: edit globalIndex based on bin interval in a subsequent PR
+// IncrementReservatiionPeriodUsage increments the reservation period usage atomically and checks for overflow
+func (m *Meterer) IncrementGlobalPeriodUsage(ctx context.Context, symbolsCharged uint64) error {
+	//TODO: edit globalIndex based on period interval in a subsequent PR
 	globalIndex := uint64(time.Now().Unix())
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, symbolsCharged)
+	newUsage, err := m.OffchainStore.UpdateGlobalPeriod(ctx, globalIndex, symbolsCharged)
 	if err != nil {
-		return fmt.Errorf("failed to increment global bin usage: %w", err)
+		return fmt.Errorf("failed to increment global reservation period usage: %w", err)
 	}
 	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond() {
-		return fmt.Errorf("global bin usage overflows")
+		return fmt.Errorf("global reservation period usage overflows")
 	}
 	return nil
 }
 
-// GetReservationBinLimit returns the bin limit for a given reservation
-func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
+// GetReservationPeriodLimit returns the period limit for a given reservation
+func (m *Meterer) GetReservationPeriodLimit(reservation *core.ActiveReservation) uint64 {
 	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }
