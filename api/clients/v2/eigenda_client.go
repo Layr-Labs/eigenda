@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/cockroachdb/errors/join"
 	"math/rand"
 )
 
@@ -139,7 +138,7 @@ func (c *EigenDAClient) Close() error {
 	relayClientErr := c.relayClient.Close()
 
 	// TODO: this is using join, since there will be more subcomponents requiring closing after adding PUT functionality
-	return join.Join(relayClientErr)
+	return errors.Join(relayClientErr)
 }
 
 // createCodec creates the codec based on client config values
