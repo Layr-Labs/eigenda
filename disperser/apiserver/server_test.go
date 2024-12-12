@@ -798,7 +798,11 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		teardown()
 		panic("failed to create offchain store")
 	}
-	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	mt := meterer.NewMeterer(meterer.Config{
+		ChainReadTimeout:      1 * time.Second,
+		OnchainUpdateInterval: 1 * time.Second,
+		OffchainPruneInterval: 1 * time.Second,
+	}, mockState, store, logger)
 	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
 	if err != nil {
 		panic("failed to make initial query to the on-chain state")

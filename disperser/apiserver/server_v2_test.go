@@ -482,7 +482,11 @@ func newTestServerV2(t *testing.T) *testComponents {
 		teardown()
 		panic("failed to create offchain store")
 	}
-	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	meterer := meterer.NewMeterer(meterer.Config{
+		ChainReadTimeout:      1 * time.Second,
+		OnchainUpdateInterval: 1 * time.Second,
+		OffchainPruneInterval: 1 * time.Second,
+	}, mockState, store, logger)
 
 	chainReader.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	chainReader.On("GetQuorumCount").Return(uint8(2), nil)
