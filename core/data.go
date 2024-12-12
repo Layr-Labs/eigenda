@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
@@ -624,4 +625,9 @@ type BlobVersionParameters struct {
 	CodingRate      uint32
 	MaxNumOperators uint32
 	NumChunks       uint32
+}
+
+func (ar *ReservedPayment) IsActive() bool {
+	now := uint64(time.Now().Unix())
+	return ar.StartTimestamp <= now && ar.EndTimestamp >= now
 }
