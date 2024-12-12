@@ -93,9 +93,9 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint32, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(reservationPeriod), 10)},
 	}
 
 	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
