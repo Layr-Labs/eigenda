@@ -47,10 +47,11 @@ message StoreChunksRequest {
   //   e. digest certificate.BlobHeader.Commitment.LengthProof
   //   f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
   //   g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  //   h. digest certificate.BlobHeader.PaymentHeader.BinIndex (4 bytes, unsigned big endian)
+  //   h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
   //   i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  //   j. digest certificate.BlobHeader.Signature
-  //   k. for each relay in certificate.Relays:
+  //   j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
+  //   k. digest certificate.BlobHeader.Signature
+  //   l. for each relay in certificate.Relays:
   //     i. digest relay (4 bytes, unsigned big endian)
   // 4. digest disperserID (4 bytes, unsigned big endian)
   //
