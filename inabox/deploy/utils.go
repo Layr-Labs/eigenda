@@ -306,8 +306,8 @@ func execCmd(name string, args []string, envVars []string) error {
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	// TODO: When these are uncommented, the deployer sometimes fails to start anvil
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
