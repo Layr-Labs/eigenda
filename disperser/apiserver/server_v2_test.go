@@ -443,6 +443,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetReservationWindow", tmock.Anything).Return(uint32(1), nil)
 	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint32(2), nil)
 	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetGlobalRateBinInterval", tmock.Anything).Return(uint32(1), nil)
 	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint32(3), nil)
 
 	now := uint64(time.Now().Unix())
