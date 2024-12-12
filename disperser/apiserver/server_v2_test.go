@@ -213,8 +213,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: invalidReqProto,
 	})
 	// TODO(hopeyen); re-enable this validation after adding signature verification
-	// assert.ErrorContains(t, err, "authentication failed")
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "authentication failed")
+	// assert.NoError(t, err)
 
 	// request with invalid payment metadata
 	invalidReqProto = &pbcommonv2.BlobHeader{
