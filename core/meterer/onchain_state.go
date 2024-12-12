@@ -2,10 +2,8 @@ package meterer
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -147,18 +145,9 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 
 // GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
-	timestamp := uint64(time.Now().Unix())
-	pcs.ReservationsLock.Lock()
-	defer pcs.ReservationsLock.Unlock()
-
+	pcs.ReservationsLock.RLock()
+	defer pcs.ReservationsLock.RUnlock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
-		if !reservation.IsActive(timestamp) {
-			// if reservation is expired, remove it from the local state; if it is not activated, we leave the reservation in the local state
-			if reservation.EndTimestamp < timestamp {
-				delete(pcs.ReservedPayments, accountID)
-			}
-			return nil, fmt.Errorf("reservation not active")
-		}
 		return reservation, nil
 	}
 
@@ -167,14 +156,9 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if !res.IsActive(timestamp) {
-		if res.StartTimestamp > timestamp {
-			// if reservation is not activated yet, we add it to the local state to reduce future on-chain calls
-			(pcs.ReservedPayments)[accountID] = res
-		}
-		return nil, fmt.Errorf("reservation not active")
-	}
+	pcs.ReservationsLock.Lock()
 	(pcs.ReservedPayments)[accountID] = res
+	pcs.ReservationsLock.Unlock()
 
 	return res, nil
 }

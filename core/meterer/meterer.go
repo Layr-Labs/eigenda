@@ -98,6 +98,9 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint, quorumNumbers []uint8) error {
+	if !reservation.IsActive(uint64(time.Now().Unix())) {
+		return fmt.Errorf("reservation not active")
+	}
 	if err := m.ValidateQuorum(quorumNumbers, reservation.QuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
