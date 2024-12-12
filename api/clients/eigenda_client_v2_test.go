@@ -269,8 +269,11 @@ func TestBuilder(t *testing.T) {
 		PointVerificationMode: clients.IFFT,
 	}
 
+	sockets := make(map[v2.RelayKey]string)
+	sockets[v2.RelayKey(44)] = "socketVal"
+
 	relayClientConfig := &clients.RelayClientConfig{
-		Sockets:           make(map[v2.RelayKey]string),
+		Sockets:           sockets,
 		UseSecureGrpcFlag: true,
 	}
 
