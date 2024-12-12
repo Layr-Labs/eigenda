@@ -219,7 +219,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideStoreDurationBlocks:    ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                   ids,
 		DbPath:                         ctx.GlobalString(flags.DbPathFlag.Name),
-		DBSizePollPeriod:               ctx.GlobalDuration(flags.DBSizePollPeriodFlag.Name),
+		DBSizePollPeriod:               ctx.GlobalDuration(flags.MetricsDBSizePollPeriodFlag.Name),
 		PrivateBls:                     privateBls,
 		EthClientConfig:                ethClientConfig,
 		EncoderConfig:                  kzg.ReadCLIConfig(ctx),

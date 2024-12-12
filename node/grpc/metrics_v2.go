@@ -14,8 +14,8 @@ import (
 
 const namespace = "eigenda_node"
 
-// V2Metrics encapsulates metrics for the v2 DA node.
-type V2Metrics struct {
+// MetricsV2 encapsulates metrics for the v2 DA node.
+type MetricsV2 struct {
 	logger logging.Logger
 
 	registry         *prometheus.Registry
@@ -33,13 +33,13 @@ type V2Metrics struct {
 	isAlive          *atomic.Bool
 }
 
-// NewV2Metrics creates a new V2Metrics instance. dbSizePollPeriod is the period at which the database size is polled.
+// NewV2Metrics creates a new MetricsV2 instance. dbSizePollPeriod is the period at which the database size is polled.
 // If set to 0, the database size is not polled.
 func NewV2Metrics(
 	logger logging.Logger,
 	registry *prometheus.Registry,
 	dbDir string,
-	dbSizePollPeriod time.Duration) (*V2Metrics, error) {
+	dbSizePollPeriod time.Duration) (*MetricsV2, error) {
 
 	// These should be re-enabled once the legacy v1 metrics are removed.
 	//registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -100,7 +100,7 @@ func NewV2Metrics(
 	isAlive := &atomic.Bool{}
 	isAlive.Store(true)
 
-	return &V2Metrics{
+	return &MetricsV2{
 		logger:              logger,
 		registry:            registry,
 		grpcServerOption:    grpcServerOption,
@@ -116,7 +116,7 @@ func NewV2Metrics(
 }
 
 // Start starts the metrics server.
-func (m *V2Metrics) Start() {
+func (m *MetricsV2) Start() {
 	if m.dbSizePollPeriod.Nanoseconds() == 0 {
 		return
 	}
@@ -147,29 +147,29 @@ func (m *V2Metrics) Start() {
 }
 
 // Stop stops the metrics server.
-func (m *V2Metrics) Stop() {
+func (m *MetricsV2) Stop() {
 	m.isAlive.Store(false)
 }
 
 // GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
-func (m *V2Metrics) GetGRPCServerOption() grpc.ServerOption {
+func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-func (m *V2Metrics) ReportStoreChunksLatency(latency time.Duration) {
+func (m *MetricsV2) ReportStoreChunksLatency(latency time.Duration) {
 	m.storeChunksLatency.WithLabelValues().Observe(
 		float64(latency.Nanoseconds()) / float64(time.Millisecond))
 }
 
-func (m *V2Metrics) ReportStoreChunksDataSize(size uint64) {
+func (m *MetricsV2) ReportStoreChunksDataSize(size uint64) {
 	m.storeChunksDataSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *V2Metrics) ReportGetChunksLatency(latency time.Duration) {
+func (m *MetricsV2) ReportGetChunksLatency(latency time.Duration) {
 	m.getChunksLatency.WithLabelValues().Observe(
 		float64(latency.Nanoseconds()) / float64(time.Millisecond))
 }
 
-func (m *V2Metrics) ReportGetChunksDataSize(size int) {
+func (m *MetricsV2) ReportGetChunksDataSize(size int) {
 	m.getChunksDataSize.WithLabelValues().Set(float64(size))
 }

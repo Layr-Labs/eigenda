@@ -27,7 +27,7 @@ type ServerV2 struct {
 	node        *node.Node
 	ratelimiter common.RateLimiter
 	logger      logging.Logger
-	metrics     *V2Metrics
+	metrics     *MetricsV2
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -190,8 +190,7 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	}
 	s.metrics.ReportGetChunksDataSize(size)
 
-	elapsed := time.Since(start)
-	s.metrics.ReportGetChunksLatency(elapsed)
+	s.metrics.ReportGetChunksLatency(time.Since(start))
 
 	return &pb.GetChunksReply{
 		Chunks: chunks,

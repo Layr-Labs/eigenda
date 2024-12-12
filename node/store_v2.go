@@ -19,10 +19,19 @@ const (
 )
 
 type StoreV2 interface {
+
 	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
 	// and the size of the stored data, in bytes.
+	//
+	// All modifications to the database within this method are performed atomically.
 	StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error)
+
+	// DeleteKeys deletes the keys from local storage.
+	//
+	// All modifications to the database within this method are performed atomically.
 	DeleteKeys(keys []kvstore.Key) error
+
+	// GetChunks returns the chunks of a blob with the given blob key and quorum.
 	GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error)
 }
 

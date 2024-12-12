@@ -98,12 +98,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
 	}
-	DBSizePollPeriodFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "db-size-poll-period"),
-		Usage:    "The period at which the database size is polled. If set to 0, the database size is not polled.",
+	MetricsDBSizePollPeriodFlag = cli.DurationFlag{
+		Name: common.PrefixFlag(FlagPrefix, "metrics-db-size-poll-period"),
+		Usage: "The period at which the database size is polled for metrics. " +
+			"If set to 0, the database size is not polled.",
 		Required: false,
 		Value:    10 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_SIZE_POLL_PERIOD"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "METRICS_DB_SIZE_POLL_PERIOD"),
 	}
 	// The files for encrypted private keys.
 	BlsKeyFileFlag = cli.StringFlag{
@@ -391,7 +392,7 @@ var optionalFlags = []cli.Flag{
 	ChunkDownloadTimeoutFlag,
 	PprofHttpPort,
 	EnablePprof,
-	DBSizePollPeriodFlag,
+	MetricsDBSizePollPeriodFlag,
 }
 
 func init() {
