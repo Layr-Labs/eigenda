@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
@@ -173,8 +172,6 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	cs := eth.NewChainState(tx, gethClient)
 
-	chainState := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
-
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 
 	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
@@ -187,7 +184,7 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	retriever, err := clients.NewRetrievalClient(
 		logger,
-		chainState,
+		cs,
 		assignmentCoordinator,
 		nodeClient,
 		v,
