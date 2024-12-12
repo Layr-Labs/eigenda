@@ -227,16 +227,16 @@ func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.O
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.ActiveReservation), args.Error(1)
+	return result.(map[gethcommon.Address]*core.ReservedPayment), args.Error(1)
 }
 
-func (t *MockWriter) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+func (t *MockWriter) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(*core.ActiveReservation), args.Error(1)
+	return result.(*core.ReservedPayment), args.Error(1)
 }
 
 func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {

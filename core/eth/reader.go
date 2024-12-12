@@ -690,11 +690,11 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	reservationsMap := make(map[gethcommon.Address]*core.ActiveReservation)
+	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
 	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
 		Context: ctx,
 	}, accountIDs)
@@ -704,7 +704,7 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		res, err := ConvertToActiveReservation(reservation)
+		res, err := ConvertToReservedPayment(reservation)
 		if err != nil {
 			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
 			continue
@@ -716,7 +716,7 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 	return reservationsMap, nil
 }
 
-func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
@@ -726,7 +726,7 @@ func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID ge
 	if err != nil {
 		return nil, err
 	}
-	return ConvertToActiveReservation(reservation)
+	return ConvertToReservedPayment(reservation)
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {

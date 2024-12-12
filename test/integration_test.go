@@ -221,10 +221,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState := &coremock.MockOnchainPaymentState{}
 	reservationLimit := uint64(1024)
 	paymentLimit := big.NewInt(512)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	})).Return(&core.ActiveReservation{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.Anything).Return(&core.ActiveReservation{}, errors.New("reservation not found"))
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
