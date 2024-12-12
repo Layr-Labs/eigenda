@@ -74,6 +74,7 @@ type Node struct {
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
+	BLSPublicKeyHex         string
 
 	BlsSigner sdkSigner.Signer
 
@@ -132,6 +133,7 @@ func NewNode(
 
 	var keyPair *core.KeyPair
 	var blsSigner sdkSigner.Signer
+	var blsPublicKeyHex string
 	if config.PrivateBls != "" {
 		nodeLogger.Info("using local keystore private key for BLS signing")
 		// Generate BLS keys
@@ -141,7 +143,9 @@ func NewNode(
 		}
 
 		config.ID = keyPair.GetPubKeyG1().GetOperatorID()
+		blsPublicKeyHex = hex.EncodeToString(keyPair.PubKey.Serialize())
 	} else {
+		nodeLogger.Info("using eigensdk BLS signer for BLS signing")
 		blsSigner, err = sdkSigner.NewSigner(config.BlsSignerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create BLS signer: %w", err)
@@ -154,6 +158,7 @@ func NewNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert operator ID: %w", err)
 		}
+		blsPublicKeyHex = blsSigner.GetPublicKeyHex()
 	}
 
 	// Setup Node Api
@@ -223,6 +228,7 @@ func NewNode(
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		BlsSigner:               blsSigner,
+		BLSPublicKeyHex:         blsPublicKeyHex,
 	}
 
 	if !config.EnableV2 {
@@ -568,15 +574,15 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	}
 
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", n.BlsSigner.GetPublicKeyHex(), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.BLSPublicKeyHex, "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
 	return signature, nil
 }
 
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
-	// This usecase is only used for testing purposes.
-	if n.Config.PrivateBls != "" {
+	// This use case is only used for testing purposes.
+	if n.KeyPair != nil {
 		return n.KeyPair.SignMessage(data), nil
 	}
 
