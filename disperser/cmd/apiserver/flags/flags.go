@@ -114,20 +114,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_UPDATE_INTERVAL"),
 		Required: false,
 	}
-	OffchainPruneInterval = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "offchain-prune-interval"),
-		Usage:    "update interval for pruning the off-chain state",
-		Value:    2 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_PRUNE_INTERVAL"),
-		Required: false,
-	}
-	OffchainMaxOnDemandStorage = cli.UintFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "offchain-max-on-demand-storage"),
-		Usage:    "max number of on-demand payments to store in the off-chain state",
-		Value:    100,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_MAX_ON_DEMAND_STORAGE"),
-		Required: false,
-	}
 	ChainReadTimeout = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
 		Usage:    "timeout for reading from the chain",
@@ -160,14 +146,21 @@ var (
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
-		Value:    1 * time.Hour,
+		Value:    2 * time.Minute,
 	}
-	OffchainStatePruningInterval = cli.DurationFlag{
+	OffchainPruneInterval = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "offchain-state-pruning-interval"),
 		Usage:    "The interval at which to prune the outdated offchain state. This flag is only relevant in v2",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_STATE_PRUNING_INTERVAL"),
-		Value:    1 * time.Hour,
+		Value:    2 * time.Minute,
+	}
+	OffchainMaxOnDemandStorage = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "offchain-max-on-demand-storage"),
+		Usage:    "max number of on-demand payments to store in the off-chain state",
+		Value:    100,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_MAX_ON_DEMAND_STORAGE"),
+		Required: false,
 	}
 	MaxNumSymbolsPerBlob = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),

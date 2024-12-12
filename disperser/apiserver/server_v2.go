@@ -54,10 +54,10 @@ type DispersalServerV2 struct {
 	logger        logging.Logger
 
 	// state
-	onchainState                 atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob         uint64
-	onchainStateRefreshInterval  time.Duration
-	offchainStatePruningInterval time.Duration
+	onchainState                atomic.Pointer[OnchainState]
+	maxNumSymbolsPerBlob        uint64
+	onchainStateRefreshInterval time.Duration
+	OffchainPruneInterval       time.Duration
 
 	metrics *metricsV2
 }
@@ -73,7 +73,7 @@ func NewDispersalServerV2(
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
-	offchainStatePruningInterval time.Duration,
+	OffchainPruneInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 ) *DispersalServerV2 {
@@ -90,9 +90,9 @@ func NewDispersalServerV2(
 		prover:        prover,
 		logger:        logger,
 
-		maxNumSymbolsPerBlob:         maxNumSymbolsPerBlob,
-		onchainStateRefreshInterval:  onchainStateRefreshInterval,
-		offchainStatePruningInterval: offchainStatePruningInterval,
+		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
+		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		OffchainPruneInterval:       OffchainPruneInterval,
 
 		metrics: newAPIServerV2Metrics(registry),
 	}
@@ -140,7 +140,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	}()
 
 	go func() {
-		ticker := time.NewTicker(s.offchainStatePruningInterval)
+		ticker := time.NewTicker(s.OffchainPruneInterval)
 		defer ticker.Stop()
 
 		for {

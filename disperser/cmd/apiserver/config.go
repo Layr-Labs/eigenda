@@ -24,31 +24,30 @@ const (
 )
 
 type Config struct {
-	DisperserVersion             DisperserVersion
-	AwsClientConfig              aws.ClientConfig
-	BlobstoreConfig              blobstore.Config
-	ServerConfig                 disperser.ServerConfig
-	LoggerConfig                 common.LoggerConfig
-	MetricsConfig                disperser.MetricsConfig
-	RatelimiterConfig            ratelimit.Config
-	RateConfig                   apiserver.RateConfig
-	EncodingConfig               kzg.KzgConfig
-	EnableRatelimiter            bool
-	EnablePaymentMeterer         bool
-	OnchainUpdateInterval        int
-	OffchainPruneInterval        int
-	OffchainMaxOnDemandStorage   int
-	ChainReadTimeout             int
-	ReservationsTableName        string
-	OnDemandTableName            string
-	GlobalRateTableName          string
-	BucketTableName              string
-	BucketStoreSize              int
-	EthClientConfig              geth.EthClientConfig
-	MaxBlobSize                  int
-	MaxNumSymbolsPerBlob         uint
-	OnchainStateRefreshInterval  time.Duration
-	OffchainStatePruningInterval time.Duration
+	DisperserVersion            DisperserVersion
+	AwsClientConfig             aws.ClientConfig
+	BlobstoreConfig             blobstore.Config
+	ServerConfig                disperser.ServerConfig
+	LoggerConfig                common.LoggerConfig
+	MetricsConfig               disperser.MetricsConfig
+	RatelimiterConfig           ratelimit.Config
+	RateConfig                  apiserver.RateConfig
+	EncodingConfig              kzg.KzgConfig
+	EnableRatelimiter           bool
+	EnablePaymentMeterer        bool
+	OnchainUpdateInterval       int
+	OffchainMaxOnDemandStorage  int
+	ChainReadTimeout            int
+	ReservationsTableName       string
+	OnDemandTableName           string
+	GlobalRateTableName         string
+	BucketTableName             string
+	BucketStoreSize             int
+	EthClientConfig             geth.EthClientConfig
+	MaxBlobSize                 int
+	MaxNumSymbolsPerBlob        uint
+	OnchainStateRefreshInterval time.Duration
+	OffchainPruneInterval       time.Duration
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -112,25 +111,24 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
-		RatelimiterConfig:            ratelimiterConfig,
-		RateConfig:                   rateConfig,
-		EncodingConfig:               encodingConfig,
-		EnableRatelimiter:            ctx.GlobalBool(flags.EnableRatelimiter.Name),
-		EnablePaymentMeterer:         ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
-		ReservationsTableName:        ctx.GlobalString(flags.ReservationsTableName.Name),
-		OnDemandTableName:            ctx.GlobalString(flags.OnDemandTableName.Name),
-		GlobalRateTableName:          ctx.GlobalString(flags.GlobalRateTableName.Name),
-		BucketTableName:              ctx.GlobalString(flags.BucketTableName.Name),
-		BucketStoreSize:              ctx.GlobalInt(flags.BucketStoreSize.Name),
-		OnchainUpdateInterval:        ctx.GlobalInt(flags.OnchainUpdateInterval.Name),
-		OffchainPruneInterval:        ctx.GlobalInt(flags.OffchainPruneInterval.Name),
-		OffchainMaxOnDemandStorage:   ctx.GlobalInt(flags.OffchainMaxOnDemandStorage.Name),
-		ChainReadTimeout:             ctx.GlobalInt(flags.ChainReadTimeout.Name),
-		EthClientConfig:              geth.ReadEthClientConfigRPCOnly(ctx),
-		MaxBlobSize:                  ctx.GlobalInt(flags.MaxBlobSize.Name),
-		MaxNumSymbolsPerBlob:         ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
-		OnchainStateRefreshInterval:  ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
-		OffchainStatePruningInterval: ctx.GlobalDuration(flags.OffchainStatePruningInterval.Name),
+		RatelimiterConfig:           ratelimiterConfig,
+		RateConfig:                  rateConfig,
+		EncodingConfig:              encodingConfig,
+		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
+		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
+		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
+		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
+		BucketTableName:             ctx.GlobalString(flags.BucketTableName.Name),
+		BucketStoreSize:             ctx.GlobalInt(flags.BucketStoreSize.Name),
+		OnchainUpdateInterval:       ctx.GlobalInt(flags.OnchainUpdateInterval.Name),
+		ChainReadTimeout:            ctx.GlobalInt(flags.ChainReadTimeout.Name),
+		EthClientConfig:             geth.ReadEthClientConfigRPCOnly(ctx),
+		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
+		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
+		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
+		OffchainPruneInterval:       ctx.GlobalDuration(flags.OffchainPruneInterval.Name),
+		OffchainMaxOnDemandStorage:  ctx.GlobalInt(flags.OffchainMaxOnDemandStorage.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
