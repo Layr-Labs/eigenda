@@ -1,35 +1,36 @@
-package clients
+package v2
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/cockroachdb/errors/join"
 	"math/rand"
 )
 
-// EigenDAClientV2 provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
+// EigenDAClient provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
 //
 // This struct is not threadsafe.
-type EigenDAClientV2 struct {
+type EigenDAClient struct {
 	log logging.Logger
 	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
 	random      *rand.Rand
-	config      *EigenDAClientConfigV2
+	config      *EigenDAClientConfig
 	codec       codecs.BlobCodec
-	relayClient RelayClient
+	relayClient clients.RelayClient
 }
 
-// BuildEigenDAClientV2 builds an EigenDAClientV2 from config structs.
-func BuildEigenDAClientV2(
+// BuildEigenDAClient builds an EigenDAClient from config structs.
+func BuildEigenDAClient(
 	log logging.Logger,
-	config *EigenDAClientConfigV2,
-	relayClientConfig *RelayClientConfig) (*EigenDAClientV2, error) {
+	config *EigenDAClientConfig,
+	relayClientConfig *clients.RelayClientConfig) (*EigenDAClient, error) {
 
-	relayClient, err := NewRelayClient(relayClientConfig, log)
+	relayClient, err := clients.NewRelayClient(relayClientConfig, log)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
@@ -39,18 +40,18 @@ func BuildEigenDAClientV2(
 		return nil, err
 	}
 
-	return NewEigenDAClientV2(log, rand.New(rand.NewSource(rand.Int63())), config, relayClient, codec)
+	return NewEigenDAClient(log, rand.New(rand.NewSource(rand.Int63())), config, relayClient, codec)
 }
 
-// NewEigenDAClientV2 assembles an EigenDAClientV2 from subcomponents that have already been constructed and initialized.
-func NewEigenDAClientV2(
+// NewEigenDAClient assembles an EigenDAClient from subcomponents that have already been constructed and initialized.
+func NewEigenDAClient(
 	log logging.Logger,
 	random *rand.Rand,
-	config *EigenDAClientConfigV2,
-	relayClient RelayClient,
-	codec codecs.BlobCodec) (*EigenDAClientV2, error) {
+	config *EigenDAClientConfig,
+	relayClient clients.RelayClient,
+	codec codecs.BlobCodec) (*EigenDAClient, error) {
 
-	return &EigenDAClientV2{
+	return &EigenDAClient{
 		log:         log,
 		random:      random,
 		config:      config,
@@ -64,10 +65,10 @@ func NewEigenDAClientV2(
 // The relays are attempted in random order.
 //
 // The returned blob is decoded.
-func (c *EigenDAClientV2) GetBlob(
+func (c *EigenDAClient) GetBlob(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobCertificate corev2.BlobCertificate) ([]byte, error) {
+	blobKey core.BlobKey,
+	blobCertificate core.BlobCertificate) ([]byte, error) {
 
 	relayKeyCount := len(blobCertificate.RelayKeys)
 
@@ -113,7 +114,7 @@ func (c *EigenDAClientV2) GetBlob(
 }
 
 // GetCodec returns the codec the client uses for encoding and decoding blobs
-func (c *EigenDAClientV2) GetCodec() codecs.BlobCodec {
+func (c *EigenDAClient) GetCodec() codecs.BlobCodec {
 	return c.codec
 }
 
@@ -123,7 +124,7 @@ func (c *EigenDAClientV2) GetCodec() codecs.BlobCodec {
 // Any and all errors returned from closing internal clients will be joined and returned.
 //
 // This method should only be called once.
-func (c *EigenDAClientV2) Close() error {
+func (c *EigenDAClient) Close() error {
 	relayClientErr := c.relayClient.Close()
 
 	// TODO: this is using join, since there will be more subcomponents requiring closing after adding PUT functionality
@@ -131,7 +132,7 @@ func (c *EigenDAClientV2) Close() error {
 }
 
 // createCodec creates the codec based on client config values
-func createCodec(config *EigenDAClientConfigV2) (codecs.BlobCodec, error) {
+func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.BlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create low level codec: %w", err)

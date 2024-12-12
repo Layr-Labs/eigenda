@@ -1,4 +1,4 @@
-package clients
+package v2
 
 import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -14,8 +14,8 @@ const (
 	NoIFFT
 )
 
-// EigenDAClientConfigV2 contains configuration values for EigenDAClientV2
-type EigenDAClientConfigV2 struct {
+// EigenDAClientConfig contains configuration values for EigenDAClient
+type EigenDAClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
