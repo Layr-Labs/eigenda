@@ -280,9 +280,10 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  |  |
-| bin_index | [uint32](#uint32) |  |  |
-| cumulative_payment | [bytes](#bytes) |  |  |
+| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
+| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
 
 
 
@@ -638,7 +639,7 @@ BlobStatusRequest is used to query the status of a blob.
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
 | quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains AccountID, BinIndex, and CumulativePayment |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains account_id, reservation_period, cumulative_payment, and salt |
 | payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 
@@ -949,7 +950,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | start_timestamp | [uint32](#uint32) |  |  |
 | end_timestamp | [uint32](#uint32) |  |  |
 | quorum_numbers | [uint32](#uint32) | repeated |  |
-| quorum_split | [uint32](#uint32) | repeated |  |
+| quorum_splits | [uint32](#uint32) | repeated |  |
 
 
 
@@ -986,7 +987,6 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
-- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -994,8 +994,7 @@ Terminal states are states that will not be updated to a different state:
 | QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing |
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
-| FAILED | 4 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state) |
-| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
+| FAILED | 4 | FAILED means that the blob has failed permanently |
 
 
  

@@ -63,14 +63,14 @@ func (l *BlobRateLimiter) BeginGetBlobOperation(now time.Time) error {
 
 	if l.operationsInFlight >= l.config.MaxConcurrentGetBlobOps {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetBlobRateLimited.Increment(metrics.RateLimitLabel{Reason: "global concurrency"})
+			l.relayMetrics.ReportBlobRateLimited("global concurrency")
 		}
 		return fmt.Errorf("global concurrent request limit %d exceeded for getBlob operations, try again later",
 			l.config.MaxConcurrentGetBlobOps)
 	}
 	if l.opLimiter.TokensAt(now) < 1 {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetBlobRateLimited.Increment(metrics.RateLimitLabel{Reason: "global rate"})
+			l.relayMetrics.ReportBlobRateLimited("global rate")
 		}
 		return fmt.Errorf("global rate limit %0.1fhz exceeded for getBlob operations, try again later",
 			l.config.MaxGetBlobOpsPerSecond)
@@ -110,7 +110,7 @@ func (l *BlobRateLimiter) RequestGetBlobBandwidth(now time.Time, bytes uint32) e
 	allowed := l.bandwidthLimiter.AllowN(now, int(bytes))
 	if !allowed {
 		if l.relayMetrics != nil {
-			l.relayMetrics.GetBlobRateLimited.Increment(metrics.RateLimitLabel{Reason: "global bandwidth"})
+			l.relayMetrics.ReportBlobRateLimited("global bandwidth")
 		}
 		return fmt.Errorf("global rate limit %dMib/s exceeded for getBlob bandwidth, try again later",
 			int(l.config.MaxGetBlobBytesPerSecond/1024/1024))

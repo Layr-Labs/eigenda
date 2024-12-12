@@ -21,22 +21,22 @@ func TestReservationBinsBasicOperations(t *testing.T) {
 	ctx := context.Background()
 	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
-			"AccountID": &types.AttributeValueMemberS{Value: "account1"},
-			"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
-			"BinUsage":  &types.AttributeValueMemberN{Value: "1000"},
-			"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
+			"BinUsage":          &types.AttributeValueMemberN{Value: "1000"},
+			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		},
 	)
 	assert.NoError(t, err)
 
 	item, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: "account1"},
-		"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
+		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
 
 	assert.Equal(t, "account1", item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "1", item["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1", item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	items, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
@@ -51,25 +51,25 @@ func TestReservationBinsBasicOperations(t *testing.T) {
 	assert.Error(t, err)
 
 	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: "account1"},
-		"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
+		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
 	}, commondynamodb.Item{
 		"BinUsage": &types.AttributeValueMemberN{Value: "2000"},
 	})
 	assert.NoError(t, err)
 	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
-			"AccountID": &types.AttributeValueMemberS{Value: "account2"},
-			"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
-			"BinUsage":  &types.AttributeValueMemberN{Value: "3000"},
-			"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"AccountID":         &types.AttributeValueMemberS{Value: "account2"},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
+			"BinUsage":          &types.AttributeValueMemberN{Value: "3000"},
+			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		},
 	)
 	assert.NoError(t, err)
 
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: "account1"},
-		"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
+		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "2000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
@@ -82,8 +82,8 @@ func TestReservationBinsBasicOperations(t *testing.T) {
 	assert.Equal(t, "2000", items[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: "account2"},
-		"BinIndex":  &types.AttributeValueMemberN{Value: "1"},
+		"AccountID":         &types.AttributeValueMemberS{Value: "account2"},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "3000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
@@ -102,34 +102,34 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	items := make([]commondynamodb.Item, numItems)
 	for i := 0; i < numItems; i += 1 {
 		items[i] = commondynamodb.Item{
-			"BinIndex":  &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"BinUsage":  &types.AttributeValueMemberN{Value: "1000"},
-			"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
+			"BinUsage":          &types.AttributeValueMemberN{Value: "1000"},
+			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
 	assert.NoError(t, err)
 	assert.Len(t, unprocessed, 0)
 
-	queryResult, err := dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err := dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "32",
 		}})
@@ -137,7 +137,7 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 	assert.Len(t, queryResult, 0)
 
 	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
-		"BinIndex": &types.AttributeValueMemberN{Value: "1"},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
 	}, commondynamodb.Item{
 		"BinUsage": &types.AttributeValueMemberN{Value: "2000"},
 	})
@@ -145,29 +145,29 @@ func TestGlobalBinsBasicOperations(t *testing.T) {
 
 	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
-			"BinIndex":  &types.AttributeValueMemberN{Value: "2"},
-			"BinUsage":  &types.AttributeValueMemberN{Value: "3000"},
-			"UpdatedAt": &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: "2"},
+			"BinUsage":          &types.AttributeValueMemberN{Value: "3000"},
+			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
 		},
 	)
 	assert.NoError(t, err)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "1",
 		}})
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "2000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "BinIndex = :index", commondynamodb.ExpressionValues{
+	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
 		":index": &types.AttributeValueMemberN{
 			Value: "2",
 		}})
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "2", queryResult[0]["BinIndex"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "2", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, "3000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
 }
 

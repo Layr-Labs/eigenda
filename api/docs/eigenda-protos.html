@@ -949,21 +949,29 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               
                 <tr>
-                  <td>bin_index</td>
+                  <td>reservation_period</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The reservation period of the dispersal request. </p></td>
                 </tr>
               
                 <tr>
                   <td>cumulative_payment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The cumulative payment of the dispersal request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. </p></td>
                 </tr>
               
             </tbody>
@@ -1713,7 +1721,7 @@ corresponding to the key used by the client to sign the BlobAuthHeader. </p></td
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p>Payment header contains AccountID, BinIndex, and CumulativePayment </p></td>
+                  <td><p>Payment header contains account_id, reservation_period, cumulative_payment, and salt </p></td>
                 </tr>
               
                 <tr>
@@ -2396,7 +2404,7 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
                 </tr>
               
                 <tr>
-                  <td>quorum_split</td>
+                  <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
@@ -2443,7 +2451,7 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -2477,15 +2485,7 @@ TODO: sign over a bin index or a nonce to mitigate signature replay attacks </p>
               <tr>
                 <td>FAILED</td>
                 <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently (for reasons other than insufficient
-signatures, which is a separate state)</p></td>
-              </tr>
-            
-              <tr>
-                <td>INSUFFICIENT_SIGNATURES</td>
-                <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
-for at least one quorum.</p></td>
+                <td><p>FAILED means that the blob has failed permanently</p></td>
               </tr>
             
           </tbody>

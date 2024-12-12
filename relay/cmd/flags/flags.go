@@ -89,6 +89,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_MAX_CONCURRENCY"),
 		Value:    32,
 	}
+	MaxKeysPerGetChunksRequestFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "max-keys-per-get-chunks-request"),
+		Usage:    "Max number of keys to fetch in a single GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_KEYS_PER_GET_CHUNKS_REQUEST"),
+		Value:    1024,
+	}
 	MaxGetBlobOpsPerSecondFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-get-blob-ops-per-second"),
 		Usage:    "Max number of GetBlob operations per second",
@@ -185,6 +192,7 @@ var (
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS_CLIENT"),
+		Value:    2 * 1024 * 1024,
 	}
 	MaxConcurrentGetChunkOpsClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops-client"),
@@ -300,6 +308,7 @@ var optionalFlags = []cli.Flag{
 	BlobMaxConcurrencyFlag,
 	ChunkCacheSizeFlag,
 	ChunkMaxConcurrencyFlag,
+	MaxKeysPerGetChunksRequestFlag,
 	MaxGetBlobOpsPerSecondFlag,
 	GetBlobOpsBurstinessFlag,
 	MaxGetBlobBytesPerSecondFlag,
