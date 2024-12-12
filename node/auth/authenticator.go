@@ -7,7 +7,6 @@ import (
 	"fmt"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	dauth "github.com/Layr-Labs/eigenda/disperser/auth"
 	"github.com/ethereum/go-ethereum/crypto"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"time"
@@ -116,7 +115,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	}
 
 	signature := request.Signature
-	isValid := dauth.VerifyStoreChunksRequest(key, request, signature)
+	isValid := VerifyStoreChunksRequest(key, request, signature)
 
 	if !isValid {
 		return errors.New("signature verification failed")

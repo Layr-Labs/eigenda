@@ -12,8 +12,6 @@ import (
 	"hash"
 )
 
-// TODO test these methods
-
 // SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
 // write the signature into the request.
 func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
