@@ -44,7 +44,7 @@ func TestStoreBatchV2(t *testing.T) {
 	}()
 	keys, err := s.StoreBatch(batch, rawBundles)
 	require.NoError(t, err)
-	require.Len(t, keys, 10)
+	require.Len(t, keys, 7)
 
 	tables := db.GetTables()
 	require.ElementsMatch(t, []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}, tables)
@@ -60,21 +60,6 @@ func TestStoreBatchV2(t *testing.T) {
 	deserializedBatchHeader, err := corev2.DeserializeBatchHeader(bhhBytes)
 	require.NoError(t, err)
 	assert.Equal(t, batch.BatchHeader, deserializedBatchHeader)
-
-	// Check blob certificates
-	blobCertKeyBuilder, err := db.GetKeyBuilder(node.BlobCertificateTableName)
-	require.NoError(t, err)
-	for _, cert := range batch.BlobCertificates {
-		blobKey, err := cert.BlobHeader.BlobKey()
-		require.NoError(t, err)
-		blobCertKey := blobCertKeyBuilder.Key(blobKey[:])
-		blobCertBytes, err := db.Get(blobCertKey)
-		require.NoError(t, err)
-		assert.NotNil(t, blobCertBytes)
-		deserializedBlobCert, err := corev2.DeserializeBlobCertificate(blobCertBytes)
-		require.NoError(t, err)
-		assert.Equal(t, cert, deserializedBlobCert)
-	}
 
 	// Check bundles
 	bundleKeyBuilder, err := db.GetKeyBuilder(node.BundleTableName)
@@ -103,14 +88,6 @@ func TestStoreBatchV2(t *testing.T) {
 	bhhBytes, err = db.Get(batchHeaderKeyBuilder.Key(bhh[:]))
 	require.Error(t, err)
 	require.Empty(t, bhhBytes)
-	for _, cert := range batch.BlobCertificates {
-		blobKey, err := cert.BlobHeader.BlobKey()
-		require.NoError(t, err)
-		blobCertKey := blobCertKeyBuilder.Key(blobKey[:])
-		blobCertBytes, err := db.Get(blobCertKey)
-		require.Error(t, err)
-		require.Empty(t, blobCertBytes)
-	}
 
 	for _, bundles := range rawBundles {
 		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()

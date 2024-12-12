@@ -78,22 +78,10 @@ func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]k
 
 	// Store blob shards
 	for _, bundles := range rawBundles {
-		// Store blob certificate
-		blobCertificateKeyBuilder, err := s.db.GetKeyBuilder(BlobCertificateTableName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get key builder for blob certificate: %v", err)
-		}
 		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get blob key: %v", err)
 		}
-		blobCertificateKey := blobCertificateKeyBuilder.Key(blobKey[:])
-		blobCertificateBytes, err := bundles.BlobCertificate.Serialize()
-		if err != nil {
-			return nil, fmt.Errorf("failed to serialize blob certificate: %v", err)
-		}
-		keys = append(keys, blobCertificateKey)
-		dbBatch.PutWithTTL(blobCertificateKey, blobCertificateBytes, s.ttl)
 
 		// Store bundles
 		for quorum, bundle := range bundles.Bundles {

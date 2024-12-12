@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -21,7 +22,7 @@ type Config struct {
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
-// with payments information (CumulativePayments, BinIndex, and Signature). Disperser will pass the blob header to the meterer, which will check if the
+// with payments information (CumulativePayments, ReservationPeriod, Salt, and Signature). Disperser will pass the blob header to the meterer, which will check if the
 // payments information is valid.
 type Meterer struct {
 	Config
@@ -71,21 +72,22 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
+	accountID := gethcommon.HexToAddress(header.AccountID)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, header.AccountID)
+		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, &reservation, numSymbols, quorumNumbers); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, reservation, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
-		if err := m.ServeOnDemandRequest(ctx, header, &onDemandPayment, numSymbols, quorumNumbers); err != nil {
+		if err := m.ServeOnDemandRequest(ctx, header, onDemandPayment, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}
@@ -98,7 +100,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	if err := m.ValidateQuorum(quorumNumbers, reservation.QuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
-	if !m.ValidateBinIndex(header, reservation) {
+	if !m.ValidateReservationPeriod(header, reservation) {
 		return fmt.Errorf("invalid bin index for reservation")
 	}
 
@@ -129,13 +131,13 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 	return nil
 }
 
-// ValidateBinIndex checks if the provided bin index is valid
-func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *core.ActiveReservation) bool {
+// ValidateReservationPeriod checks if the provided bin index is valid
+func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ActiveReservation) bool {
 	now := uint64(time.Now().Unix())
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	currentBinIndex := GetBinIndex(now, reservationWindow)
+	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
 	// Valid bin indexes are either the current bin or the previous bin
-	if (header.BinIndex != currentBinIndex && header.BinIndex != (currentBinIndex-1)) || (GetBinIndex(reservation.StartTimestamp, reservationWindow) > header.BinIndex || header.BinIndex > GetBinIndex(reservation.EndTimestamp, reservationWindow)) {
+	if (header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(reservation.StartTimestamp, reservationWindow) > header.ReservationPeriod || header.ReservationPeriod > GetReservationPeriod(reservation.EndTimestamp, reservationWindow)) {
 		return false
 	}
 	return true
@@ -144,7 +146,7 @@ func (m *Meterer) ValidateBinIndex(header core.PaymentMetadata, reservation *cor
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex), uint64(symbolsCharged))
+	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -157,8 +159,8 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
-	if newUsage <= 2*usageLimit && header.BinIndex+2 <= GetBinIndex(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
-		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.BinIndex+2), newUsage-usageLimit)
+	if newUsage <= 2*usageLimit && header.ReservationPeriod+2 <= GetReservationPeriod(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
+		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod+2), newUsage-usageLimit)
 		if err != nil {
 			return err
 		}
@@ -167,9 +169,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	return fmt.Errorf("overflow usage exceeds bin limit")
 }
 
-// GetBinIndex returns the current bin index by chunking time by the bin interval;
+// GetReservationPeriod returns the current bin index by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetBinIndex(timestamp uint64, binInterval uint32) uint32 {
+func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
 	return uint32(timestamp) / binInterval
 }
 
@@ -254,20 +256,21 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(m.ChainPaymentState.GetMinNumSymbols()))) * m.ChainPaymentState.GetMinNumSymbols()
 }
 
-// ValidateBinIndex checks if the provided bin index is valid
-func (m *Meterer) ValidateGlobalBinIndex(header core.PaymentMetadata) (uint32, error) {
+// ValidateReservationPeriod checks if the provided bin index is valid
+func (m *Meterer) ValidateGlobalReservationPeriod(header core.PaymentMetadata) (uint32, error) {
 	// Deterministic function: local clock -> index (1second intervals)
-	currentBinIndex := uint32(time.Now().Unix())
+	currentReservationPeriod := uint32(time.Now().Unix())
 
 	// Valid bin indexes are either the current bin or the previous bin (allow this second or prev sec)
-	if header.BinIndex != currentBinIndex && header.BinIndex != (currentBinIndex-1) {
+	if header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1) {
 		return 0, fmt.Errorf("invalid bin index for on-demand request")
 	}
-	return currentBinIndex, nil
+	return currentReservationPeriod, nil
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
+	//TODO: edit globalIndex based on bin interval in a subsequent PR
 	globalIndex := uint64(time.Now().Unix())
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalIndex, symbolsCharged)
 	if err != nil {
@@ -281,5 +284,5 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
-	return reservation.SymbolsPerSec * uint64(m.ChainPaymentState.GetReservationWindow())
+	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }

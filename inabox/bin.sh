@@ -50,6 +50,29 @@ function start_trap {
         pids="$pids $pid"
     done
 
+    for FILE in $(ls $testpath/envs/controller*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+
+    files=($(ls $testpath/envs/relay*.env))
+    for i in "${!files[@]}"; do
+        FILE=${files[$i]}
+        set -a
+        source $FILE
+        set +a
+        ../relay/bin/relay &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
 
@@ -145,12 +168,39 @@ function start_detached {
         pids="$pids $pid"
     done
 
+    for FILE in $(ls $testpath/envs/controller*.env); do
+        set -a
+        source $FILE
+        set +a
+        ../disperser/bin/controller > $testpath/logs/controller.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+    done
+
+    files=($(ls $testpath/envs/relay*.env))
+    last_index=$(( ${#files[@]} - 1 ))
+    for i in "${!files[@]}"; do
+        FILE=${files[$i]}
+        set -a
+        source $FILE
+        set +a
+        id=$(basename $FILE | tr -d -c 0-9)
+        ../relay/bin/relay > $testpath/logs/relay${id}.log 2>&1 &
+
+        pid="$!"
+        pids="$pids $pid"
+
+        ./wait-for 0.0.0.0:${RELAY_GRPC_PORT} -- echo "Relay up" &
+        waiters="$waiters $!"
+    done
+
     files=($(ls $testpath/envs/opr*.env))
     last_index=$(( ${#files[@]} - 1 ))
 
     for i in "${!files[@]}"; do
         if [ $i -eq $last_index ]; then
-            sleep 5  # Sleep for 5 seconds before the last loop iteration
+            sleep 10  # Sleep for 10 seconds before the last loop iteration
         fi
         FILE=${files[$i]}
         set -a

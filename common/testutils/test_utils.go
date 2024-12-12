@@ -11,6 +11,7 @@ import (
 
 // InitializeRandom initializes the random number generator. If no arguments are provided, then the seed is randomly
 // generated. If a single argument is provided, then the seed is fixed to that value.
+// Deprecated: use TestRandom instead
 func InitializeRandom(fixedSeed ...uint64) {
 
 	var seed uint64
@@ -85,6 +86,7 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 }
 
 // RandomBytes generates a random byte slice of a given length.
+// Deprecated: use TestRandom.RandomBytes instead
 func RandomBytes(length int) []byte {
 	bytes := make([]byte, length)
 	_, err := rand.Read(bytes)
@@ -95,11 +97,13 @@ func RandomBytes(length int) []byte {
 }
 
 // RandomTime generates a random time.
+// Deprecated: use TestRandom.RandomTime instead
 func RandomTime() time.Time {
 	return time.Unix(int64(rand.Int31()), 0)
 }
 
 // RandomString generates a random string out of printable ASCII characters.
+// Deprecated: use TestRandom.RandomString instead
 func RandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)

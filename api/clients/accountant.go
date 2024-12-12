@@ -69,30 +69,30 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 // and both fields are used to create the payment header and signature
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
-	currentBinIndex := meterer.GetBinIndex(uint64(now), a.reservationWindow)
+	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativeBinRecord := a.GetRelativeBinRecord(currentBinIndex)
+	relativeBinRecord := a.GetRelativeBinRecord(currentReservationPeriod)
 	relativeBinRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
-	binLimit := a.reservation.SymbolsPerSec * uint64(a.reservationWindow)
+	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativeBinRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentBinIndex, big.NewInt(0), nil
+		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
-	overflowBinRecord := a.GetRelativeBinRecord(currentBinIndex + 2)
+	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
 		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentBinIndex, big.NewInt(0), nil
+		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
 	// reservation not available, attempt on-demand
@@ -110,16 +110,17 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8) (*core.PaymentMetadata, error) {
-	binIndex, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
+	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
 	}
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		BinIndex:          binIndex,
+		ReservationPeriod: reservationPeriod,
 		CumulativePayment: cumulativePayment,
+		Salt:              salt,
 	}
 
 	return pm, nil
@@ -166,7 +167,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("reservation cannot be nil")
 	} else if paymentState.GetReservation().GetQuorumNumbers() == nil {
 		return fmt.Errorf("reservation quorum numbers cannot be nil")
-	} else if paymentState.GetReservation().GetQuorumSplit() == nil {
+	} else if paymentState.GetReservation().GetQuorumSplits() == nil {
 		return fmt.Errorf("reservation quorum split cannot be nil")
 	} else if paymentState.GetBinRecords() == nil {
 		return fmt.Errorf("bin records cannot be nil")
@@ -177,7 +178,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	a.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
 	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
 
-	a.reservation.SymbolsPerSec = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
+	a.reservation.SymbolsPerSecond = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
 	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
 	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
 	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
@@ -188,11 +189,11 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 	a.reservation.QuorumNumbers = quorumNumbers
 
-	quorumSplit := make([]uint8, len(paymentState.Reservation.QuorumSplit))
-	for i, quorum := range paymentState.Reservation.QuorumSplit {
-		quorumSplit[i] = uint8(quorum)
+	quorumSplits := make([]uint8, len(paymentState.Reservation.QuorumSplits))
+	for i, quorum := range paymentState.Reservation.QuorumSplits {
+		quorumSplits[i] = uint8(quorum)
 	}
-	a.reservation.QuorumSplit = quorumSplit
+	a.reservation.QuorumSplits = quorumSplits
 
 	binRecords := make([]BinRecord, len(paymentState.BinRecords))
 	for i, record := range paymentState.BinRecords {

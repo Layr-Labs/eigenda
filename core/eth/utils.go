@@ -1,12 +1,14 @@
 package eth
 
 import (
+	"fmt"
 	"math/big"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -125,4 +127,28 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 		}
 	}
 	return bytesArray
+}
+
+func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+	return reservation.SymbolsPerSecond == 0 &&
+		reservation.StartTimestamp == 0 &&
+		reservation.EndTimestamp == 0 &&
+		len(reservation.QuorumNumbers) == 0 &&
+		len(reservation.QuorumSplits) == 0
+}
+
+// ConvertToActiveReservation converts a upstream binding data structure to local definition.
+// Returns an error if the input reservation is zero-valued.
+func ConvertToActiveReservation(reservation paymentvault.IPaymentVaultReservation) (*core.ActiveReservation, error) {
+	if isZeroValuedReservation(reservation) {
+		return nil, fmt.Errorf("reservation is not a valid active reservation")
+	}
+
+	return &core.ActiveReservation{
+		SymbolsPerSecond: reservation.SymbolsPerSecond,
+		StartTimestamp:   reservation.StartTimestamp,
+		EndTimestamp:     reservation.EndTimestamp,
+		QuorumNumbers:    reservation.QuorumNumbers,
+		QuorumSplits:     reservation.QuorumSplits,
+	}, nil
 }

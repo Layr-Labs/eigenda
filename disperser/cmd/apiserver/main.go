@@ -124,7 +124,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		// add some default sensible configs
 		meterer = mt.NewMeterer(
 			mtConfig,
-			&paymentChainState,
+			paymentChainState,
 			offchainStore,
 			logger,
 			// metrics.NewNoopMetrics(),
@@ -172,17 +172,16 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		server := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
-			config.RateConfig,
 			blobStore,
 			blobMetadataStore,
 			transactor,
-			ratelimiter,
 			meterer,
 			authv2.NewAuthenticator(),
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,
 			logger,
+			reg,
 		)
 		return server.Start(context.Background())
 	}
@@ -210,6 +209,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
+		// TODO(cody-littley): once we deprecate v1, move all remaining metrics functionality to metrics_v2.go
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Disperser", "socket", httpSocket)
 	}

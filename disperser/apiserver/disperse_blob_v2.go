@@ -3,12 +3,10 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -16,6 +14,11 @@ import (
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
+	start := time.Now()
+	defer func() {
+		s.metrics.reportDisperseBlobLatency(time.Since(start))
+	}()
+
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
@@ -24,6 +27,11 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
 		return nil, err
 	}
+
+	finishedValidation := time.Now()
+	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
+
+	s.metrics.reportDisperseBlobSize(len(req.GetData()))
 
 	data := req.GetData()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
@@ -36,6 +44,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err != nil {
 		return nil, err
 	}
+
+	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
 	return &pb.DisperseBlobReply{
 		Result:  dispv2.Queued.ToProfobuf(),
@@ -111,33 +121,34 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	if err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
 	}
-	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
-	}
+	// TODO(ian-shim): enable this check for authentication
+	// if blobHeader.PaymentMetadata == nil {
+	// 	return api.NewErrorInvalidArg("payment metadata is required")
+	// }
+	// if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
+	// 	return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+	// }
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.BinIndex == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
-		return api.NewErrorInvalidArg("invalid payment metadata")
-	}
+	// TODO(ian-shim): enable this check when we have payment metadata + authentication in disperser client
+	// if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	// 	return api.NewErrorInvalidArg("invalid payment metadata")
+	// }
 
 	// handle payments and check rate limits
-	if blobHeaderProto.GetPaymentHeader() != nil {
-		binIndex := blobHeaderProto.GetPaymentHeader().GetBinIndex()
-		cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-		accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+	// reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
+	// cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
+	// accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 
-		paymentHeader := core.PaymentMetadata{
-			AccountID:         accountID,
-			BinIndex:          binIndex,
-			CumulativePayment: cumulativePayment,
-		}
+	// paymentHeader := core.PaymentMetadata{
+	// 	AccountID:         accountID,
+	// 	ReservationPeriod:          reservationPeriod,
+	// 	CumulativePayment: cumulativePayment,
+	// }
 
-		err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
-		if err != nil {
-			return api.NewErrorResourceExhausted(err.Error())
-		}
-	} else {
-		return api.NewErrorInvalidArg("payment header is required")
-	}
+	// err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	// if err != nil {
+	// 	return api.NewErrorResourceExhausted(err.Error())
+	// }
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)
 	if err != nil {

@@ -110,7 +110,7 @@ func testHeader(t *testing.T, accountID string) *corev2.BlobHeader {
 		QuorumNumbers: []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			BinIndex:          5,
+			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
 		Signature: []byte{},

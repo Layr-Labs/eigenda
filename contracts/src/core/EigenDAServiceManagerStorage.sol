@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
  * @author Layr Labs, Inc.
