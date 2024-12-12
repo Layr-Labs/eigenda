@@ -273,6 +273,8 @@ var optionalFlags = []cli.Flag{
 	OnDemandTableName,
 	GlobalRateTableName,
 	OnchainStateRefreshInterval,
+	OffchainPruneInterval,
+	OffchainMaxOnDemandStorage,
 	MaxNumSymbolsPerBlob,
 	PprofHttpPort,
 	EnablePprof,
