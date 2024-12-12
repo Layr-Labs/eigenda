@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	dummyActiveReservation = &core.ActiveReservation{
+	dummyReservedPayment = &core.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
@@ -43,14 +43,14 @@ func TestGetCurrentBlockNumber(t *testing.T) {
 	assert.Equal(t, uint32(1000), blockNumber)
 }
 
-func TestGetActiveReservationByAccount(t *testing.T) {
+func TestGetReservedPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
+	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(dummyReservedPayment, nil)
 
-	reservation, err := mockState.GetActiveReservationByAccount(ctx, gethcommon.Address{})
+	reservation, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
 	assert.NoError(t, err)
-	assert.Equal(t, dummyActiveReservation, reservation)
+	assert.Equal(t, dummyReservedPayment, reservation)
 }
 
 func TestGetOnDemandPaymentByAccount(t *testing.T) {

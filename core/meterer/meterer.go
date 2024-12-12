@@ -76,7 +76,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	accountID := gethcommon.HexToAddress(header.AccountID)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetActiveReservationByAccount(ctx, accountID)
+		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -97,7 +97,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 }
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint, quorumNumbers []uint8) error {
+func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint, quorumNumbers []uint8) error {
 	if err := m.ValidateQuorum(quorumNumbers, reservation.QuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
@@ -122,7 +122,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 		return fmt.Errorf("no quorum params in blob header")
 	}
 
-	// check that all the quorum ids are in ActiveReservation's
+	// check that all the quorum ids are in ReservedPayment's
 	for _, q := range headerQuorums {
 		if !slices.Contains(allowedQuorums, q) {
 			// fail the entire request if there's a quorum number mismatch
@@ -133,7 +133,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided bin index is valid
-func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ActiveReservation) bool {
+func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ReservedPayment) bool {
 	now := uint64(time.Now().Unix())
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
@@ -145,7 +145,7 @@ func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reserva
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
+func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
 	if err != nil {
@@ -274,6 +274,6 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 }
 
 // GetReservationBinLimit returns the bin limit for a given reservation
-func (m *Meterer) GetReservationBinLimit(reservation *core.ActiveReservation) uint64 {
+func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment) uint64 {
 	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }

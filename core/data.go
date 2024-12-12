@@ -606,7 +606,7 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
 // corresponding to a particular quorum
-type ActiveReservation struct {
+type ReservedPayment struct {
 	SymbolsPerSecond uint64 // reserve number of symbols per second
 	//TODO: we are not using start and end timestamp, add check or remove
 	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity

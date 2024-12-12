@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -260,7 +261,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
 	}
 	// on-Chain account state
-	reservation, err := s.meterer.ChainPaymentState.GetActiveReservationByAccount(ctx, accountID)
+	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}

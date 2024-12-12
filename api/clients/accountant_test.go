@@ -18,7 +18,7 @@ const numBins = uint32(3)
 const salt = uint32(0)
 
 func TestNewAccountant(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -48,7 +48,7 @@ func TestNewAccountant(t *testing.T) {
 }
 
 func TestAccountBlob_Reservation(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -96,7 +96,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -130,7 +130,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 }
 
 func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
-	reservation := &core.ActiveReservation{}
+	reservation := &core.ReservedPayment{}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
@@ -152,7 +152,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -200,7 +200,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -242,7 +242,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 }
 
 func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -284,7 +284,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 }
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
@@ -332,7 +332,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 }
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
-	reservation := &core.ActiveReservation{
+	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
