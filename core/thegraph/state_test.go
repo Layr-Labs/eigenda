@@ -11,6 +11,7 @@ import (
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
+	tmock "github.com/stretchr/testify/mock"
 )
 
 var (
@@ -33,7 +34,10 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 		1: 1,
 		2: 1,
 	})
+
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	// Set up mock expectations for all the calls we'll make
+	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -80,7 +84,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 		}
 	}
 
-	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger, 0)
 	assert.NoError(t, err)
 
 	err = cs.Start(context.Background())
@@ -102,7 +106,11 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 		1: 2,
 		2: 2,
 	})
+
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+
+	// Set up mock expectations for all the calls we'll make
+	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -150,7 +158,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 		}
 	}
 
-	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger, 0)
 	assert.NoError(t, err)
 
 	err = cs.Start(context.Background())
@@ -171,7 +179,11 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 		1: 1,
 		2: 1,
 	})
+
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+
+	// Set up mock expectations for all the calls we'll make
+	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -233,7 +245,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 		}
 	}
 
-	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger, 0)
 	assert.NoError(t, err)
 
 	err = cs.Start(context.Background())
@@ -256,7 +268,11 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 		1: 1,
 		2: 1,
 	})
+
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+
+	// Set up mock expectations for all the calls we'll make
+	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -289,7 +305,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 		}
 	}
 
-	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger)
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger, 0)
 	assert.NoError(t, err)
 
 	err = cs.Start(context.Background())
@@ -303,4 +319,102 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "3336192159512049190945679273141887248666932624338963482128432381981287252980", info.PubkeyG1.X.String())
 	assert.Equal(t, "15195175002875833468883745675063986308012687914999552116603423331534089122704", info.PubkeyG1.Y.String())
+}
+
+func TestIndexedOperatorStateCache_CacheEviction(t *testing.T) {
+	logger := logging.NewNoopLogger()
+	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+		0: 1,
+	})
+
+	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+
+	// Set up mock expectations for all the calls we'll make
+	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", tmock.Anything, uint(2), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", tmock.Anything, uint(3), []core.QuorumID{0}).Return(chainState.Operators, nil)
+
+	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
+	id := ""
+	for key := range state.Operators[0] {
+		id = key.Hex()
+	}
+
+	// Set up the mock querier to return consistent data
+	operatorsQueryCalled := false
+	querier := &mockGraphQLQuerier{}
+	querier.QueryFn = func(ctx context.Context, q any, variables map[string]any) error {
+		switch res := q.(type) {
+		case *thegraph.QueryQuorumAPKGql:
+			pubKey := thegraph.AggregatePubkeyKeyGql{
+				Apk_X: "3829803941453902453085939595934570464887466392754984985219704448765546217155",
+				Apk_Y: "7864472681234874546092094912246874347602747071877011905183009416740980374479",
+			}
+			res.QuorumAPK = append(res.QuorumAPK, pubKey)
+			return nil
+		case *thegraph.QueryOperatorsGql:
+			if operatorsQueryCalled {
+				operatorsQueryCalled = false
+				return nil
+			}
+			res.Operators = []thegraph.IndexedOperatorInfoGql{
+				{
+					Id:         graphql.String(id),
+					PubkeyG1_X: "3336192159512049190945679273141887248666932624338963482128432381981287252980",
+					PubkeyG1_Y: "15195175002875833468883745675063986308012687914999552116603423331534089122704",
+					PubkeyG2_X: []graphql.String{
+						"21597023645215426396093421944506635812143308313031252511177204078669540440732",
+						"11405255666568400552575831267661419473985517916677491029848981743882451844775",
+					},
+					PubkeyG2_Y: []graphql.String{
+						"9416989242565286095121881312760798075882411191579108217086927390793923664442",
+						"13612061731370453436662267863740141021994163834412349567410746669651828926551",
+					},
+					SocketUpdates: []thegraph.SocketUpdates{{Socket: "localhost:32006;32007"}},
+				},
+			}
+			operatorsQueryCalled = true
+			return nil
+		default:
+			return nil
+		}
+	}
+
+	// Create IndexedChainState with cache size 2
+	cs, err := thegraph.NewIndexedChainState(chainState, querier, logger, 2)
+	assert.NoError(t, err)
+
+	err = cs.Start(context.Background())
+	assert.NoError(t, err)
+
+	ctx := context.Background()
+	quorums := []core.QuorumID{0}
+
+	// First call - should fetch the state
+	_, err = cs.GetIndexedOperatorState(ctx, 1, quorums)
+	assert.NoError(t, err)
+
+	// Second call with different block - should fetch
+	_, err = cs.GetIndexedOperatorState(ctx, 2, quorums)
+	assert.NoError(t, err)
+
+	// Third call with new block - should evict first entry
+	_, err = cs.GetIndexedOperatorState(ctx, 3, quorums)
+	assert.NoError(t, err)
+
+	// Call again with block 1 - should fetch state again since it was evicted and evict block 2
+	_, err = cs.GetIndexedOperatorState(ctx, 1, quorums)
+	assert.NoError(t, err)
+
+	// Call with block 3 - should hit cache
+	_, err = cs.GetIndexedOperatorState(ctx, 3, quorums)
+	assert.NoError(t, err)
+
+	// Call with block 1 - should hit cache
+	_, err = cs.GetIndexedOperatorState(ctx, 1, quorums)
+	assert.NoError(t, err)
+
+	// Verify number of calls
+	// 4 calls to GetOperatorState + 1 from the initial call to GetOperatorState
+	chainState.AssertNumberOfCalls(t, "GetOperatorState", 5)
 }

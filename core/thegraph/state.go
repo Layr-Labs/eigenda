@@ -16,12 +16,11 @@ import (
 )
 
 const (
-	defaultInterval        = time.Second
-	maxInterval            = 5 * time.Minute
-	maxEntriesPerQuery     = 1000
-	startRetriesInterval   = time.Second * 5
-	startMaxRetries        = 6
-	operatorStateCacheSize = 32
+	defaultInterval      = time.Second
+	maxInterval          = 5 * time.Minute
+	maxEntriesPerQuery   = 1000
+	startRetriesInterval = time.Second * 5
+	startMaxRetries      = 6
 )
 
 type (
@@ -96,17 +95,23 @@ func MakeIndexedChainState(config Config, cs core.ChainState, logger logging.Log
 	// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
 	retryQuerier := NewRetryQuerier(querier, config.PullInterval, config.MaxRetries)
 
-	return NewIndexedChainState(cs, retryQuerier, logger)
+	return NewIndexedChainState(cs, retryQuerier, logger, config.OperatorStateCacheSize)
 }
 
-func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger) (*indexedChainState, error) {
-	operatorStateCache, err := lru.New[string, *core.IndexedOperatorState](operatorStateCacheSize)
-	if err != nil {
-		return nil, err
+func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger, cacheSize int) (*indexedChainState, error) {
+	var operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
+	var err error
+
+	if cacheSize > 0 {
+		operatorStateCache, err = lru.New[string, *core.IndexedOperatorState](cacheSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &indexedChainState{
-		ChainState:         cs,
+		ChainState: cs,
+
 		querier:            querier,
 		logger:             logger.With("component", "IndexedChainState"),
 		operatorStateCache: operatorStateCache,
@@ -135,8 +140,10 @@ func (ics *indexedChainState) Start(ctx context.Context) error {
 func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 	// Check if the indexed operator state has been cached
 	cacheKey := computeCacheKey(blockNumber, quorums)
-	if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
-		return val, nil
+	if ics.operatorStateCache != nil {
+		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
+			return val, nil
+		}
 	}
 
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
@@ -189,7 +196,10 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		AggKeys:          aggKeys,
 	}
 
-	ics.operatorStateCache.Add(cacheKey, state)
+	if ics.operatorStateCache != nil {
+		ics.operatorStateCache.Add(cacheKey, state)
+	}
+
 	return state, nil
 }
 
@@ -383,6 +393,9 @@ func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperato
 	}, nil
 }
 
+// Computes a cache key for the operator state cache. The cache key is a
+// combination of the block number and the quorum IDs. Note: the order of the
+// quorum IDs matters.
 func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
 	bytes := make([]byte, 8+len(quorumIDs))
 	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))
