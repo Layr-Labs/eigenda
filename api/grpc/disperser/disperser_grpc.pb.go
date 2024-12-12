@@ -43,7 +43,7 @@ type DisperserClient interface {
 	// INTERNAL (500): serious error, user should NOT retry.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
-	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+	// client to authenticate itself via the AuthenticationData message. The protocol is as follows:
 	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
 	//  2. The Disperser sends back a BlobAuthHeader message containing information for the client to
 	//     verify and sign.
@@ -146,7 +146,7 @@ type DisperserServer interface {
 	// INTERNAL (500): serious error, user should NOT retry.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
-	// client to authenticate itself via the AuthenticationData message. The protoco is as follows:
+	// client to authenticate itself via the AuthenticationData message. The protocol is as follows:
 	//  1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message
 	//  2. The Disperser sends back a BlobAuthHeader message containing information for the client to
 	//     verify and sign.
