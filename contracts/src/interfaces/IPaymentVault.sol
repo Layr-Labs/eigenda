@@ -7,8 +7,8 @@ interface IPaymentVault {
         uint64 symbolsPerSecond; // Number of symbols reserved per second
         uint64 startTimestamp;   // timestamp of epoch where reservation begins
         uint64 endTimestamp;     // timestamp of epoch where reservation ends
-	    bytes quorumNumbers;     // quorum numbers in an ordered bytes array
-	    bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
+        bytes quorumNumbers;     // quorum numbers in an ordered bytes array
+        bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
     }
 
     struct OnDemandPayment {

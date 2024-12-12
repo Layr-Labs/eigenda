@@ -53,7 +53,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         address _account, 
         Reservation memory _reservation
     ) external onlyOwner { 
-		_checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
+        _checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
         require(_reservation.endTimestamp > _reservation.startTimestamp, "end timestamp must be greater than start timestamp");
         reservations[_account] = _reservation;
         emit ReservationUpdated(_account, _reservation);
@@ -64,7 +64,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
      * @param _account is the address to deposit the funds for
      */
     function depositOnDemand(address _account) external payable {
-		_deposit(_account, msg.value);
+        _deposit(_account, msg.value);
     }
 
     function setPriceParams(
