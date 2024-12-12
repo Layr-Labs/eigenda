@@ -203,7 +203,7 @@ func (t *MockWriter) GetNumBlobVersions(ctx context.Context) (uint16, error) {
 	return result.(uint16), args.Error(1)
 }
 
-func (t *MockWriter) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+func (t *MockWriter) GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*core.BlobVersionParameters, error) {
 	args := t.Called()
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -212,13 +212,13 @@ func (t *MockWriter) GetVersionedBlobParams(ctx context.Context, blobVersion uin
 	return result.(*core.BlobVersionParameters), args.Error(1)
 }
 
-func (t *MockWriter) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+func (t *MockWriter) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*core.BlobVersionParameters, error) {
 	args := t.Called()
 	result := args.Get(0)
 	if result == nil {
 		return nil, args.Error(1)
 	}
-	return result.(map[uint8]*core.BlobVersionParameters), args.Error(1)
+	return result.(map[uint16]*core.BlobVersionParameters), args.Error(1)
 }
 
 func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {

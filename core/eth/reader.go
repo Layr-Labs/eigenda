@@ -647,7 +647,7 @@ func (t *Reader) GetNumBlobVersions(ctx context.Context) (uint16, error) {
 	})
 }
 
-func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*core.BlobVersionParameters, error) {
 	params, err := t.bindings.EigenDAServiceManager.GetBlobParams(&bind.CallOpts{
 		Context: ctx,
 	}, uint16(blobVersion))
@@ -661,7 +661,7 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) 
 	}, nil
 }
 
-func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*core.BlobVersionParameters, error) {
 	if t.bindings.ThresholdRegistry == nil {
 		return nil, errors.New("threshold registry not deployed")
 	}
@@ -671,8 +671,8 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 		return nil, err
 	}
 
-	res := make(map[uint8]*core.BlobVersionParameters)
-	for version := uint8(0); version < uint8(numBlobVersions); version++ {
+	res := make(map[uint16]*core.BlobVersionParameters)
+	for version := uint16(0); version < uint16(numBlobVersions); version++ {
 		params, err := t.GetVersionedBlobParams(ctx, version)
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
 			break
