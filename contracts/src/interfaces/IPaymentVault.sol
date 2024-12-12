@@ -11,24 +11,28 @@ interface IPaymentVault {
 	    bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
     }
 
+    struct OnDemandPayment {
+        uint80 totalDeposit;
+    }
+
     /// @notice Emitted when a reservation is created or updated
     event ReservationUpdated(address indexed account, Reservation reservation);
     /// @notice Emitted when an on-demand payment is created or updated
-    event OnDemandPaymentUpdated(address indexed account, uint128 onDemandPayment, uint128 totalDeposit);
-    /// @notice Emitted when globalSymbolsPerBin is updated
-    event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
-    /// @notice Emitted when reservationBinInterval is updated
-    event ReservationBinIntervalUpdated(uint128 previousValue, uint128 newValue);
-    /// @notice Emitted when globalRateBinInterval is updated
-    event GlobalRateBinIntervalUpdated(uint128 previousValue, uint128 newValue);
+    event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit);
+    /// @notice Emitted when globalSymbolsPerPeriod is updated
+    event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue);
+    /// @notice Emitted when reservationPeriodInterval is updated
+    event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
+    /// @notice Emitted when globalRatePeriodInterval is updated
+    event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
     /// @notice Emitted when priceParams are updated
     event PriceParamsUpdated(
-        uint128 previousMinNumSymbols, 
-        uint128 newMinNumSymbols, 
-        uint128 previousPricePerSymbol, 
-        uint128 newPricePerSymbol, 
-        uint128 previousPriceUpdateCooldown, 
-        uint128 newPriceUpdateCooldown
+        uint64 previousMinNumSymbols, 
+        uint64 newMinNumSymbols, 
+        uint64 previousPricePerSymbol, 
+        uint64 newPricePerSymbol, 
+        uint64 previousPriceUpdateCooldown, 
+        uint64 newPriceUpdateCooldown
     );
 
     /**
@@ -54,8 +58,8 @@ interface IPaymentVault {
     function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations);
 
     /// @notice Fetches the current total on demand balance of an account
-    function getOnDemandAmount(address _account) external view returns (uint128);
+    function getOnDemandTotalDeposit(address _account) external view returns (uint80);
 
     /// @notice Fetches the current total on demand balances for a set of accounts
-    function getOnDemandAmounts(address[] memory _accounts) external view returns (uint128[] memory _payments);
+    function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments);
 }

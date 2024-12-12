@@ -12,17 +12,17 @@ contract PaymentVaultUnit is Test {
     using stdStorage for StdStorage;
 
     event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
-    event OnDemandPaymentUpdated(address indexed account, uint128 onDemandPayment, uint128 totalDeposit);
-    event GlobalSymbolsPerBinUpdated(uint128 previousValue, uint128 newValue);
-    event ReservationBinIntervalUpdated(uint128 previousValue, uint128 newValue);
-    event GlobalRateBinIntervalUpdated(uint128 previousValue, uint128 newValue);
+    event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit);
+    event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue);
+    event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
+    event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
     event PriceParamsUpdated(
-        uint128 previousMinNumSymbols, 
-        uint128 newMinNumSymbols, 
-        uint128 previousPricePerSymbol, 
-        uint128 newPricePerSymbol, 
-        uint128 previousPriceUpdateCooldown, 
-        uint128 newPriceUpdateCooldown
+        uint64 previousMinNumSymbols, 
+        uint64 newMinNumSymbols, 
+        uint64 previousPricePerSymbol, 
+        uint64 newPricePerSymbol, 
+        uint64 previousPriceUpdateCooldown, 
+        uint64 newPriceUpdateCooldown
     );
 
     PaymentVault paymentVault;
@@ -34,13 +34,12 @@ contract PaymentVaultUnit is Test {
     address user = address(uint160(uint256(keccak256(abi.encodePacked("user")))));
     address user2 = address(uint160(uint256(keccak256(abi.encodePacked("user2")))));
 
-    uint128 minNumSymbols = 1;
-    uint128 globalSymbolsPerBin = 2;
-    uint128 pricePerSymbol = 3;
-    uint128 reservationBinInterval = 4;
-    uint128 globalRateBinInterval = 5;
-
-    uint128 priceUpdateCooldown = 6 days;
+    uint64 minNumSymbols = 1;
+    uint64 globalSymbolsPerPeriod = 2;
+    uint64 pricePerSymbol = 3;
+    uint64 reservationPeriodInterval = 4;
+    uint64 globalRatePeriodInterval = 5;
+    uint64 priceUpdateCooldown = 6 days;
 
     bytes quorumNumbers = hex"0001";
     bytes quorumSplits = hex"3232";
@@ -58,11 +57,11 @@ contract PaymentVaultUnit is Test {
                             PaymentVault.initialize.selector,
                             initialOwner,
                             minNumSymbols,
-                            globalSymbolsPerBin,
                             pricePerSymbol,
-                            reservationBinInterval,
                             priceUpdateCooldown,
-                            globalRateBinInterval
+                            globalSymbolsPerPeriod,
+                            reservationPeriodInterval,
+                            globalRatePeriodInterval
                         )
                     )
                 )
@@ -75,11 +74,11 @@ contract PaymentVaultUnit is Test {
     function test_initialize() public {
         require(paymentVault.owner() == initialOwner, "Owner is not set");
         assertEq(paymentVault.minNumSymbols(), minNumSymbols);
-        assertEq(paymentVault.globalSymbolsPerBin(), globalSymbolsPerBin);
+        assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod);
         assertEq(paymentVault.pricePerSymbol(), pricePerSymbol);
-        assertEq(paymentVault.reservationBinInterval(), reservationBinInterval);
+        assertEq(paymentVault.reservationPeriodInterval(), reservationPeriodInterval);
         assertEq(paymentVault.priceUpdateCooldown(), priceUpdateCooldown);
-        assertEq(paymentVault.globalRateBinInterval(), globalRateBinInterval);
+        assertEq(paymentVault.globalRatePeriodInterval(), globalRatePeriodInterval);
 
         vm.expectRevert("Initializable: contract is already initialized");
         paymentVault.initialize(address(0), 0, 0, 0, 0, 0, 0);
@@ -167,13 +166,13 @@ contract PaymentVaultUnit is Test {
         emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
         vm.prank(user);
         paymentVault.depositOnDemand{value: 100 ether}(user);
-        assertEq(paymentVault.onDemandPayments(user), 100 ether);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
 
         vm.expectEmit(address(paymentVault));
         emit OnDemandPaymentUpdated(user, 100 ether, 200 ether);
         vm.prank(user);
         paymentVault.depositOnDemand{value: 100 ether}(user);
-        assertEq(paymentVault.onDemandPayments(user), 200 ether);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user), 200 ether);
     }
 
     function test_depositOnDemand_forOtherUser() public {
@@ -184,8 +183,8 @@ contract PaymentVaultUnit is Test {
         emit OnDemandPaymentUpdated(user2, 100 ether, 100 ether);
         vm.prank(user);
         paymentVault.depositOnDemand{value: 100 ether}(user2);
-        assertEq(paymentVault.onDemandPayments(user2), 100 ether);
-        assertEq(paymentVault.onDemandPayments(user), 0);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user2), 100 ether);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user), 0);
     }
 
     function test_depositOnDemand_fallback() public {
@@ -195,7 +194,7 @@ contract PaymentVaultUnit is Test {
         emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
         vm.prank(user);
         payable(paymentVault).call{value: 100 ether}(hex"69");
-        assertEq(paymentVault.onDemandPayments(user), 100 ether);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
     }
 
     function test_depositOnDemand_recieve() public {
@@ -205,7 +204,14 @@ contract PaymentVaultUnit is Test {
         emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
         vm.prank(user);
         payable(paymentVault).call{value: 100 ether}("");
-        assertEq(paymentVault.onDemandPayments(user), 100 ether);
+        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
+    }
+
+    function test_depositOnDemand_revertUint80Overflow() public {
+        vm.deal(user, uint256(type(uint80).max) + 1);
+        vm.expectRevert("amount must be less than or equal to 80 bits");
+        vm.prank(user);
+        paymentVault.depositOnDemand{value: uint256(type(uint80).max) + 1}(user);
     }
 
     function test_setPriceParams() public {
@@ -230,28 +236,28 @@ contract PaymentVaultUnit is Test {
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
     }
 
-    function test_setGlobalRateBinInterval() public {
+    function test_setGlobalRatePeriodInterval() public {
         vm.expectEmit(address(paymentVault));
-        emit GlobalRateBinIntervalUpdated(globalRateBinInterval, globalRateBinInterval + 1);
+        emit GlobalRatePeriodIntervalUpdated(globalRatePeriodInterval, globalRatePeriodInterval + 1);
         vm.prank(initialOwner);
-        paymentVault.setGlobalRateBinInterval(globalRateBinInterval + 1);
-        assertEq(paymentVault.globalRateBinInterval(), globalRateBinInterval + 1);
+        paymentVault.setGlobalRatePeriodInterval(globalRatePeriodInterval + 1);
+        assertEq(paymentVault.globalRatePeriodInterval(), globalRatePeriodInterval + 1);
     }
 
-    function test_setGlobalSymbolsPerBin() public {
+    function test_setGlobalSymbolsPerPeriod() public {
         vm.expectEmit(address(paymentVault));
-        emit GlobalSymbolsPerBinUpdated(globalSymbolsPerBin, globalSymbolsPerBin + 1);
+        emit GlobalSymbolsPerPeriodUpdated(globalSymbolsPerPeriod, globalSymbolsPerPeriod + 1);
         vm.prank(initialOwner);
-        paymentVault.setGlobalSymbolsPerBin(globalSymbolsPerBin + 1);
-        assertEq(paymentVault.globalSymbolsPerBin(), globalSymbolsPerBin + 1);
+        paymentVault.setGlobalSymbolsPerPeriod(globalSymbolsPerPeriod + 1);
+        assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod + 1);
     }
 
-    function test_setReservationBinInterval() public {
+    function test_setReservationPeriodInterval() public {
         vm.expectEmit(address(paymentVault));
-        emit ReservationBinIntervalUpdated(reservationBinInterval, reservationBinInterval + 1);
+        emit ReservationPeriodIntervalUpdated(reservationPeriodInterval, reservationPeriodInterval + 1);
         vm.prank(initialOwner);
-        paymentVault.setReservationBinInterval(reservationBinInterval + 1);
-        assertEq(paymentVault.reservationBinInterval(), reservationBinInterval + 1);
+        paymentVault.setReservationPeriodInterval(reservationPeriodInterval + 1);
+        assertEq(paymentVault.reservationPeriodInterval(), reservationPeriodInterval + 1);
     }
 
     function test_withdraw() public {
@@ -286,11 +292,11 @@ contract PaymentVaultUnit is Test {
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setGlobalRateBinInterval(globalRateBinInterval + 1);
+        paymentVault.setGlobalRatePeriodInterval(globalRatePeriodInterval + 1);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setGlobalSymbolsPerBin(globalSymbolsPerBin + 1);
+        paymentVault.setGlobalSymbolsPerPeriod(globalSymbolsPerPeriod + 1);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setReservationBinInterval(reservationBinInterval + 1);
+        paymentVault.setReservationPeriodInterval(reservationPeriodInterval + 1);
     }
 
     function test_getReservations() public {
@@ -335,7 +341,7 @@ contract PaymentVaultUnit is Test {
         accounts[0] = user;
         accounts[1] = user2;
 
-        uint128[] memory payments = paymentVault.getOnDemandAmounts(accounts);
+        uint80[] memory payments = paymentVault.getOnDemandTotalDeposits(accounts);
         assertEq(payments[0], 100 ether);
         assertEq(payments[1], 200 ether);
     }

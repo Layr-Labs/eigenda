@@ -63,12 +63,12 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
 
-    uint128 _minNumSymbols = 4096;
-    uint128 _globalSymbolsPerBin = 131072;
-    uint128 _pricePerSymbol = 0.4470 gwei;
-    uint128 _reservationBinInterval = 300;
-    uint128 _priceUpdateCooldown = 1;
-    uint128 _globalRateBinInterval = 30;
+    uint64 _minNumSymbols = 4096;
+    uint64 _pricePerSymbol = 0.4470 gwei;
+    uint64 _priceUpdateCooldown = 1;
+    uint64 _globalSymbolsPerPeriod = 131072;
+    uint64 _reservationPeriodInterval = 300;
+    uint64 _globalRatePeriodInterval = 30;
 
     struct AddressConfig {
         address eigenLayerCommunityMultisig;
@@ -159,11 +159,11 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 PaymentVault.initialize.selector,
                 addressConfig.eigenDACommunityMultisig,
                 _minNumSymbols,
-                _globalSymbolsPerBin,
                 _pricePerSymbol,
-                _reservationBinInterval,
                 _priceUpdateCooldown,
-                _globalRateBinInterval
+                _globalSymbolsPerPeriod,
+                _reservationPeriodInterval,
+                _globalRatePeriodInterval
             )
         );
         }
