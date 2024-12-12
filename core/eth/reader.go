@@ -786,7 +786,7 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 	return globalSymbolsPerSecond.Uint64(), nil
 }
 
-func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
+func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -796,7 +796,7 @@ func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return globalRateBinInterval.Uint64(), nil
+	return uint32(globalRateBinInterval.Uint64()), nil
 }
 
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
