@@ -26,15 +26,15 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
-	binRecords        []BinRecord
-	usageLock         sync.Mutex
-	cumulativePayment *big.Int
+	reservationPeriodRecords []ReservationPeriodRecord
+	usageLock                sync.Mutex
+	cumulativePayment        *big.Int
 
-	// number of bins in the circular accounting, restricted by minNumBins which is 3
+	// number of bins in the circular accounting, restricted by MinNumPeriods which is 3
 	numBins uint32
 }
 
-type BinRecord struct {
+type ReservationPeriodRecord struct {
 	Index uint32
 	Usage uint64
 }
@@ -43,20 +43,20 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
-	binRecords := make([]BinRecord, numBins)
-	for i := range binRecords {
-		binRecords[i] = BinRecord{Index: uint32(i), Usage: 0}
+	reservationPeriodRecords := make([]ReservationPeriodRecord, numBins)
+	for i := range reservationPeriodRecords {
+		reservationPeriodRecords[i] = ReservationPeriodRecord{Index: uint32(i), Usage: 0}
 	}
 	a := Accountant{
-		accountID:         accountID,
-		reservation:       reservation,
-		onDemand:          onDemand,
-		reservationWindow: reservationWindow,
-		pricePerSymbol:    pricePerSymbol,
-		minNumSymbols:     minNumSymbols,
-		binRecords:        binRecords,
-		cumulativePayment: big.NewInt(0),
-		numBins:           max(numBins, uint32(meterer.MinNumBins)),
+		accountID:                accountID,
+		reservation:              reservation,
+		onDemand:                 onDemand,
+		reservationWindow:        reservationWindow,
+		pricePerSymbol:           pricePerSymbol,
+		minNumSymbols:            minNumSymbols,
+		reservationPeriodRecords: reservationPeriodRecords,
+		cumulativePayment:        big.NewInt(0),
+		numBins:                  max(numBins, uint32(meterer.MinNumPeriods)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -73,22 +73,22 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativeBinRecord := a.GetRelativeBinRecord(currentReservationPeriod)
-	relativeBinRecord.Usage += numSymbols
+	relativeReservationPeriodRecord := a.GetRelativeReservationPeriodRecord(currentReservationPeriod)
+	relativeReservationPeriodRecord.Usage += numSymbols
 
 	// first attempt to use the active reservation
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
-	if relativeBinRecord.Usage <= binLimit {
+	if relativeReservationPeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
 		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
-	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
+	overflowReservationPeriodRecord := a.GetRelativeReservationPeriodRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
-		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
+	if overflowReservationPeriodRecord.Usage == 0 && relativeReservationPeriodRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
+		overflowReservationPeriodRecord.Usage += relativeReservationPeriodRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
@@ -97,7 +97,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 	// reservation not available, attempt on-demand
 	//todo: rollback later if disperser respond with some type of rejection?
-	relativeBinRecord.Usage -= numSymbols
+	relativeReservationPeriodRecord.Usage -= numSymbols
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(numSymbols))))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
@@ -142,16 +142,16 @@ func (a *Accountant) SymbolsCharged(numSymbols uint) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(a.minNumSymbols))) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativeBinRecord(index uint32) *BinRecord {
+func (a *Accountant) GetRelativeReservationPeriodRecord(index uint32) *ReservationPeriodRecord {
 	relativeIndex := index % a.numBins
-	if a.binRecords[relativeIndex].Index != uint32(index) {
-		a.binRecords[relativeIndex] = BinRecord{
+	if a.reservationPeriodRecords[relativeIndex].Index != uint32(index) {
+		a.reservationPeriodRecords[relativeIndex] = ReservationPeriodRecord{
 			Index: uint32(index),
 			Usage: 0,
 		}
 	}
 
-	return &a.binRecords[relativeIndex]
+	return &a.reservationPeriodRecords[relativeIndex]
 }
 
 func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
@@ -169,7 +169,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("reservation quorum numbers cannot be nil")
 	} else if paymentState.GetReservation().GetQuorumSplits() == nil {
 		return fmt.Errorf("reservation quorum split cannot be nil")
-	} else if paymentState.GetBinRecords() == nil {
+	} else if paymentState.GetReservationPeriodRecords() == nil {
 		return fmt.Errorf("bin records cannot be nil")
 	}
 
@@ -195,14 +195,14 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 	a.reservation.QuorumSplits = quorumSplits
 
-	binRecords := make([]BinRecord, len(paymentState.BinRecords))
-	for i, record := range paymentState.BinRecords {
-		binRecords[i] = BinRecord{
+	reservationPeriodRecords := make([]ReservationPeriodRecord, len(paymentState.ReservationPeriodRecords))
+	for i, record := range paymentState.ReservationPeriodRecords {
+		reservationPeriodRecords[i] = ReservationPeriodRecord{
 			Index: record.Index,
 			Usage: record.Usage,
 		}
 	}
-	a.binRecords = binRecords
+	a.reservationPeriodRecords = reservationPeriodRecords
 
 	return nil
 }

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -56,6 +57,7 @@ type DispersalServerV2 struct {
 	onchainState                atomic.Pointer[OnchainState]
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
+	OffchainPruneInterval       time.Duration
 
 	metrics *metricsV2
 }
@@ -71,6 +73,7 @@ func NewDispersalServerV2(
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
+	OffchainPruneInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 ) *DispersalServerV2 {
@@ -89,6 +92,7 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		OffchainPruneInterval:       OffchainPruneInterval,
 
 		metrics: newAPIServerV2Metrics(registry),
 	}
@@ -128,6 +132,23 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 			case <-ticker.C:
 				if err := s.RefreshOnchainState(ctx); err != nil {
 					s.logger.Error("failed to refresh onchain quorum state", "err", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(s.OffchainPruneInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				prevPeriod := s.meterer.CurrentReservationPeriod() - 1
+				if err := s.meterer.OffchainStore.DeleteOldPeriods(ctx, prevPeriod); err != nil {
+					s.logger.Error("failed to delete old bins", "err", err)
 				}
 			case <-ctx.Done():
 				return
@@ -251,7 +272,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
+	reservationPeriodRecords, err := s.meterer.OffchainStore.GetReservationPeriodRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		return nil, api.NewErrorNotFound("failed to get active reservation")
 	}
@@ -286,8 +307,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}
 	// build reply
 	reply := &pb.GetPaymentStateReply{
-		PaymentGlobalParams: &paymentGlobalParams,
-		BinRecords:          binRecords[:],
+		PaymentGlobalParams:      &paymentGlobalParams,
+		ReservationPeriodRecords: reservationPeriodRecords[:],
 		Reservation: &pb.Reservation{
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   uint32(reservation.StartTimestamp),

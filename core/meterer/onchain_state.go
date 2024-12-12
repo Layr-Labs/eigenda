@@ -15,7 +15,7 @@ import (
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
-	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error
+	RefreshOnchainPaymentState(ctx context.Context) error
 	GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
@@ -107,8 +107,8 @@ func GetPaymentVaultParams(ctx context.Context, tx *eth.Reader) (*PaymentVaultPa
 }
 
 // RefreshOnchainPaymentState returns the current onchain payment state
-func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
-	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
+func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
+	paymentVaultParams, err := GetPaymentVaultParams(ctx, pcs.tx)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	activeReservations, err := tx.GetActiveReservations(ctx, accountIDs)
+	activeReservations, err := pcs.tx.GetActiveReservations(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := tx.GetOnDemandPayments(ctx, accountIDs)
+	onDemandPayments, err := pcs.tx.GetOnDemandPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}

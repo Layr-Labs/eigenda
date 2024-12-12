@@ -451,7 +451,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
@@ -476,13 +476,18 @@ func newTestServerV2(t *testing.T) *testComponents {
 		table_names[0],
 		table_names[1],
 		table_names[2],
+		uint64(100),
 		logger,
 	)
 	if err != nil {
 		teardown()
 		panic("failed to create offchain store")
 	}
-	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+	meterer := meterer.NewMeterer(meterer.Config{
+		ChainReadTimeout:      1 * time.Second,
+		OnchainUpdateInterval: 1 * time.Second,
+		OffchainPruneInterval: 1 * time.Second,
+	}, mockState, store, logger)
 
 	chainReader.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	chainReader.On("GetQuorumCount").Return(uint8(2), nil)
@@ -510,8 +515,10 @@ func newTestServerV2(t *testing.T) *testComponents {
 		prover,
 		10,
 		time.Hour,
+		time.Hour,
 		logger,
-		prometheus.NewRegistry())
+		prometheus.NewRegistry(),
+	)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

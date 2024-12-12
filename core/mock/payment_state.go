@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
@@ -25,7 +24,7 @@ func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (ui
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
+func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
 	args := m.Called()
 	return args.Error(0)
 }

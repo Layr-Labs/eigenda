@@ -5,7 +5,6 @@
 
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
-    - [BinRecord](#disperser-v2-BinRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -17,6 +16,7 @@
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
     - [Reservation](#disperser-v2-Reservation)
+    - [ReservationPeriodRecord](#disperser-v2-ReservationPeriodRecord)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
     - [BlobStatus](#disperser-v2-BlobStatus)
@@ -47,23 +47,6 @@
 | quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum |
 | sigma | [bytes](#bytes) |  | Serialized bytes of aggregate signature |
 | quorum_numbers | [uint32](#uint32) | repeated | Relevant quorum numbers for the attestation |
-
-
-
-
-
-
-<a name="disperser-v2-BinRecord"></a>
-
-### BinRecord
-BinRecord is the usage record of an account in a bin. The API should return the active bin 
-record and the subsequent two records that contains potential overflows.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| index | [uint32](#uint32) |  |  |
-| usage | [uint64](#uint64) |  |  |
 
 
 
@@ -191,7 +174,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| reservation_period_records | [ReservationPeriodRecord](#disperser-v2-ReservationPeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
@@ -249,6 +232,23 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | end_timestamp | [uint32](#uint32) |  |  |
 | quorum_numbers | [uint32](#uint32) | repeated |  |
 | quorum_splits | [uint32](#uint32) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-ReservationPeriodRecord"></a>
+
+### ReservationPeriodRecord
+ReservationPeriodRecord is the usage record of an account in a bin. The API should return the active bin 
+record and the subsequent two records that contains potential overflows.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| index | [uint32](#uint32) |  |  |
+| usage | [uint64](#uint64) |  |  |
 
 
 
