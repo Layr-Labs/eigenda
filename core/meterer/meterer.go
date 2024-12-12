@@ -18,8 +18,10 @@ type Config struct {
 	// ChainReadTimeout is the timeout for reading payment state from chain
 	ChainReadTimeout time.Duration
 
-	// UpdateInterval is the interval for refreshing the on-chain state
-	UpdateInterval time.Duration
+	// OnchainUpdateInterval is the interval for refreshing the on-chain state
+	OnchainUpdateInterval time.Duration
+	// OffchainPruneInterval is the interval for pruning the off-chain state
+	OffchainPruneInterval time.Duration
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
@@ -51,17 +53,32 @@ func NewMeterer(
 	}
 }
 
-// Start starts to periodically refreshing the on-chain state
+// Start starts to periodically refreshing the on-chain state and pruning the off-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(m.UpdateInterval)
+		ticker := time.NewTicker(m.OnchainUpdateInterval)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		ticker := time.NewTicker(m.OffchainPruneInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := m.OffchainStore.DeleteOldPeriods(ctx, m.CurrentReservationPeriod()-uint32(MinNumPeriods)); err != nil {
+					m.logger.Error("Failed to prune off-chain state", "error", err)
 				}
 			case <-ctx.Done():
 				return

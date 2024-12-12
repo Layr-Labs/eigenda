@@ -103,8 +103,9 @@ func setup(_ *testing.M) {
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
-		ChainReadTimeout: 3 * time.Second,
-		UpdateInterval:   1 * time.Second,
+		ChainReadTimeout:      1 * time.Second,
+		OnchainUpdateInterval: 1 * time.Second,
+		OffchainPruneInterval: 1 * time.Second,
 	}
 
 	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
@@ -144,8 +145,8 @@ func setup(_ *testing.M) {
 		panic("failed to create offchain store")
 	}
 
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
-	if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	paymentChainState.On("RefreshOnchainPaymentState").Return(nil).Maybe()
+	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
