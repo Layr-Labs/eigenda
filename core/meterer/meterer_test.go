@@ -37,6 +37,8 @@ var (
 	accountID2               gethcommon.Address
 	account2Reservations     *core.ReservedPayment
 	account2OnDemandPayments *core.OnDemandPayment
+	accountID3               gethcommon.Address
+	account3Reservations     *core.ReservedPayment
 	mt                       *meterer.Meterer
 
 	deployLocalStack           bool
@@ -100,6 +102,11 @@ func setup(_ *testing.M) {
 		teardown()
 		panic("failed to generate private key")
 	}
+	privateKey3, err := crypto.GenerateKey()
+	if err != nil {
+		teardown()
+		panic("failed to generate private key")
+	}
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
@@ -126,8 +133,10 @@ func setup(_ *testing.M) {
 	now := uint64(time.Now().Unix())
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
-	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	accountID3 = crypto.PubkeyToAddress(privateKey3.PublicKey)
+	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
 	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
@@ -183,6 +192,9 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
 	})).Return(account2Reservations, nil)
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
+		return account == accountID3
+	})).Return(account3Reservations, nil)
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
 
 	// test invalid quorom ID
@@ -209,10 +221,15 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
-	// test invalid bin index
-	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID1)
+	// test inactive reservation
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID3)
+	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0})
+	assert.ErrorContains(t, err, "reservation not active")
+
+	// test invalid reservation period
+	header = createPaymentHeader(reservationPeriod-3, big.NewInt(0), accountID1)
 	err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
-	assert.ErrorContains(t, err, "invalid bin index for reservation")
+	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
 	// test bin usage metering
 	symbolLength := uint(20)

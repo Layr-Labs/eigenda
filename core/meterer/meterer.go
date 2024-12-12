@@ -105,7 +105,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 	if !m.ValidateReservationPeriod(header, reservation) {
-		return fmt.Errorf("invalid bin index for reservation")
+		return fmt.Errorf("invalid reservation period for reservation")
 	}
 
 	// Update bin usage atomically and check against reservation's data rate as the bin limit
@@ -135,12 +135,12 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 	return nil
 }
 
-// ValidateReservationPeriod checks if the provided bin index is valid
+// ValidateReservationPeriod checks if the provided reservation period is valid
 func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ReservedPayment) bool {
 	now := uint64(time.Now().Unix())
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
-	// Valid bin indexes are either the current bin or the previous bin
+	// Valid reservation periodes are either the current bin or the previous bin
 	if (header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(reservation.StartTimestamp, reservationWindow) > header.ReservationPeriod || header.ReservationPeriod > GetReservationPeriod(reservation.EndTimestamp, reservationWindow)) {
 		return false
 	}
@@ -173,7 +173,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	return fmt.Errorf("overflow usage exceeds bin limit")
 }
 
-// GetReservationPeriod returns the current bin index by chunking time by the bin interval;
+// GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
 func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
 	return uint32(timestamp) / binInterval

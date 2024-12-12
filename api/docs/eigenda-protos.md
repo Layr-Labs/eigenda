@@ -912,7 +912,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  |  |
-| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a bin index or a nonce to mitigate signature replay attacks |
+| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a reservation period or a nonce to mitigate signature replay attacks |
 
 
 

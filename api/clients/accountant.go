@@ -65,7 +65,7 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
-// bin index for reservation payments and cumulative payment for on-demand payments,
+// reservation period for reservation payments and cumulative payment for on-demand payments,
 // and both fields are used to create the payment header and signature
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
