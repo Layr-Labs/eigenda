@@ -4,7 +4,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
 	"os"
@@ -42,8 +41,9 @@ func NewV2Metrics(
 	dbDir string,
 	dbSizePollPeriod time.Duration) (*V2Metrics, error) {
 
-	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-	registry.MustRegister(collectors.NewGoCollector())
+	// These should be re-enabled once the legacy v1 metrics are removed.
+	//registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	//registry.MustRegister(collectors.NewGoCollector())
 
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
