@@ -107,11 +107,25 @@ var (
 		Value:  "global_rate",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
 	}
-	UpdateInterval = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "update-interval"),
+	OnchainUpdateInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-update-interval"),
 		Usage:    "update interval for refreshing the on-chain state",
-		Value:    1 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
+		Value:    2 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_UPDATE_INTERVAL"),
+		Required: false,
+	}
+	OffchainPruneInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "offchain-prune-interval"),
+		Usage:    "update interval for pruning the off-chain state",
+		Value:    2 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_PRUNE_INTERVAL"),
+		Required: false,
+	}
+	OffchainMaxOnDemandStorage = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "offchain-max-on-demand-storage"),
+		Usage:    "max number of on-demand payments to store in the off-chain state",
+		Value:    100,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_MAX_ON_DEMAND_STORAGE"),
 		Required: false,
 	}
 	ChainReadTimeout = cli.UintFlag{

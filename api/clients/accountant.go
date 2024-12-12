@@ -30,7 +30,7 @@ type Accountant struct {
 	usageLock                sync.Mutex
 	cumulativePayment        *big.Int
 
-	// number of bins in the circular accounting, restricted by minNumBins which is 3
+	// number of bins in the circular accounting, restricted by MinNumPeriods which is 3
 	numBins uint32
 }
 
@@ -56,7 +56,7 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 		minNumSymbols:            minNumSymbols,
 		reservationPeriodRecords: reservationPeriodRecords,
 		cumulativePayment:        big.NewInt(0),
-		numBins:                  max(numBins, uint32(meterer.MinNumBins)),
+		numBins:                  max(numBins, uint32(meterer.MinNumPeriods)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a

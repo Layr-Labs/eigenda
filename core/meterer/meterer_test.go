@@ -137,6 +137,7 @@ func setup(_ *testing.M) {
 		reservationTableName,
 		ondemandTableName,
 		globalReservationTableName,
+		uint64(100),
 		logger,
 	)
 

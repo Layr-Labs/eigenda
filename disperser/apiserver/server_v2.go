@@ -146,7 +146,8 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				if err := s.meterer.OffchainStore.DeleteOldBins(ctx, s.meterer.CurrentReservationPeriod()-1); err != nil {
+				prevPeriod := s.meterer.CurrentReservationPeriod() - 1
+				if err := s.meterer.OffchainStore.DeleteOldPeriods(ctx, prevPeriod); err != nil {
 					s.logger.Error("failed to delete old bins", "err", err)
 				}
 			case <-ctx.Done():

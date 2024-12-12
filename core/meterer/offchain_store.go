@@ -18,7 +18,6 @@ import (
 )
 
 const MinNumPeriods int32 = 3
-const MaxNumOnDemandPayments int32 = 100
 
 type OffchainStore struct {
 	dynamoClient         commondynamodb.Client
@@ -35,6 +34,7 @@ func NewOffchainStore(
 	reservationTableName string,
 	onDemandTableName string,
 	globalBinTableName string,
+	maxOnDemandStorage uint64,
 	logger logging.Logger,
 ) (OffchainStore, error) {
 
@@ -63,6 +63,7 @@ func NewOffchainStore(
 		onDemandTableName:    onDemandTableName,
 		globalBinTableName:   globalBinTableName,
 		logger:               logger,
+		MaxOnDemandStorage:   maxOnDemandStorage,
 	}, nil
 }
 

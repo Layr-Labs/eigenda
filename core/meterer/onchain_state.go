@@ -121,7 +121,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	activeReservations, err := tx.GetActiveReservations(ctx, accountIDs)
+	activeReservations, err := pcs.tx.GetActiveReservations(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := tx.GetOnDemandPayments(ctx, accountIDs)
+	onDemandPayments, err := pcs.tx.GetOnDemandPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}

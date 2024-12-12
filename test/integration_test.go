@@ -281,6 +281,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		table_names[0],
 		table_names[1],
 		table_names[2],
+		uint64(100),
 		logger,
 	)
 	if err != nil {
@@ -288,7 +289,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
