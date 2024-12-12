@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"maps"
 	"math"
@@ -576,6 +575,11 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 }
 
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	// This usecase is only used for testing purposes.
+	if n.Config.PrivateBls != "" {
+		return n.KeyPair.SignMessage(data), nil
+	}
+
 	signature, err := n.BlsSigner.Sign(ctx, data[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
