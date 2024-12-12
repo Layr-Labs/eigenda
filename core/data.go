@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
-	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/common"
@@ -605,20 +604,24 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 	}
 }
 
-// OperatorInfo contains information about an operator which is stored on the blockchain state,
-// corresponding to a particular quorum
+// ReservedPayment contains information the onchain state about a reserved payment
 type ReservedPayment struct {
-	SymbolsPerSecond uint64 // reserve number of symbols per second
-	//TODO: we are not using start and end timestamp, add check or remove
-	StartTimestamp uint64 // Unix timestamp that's valid for basically eternity
-	EndTimestamp   uint64
+	// reserve number of symbols per second
+	SymbolsPerSecond uint64
+	// reservation activation timestamp
+	StartTimestamp uint64
+	// reservation expiration timestamp
+	EndTimestamp uint64
 
-	QuorumNumbers []uint8 // allowed quorums
-	QuorumSplits  []byte  // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	// allowed quorums
+	QuorumNumbers []uint8
+	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	QuorumSplits []byte
 }
 
 type OnDemandPayment struct {
-	CumulativePayment *big.Int // Total amount deposited by the user
+	// Total amount deposited by the user
+	CumulativePayment *big.Int
 }
 
 type BlobVersionParameters struct {
@@ -627,7 +630,7 @@ type BlobVersionParameters struct {
 	NumChunks       uint32
 }
 
-func (ar *ReservedPayment) IsActive() bool {
-	now := uint64(time.Now().Unix())
-	return ar.StartTimestamp <= now && ar.EndTimestamp >= now
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
+	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
 }

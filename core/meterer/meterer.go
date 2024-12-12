@@ -80,9 +80,6 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		if err != nil {
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if !reservation.IsActive() {
-			return fmt.Errorf("reservation not active")
-		}
 		if err := m.ServeReservationRequest(ctx, header, reservation, numSymbols, quorumNumbers); err != nil {
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
