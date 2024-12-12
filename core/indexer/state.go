@@ -10,8 +10,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
-const operatorStateCacheSize = 32
-
 type IndexedChainState struct {
 	core.ChainState
 
@@ -24,15 +22,22 @@ var _ core.IndexedChainState = (*IndexedChainState)(nil)
 func NewIndexedChainState(
 	chainState core.ChainState,
 	indexer indexer.Indexer,
+	cacheSize int,
 ) (*IndexedChainState, error) {
-	operatorStateCache, err := lru.New[string, *core.IndexedOperatorState](operatorStateCacheSize)
-	if err != nil {
-		return nil, err
+	var operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
+	var err error
+
+	if cacheSize > 0 {
+		operatorStateCache, err = lru.New[string, *core.IndexedOperatorState](cacheSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &IndexedChainState{
-		ChainState:         chainState,
-		Indexer:            indexer,
+		ChainState: chainState,
+		Indexer:    indexer,
+
 		operatorStateCache: operatorStateCache,
 	}, nil
 }
@@ -44,8 +49,10 @@ func (ics *IndexedChainState) Start(ctx context.Context) error {
 func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 	// Check if the indexed operator state has been cached
 	cacheKey := computeCacheKey(blockNumber, quorums)
-	if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
-		return val, nil
+	if ics.operatorStateCache != nil {
+		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
+			return val, nil
+		}
 	}
 
 	pubkeys, sockets, err := ics.getObjects(blockNumber)
@@ -88,7 +95,10 @@ func (ics *IndexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		AggKeys:          aggKeys,
 	}
 
-	ics.operatorStateCache.Add(cacheKey, state)
+	if ics.operatorStateCache != nil {
+		ics.operatorStateCache.Add(cacheKey, state)
+	}
+
 	return state, nil
 }
 
@@ -154,6 +164,9 @@ func (ics *IndexedChainState) getObjects(blockNumber uint) (*OperatorPubKeys, Op
 
 }
 
+// Computes a cache key for the operator state cache. The cache key is a
+// combination of the block number and the quorum IDs. Note: the order of the
+// quorum IDs matters.
 func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
 	bytes := make([]byte, 8+len(quorumIDs))
 	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))

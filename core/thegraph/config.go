@@ -8,15 +8,17 @@ import (
 )
 
 const (
-	EndpointFlagName   = "thegraph.endpoint"
-	BackoffFlagName    = "thegraph.backoff"
-	MaxRetriesFlagName = "thegraph.max_retries"
+	EndpointFlagName       = "thegraph.endpoint"
+	BackoffFlagName        = "thegraph.backoff"
+	MaxRetriesFlagName     = "thegraph.max_retries"
+	OperatorStateCacheSize = "thegraph.operator_state_cache_size"
 )
 
 type Config struct {
-	Endpoint     string        // The Graph endpoint
-	PullInterval time.Duration // The interval to pull data from The Graph
-	MaxRetries   int           // The maximum number of retries to pull data from The Graph
+	Endpoint               string        // The Graph endpoint
+	PullInterval           time.Duration // The interval to pull data from The Graph
+	MaxRetries             int           // The maximum number of retries to pull data from The Graph
+	OperatorStateCacheSize int           // The size of the cache
 }
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -39,15 +41,22 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Value:  5,
 			EnvVar: common.PrefixEnvVar(envPrefix, "GRAPH_MAX_RETRIES"),
 		},
+		cli.IntFlag{
+			Name:   OperatorStateCacheSize,
+			Usage:  "The size of the operator state cache in elements (0 to disable)",
+			Value:  0,
+			EnvVar: common.PrefixEnvVar(envPrefix, "GRAPH_OPERATOR_STATE_CACHE_SIZE"),
+		},
 	}
 }
 
 func ReadCLIConfig(ctx *cli.Context) Config {
 
 	return Config{
-		Endpoint:     ctx.String(EndpointFlagName),
-		PullInterval: ctx.Duration(BackoffFlagName),
-		MaxRetries:   ctx.Int(MaxRetriesFlagName),
+		Endpoint:               ctx.String(EndpointFlagName),
+		PullInterval:           ctx.Duration(BackoffFlagName),
+		MaxRetries:             ctx.Int(MaxRetriesFlagName),
+		OperatorStateCacheSize: ctx.Int(OperatorStateCacheSize),
 	}
 
 }

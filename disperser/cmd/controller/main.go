@@ -154,7 +154,7 @@ func RunController(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		ics, err = indexer.NewIndexedChainState(chainState, idx)
+		ics, err = indexer.NewIndexedChainState(chainState, idx, 0)
 		if err != nil {
 			return err
 		}
