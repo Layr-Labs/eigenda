@@ -307,6 +307,44 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	return payment, nil
 }
 
+// DeleteOldBins removes all reservation bin entries with indices less than the provided binIndex
+func (s *OffchainStore) DeleteOldBins(ctx context.Context, binIndex uint32) error {
+	// get all keys that need to be deleted
+	queryInput := &dynamodb.QueryInput{
+		TableName:        aws.String(s.reservationTableName),
+		FilterExpression: aws.String("BinIndex < :binIndex"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":binIndex": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(binIndex), 10)},
+		},
+	}
+
+	items, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return fmt.Errorf("failed to query old bins: %w", err)
+	}
+
+	keys := make([]commondynamodb.Key, len(items))
+	for i, item := range items {
+		keys[i] = commondynamodb.Key{
+			"AccountID": item["AccountID"],
+			"BinIndex":  item["BinIndex"],
+		}
+	}
+
+	// Delete the items in batches
+	if len(keys) > 0 {
+		failedKeys, err := s.dynamoClient.DeleteItems(ctx, s.reservationTableName, keys)
+		if err != nil {
+			return fmt.Errorf("failed to delete old bins: %w", err)
+		}
+		if len(failedKeys) > 0 {
+			return fmt.Errorf("failed to delete %d bins", len(failedKeys))
+		}
+	}
+
+	return nil
+}
+
 func parseBinRecord(bin map[string]types.AttributeValue) (*pb.BinRecord, error) {
 	reservationPeriod, ok := bin["ReservationPeriod"]
 	if !ok {

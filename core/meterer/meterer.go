@@ -144,6 +144,13 @@ func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reserva
 	return true
 }
 
+// CurrentReservationPeriod returns the current bin index
+func (m *Meterer) CurrentReservationPeriod() uint32 {
+	now := uint64(time.Now().Unix())
+	reservationWindow := m.ChainPaymentState.GetReservationWindow()
+	return GetReservationPeriod(now, reservationWindow)
+}
+
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ActiveReservation, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)

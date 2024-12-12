@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -53,9 +54,10 @@ type DispersalServerV2 struct {
 	logger        logging.Logger
 
 	// state
-	onchainState                atomic.Pointer[OnchainState]
-	maxNumSymbolsPerBlob        uint64
-	onchainStateRefreshInterval time.Duration
+	onchainState                 atomic.Pointer[OnchainState]
+	maxNumSymbolsPerBlob         uint64
+	onchainStateRefreshInterval  time.Duration
+	offchainStatePruningInterval time.Duration
 
 	metrics *metricsV2
 }
@@ -71,6 +73,7 @@ func NewDispersalServerV2(
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
+	offchainStatePruningInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 ) *DispersalServerV2 {
@@ -87,8 +90,9 @@ func NewDispersalServerV2(
 		prover:        prover,
 		logger:        logger,
 
-		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
-		onchainStateRefreshInterval: onchainStateRefreshInterval,
+		maxNumSymbolsPerBlob:         maxNumSymbolsPerBlob,
+		onchainStateRefreshInterval:  onchainStateRefreshInterval,
+		offchainStatePruningInterval: offchainStatePruningInterval,
 
 		metrics: newAPIServerV2Metrics(registry),
 	}
@@ -128,6 +132,22 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 			case <-ticker.C:
 				if err := s.RefreshOnchainState(ctx); err != nil {
 					s.logger.Error("failed to refresh onchain quorum state", "err", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(s.offchainStatePruningInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := s.meterer.OffchainStore.DeleteOldBins(ctx, s.meterer.CurrentReservationPeriod()-1); err != nil {
+					s.logger.Error("failed to delete old bins", "err", err)
 				}
 			case <-ctx.Done():
 				return

@@ -148,6 +148,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    1 * time.Hour,
 	}
+	OffchainStatePruningInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "offchain-state-pruning-interval"),
+		Usage:    "The interval at which to prune the outdated offchain state. This flag is only relevant in v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_STATE_PRUNING_INTERVAL"),
+		Value:    1 * time.Hour,
+	}
 	MaxNumSymbolsPerBlob = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),
 		Usage:    "max number of symbols per blob. This flag is only relevant in v2",

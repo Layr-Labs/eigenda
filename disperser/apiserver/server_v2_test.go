@@ -509,8 +509,10 @@ func newTestServerV2(t *testing.T) *testComponents {
 		prover,
 		10,
 		time.Hour,
+		time.Hour,
 		logger,
-		prometheus.NewRegistry())
+		prometheus.NewRegistry(),
+	)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
