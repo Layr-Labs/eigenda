@@ -18,6 +18,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
@@ -154,7 +155,7 @@ var _ = Describe("Indexer", func() {
 				Skip("No test path provided")
 			}
 
-			logger := logging.NewNoopLogger()
+			logger := testutils.GetLogger()
 			ctx, cancel := context.WithCancel(context.Background())
 			_ = cancel
 

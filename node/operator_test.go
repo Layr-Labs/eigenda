@@ -2,22 +2,23 @@ package node_test
 
 import (
 	"context"
+
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestRegisterOperator(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -58,7 +59,7 @@ func TestRegisterOperator(t *testing.T) {
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)

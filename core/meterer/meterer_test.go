@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -22,8 +23,6 @@ import (
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
-
-	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var (
@@ -108,7 +107,7 @@ func setup(_ *testing.M) {
 		panic("failed to generate private key")
 	}
 
-	logger = logging.NewNoopLogger()
+	logger = testutils.GetLogger()
 	config := meterer.Config{
 		ChainReadTimeout: 3 * time.Second,
 		UpdateInterval:   1 * time.Second,
