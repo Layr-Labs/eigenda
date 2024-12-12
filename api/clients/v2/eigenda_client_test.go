@@ -7,16 +7,16 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	codecsmock "github.com/Layr-Labs/eigenda/api/clients/codecs/mock"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"math/rand"
 	"testing"
 )
 
 type ClientTester struct {
+	Random          *testrandom.TestRandom
 	Client          *EigenDAClient
 	MockRelayClient *clientsmock.MockRelayClient
 	MockCodec       *codecsmock.BlobCodec
@@ -29,19 +29,17 @@ func (c *ClientTester) assertExpectations(t *testing.T) {
 
 // buildClientTester sets up a client with mocks necessary for testing
 func buildClientTester(t *testing.T) ClientTester {
-	tu.InitializeRandom()
 	logger := logging.NewNoopLogger()
 	clientConfig := &EigenDAClientConfig{}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	mockCodec := codecsmock.BlobCodec{}
 
-	// TODO (litt3): use TestRandom once the PR merges https://github.com/Layr-Labs/eigenda/pull/976
-	random := rand.New(rand.NewSource(rand.Int63()))
+	random := testrandom.NewTestRandom()
 
 	client, err := NewEigenDAClient(
 		logger,
-		random,
+		random.Rand,
 		clientConfig,
 		&mockRelayClient,
 		&mockCodec)
@@ -50,6 +48,7 @@ func buildClientTester(t *testing.T) ClientTester {
 	assert.Nil(t, err)
 
 	return ClientTester{
+		Random:          random,
 		Client:          client,
 		MockRelayClient: &mockRelayClient,
 		MockCodec:       &mockCodec,
@@ -60,17 +59,17 @@ func buildClientTester(t *testing.T) ClientTester {
 func TestGetBlobSuccess(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
-	blobBytes := tu.RandomBytes(100)
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobBytes := tester.Random.RandomBytes(100)
 
 	relayKeys := make([]core.RelayKey, 1)
-	relayKeys[0] = rand.Uint32()
+	relayKeys[0] = tester.Random.Uint32()
 	blobCert := core.BlobCertificate{
 		RelayKeys: relayKeys,
 	}
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
-	tester.MockCodec.On("DecodeBlob", blobBytes).Return(tu.RandomBytes(50), nil).Once()
+	tester.MockCodec.On("DecodeBlob", blobBytes).Return(tester.Random.RandomBytes(50), nil).Once()
 
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
 
@@ -85,13 +84,13 @@ func TestGetBlobSuccess(t *testing.T) {
 func TestRandomRelayRetries(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
-	blobBytes := tu.RandomBytes(100)
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobBytes := tester.Random.RandomBytes(100)
 
 	relayCount := 100
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = rand.Uint32()
+		relayKeys[i] = tester.Random.Uint32()
 	}
 	blobCert := core.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -99,7 +98,7 @@ func TestRandomRelayRetries(t *testing.T) {
 
 	// for this test, only a single relay is online
 	// we will be asserting that it takes a different amount of retries to dial this relay, since the array of relay keys to try is randomized
-	onlineRelayKey := relayKeys[rand.Intn(len(relayKeys))]
+	onlineRelayKey := relayKeys[tester.Random.Intn(len(relayKeys))]
 
 	offlineKeyMatcher := func(relayKey core.RelayKey) bool { return relayKey != onlineRelayKey }
 	onlineKeyMatcher := func(relayKey core.RelayKey) bool { return relayKey == onlineRelayKey }
@@ -108,7 +107,7 @@ func TestRandomRelayRetries(t *testing.T) {
 		failedCallCount++
 	})
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.MatchedBy(onlineKeyMatcher), blobKey).Return(blobBytes, nil)
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tu.RandomBytes(50), nil)
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil)
 
 	// keep track of how many tries various blob retrievals require
 	// this allows us to assert that there is variability, i.e. that relay call order is actually random
@@ -133,12 +132,12 @@ func TestRandomRelayRetries(t *testing.T) {
 func TestNoRelayResponse(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = rand.Uint32()
+		relayKeys[i] = tester.Random.Uint32()
 	}
 	blobCert := core.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -157,7 +156,7 @@ func TestNoRelayResponse(t *testing.T) {
 func TestNoRelaysInCert(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
 
 	// cert has no listed relay keys
 	blobCert := core.BlobCertificate{
@@ -175,12 +174,12 @@ func TestNoRelaysInCert(t *testing.T) {
 func TestGetBlobReturns0Len(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = rand.Uint32()
+		relayKeys[i] = tester.Random.Uint32()
 	}
 	blobCert := core.BlobCertificate{
 		RelayKeys: relayKeys,
@@ -189,9 +188,9 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	// the first GetBlob will return a 0 len blob
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return([]byte{}, nil).Once()
 	// the second call will return random bytes
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tu.RandomBytes(100), nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tester.Random.RandomBytes(100), nil).Once()
 
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tu.RandomBytes(50), nil)
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil)
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
@@ -205,21 +204,21 @@ func TestGetBlobReturns0Len(t *testing.T) {
 func TestFailedDecoding(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tu.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = rand.Uint32()
+		relayKeys[i] = tester.Random.Uint32()
 	}
 	blobCert := core.BlobCertificate{
 		RelayKeys: relayKeys,
 	}
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tu.RandomBytes(100), nil)
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tester.Random.RandomBytes(100), nil)
 
 	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(nil, fmt.Errorf("decode failed")).Once()
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tu.RandomBytes(50), nil).Once()
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil).Once()
 
 	// decoding will fail the first time, but succeed the second time
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
