@@ -2,6 +2,7 @@ package v2
 
 import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"time"
 )
 
 // VerificationMode is an enum that represents the different ways that a blob may be encoded/decoded between
@@ -26,4 +27,7 @@ type EigenDAClientConfig struct {
 	// If PointVerificationMode is NoIFFT, the blob must be supplied in its entirety, to perform a verification
 	// that any part of the data matches the KZG commitment.
 	PointVerificationMode VerificationMode
+
+	// The timeout duration for relay calls
+	RelayTimeout time.Duration
 }

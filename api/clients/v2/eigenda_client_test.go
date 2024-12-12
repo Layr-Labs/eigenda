@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"testing"
+	"time"
 )
 
 type ClientTester struct {
@@ -30,7 +32,9 @@ func (c *ClientTester) assertExpectations(t *testing.T) {
 // buildClientTester sets up a client with mocks necessary for testing
 func buildClientTester(t *testing.T) ClientTester {
 	logger := logging.NewNoopLogger()
-	clientConfig := &EigenDAClientConfig{}
+	clientConfig := &EigenDAClientConfig{
+		RelayTimeout: 50 * time.Millisecond,
+	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	mockCodec := codecsmock.BlobCodec{}
@@ -75,6 +79,57 @@ func TestGetBlobSuccess(t *testing.T) {
 
 	assert.NotNil(t, blob)
 	assert.Nil(t, err)
+
+	tester.assertExpectations(t)
+}
+
+// TestRelayCallTimeout verifies that calls to the relay timeout after the expected duration
+func TestRelayCallTimeout(t *testing.T) {
+	tester := buildClientTester(t)
+
+	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+
+	relayKeys := make([]core.RelayKey, 1)
+	relayKeys[0] = tester.Random.Uint32()
+	blobCert := core.BlobCertificate{
+		RelayKeys: relayKeys,
+	}
+
+	// the timeout should occur before the panic has a chance to be triggered
+	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(
+		nil, errors.New("timeout")).Once().Run(
+		func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			select {
+			case <-ctx.Done():
+				// this is the expected case
+				return
+			case <-time.After(time.Second):
+				panic("call should have timed out first")
+			}
+		})
+
+	// the panic should be triggered, since it happens faster than the configured timout
+	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(
+		nil, errors.New("timeout")).Once().Run(
+		func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Millisecond):
+				// this is the expected case
+				panic("call should not have timed out")
+			}
+		})
+	
+	assert.NotPanics(t, func() {
+		_, _ = tester.Client.GetBlob(context.Background(), blobKey, blobCert)
+	})
+
+	assert.Panics(t, func() {
+		_, _ = tester.Client.GetBlob(context.Background(), blobKey, blobCert)
+	})
 
 	tester.assertExpectations(t)
 }
@@ -266,6 +321,7 @@ func TestBuilder(t *testing.T) {
 	clientConfig := &EigenDAClientConfig{
 		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
 		PointVerificationMode: IFFT,
+		RelayTimeout:          500 * time.Millisecond,
 	}
 
 	sockets := make(map[core.RelayKey]string)

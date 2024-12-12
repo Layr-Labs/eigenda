@@ -85,8 +85,7 @@ func (c *EigenDAClient) GetBlob(
 	for _, val := range indices {
 		relayKey := blobCertificate.RelayKeys[val]
 
-		// TODO: does this need a timeout?
-		data, err := c.relayClient.GetBlob(ctx, relayKey, blobKey)
+		data, err := c.getBlobWithTimeout(ctx, relayKey, blobKey)
 
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
@@ -111,6 +110,18 @@ func (c *EigenDAClient) GetBlob(
 	}
 
 	return nil, fmt.Errorf("unable to retrieve blob from any relay. relay count: %d", relayKeyCount)
+}
+
+// getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
+func (c *EigenDAClient) getBlobWithTimeout(
+	ctx context.Context,
+	relayKey core.RelayKey,
+	blobKey core.BlobKey) ([]byte, error) {
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, c.config.RelayTimeout)
+	defer cancel()
+
+	return c.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 }
 
 // GetCodec returns the codec the client uses for encoding and decoding blobs
