@@ -2,12 +2,13 @@ package auth
 
 import (
 	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/sha3"
 	"hash"
 )
@@ -17,7 +18,7 @@ import (
 func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequest) ([]byte, error) {
 	requestHash := HashStoreChunksRequest(request)
 
-	signature, err := ecdsa.SignASN1(rand.Reader, key, requestHash)
+	signature, err := crypto.Sign(requestHash, key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
@@ -27,9 +28,20 @@ func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequ
 
 // VerifyStoreChunksRequest verifies the given signature of the given StoreChunksRequest with the given
 // public key.
-func VerifyStoreChunksRequest(key *ecdsa.PublicKey, request *grpc.StoreChunksRequest, signature []byte) bool {
+func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksRequest, signature []byte) error {
 	requestHash := HashStoreChunksRequest(request)
-	return ecdsa.VerifyASN1(key, requestHash, signature)
+
+	signingPublicKey, err := crypto.SigToPub(requestHash, signature)
+	if err != nil {
+		return fmt.Errorf("failed to recover public key from signature: %w", err)
+	}
+
+	signingAddress := crypto.PubkeyToAddress(*signingPublicKey)
+
+	if key.Cmp(signingAddress) != 0 {
+		return fmt.Errorf("signature doesn't match with provided public key")
+	}
+	return nil
 }
 
 // HashStoreChunksRequest hashes the given StoreChunksRequest.

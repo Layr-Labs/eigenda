@@ -4,8 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/disperser/auth"
-	auth2 "github.com/Layr-Labs/eigenda/node/auth"
+	"github.com/Layr-Labs/eigenda/node/auth"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -45,13 +44,13 @@ func NewNodeClientV2(config *NodeClientV2Config) (*nodeClientV2, error) {
 	}
 
 	var key *ecdsa.PrivateKey // TODO update flags
-	if config.PrivateKeyFile != "" {
-		var err error
-		key, err = auth.ReadPrivateECDSAKeyFile(config.PrivateKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read private key file: %v", err)
-		}
-	}
+	//if config.PrivateKeyFile != "" {
+	//	var err error
+	//	key, err = auth.ReadPrivateECDSAKeyFile(config.PrivateKeyFile)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to read private key file: %v", err)
+	//	}
+	//}
 
 	return &nodeClientV2{
 		config: config,
@@ -88,7 +87,7 @@ func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*c
 	}
 
 	if c.key != nil {
-		signature, err := auth2.SignStoreChunksRequest(c.key, request) // TODO
+		signature, err := auth.SignStoreChunksRequest(c.key, request) // TODO
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign request: %v", err)
 		}

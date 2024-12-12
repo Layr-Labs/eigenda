@@ -5,6 +5,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -31,18 +32,18 @@ func randomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 				Version:       rand.Uint32(),
 				QuorumNumbers: quorumNumbers,
 				Commitment: &common.BlobCommitment{
-					Commitment:       rand.RandomBytes(32),
-					LengthCommitment: rand.RandomBytes(32),
-					LengthProof:      rand.RandomBytes(32),
+					Commitment:       rand.Bytes(32),
+					LengthCommitment: rand.Bytes(32),
+					LengthProof:      rand.Bytes(32),
 					Length:           rand.Uint32(),
 				},
 				PaymentHeader: &common.PaymentHeader{
-					AccountId:         rand.RandomString(32),
+					AccountId:         rand.String(32),
 					ReservationPeriod: rand.Uint32(),
-					CumulativePayment: rand.RandomBytes(32),
+					CumulativePayment: rand.Bytes(32),
 					Salt:              rand.Uint32(),
 				},
-				Signature: rand.RandomBytes(32),
+				Signature: rand.Bytes(32),
 			},
 			Relays: relays,
 		}
@@ -51,13 +52,13 @@ func randomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 	return &grpc.StoreChunksRequest{
 		Batch: &v2.Batch{
 			Header: &v2.BatchHeader{
-				BatchRoot:            rand.RandomBytes(32),
+				BatchRoot:            rand.Bytes(32),
 				ReferenceBlockNumber: rand.Uint64(),
 			},
 			BlobCertificates: blobCertificates,
 		},
 		DisperserID: rand.Uint32(),
-		Signature:   rand.RandomBytes(32),
+		Signature:   rand.Bytes(32),
 	}
 }
 
@@ -68,7 +69,7 @@ func TestHashing(t *testing.T) {
 	originalRequestHash := HashStoreChunksRequest(request)
 
 	// modifying the signature should not change the hash
-	request.Signature = rand.RandomBytes(32)
+	request.Signature = rand.Bytes(32)
 	hash := HashStoreChunksRequest(request)
 	require.Equal(t, originalRequestHash, hash)
 
@@ -136,21 +137,21 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the Commitment.Commitment
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Commitment.Commitment = rand.RandomBytes(32)
+	request.Batch.BlobCertificates[0].BlobHeader.Commitment.Commitment = rand.Bytes(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.LengthCommitment
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthCommitment = rand.RandomBytes(32)
+	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthCommitment = rand.Bytes(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.LengthProof
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthProof = rand.RandomBytes(32)
+	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthProof = rand.Bytes(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -164,7 +165,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the PaymentHeader.AccountId
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.AccountId = rand.RandomString(32)
+	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.AccountId = rand.String(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -178,7 +179,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the PaymentHeader.CumulativePayment
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.CumulativePayment = rand.RandomBytes(32)
+	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.CumulativePayment = rand.Bytes(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -192,7 +193,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the Signature
 	rand.Reset()
 	request = randomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Signature = rand.RandomBytes(32)
+	request.Batch.BlobCertificates[0].BlobHeader.Signature = rand.Bytes(32)
 	hash = HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 }
@@ -200,34 +201,37 @@ func TestHashing(t *testing.T) {
 func TestRequestSigning(t *testing.T) {
 	rand := random.NewTestRandom(t)
 
-	public, private := rand.RandomECDSA()
+	public, private := rand.ECDSA()
+	publicAddress := crypto.PubkeyToAddress(*public)
+
 	request := randomStoreChunksRequest(rand)
 
 	signature, err := SignStoreChunksRequest(private, request)
 	require.NoError(t, err)
 
-	isValid := VerifyStoreChunksRequest(public, request, signature)
-	require.True(t, isValid)
+	err = VerifyStoreChunksRequest(publicAddress, request, signature)
+	require.NoError(t, err)
 
 	// Adding the signature to the request should not change the hash, so it should still be valid
 	request.Signature = signature
-	isValid = VerifyStoreChunksRequest(public, request, signature)
-	require.True(t, isValid)
+	err = VerifyStoreChunksRequest(publicAddress, request, signature)
+	require.NoError(t, err)
 
 	// Using a different public key should make the signature invalid
-	otherPublic, _ := rand.RandomECDSA()
-	isValid = VerifyStoreChunksRequest(otherPublic, request, signature)
-	require.False(t, isValid)
+	otherPublic, _ := rand.ECDSA()
+	otherPublicAddress := crypto.PubkeyToAddress(*otherPublic)
+	err = VerifyStoreChunksRequest(otherPublicAddress, request, signature)
+	require.Error(t, err)
 
 	// Changing a byte in the signature should make it invalid
 	alteredSignature := make([]byte, len(signature))
 	copy(alteredSignature, signature)
 	alteredSignature[0] = alteredSignature[0] + 1
-	isValid = VerifyStoreChunksRequest(public, request, alteredSignature)
-	require.False(t, isValid)
+	err = VerifyStoreChunksRequest(publicAddress, request, alteredSignature)
+	require.Error(t, err)
 
 	// Changing a field in the request should make it invalid
 	request.DisperserID = request.DisperserID + 1
-	isValid = VerifyStoreChunksRequest(public, request, signature)
-	require.False(t, isValid)
+	err = VerifyStoreChunksRequest(publicAddress, request, signature)
+	require.Error(t, err)
 }

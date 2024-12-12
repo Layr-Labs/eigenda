@@ -286,7 +286,7 @@ func (t *MockWriter) GetRelayURLs(ctx context.Context) (map[uint32]string, error
 }
 
 func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
-	args := t.Called()
+	args := t.Called(disperserID)
 	result := args.Get(0)
 	if result == nil {
 		var zeroValue gethcommon.Address

@@ -2,17 +2,18 @@ package auth
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/ethereum/go-ethereum/crypto"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"time"
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
+//
+// This class has largely been future-proofed for decentralized dispersers, with the exception of the
+// preloadCache method, which will need to be updated to handle decentralized dispersers.
 type RequestAuthenticator interface {
 	// AuthenticateStoreChunksRequest authenticates a StoreChunksRequest, returning an error if the request is invalid.
 	// The origin is the address of the peer that sent the request. This may be used to cache auth results
@@ -27,7 +28,7 @@ type RequestAuthenticator interface {
 // keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
 // from the chain state in case the key has been changed.
 type keyWithTimeout struct {
-	key        *ecdsa.PublicKey
+	key        gethcommon.Address
 	expiration time.Time
 }
 
@@ -89,7 +90,7 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// TODO (cody-littley): this will need to be updated for decentralized dispersers
+	// this will need to be updated for decentralized dispersers
 	_, err := a.getDisperserKey(ctx, now, 0)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
@@ -115,10 +116,9 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	}
 
 	signature := request.Signature
-	isValid := VerifyStoreChunksRequest(key, request, signature)
-
-	if !isValid {
-		return errors.New("signature verification failed")
+	err = VerifyStoreChunksRequest(*key, request, signature)
+	if err != nil {
+		return fmt.Errorf("failed to verify request: %w", err)
 	}
 
 	a.saveAuthenticationResult(now, origin)
@@ -129,12 +129,12 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 func (a *requestAuthenticator) getDisperserKey(
 	ctx context.Context,
 	now time.Time,
-	disperserID uint32) (*ecdsa.PublicKey, error) {
+	disperserID uint32) (*gethcommon.Address, error) {
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {
 		expirationTime := key.expiration
 		if now.Before(expirationTime) {
-			return key.key, nil
+			return &key.key, nil
 		}
 	}
 
@@ -143,17 +143,12 @@ func (a *requestAuthenticator) getDisperserKey(
 		return nil, fmt.Errorf("failed to get disperser address: %w", err)
 	}
 
-	ecdsaKey, err := crypto.UnmarshalPubkey(address.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal public key: %w", err)
-	}
-
 	a.keyCache.Add(disperserID, &keyWithTimeout{
-		key:        ecdsaKey,
+		key:        address,
 		expiration: now.Add(a.keyTimeoutDuration),
 	})
 
-	return ecdsaKey, nil
+	return &address, nil
 }
 
 // saveAuthenticationResult saves the result of an auth.

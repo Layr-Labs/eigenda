@@ -2,8 +2,8 @@ package random
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"io"
 	"math/rand"
@@ -49,8 +49,8 @@ func (r *TestRandom) Reset() {
 	r.Seed(r.seed)
 }
 
-// RandomBytes generates a random byte slice of a given length.
-func (r *TestRandom) RandomBytes(length int) []byte {
+// Bytes generates a random byte slice of a given length.
+func (r *TestRandom) Bytes(length int) []byte {
 	bytes := make([]byte, length)
 	_, err := r.Read(bytes)
 	if err != nil {
@@ -59,13 +59,13 @@ func (r *TestRandom) RandomBytes(length int) []byte {
 	return bytes
 }
 
-// RandomTime generates a random time.
-func (r *TestRandom) RandomTime() time.Time {
+// Time generates a random time.
+func (r *TestRandom) Time() time.Time {
 	return time.Unix(r.Int63(), r.Int63())
 }
 
-// RandomString generates a random string out of printable ASCII characters.
-func (r *TestRandom) RandomString(length int) string {
+// String generates a random string out of printable ASCII characters.
+func (r *TestRandom) String(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	for i := range b {
@@ -85,9 +85,9 @@ func (i *randIOReader) Read(p []byte) (n int, err error) {
 	return i.rand.Read(p)
 }
 
-// RandomECDSA generates a random ECDSA key. FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) RandomECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), &randIOReader{r})
+// ECDSA generates a random ECDSA key. FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
+func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+	key, err := ecdsa.GenerateKey(crypto.S256(), &randIOReader{r})
 	require.NoError(r.t, err)
 	return &key.PublicKey, key
 }
