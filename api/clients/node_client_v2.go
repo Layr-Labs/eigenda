@@ -84,10 +84,11 @@ func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*c
 			},
 			BlobCertificates: blobCerts,
 		},
+		DisperserID: uint32(0), // currently hard coded, update for decentralized dispersers
 	}
 
 	if c.key != nil {
-		signature, err := auth.SignStoreChunksRequest(c.key, request) // TODO
+		signature, err := auth.SignStoreChunksRequest(c.key, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign request: %v", err)
 		}
