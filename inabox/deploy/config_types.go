@@ -56,6 +56,7 @@ type EigenDADeployConfig struct {
 	ConfirmerPrivateKey string     `json:"confirmerPrivateKey"`
 	StakerTokenAmounts  [][]string `json:"-"`
 	OperatorPrivateKeys []string   `json:"-"`
+	ClientPrivateKeys   []string   `json:"clientPrivateKeys"`
 }
 
 func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
@@ -85,6 +86,7 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 		"maxOperatorCount":    cfg.MaxOperatorCount,
 		"stakerPrivateKeys":   cfg.StakerPrivateKeys,
 		"confirmerPrivateKey": cfg.ConfirmerPrivateKey,
+		"clientPrivateKeys":   cfg.ClientPrivateKeys,
 	}
 
 	remainingJSON, err := json.Marshal(remainingFields)

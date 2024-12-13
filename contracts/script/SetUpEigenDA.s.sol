@@ -10,6 +10,8 @@ import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
 import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
 
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {PaymentVault} from "../src/payments/PaymentVault.sol";
+import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
@@ -111,9 +113,20 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             operatorETHAmounts[i] = 5 ether;
         }
 
+        uint256[] memory clientPrivateKeys = stdJson.readUintArray(config_data, ".clientPrivateKeys");
+        address[] memory clients = new address[](clientPrivateKeys.length);
+        for (uint i = 0; i < clients.length; i++) {
+            clients[i] = vm.addr(clientPrivateKeys[i]);
+        }
+        uint256[] memory clientETHAmounts = new uint256[](clients.length);
+        // 0.5 eth each
+        for (uint i = 0; i < clientETHAmounts.length; i++) {
+            clientETHAmounts[i] = 0.5 ether;
+        }
+
         vm.startBroadcast();
 
-        // Allocate eth to stakers and operators
+        // Allocate eth to stakers, operators, dispserser clients
         _allocate(
             IERC20(address(0)),
             stakers,
@@ -124,6 +137,12 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             IERC20(address(0)),
             operators,
             operatorETHAmounts
+        );
+
+        _allocate(
+            IERC20(address(0)),
+            clients,
+            clientETHAmounts
         );
 
         // Allocate tokens to stakers
@@ -155,6 +174,37 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             string memory metadataURI = string.concat("https://urmom.com/operator/", vm.toString(i));
             delegation.registerAsOperator(IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks), metadataURI);
         }
+
+
+
+        // Register Reservations for client 0 and 1 as the eigenDACommunityMultisig
+        clientPrivateKeys[0] = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
+        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
+            symbolsPerSecond: 452198,
+            startTimestamp: uint64(block.timestamp),
+            endTimestamp: uint64(block.timestamp + 1000000000),
+            quorumNumbers: hex"0001",
+            quorumSplits: hex"3232"
+        });
+        vm.broadcast(clientPrivateKeys[0]);
+        address reservedClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKeys[0])))));
+        // vm.prank(eigenDACommunityMultisig);
+        paymentVault.setReservation(reservedClient, reservation);
+
+        vm.broadcast(clientPrivateKeys[1]);
+        address reservedClient1 = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKeys[1])))));
+        // vm.prank(eigenDACommunityMultisig);
+        paymentVault.setReservation(reservedClient1, reservation);
+
+        // Deposit OnDemand for client 0 and 2
+        vm.broadcast(operatorPrivateKeys[0]);
+        address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(operatorPrivateKeys[0])))));
+        vm.prank(ondemandClient);
+        paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
+        // vm.broadcast(operatorPrivateKeys[2]);
+        // address ondemandClient2 = address(uint160(uint256(keccak256(abi.encodePacked(operatorPrivateKeys[2])))));
+        // vm.prank(ondemandClient2);
+        // PaymentVault.depositOnDemand{value: 1 ether}(ondemandClient2);
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
