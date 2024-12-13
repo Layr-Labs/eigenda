@@ -68,7 +68,7 @@ func setup() {
 		PrivateKeyString: pk,
 		NumConfirmations: 0,
 		NumRetries:       1,
-	}, gethcommon.Address{}, logging.NewNoopLogger())
+	}, gethcommon.Address{}, testutils.GetLogger())
 	if err != nil {
 		panic(err)
 	}
