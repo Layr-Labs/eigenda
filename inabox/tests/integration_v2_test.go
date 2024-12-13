@@ -34,6 +34,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		}, signer, nil, nil)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
+		err = disp.PopulateAccountant(ctx)
+		Expect(err).To(BeNil())
 
 		data1 := make([]byte, 992)
 		_, err = rand.Read(data1)
