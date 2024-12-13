@@ -173,7 +173,7 @@ library EigenDABlobVerificationUtils {
             Merkle.verifyInclusionKeccak(
                 blobVerificationProof.inclusionProof, 
                 batchHeader.batchRoot, 
-                EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate),
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
                 blobVerificationProof.blobIndex
             ),
             "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
@@ -242,7 +242,7 @@ library EigenDABlobVerificationUtils {
             Merkle.verifyInclusionKeccak(
                 blobVerificationProof.inclusionProof, 
                 batchHeader.batchRoot, 
-                EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate),
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
                 blobVerificationProof.blobIndex
             ),
             "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
