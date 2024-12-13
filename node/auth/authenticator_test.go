@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-// TODO:
-//  - test key caching
-//  - test cache sizes
-
 func TestValidRequest(t *testing.T) {
 	rand := random.NewTestRandom(t)
 

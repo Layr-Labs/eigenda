@@ -95,8 +95,6 @@ type Config struct {
 	PprofHttpPort string
 	EnablePprof   bool
 
-	// TODO update flags
-
 	// if true then the node will not authenticate StoreChunks requests from dispersers (v2 only)
 	DisableDispersalAuthentication bool
 	// the size of the cache for storing public keys of dispersers
