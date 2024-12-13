@@ -6,12 +6,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
-	tmock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -29,15 +29,14 @@ func (m mockGraphQLQuerier) Query(ctx context.Context, q any, variables map[stri
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	logger := testutils.GetLogger()
 
-	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 1,
 		1: 1,
 		2: 1,
 	})
 
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-	// Set up mock expectations for all the calls we'll make
-	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -101,16 +100,13 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) {
 	logger := testutils.GetLogger()
 
-	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 2,
 		1: 2,
 		2: 2,
 	})
-
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-
-	// Set up mock expectations for all the calls we'll make
-	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -174,16 +170,13 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	logger := testutils.GetLogger()
 
-	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 1,
 		1: 1,
 		2: 1,
 	})
-
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-
-	// Set up mock expectations for all the calls we'll make
-	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -263,16 +256,13 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	logger := testutils.GetLogger()
 
-	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 1,
 		1: 1,
 		2: 1,
 	})
-
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-
-	// Set up mock expectations for all the calls we'll make
-	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -323,18 +313,15 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 
 func TestIndexedOperatorStateCache_CacheEviction(t *testing.T) {
 	logger := logging.NewNoopLogger()
-	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
+	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 1,
 	})
 
 	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-
-	// Set up mock expectations for all the calls we'll make
-	chainState.On("GetOperatorState", tmock.Anything, uint(1), []core.QuorumID{0}).Return(chainState.Operators, nil)
-	chainState.On("GetOperatorState", tmock.Anything, uint(2), []core.QuorumID{0}).Return(chainState.Operators, nil)
-	chainState.On("GetOperatorState", tmock.Anything, uint(3), []core.QuorumID{0}).Return(chainState.Operators, nil)
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
+	assert.NoError(t, err)
 	id := ""
 	for key := range state.Operators[0] {
 		id = key.Hex()

@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	dat *mock.ChainDataMock
+	dat *coremock.ChainDataMock
 	agg core.SignatureAggregator
 
 	p encoding.Prover
@@ -47,7 +47,7 @@ var (
 
 func TestMain(m *testing.M) {
 	var err error
-	dat, err = mock.MakeChainDataMock(map[uint8]int{
+	dat, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: 6,
 		1: 3,
 	})
@@ -133,12 +133,13 @@ func prepareBlobs(
 	referenceBlockNumber uint64,
 ) (map[core.OperatorID][]*corev2.BlobShard, core.IndexedChainState) {
 
-	cst, err := mock.MakeChainDataMock(map[uint8]int{
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
 		1: int(operatorCount),
 		2: int(operatorCount) / 2,
 	})
 	assert.NoError(t, err)
+	cst.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(cst.Operators, nil)
 
 	blobsMap := make([]map[core.QuorumID]map[core.OperatorID][]*encoding.Frame, 0, len(certs))
 
