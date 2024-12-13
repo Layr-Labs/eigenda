@@ -30,11 +30,11 @@ func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context
 	return args.Error(0)
 }
 
-func (m *MockOnchainPaymentState) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
 	args := m.Called(ctx, accountID)
-	var value *core.ActiveReservation
+	var value *core.ReservedPayment
 	if args.Get(0) != nil {
-		value = args.Get(0).(*core.ActiveReservation)
+		value = args.Get(0).(*core.ReservedPayment)
 	}
 	return value, args.Error(1)
 }
@@ -62,9 +62,9 @@ func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalRateBinInterval() uint64 {
+func (m *MockOnchainPaymentState) GetGlobalRateBinInterval() uint32 {
 	args := m.Called()
-	return args.Get(0).(uint64)
+	return args.Get(0).(uint32)
 }
 
 func (m *MockOnchainPaymentState) GetMinNumSymbols() uint32 {

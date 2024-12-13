@@ -10,6 +10,7 @@ import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCo
 import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
 import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
 import "../interfaces/IEigenDAStructs.sol";
@@ -40,11 +41,12 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IRegistryCoordinator __registryCoordinator,
         IStakeRegistry __stakeRegistry,
         IEigenDAThresholdRegistry __eigenDAThresholdRegistry,
-        IEigenDARelayRegistry __eigenDARelayRegistry
+        IEigenDARelayRegistry __eigenDARelayRegistry,
+        IPaymentVault __paymentVault
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
-        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry, __eigenDARelayRegistry)
+        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry, __eigenDARelayRegistry, __paymentVault)
     {
         _disableInitializers();
     }

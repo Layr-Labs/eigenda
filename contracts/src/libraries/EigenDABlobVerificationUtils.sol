@@ -307,7 +307,7 @@ library EigenDABlobVerificationUtils {
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
-            signedBatch.attestation
+            signedBatch
         );
 
         _verifyBlobV2ForQuorums(
@@ -336,7 +336,7 @@ library EigenDABlobVerificationUtils {
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
-            signedBatch.attestation
+            signedBatch
         );
 
         _verifyBlobV2ForQuorumsForThresholds(
@@ -354,30 +354,30 @@ library EigenDABlobVerificationUtils {
     function _getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        Attestation memory attestation
+        SignedBatch memory signedBatch
     ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature) {
-        bytes32[] memory nonSignerOperatorIds = new bytes32[](attestation.nonSignerPubkeys.length);
-        for (uint i = 0; i < attestation.nonSignerPubkeys.length; ++i) {
-            nonSignerOperatorIds[i] = BN254.hashG1Point(attestation.nonSignerPubkeys[i]);
+        bytes32[] memory nonSignerOperatorIds = new bytes32[](signedBatch.attestation.nonSignerPubkeys.length);
+        for (uint i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {
+            nonSignerOperatorIds[i] = BN254.hashG1Point(signedBatch.attestation.nonSignerPubkeys[i]);
         }
 
         bytes memory quorumNumbers;
-        for (uint i = 0; i < attestation.quorumNumbers.length; ++i) {
-            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(attestation.quorumNumbers[i]));
+        for (uint i = 0; i < signedBatch.attestation.quorumNumbers.length; ++i) {
+            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
         OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever.getCheckSignaturesIndices(
             registryCoordinator,
-            attestation.referenceBlockNumber,
+            signedBatch.batchHeader.referenceBlockNumber,
             quorumNumbers,
             nonSignerOperatorIds
         );
 
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = checkSignaturesIndices.nonSignerQuorumBitmapIndices; 
-        nonSignerStakesAndSignature.nonSignerPubkeys = attestation.nonSignerPubkeys; 
-        nonSignerStakesAndSignature.quorumApks = attestation.quorumApks; 
-        nonSignerStakesAndSignature.apkG2 = attestation.apkG2; 
-        nonSignerStakesAndSignature.sigma = attestation.sigma; 
+        nonSignerStakesAndSignature.nonSignerPubkeys = signedBatch.attestation.nonSignerPubkeys; 
+        nonSignerStakesAndSignature.quorumApks = signedBatch.attestation.quorumApks; 
+        nonSignerStakesAndSignature.apkG2 = signedBatch.attestation.apkG2; 
+        nonSignerStakesAndSignature.sigma = signedBatch.attestation.sigma; 
         nonSignerStakesAndSignature.quorumApkIndices = checkSignaturesIndices.quorumApkIndices; 
         nonSignerStakesAndSignature.totalStakeIndices = checkSignaturesIndices.totalStakeIndices; 
         nonSignerStakesAndSignature.nonSignerStakeIndices = checkSignaturesIndices.nonSignerStakeIndices; 

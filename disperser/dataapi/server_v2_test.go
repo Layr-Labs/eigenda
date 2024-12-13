@@ -190,7 +190,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "Queued", response.Status)
-	assert.Equal(t, uint8(0), response.BlobHeader.BlobVersion)
+	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
 	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)

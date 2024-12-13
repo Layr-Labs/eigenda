@@ -424,7 +424,7 @@ type GetPaymentStateRequest struct {
 
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Signature over the account ID
-	// TODO: sign over a bin index or a nonce to mitigate signature replay attacks
+	// TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 

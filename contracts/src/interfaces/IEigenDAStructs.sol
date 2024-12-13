@@ -103,7 +103,6 @@ struct Attestation {
     BN254.G1Point sigma;
     BN254.G2Point apkG2;
     uint32[] quorumNumbers;
-    uint32 referenceBlockNumber;
 }
 
 ///////////////////////// SIGNATURE VERIFIER ///////////////////////////////

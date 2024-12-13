@@ -32,11 +32,13 @@ var (
 	dynamoClient             commondynamodb.Client
 	clientConfig             commonaws.ClientConfig
 	accountID1               gethcommon.Address
-	account1Reservations     *core.ActiveReservation
+	account1Reservations     *core.ReservedPayment
 	account1OnDemandPayments *core.OnDemandPayment
 	accountID2               gethcommon.Address
-	account2Reservations     *core.ActiveReservation
+	account2Reservations     *core.ReservedPayment
 	account2OnDemandPayments *core.OnDemandPayment
+	accountID3               gethcommon.Address
+	account3Reservations     *core.ReservedPayment
 	mt                       *meterer.Meterer
 
 	deployLocalStack           bool
@@ -100,6 +102,11 @@ func setup(_ *testing.M) {
 		teardown()
 		panic("failed to generate private key")
 	}
+	privateKey3, err := crypto.GenerateKey()
+	if err != nil {
+		teardown()
+		panic("failed to generate private key")
+	}
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
@@ -126,8 +133,10 @@ func setup(_ *testing.M) {
 	now := uint64(time.Now().Unix())
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
-	account1Reservations = &core.ActiveReservation{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = &core.ActiveReservation{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	accountID3 = crypto.PubkeyToAddress(privateKey3.PublicKey)
+	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
@@ -171,31 +180,34 @@ func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
-	paymentChainState.On("GetGlobalRateBinInterval", testifymock.Anything).Return(uint64(1), nil)
+	paymentChainState.On("GetGlobalRateBinInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
 	reservationPeriod := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
 	})).Return(account1Reservations, nil)
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
 	})).Return(account2Reservations, nil)
-	paymentChainState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ActiveReservation{}, fmt.Errorf("reservation not found"))
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
+		return account == accountID3
+	})).Return(account3Reservations, nil)
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
 
 	// test invalid quorom ID
-	header := createPaymentHeader(1, 0, accountID1)
+	header := createPaymentHeader(1, big.NewInt(0), accountID1)
 	err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
 	// overwhelming bin overflow for empty bins
-	header = createPaymentHeader(reservationPeriod-1, 0, accountID2)
+	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
 	// overwhelming bin overflow for empty bins
-	header = createPaymentHeader(reservationPeriod-1, 0, accountID2)
+	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
@@ -204,21 +216,26 @@ func TestMetererReservations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header = createPaymentHeader(1, 0, crypto.PubkeyToAddress(unregisteredUser.PublicKey))
+	header = createPaymentHeader(1, big.NewInt(0), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "failed to get active reservation by account: reservation not found")
 
-	// test invalid bin index
-	header = createPaymentHeader(reservationPeriod, 0, accountID1)
+	// test inactive reservation
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID3)
+	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0})
+	assert.ErrorContains(t, err, "reservation not active")
+
+	// test invalid reservation period
+	header = createPaymentHeader(reservationPeriod-3, big.NewInt(0), accountID1)
 	err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
-	assert.ErrorContains(t, err, "invalid bin index for reservation")
+	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
 	// test bin usage metering
 	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
-		header = createPaymentHeader(reservationPeriod, 0, accountID2)
+		header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID2)
 		err = mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
@@ -232,7 +249,7 @@ func TestMetererReservations(t *testing.T) {
 
 	}
 	// first over flow is allowed
-	header = createPaymentHeader(reservationPeriod, 0, accountID2)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 25, quoromNumbers)
 	assert.NoError(t, err)
@@ -248,7 +265,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
-	header = createPaymentHeader(reservationPeriod, 0, accountID2)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1, quoromNumbers)
 	assert.ErrorContains(t, err, "bin has already been filled")
@@ -275,18 +292,18 @@ func TestMetererOnDemand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
-	header := createPaymentHeader(reservationPeriod, 2, crypto.PubkeyToAddress(unregisteredUser.PublicKey))
+	header := createPaymentHeader(reservationPeriod, big.NewInt(2), crypto.PubkeyToAddress(unregisteredUser.PublicKey))
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "failed to get on-demand payment by account: payment not found")
 
 	// test invalid quorom ID
-	header = createPaymentHeader(reservationPeriod, 1, accountID1)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(2), accountID1)
 	err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	header = createPaymentHeader(reservationPeriod, 1, accountID1)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(1), accountID1)
 	err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	// No rollback after meter request
@@ -300,7 +317,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// test duplicated cumulative payments
 	symbolLength := uint(100)
 	priceCharged := mt.PaymentCharged(symbolLength)
-	assert.Equal(t, uint64(102*mt.ChainPaymentState.GetPricePerSymbol()), priceCharged)
+	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(reservationPeriod, priceCharged, accountID2)
 	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.NoError(t, err)
@@ -310,24 +327,24 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test valid payments
 	for i := 1; i < 9; i++ {
-		header = createPaymentHeader(reservationPeriod, uint64(priceCharged)*uint64(i+1), accountID2)
+		header = createPaymentHeader(reservationPeriod, new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 		assert.NoError(t, err)
 	}
 
 	// test cumulative payment on-chain constraint
-	header = createPaymentHeader(reservationPeriod, 2023, accountID2)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(2023), accountID2)
 	err = mt.MeterRequest(ctx, *header, 1, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
-	previousCumulativePayment := uint64(priceCharged) * uint64(9)
+	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
 	symbolLength = uint(2)
 	priceCharged = mt.PaymentCharged(symbolLength)
-	header = createPaymentHeader(reservationPeriod, previousCumulativePayment+priceCharged-1, accountID2)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
-	previousCumulativePayment = previousCumulativePayment + priceCharged
+	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
 	header = createPaymentHeader(reservationPeriod, mt.PaymentCharged(50), accountID2)
@@ -342,7 +359,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numPrevRecords, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	header = createPaymentHeader(reservationPeriod, previousCumulativePayment+mt.PaymentCharged(1010), accountID1)
+	header = createPaymentHeader(reservationPeriod, big.NewInt(0).Add(previousCumulativePayment, mt.PaymentCharged(1010)), accountID1)
 	err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
@@ -360,42 +377,42 @@ func TestMeterer_paymentCharged(t *testing.T) {
 		symbolLength   uint
 		pricePerSymbol uint32
 		minNumSymbols  uint32
-		expected       uint64
+		expected       *big.Int
 	}{
 		{
 			name:           "Data length equal to min chargeable size",
 			symbolLength:   1024,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       1024,
+			expected:       big.NewInt(1024),
 		},
 		{
 			name:           "Data length less than min chargeable size",
 			symbolLength:   512,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       1024,
+			expected:       big.NewInt(1024),
 		},
 		{
 			name:           "Data length greater than min chargeable size",
 			symbolLength:   2048,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       2048,
+			expected:       big.NewInt(2048),
 		},
 		{
 			name:           "Large data length",
 			symbolLength:   1 << 20, // 1 MB
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       1 << 20,
+			expected:       big.NewInt(1 << 20),
 		},
 		{
 			name:           "Price not evenly divisible by min chargeable size",
 			symbolLength:   1536,
 			pricePerSymbol: 1,
 			minNumSymbols:  1024,
-			expected:       2048,
+			expected:       big.NewInt(2048),
 		},
 	}
 
@@ -465,10 +482,10 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 	}
 }
 
-func createPaymentHeader(reservationPeriod uint32, cumulativePayment uint64, accountID gethcommon.Address) *core.PaymentMetadata {
+func createPaymentHeader(reservationPeriod uint32, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
 	return &core.PaymentMetadata{
 		AccountID:         accountID.Hex(),
 		ReservationPeriod: reservationPeriod,
-		CumulativePayment: big.NewInt(int64(cumulativePayment)),
+		CumulativePayment: cumulativePayment,
 	}
 }

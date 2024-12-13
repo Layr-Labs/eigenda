@@ -217,3 +217,65 @@ func TestChunksData(t *testing.T) {
 		assert.EqualError(t, err, "unsupported chunk encoding format: 3")
 	}
 }
+
+func TestReservedPayment_IsActive(t *testing.T) {
+	tests := []struct {
+		name             string
+		reservedPayment  core.ReservedPayment
+		currentTimestamp uint64
+		wantActive       bool
+	}{
+		{
+			name: "active - current time in middle of range",
+			reservedPayment: core.ReservedPayment{
+				StartTimestamp: 100,
+				EndTimestamp:   200,
+			},
+			currentTimestamp: 150,
+			wantActive:       true,
+		},
+		{
+			name: "active - current time at start",
+			reservedPayment: core.ReservedPayment{
+				StartTimestamp: 100,
+				EndTimestamp:   200,
+			},
+			currentTimestamp: 100,
+			wantActive:       true,
+		},
+		{
+			name: "active - current time at end",
+			reservedPayment: core.ReservedPayment{
+				StartTimestamp: 100,
+				EndTimestamp:   200,
+			},
+			currentTimestamp: 200,
+			wantActive:       true,
+		},
+		{
+			name: "inactive - current time before start",
+			reservedPayment: core.ReservedPayment{
+				StartTimestamp: 100,
+				EndTimestamp:   200,
+			},
+			currentTimestamp: 99,
+			wantActive:       false,
+		},
+		{
+			name: "inactive - current time after end",
+			reservedPayment: core.ReservedPayment{
+				StartTimestamp: 100,
+				EndTimestamp:   200,
+			},
+			currentTimestamp: 201,
+			wantActive:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isActive := tt.reservedPayment.IsActive(tt.currentTimestamp)
+			assert.Equal(t, tt.wantActive, isActive)
+		})
+	}
+}

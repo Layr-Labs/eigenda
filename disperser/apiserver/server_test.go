@@ -761,7 +761,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{
 		CumulativePayment: big.NewInt(3000),
 	}, nil)
-	mockState.On("GetActiveReservationByAccount", tmock.Anything, tmock.Anything).Return(&core.ActiveReservation{
+	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{
 		SymbolsPerSecond: 2048,
 		StartTimestamp:   0,
 		EndTimestamp:     math.MaxUint32,

@@ -70,7 +70,7 @@ message BlobCommitmentReply {
 message GetPaymentStateRequest {
   string account_id = 1;
   // Signature over the account ID
-  // TODO: sign over a bin index or a nonce to mitigate signature replay attacks
+  // TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
   bytes signature = 2;
 }
 

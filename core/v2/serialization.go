@@ -24,92 +24,85 @@ type abiBlobCommitments struct {
 	Commitment       abiG1Commit
 	LengthCommitment abiG2Commit
 	LengthProof      abiG2Commit
-	Length           uint32
-}
-type abiBlobHeader struct {
-	BlobVersion         uint8
-	BlobCommitments     abiBlobCommitments
-	QuorumNumbers       []byte
-	PaymentMetadataHash [32]byte
+	DataLength       uint32
 }
 
-func blobHeaderArgMarshaling() []abi.ArgumentMarshaling {
-	return []abi.ArgumentMarshaling{
+func (b *BlobHeader) BlobKey() (BlobKey, error) {
+	versionType, err := abi.NewType("uint16", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	quorumNumbersType, err := abi.NewType("bytes", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	commitmentType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
-			Name: "blobVersion",
-			Type: "uint8",
-		},
-		{
-			Name: "blobCommitments",
+			Name: "commitment",
 			Type: "tuple",
 			Components: []abi.ArgumentMarshaling{
 				{
-					Name: "commitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256",
-						},
-						{
-							Name: "Y",
-							Type: "uint256",
-						},
-					},
+					Name: "X",
+					Type: "uint256",
 				},
 				{
-					Name: "lengthCommitment",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "lengthProof",
-					Type: "tuple",
-					Components: []abi.ArgumentMarshaling{
-						{
-							Name: "X",
-							Type: "uint256[2]",
-						},
-						{
-							Name: "Y",
-							Type: "uint256[2]",
-						},
-					},
-				},
-				{
-					Name: "length",
-					Type: "uint32",
+					Name: "Y",
+					Type: "uint256",
 				},
 			},
 		},
 		{
-			Name: "quorumNumbers",
-			Type: "bytes",
+			Name: "lengthCommitment",
+			Type: "tuple",
+			Components: []abi.ArgumentMarshaling{
+				{
+					Name: "X",
+					Type: "uint256[2]",
+				},
+				{
+					Name: "Y",
+					Type: "uint256[2]",
+				},
+			},
 		},
 		{
-			Name: "paymentMetadataHash",
-			Type: "bytes32",
+			Name: "lengthProof",
+			Type: "tuple",
+			Components: []abi.ArgumentMarshaling{
+				{
+					Name: "X",
+					Type: "uint256[2]",
+				},
+				{
+					Name: "Y",
+					Type: "uint256[2]",
+				},
+			},
+		},
+		{
+			Name: "dataLength",
+			Type: "uint32",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
+	arguments := abi.Arguments{
+		{
+			Type: versionType,
+		},
+		{
+			Type: quorumNumbersType,
+		},
+		{
+			Type: commitmentType,
 		},
 	}
-}
 
-func (b *BlobHeader) toABIStruct() (abiBlobHeader, error) {
-	paymentHash, err := b.PaymentMetadata.Hash()
-	if err != nil {
-		return abiBlobHeader{}, err
-	}
-	return abiBlobHeader{
-		BlobVersion: uint8(b.BlobVersion),
-		BlobCommitments: abiBlobCommitments{
+	packedBytes, err := arguments.Pack(
+		b.BlobVersion,
+		b.QuorumNumbers,
+		abiBlobCommitments{
 			Commitment: abiG1Commit{
 				X: b.BlobCommitments.Commitment.X.BigInt(new(big.Int)),
 				Y: b.BlobCommitments.Commitment.Y.BigInt(new(big.Int)),
@@ -134,41 +127,62 @@ func (b *BlobHeader) toABIStruct() (abiBlobHeader, error) {
 					b.BlobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
 				},
 			},
-			Length: uint32(b.BlobCommitments.Length),
+			DataLength: uint32(b.BlobCommitments.Length),
 		},
-		QuorumNumbers:       b.QuorumNumbers,
-		PaymentMetadataHash: paymentHash,
-	}, nil
-}
-
-func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	blobHeaderType, err := abi.NewType("tuple", "", blobHeaderArgMarshaling())
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	arguments := abi.Arguments{
-		{
-			Type: blobHeaderType,
-		},
-	}
-
-	s, err := b.toABIStruct()
-	if err != nil {
-		return [32]byte{}, err
-	}
-
-	bytes, err := arguments.Pack(s)
+	)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
 	var headerHash [32]byte
 	hasher := sha3.NewLegacyKeccak256()
-	hasher.Write(bytes)
+	hasher.Write(packedBytes)
 	copy(headerHash[:], hasher.Sum(nil)[:32])
 
-	return headerHash, nil
+	blobKeyType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "blobHeaderHash",
+			Type: "bytes32",
+		},
+		{
+			Name: "paymentMetadataHash",
+			Type: "bytes32",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	arguments = abi.Arguments{
+		{
+			Type: blobKeyType,
+		},
+	}
+
+	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	s2 := struct {
+		BlobHeaderHash      [32]byte
+		PaymentMetadataHash [32]byte
+	}{
+		BlobHeaderHash:      headerHash,
+		PaymentMetadataHash: paymentMetadataHash,
+	}
+
+	packedBytes, err = arguments.Pack(s2)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	var blobKey [32]byte
+	hasher = sha3.NewLegacyKeccak256()
+	hasher.Write(packedBytes)
+	copy(blobKey[:], hasher.Sum(nil)[:32])
+
+	return blobKey, nil
 }
 
 func (c *BlobCertificate) Hash() ([32]byte, error) {
@@ -176,40 +190,31 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, fmt.Errorf("blob header is nil")
 	}
 
-	blobCertType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{
-			Name:       "blobHeader",
-			Type:       "tuple",
-			Components: blobHeaderArgMarshaling(),
-		},
-		{
-			Name: "relayKeys",
-			Type: "uint32[]",
-		},
-	})
+	blobKeyType, err := abi.NewType("bytes32", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	relayKeysType, err := abi.NewType("uint32[]", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
 	arguments := abi.Arguments{
 		{
-			Type: blobCertType,
+			Type: blobKeyType,
+		},
+		{
+			Type: relayKeysType,
 		},
 	}
 
-	bh, err := c.BlobHeader.toABIStruct()
+	blobKey, err := c.BlobHeader.BlobKey()
 	if err != nil {
 		return [32]byte{}, err
 	}
-	s := struct {
-		BlobHeader abiBlobHeader
-		RelayKeys  []RelayKey
-	}{
-		BlobHeader: bh,
-		RelayKeys:  c.RelayKeys,
-	}
 
-	bytes, err := arguments.Pack(s)
+	bytes, err := arguments.Pack(blobKey, c.RelayKeys)
 	if err != nil {
 		return [32]byte{}, err
 	}

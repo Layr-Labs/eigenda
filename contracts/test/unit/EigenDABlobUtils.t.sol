@@ -17,6 +17,9 @@ import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureV
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
+import {PaymentVault} from "../../src/payments/PaymentVault.sol";
+
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
 
@@ -78,7 +81,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             eigenDAThresholdRegistry,
-            eigenDARelayRegistry
+            eigenDARelayRegistry,
+            IPaymentVault(address(0))
         );
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
