@@ -52,8 +52,8 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 }
 
 var (
-	indexedChainState coremock.MockIndexedChainState
-	chainState        coremock.ChainDataMock
+	indexedChainState *coremock.ChainDataMock
+	chainState        *coremock.ChainDataMock
 	indexer           *indexermock.MockIndexer
 	operatorState     *core.OperatorState
 	nodeClient        *clientsmock.MockNodeClient
@@ -72,7 +72,7 @@ var (
 func setup(t *testing.T) {
 
 	var err error
-	chainState, err := coremock.MakeChainDataMock(map[uint8]int{
+	chainState, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
 		1: numOperators,
 		2: numOperators,
@@ -81,7 +81,7 @@ func setup(t *testing.T) {
 		t.Fatalf("failed to create new mocked chain data: %s", err)
 	}
 
-	indexedChainState, err := coremock.MakeChainDataMock(map[uint8]int{
+	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,
 		1: numOperators,
 		2: numOperators,
