@@ -44,7 +44,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 	operators := make([]string, 0)
 	stakers := make([]string, 0)
-	clients := make([]string, 0)
+	// clients := make([]string, 0)
 	maxOperatorCount := env.Services.Counts.NumMaxOperatorCount
 
 	numStrategies := len(env.Services.Stakes)
@@ -72,11 +72,11 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		operators = append(operators, env.getKeyString(operatorName))
 	}
 
-	// 4 clients: with both, with reservations, with on-demand payments, without payments
-	for i := 0; i < 4; i++ {
-		clientName := fmt.Sprintf("client%d", i)
-		clients = append(clients, env.getKeyString(clientName))
-	}
+	// // 4 clients: with both, with reservations, with on-demand payments, without payments
+	// for i := 0; i < 4; i++ {
+	// 	clientName := fmt.Sprintf("client%d", i)
+	// 	clients = append(clients, env.getKeyString(clientName))
+	// }
 
 	config := EigenDADeployConfig{
 		UseDefaults:         true,
@@ -85,7 +85,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 		StakerPrivateKeys:   stakers,
 		StakerTokenAmounts:  stakes,
 		OperatorPrivateKeys: operators,
-		ClientPrivateKeys:   clients,
+		// ClientPrivateKeys:   clients,
 		ConfirmerPrivateKey: env.getKeyString("batcher0"),
 	}
 
