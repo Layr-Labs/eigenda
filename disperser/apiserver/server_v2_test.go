@@ -238,8 +238,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: invalidReqProto,
 	})
 	// TODO(ian-shim): re-enable this validation after fixing the payment metadata validation
-	// assert.ErrorContains(t, err, "invalid payment metadata")
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "invalid payment metadata")
+	// assert.NoError(t, err)
 
 	// request with invalid commitment
 	invalidCommitment := commitmentProto
