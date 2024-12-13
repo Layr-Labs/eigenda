@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"math/big"
@@ -70,10 +71,13 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 	logger.Info("Should call churner", "shouldCallChurner", shouldCallChurner)
 
 	// Generate salt and expiry
-
-	privateKeyBytes := []byte(operator.KeyPair.PrivKey.String())
+	bytes := make([]byte, 32)
+	_, err = rand.Read(bytes)
+	if err != nil {
+		return err
+	}
 	salt := [32]byte{}
-	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumsToRegister, privateKeyBytes))
+	copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumsToRegister, bytes))
 
 	// Get the current block number
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
