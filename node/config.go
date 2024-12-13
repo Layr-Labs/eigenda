@@ -62,7 +62,6 @@ type Config struct {
 	OverrideStoreDurationBlocks    int64
 	QuorumIDList                   []core.QuorumID
 	DbPath                         string
-	DBSizePollPeriod               time.Duration
 	LogPath                        string
 	PrivateBls                     string
 	ID                             core.OperatorID
@@ -219,7 +218,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideStoreDurationBlocks:    ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                   ids,
 		DbPath:                         ctx.GlobalString(flags.DbPathFlag.Name),
-		DBSizePollPeriod:               ctx.GlobalDuration(flags.MetricsDBSizePollPeriodFlag.Name),
 		PrivateBls:                     privateBls,
 		EthClientConfig:                ethClientConfig,
 		EncoderConfig:                  kzg.ReadCLIConfig(ctx),

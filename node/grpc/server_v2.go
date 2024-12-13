@@ -38,7 +38,7 @@ func NewServerV2(
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry) (*ServerV2, error) {
 
-	metrics, err := NewV2Metrics(logger, registry, config.DbPath, config.DBSizePollPeriod)
+	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return
 		}
 
-		s.metrics.ReportStoreChunksDataSize(size)
+		s.metrics.ReportStoreChunksRequestSize(size)
 
 		storeChan <- storeResult{
 			keys: keys,

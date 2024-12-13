@@ -1,14 +1,12 @@
 package grpc
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
-	"os"
-	"path/filepath"
-	"sync/atomic"
 	"time"
 )
 
@@ -21,25 +19,16 @@ type MetricsV2 struct {
 	registry         *prometheus.Registry
 	grpcServerOption grpc.ServerOption
 
-	storeChunksLatency  *prometheus.SummaryVec
-	storeChunksDataSize *prometheus.GaugeVec
+	storeChunksLatency     *prometheus.SummaryVec
+	storeChunksRequestSize *prometheus.GaugeVec
 
 	getChunksLatency  *prometheus.SummaryVec
 	getChunksDataSize *prometheus.GaugeVec
-
-	dbSize           *prometheus.GaugeVec
-	dbSizePollPeriod time.Duration
-	dbDir            string
-	isAlive          *atomic.Bool
 }
 
 // NewV2Metrics creates a new MetricsV2 instance. dbSizePollPeriod is the period at which the database size is polled.
 // If set to 0, the database size is not polled.
-func NewV2Metrics(
-	logger logging.Logger,
-	registry *prometheus.Registry,
-	dbDir string,
-	dbSizePollPeriod time.Duration) (*MetricsV2, error) {
+func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*MetricsV2, error) {
 
 	// These should be re-enabled once the legacy v1 metrics are removed.
 	//registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -61,10 +50,10 @@ func NewV2Metrics(
 		[]string{},
 	)
 
-	storeChunksDataSize := promauto.With(registry).NewGaugeVec(
+	storeChunksRequestSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "store_chunks_data_size_bytes",
+			Name:      "store_chunks_request_size_bytes",
 			Help:      "The size of the data requested to be stored by StoreChunks() RPC calls.",
 		},
 		[]string{},
@@ -89,66 +78,15 @@ func NewV2Metrics(
 		[]string{},
 	)
 
-	dbSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "db_size_bytes",
-			Help:      "The size of the leveldb database.",
-		},
-		[]string{},
-	)
-	isAlive := &atomic.Bool{}
-	isAlive.Store(true)
-
 	return &MetricsV2{
-		logger:              logger,
-		registry:            registry,
-		grpcServerOption:    grpcServerOption,
-		storeChunksLatency:  storeChunksLatency,
-		storeChunksDataSize: storeChunksDataSize,
-		getChunksLatency:    getChunksLatency,
-		getChunksDataSize:   getChunksDataSize,
-		dbSize:              dbSize,
-		dbSizePollPeriod:    dbSizePollPeriod,
-		dbDir:               dbDir,
-		isAlive:             isAlive,
+		logger:                 logger,
+		registry:               registry,
+		grpcServerOption:       grpcServerOption,
+		storeChunksLatency:     storeChunksLatency,
+		storeChunksRequestSize: storeChunksRequestSize,
+		getChunksLatency:       getChunksLatency,
+		getChunksDataSize:      getChunksDataSize,
 	}, nil
-}
-
-// Start starts the metrics server.
-func (m *MetricsV2) Start() {
-	if m.dbSizePollPeriod.Nanoseconds() == 0 {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(m.dbSizePollPeriod)
-
-		for m.isAlive.Load() {
-			var size int64
-			err := filepath.Walk(m.dbDir, func(_ string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				if !info.IsDir() {
-					size += info.Size()
-				}
-				return err
-			})
-
-			if err != nil {
-				m.logger.Errorf("failed to get database size: %v", err)
-			} else {
-				m.dbSize.WithLabelValues().Set(float64(size))
-			}
-			<-ticker.C
-		}
-	}()
-
-}
-
-// Stop stops the metrics server.
-func (m *MetricsV2) Stop() {
-	m.isAlive.Store(false)
 }
 
 // GetGRPCServerOption returns the gRPC server option that enables automatic GRPC metrics collection.
@@ -157,17 +95,15 @@ func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
 }
 
 func (m *MetricsV2) ReportStoreChunksLatency(latency time.Duration) {
-	m.storeChunksLatency.WithLabelValues().Observe(
-		float64(latency.Nanoseconds()) / float64(time.Millisecond))
+	m.storeChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(latency))
 }
 
-func (m *MetricsV2) ReportStoreChunksDataSize(size uint64) {
-	m.storeChunksDataSize.WithLabelValues().Set(float64(size))
+func (m *MetricsV2) ReportStoreChunksRequestSize(size uint64) {
+	m.storeChunksRequestSize.WithLabelValues().Set(float64(size))
 }
 
 func (m *MetricsV2) ReportGetChunksLatency(latency time.Duration) {
-	m.getChunksLatency.WithLabelValues().Observe(
-		float64(latency.Nanoseconds()) / float64(time.Millisecond))
+	m.getChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(latency))
 }
 
 func (m *MetricsV2) ReportGetChunksDataSize(size int) {

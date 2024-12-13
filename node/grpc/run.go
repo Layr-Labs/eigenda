@@ -24,8 +24,6 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 		return errors.New("node V2 server is not configured")
 	}
 
-	serverV2.metrics.Start()
-
 	go func() {
 		for {
 			addr := fmt.Sprintf("%s:%s", localhost, config.InternalDispersalPort)
