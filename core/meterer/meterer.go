@@ -270,7 +270,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond() {
+	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil
