@@ -716,6 +716,20 @@ func (env *Config) GenerateAllVariables() {
 			filename, []string{grpcPort})
 	}
 
+	// // Payment clients
+	// for i := 0; i < env.Services.Counts.NumOpr; i++ {
+
+	// 	name := fmt.Sprintf("staker%v", i)
+	// 	key, address := env.getKey(name)
+
+	// 	// Create staker paritipants
+	// 	participant := Staker{
+	// 		Address:    address,
+	// 		PrivateKey: key[2:],
+	// 	}
+	// 	env.Stakers = append(env.Stakers, participant)
+	// }
+
 	name = "retriever0"
 	key, _ = env.getKey(name)
 	logPath, _, _, envFile = env.getPaths(name)
