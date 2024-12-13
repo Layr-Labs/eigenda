@@ -104,16 +104,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 		}
 
 		logger.Info("Creating onchain payment state")
-		blockNumber, err := transactor.GetCurrentBlockNumber(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to get current block number: %w", err)
-		}
-		logger.Info("current block number", "block", blockNumber)
 		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
-		if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 

@@ -154,7 +154,7 @@ func setup(_ *testing.M) {
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
-	if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 

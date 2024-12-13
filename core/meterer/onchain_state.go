@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -14,7 +15,7 @@ import (
 
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
-	RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error
+	RefreshOnchainPaymentState(ctx context.Context) error
 	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
@@ -49,49 +50,45 @@ type PaymentVaultParams struct {
 }
 
 func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (*OnchainPaymentState, error) {
-	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-
 	state := OnchainPaymentState{
 		tx:                 tx,
 		ReservedPayments:   make(map[gethcommon.Address]*core.ReservedPayment),
 		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
 		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
 	}
+
+	paymentVaultParams, err := state.GetPaymentVaultParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	state.PaymentVaultParams.Store(paymentVaultParams)
 
 	return &state, nil
 }
 
-func GetPaymentVaultParams(ctx context.Context, tx *eth.Reader) (*PaymentVaultParams, error) {
-	blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*PaymentVaultParams, error) {
+	quorumNumbers, err := pcs.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	quorumNumbers, err := tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	globalSymbolsPerSecond, err := pcs.tx.GetGlobalSymbolsPerSecond(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	globalSymbolsPerSecond, err := tx.GetGlobalSymbolsPerSecond(ctx)
+	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	minNumSymbols, err := tx.GetMinNumSymbols(ctx)
+	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	pricePerSymbol, err := tx.GetPricePerSymbol(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	reservationWindow, err := tx.GetReservationWindow(ctx)
+	reservationWindow, err := pcs.tx.GetReservationWindow(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +103,8 @@ func GetPaymentVaultParams(ctx context.Context, tx *eth.Reader) (*PaymentVaultPa
 }
 
 // RefreshOnchainPaymentState returns the current onchain payment state
-func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, tx *eth.Reader) error {
-	paymentVaultParams, err := GetPaymentVaultParams(ctx, tx)
+func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
+	paymentVaultParams, err := pcs.GetPaymentVaultParams(ctx)
 	if err != nil {
 		return err
 	}
@@ -120,7 +117,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	reservedPayments, err := tx.GetReservedPayments(ctx, accountIDs)
+	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -133,7 +130,7 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context, 
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := tx.GetOnDemandPayments(ctx, accountIDs)
+	onDemandPayments, err := pcs.tx.GetOnDemandPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
@@ -183,7 +180,10 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	fmt.Println("Getting on demand quorum numbers")
+	fmt.Println("Getting on demand quorum numbers tx ", pcs.tx)
 	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+
 	if err != nil {
 		return nil, err
 	}
