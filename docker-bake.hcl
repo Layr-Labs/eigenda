@@ -252,6 +252,7 @@ target "dataapi-internal" {
 target "controller" {
   context    = "."
   dockerfile = "./Dockerfile"
+  target     = "controller"
   tags       = ["${REGISTRY}/${REPO}/controller:${BUILD_TAG}"]
 }
 
