@@ -38,9 +38,7 @@ func TestIndexedOperatorStateCache(t *testing.T) {
 			},
 		},
 	}
-	c.ChainState.On("GetOperatorState", mock.Anything, uint(100), []core.QuorumID{0}).Return(operatorState, nil)
-	c.ChainState.On("GetOperatorState", mock.Anything, uint(100), []core.QuorumID{1}).Return(operatorState, nil)
-	c.ChainState.On("GetOperatorState", mock.Anything, uint(101), []core.QuorumID{0, 1}).Return(operatorState, nil)
+	c.ChainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(operatorState, nil)
 
 	ctx := context.Background()
 	// Get the operator state for block 100 and quorum 0

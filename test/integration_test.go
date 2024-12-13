@@ -470,8 +470,8 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		2: numOperators,
 	})
 	assert.NoError(t, err)
-
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
+	cst.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(cst.Operators, nil)
 
 	logger := logging.NewNoopLogger()
 	assert.NoError(t, err)
