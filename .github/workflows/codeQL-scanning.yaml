@@ -20,7 +20,7 @@ on:
       - '.github/codeql/**'
       - '.github/workflows/codeql-analysis.yml'
   schedule:
-    - cron: '0 9 * * 1'
+    - cron: '0 9 * * *'
 
 jobs:
   CodeQL-Build:
