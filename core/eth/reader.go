@@ -3,6 +3,7 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -594,7 +595,10 @@ func (t *Reader) CalculateOperatorChurnApprovalDigestHash(
 }
 
 func (t *Reader) GetCurrentBlockNumber(ctx context.Context) (uint32, error) {
+	fmt.Println("Getting current block number")
+	fmt.Println("ethClient", t.ethClient)
 	bn, err := t.ethClient.BlockNumber(ctx)
+	fmt.Println("Got current block number", bn)
 	return uint32(bn), err
 }
 

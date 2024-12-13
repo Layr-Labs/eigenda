@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -188,7 +189,10 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	fmt.Println("Getting on demand quorum numbers")
+	fmt.Println("Getting on demand quorum numbers tx ", pcs.tx)
 	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+
 	if err != nil {
 		return nil, err
 	}
