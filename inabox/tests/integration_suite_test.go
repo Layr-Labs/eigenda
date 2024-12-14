@@ -85,23 +85,28 @@ var _ = BeforeSuite(func() {
 		}
 	}
 
+	fmt.Println("Starting localstack!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+	localStackPort = "4570"
+	pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
+	Expect(err).To(BeNil())
+	dockertestPool = pool
+	dockertestResource = resource
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	if testConfig.Environment.IsLocal() {
 		if !inMemoryBlobStore {
 			fmt.Println("Using shared Blob Store")
-			localStackPort = "4570"
-			pool, resource, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
-			Expect(err).To(BeNil())
-			dockertestPool = pool
-			dockertestResource = resource
 
 			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
 			Expect(err).To(BeNil())
 		} else {
 			fmt.Println("Using in-memory Blob Store")
 		}
+		fmt.Println("Making payment related tables....")
+		err = deploy.DeployPaymentRelatedTables(pool, localStackPort)
+		Expect(err).To(BeNil())
 
-		fmt.Println("Starting anvil")
+		fmt.Println("Starting anvil        inabox/tests/integration_suite_test.go")
 		testConfig.StartAnvil()
 
 		if deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
