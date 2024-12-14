@@ -45,7 +45,7 @@ var _ = BeforeSuite(func() {
 		testConfig.Deployers[0].DeploySubgraphs = false
 
 		if testConfig.Environment.IsLocal() {
-			fmt.Println("Starting anvil")
+			fmt.Println("Starting anvil core indexer indexer_suite_test")
 			testConfig.StartAnvil()
 
 			fmt.Println("Deploying experiment")
