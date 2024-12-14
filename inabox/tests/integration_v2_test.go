@@ -28,6 +28,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
+		// deploy payment dynamodb tables
+
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
 			Port:     "32005",
