@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -25,12 +28,30 @@ var _ = Describe("Inabox v2 Integration", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
+		cfg := aws.ClientConfig{
+			Region:          "us-east-1",
+			AccessKey:       "localstack",
+			SecretAccessKey: "localstack",
+			EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
+		}
+		fmt.Println("Creating v2 tables     IN integration_v2_test.go")
+
+		fmt.Println("Creating payment related tables v2")
+		// create payment related tables
+		err := meterer.CreateReservationTable(cfg, "e2e_v2_reservation")
+		fmt.Println("err", err)
+		Expect(err).To(BeNil())
+		err = meterer.CreateOnDemandTable(cfg, "e2e_v2_ondemand")
+		fmt.Println("err", err)
+		Expect(err).To(BeNil())
+		err = meterer.CreateGlobalReservationTable(cfg, "e2e_v2_global_reservation")
+		fmt.Println("err", err)
+		Expect(err).To(BeNil())
+
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		// deploy payment dynamodb tables
-
-		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
+		disp, err := clients.NewDisperserClientV2(&clients.DisperserClientV2Config{
 			Hostname: "localhost",
 			Port:     "32005",
 		}, signer, nil, nil)
