@@ -214,7 +214,6 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_TOTAL_UNAUTH_BLOB_RATE:    "10,10",
 		DISPERSER_SERVER_PER_USER_UNAUTH_BLOB_RATE: "2,2",
 		DISPERSER_SERVER_ENABLE_RATELIMITER:        "true",
-		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:    "true",
 
 		DISPERSER_SERVER_RETRIEVAL_BLOB_RATE: "4",
 		DISPERSER_SERVER_RETRIEVAL_BYTE_RATE: "10000000",
@@ -226,6 +225,11 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
+
+		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
+		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e-v2-reservation",
+		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e-v2-ondemand",
+		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e-v2-global-reservation",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
