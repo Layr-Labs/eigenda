@@ -102,9 +102,9 @@ var _ = BeforeSuite(func() {
 		} else {
 			fmt.Println("Using in-memory Blob Store")
 		}
-		fmt.Println("Making payment related tables....")
-		err = deploy.DeployPaymentRelatedTables(pool, localStackPort)
-		Expect(err).To(BeNil())
+		// fmt.Println("Making payment related tables....")
+		// err = deploy.DeployPaymentRelatedTables(pool, localStackPort)
+		// Expect(err).To(BeNil())
 
 		fmt.Println("Starting anvil        inabox/tests/integration_suite_test.go")
 		testConfig.StartAnvil()

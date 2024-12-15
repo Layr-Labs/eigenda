@@ -143,23 +143,23 @@ func DeployResources(
 			return err
 		}
 
-		fmt.Println("Creating payment related tables  ---- in localstack")
-		// create payment related tables
-		err = meterer.CreateReservationTable(cfg, v2MetadataTableName+"_reservation")
-		if err != nil {
-			fmt.Println("err", err)
-			return err
-		}
-		err = meterer.CreateOnDemandTable(cfg, v2MetadataTableName+"_ondemand")
-		if err != nil {
-			fmt.Println("err", err)
-			return err
-		}
-		err = meterer.CreateGlobalReservationTable(cfg, v2MetadataTableName+"_global_reservation")
-		if err != nil {
-			fmt.Println("err", err)
-			return err
-		}
+		// fmt.Println("Creating payment related tables  ---- in localstack")
+		// // create payment related tables
+		// err = meterer.CreateReservationTable(cfg, v2MetadataTableName+"_reservation")
+		// if err != nil {
+		// 	fmt.Println("err", err)
+		// 	return err
+		// }
+		// err = meterer.CreateOnDemandTable(cfg, v2MetadataTableName+"_ondemand")
+		// if err != nil {
+		// 	fmt.Println("err", err)
+		// 	return err
+		// }
+		// err = meterer.CreateGlobalReservationTable(cfg, v2MetadataTableName+"_global_reservation")
+		// if err != nil {
+		// 	fmt.Println("err", err)
+		// 	return err
+		// }
 	}
 
 	v2PaymentName := "e2e_v2_"
