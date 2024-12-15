@@ -188,7 +188,6 @@ func (c Config) IsEigenDADeployed() bool {
 }
 
 func NewTestConfig(testName, rootPath string) (testEnv *Config) {
-
 	rootPath, err := filepath.Abs(rootPath)
 	if err != nil {
 		log.Panicf("Error %s:", err.Error())

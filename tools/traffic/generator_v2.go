@@ -173,7 +173,10 @@ func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth
 
 	cs := eth.NewChainState(tx, gethClient)
 
-	chainState := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
+	chainState, err := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to instantiate chainState: %s", err))
+	}
 
 	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
 

@@ -76,6 +76,7 @@ func newComponents(t *testing.T) *components {
 		1: 4,
 		2: 4,
 	})
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators)
 
 	store, err := node.NewLevelDBStore(dbPath, logger, nil, 1e9, 1e9)
 	if err != nil {

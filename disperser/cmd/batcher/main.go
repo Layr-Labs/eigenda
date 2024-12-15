@@ -202,7 +202,10 @@ func RunBatcher(ctx *cli.Context) error {
 		logger.Info("Using graph node")
 
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+		ics, err = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+		if err != nil {
+			return err
+		}
 	} else {
 		logger.Info("Using built-in indexer")
 
@@ -216,7 +219,7 @@ func RunBatcher(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
+		ics, err = coreindexer.NewIndexedChainState(cs, indexer, 0)
 		if err != nil {
 			return err
 		}

@@ -52,8 +52,8 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 }
 
 var (
-	indexedChainState core.IndexedChainState
-	chainState        core.ChainState
+	indexedChainState *coremock.ChainDataMock
+	chainState        *coremock.ChainDataMock
 	indexer           *indexermock.MockIndexer
 	operatorState     *core.OperatorState
 	nodeClient        *clientsmock.MockNodeClient
@@ -89,6 +89,7 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new mocked indexed chain data: %s", err)
 	}
+	indexedChainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators, nil)
 
 	nodeClient = clientsmock.NewNodeClient()
 	coordinator = &core.StdAssignmentCoordinator{}
@@ -100,12 +101,7 @@ func setup(t *testing.T) {
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 
-	ics, err := coreindexer.NewIndexedChainState(chainState, indexer)
-	if err != nil {
-		panic("failed to create a new indexed chain state")
-	}
-
-	retrievalClient, err = clients.NewRetrievalClient(logger, ics, coordinator, nodeClient, v, 2)
+	retrievalClient, err = clients.NewRetrievalClient(logger, indexedChainState, coordinator, nodeClient, v, 2)
 	if err != nil {
 		panic("failed to create a new retrieval client")
 	}
@@ -132,6 +128,7 @@ func setup(t *testing.T) {
 		},
 		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
+
 	operatorState, err = indexedChainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
 		t.Fatalf("failed to get operator state: %s", err)
