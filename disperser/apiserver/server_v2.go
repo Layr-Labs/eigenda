@@ -261,18 +261,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, errors.New("payment meterer is not enabled")
 	}
 	start := time.Now()
-	fmt.Println("Disperser server v2 GetPaymentState start:", start)
-
 	defer func() {
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
-	deadline, ok := ctx.Deadline()
-	if ok {
-		fmt.Println("Disperser server v2 GetPaymentState Deadline:", deadline)
-	} else {
-		fmt.Println("Disperser server v2 GetPaymentState No deadline set")
-	}
 	accountID := gethcommon.HexToAddress(req.AccountId)
 	s.logger.Debug("Serve getpaymentstate request", accountID)
 

@@ -130,13 +130,13 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         uint256 clientPrivateKey = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
 
-        // _allocate(
-        //     IERC20(address(0)),
-        //     // Inline array creation for clients
-        //     toArray(vm.addr(clientPrivateKey)),
-        //     // Inline array creation for amounts
-        //     toArray(5 ether)
-        // );
+        _allocate(
+            IERC20(address(0)),
+            // Inline array creation for clients
+            toArray(vm.addr(clientPrivateKey)),
+            // Inline array creation for amounts
+            toArray(5 ether)
+        );
 
     
         vm.startBroadcast();
@@ -203,11 +203,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         // address reservedClient1 = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
         // paymentVault.setReservation(reservedClient1, reservation);
 
-        // // Deposit OnDemand for client 0 and 2
-        // vm.broadcast(clientPrivateKey);
-        // address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
-        // // vm.prank(ondemandClient);
-        // paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
+        // Deposit OnDemand for client 0 and 2
+        vm.broadcast(clientPrivateKey);
+        address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
+        // vm.prank(ondemandClient);
+        paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
