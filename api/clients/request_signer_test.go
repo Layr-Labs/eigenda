@@ -175,8 +175,8 @@ func TestRequestSigning(t *testing.T) {
 		BaseEndpoint: aws.String(localstackHost),
 	})
 
-	for i := 0; i < 1000; i++ {
-		fmt.Printf("iteration %d\n", i) // TODO remove
+	for i := 0; i < 100; i++ {
+		fmt.Printf("key iteration %d\n", i) // TODO remove
 
 		createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
 			KeySpec:  types.KeySpecEccSecgP256k1,
@@ -196,39 +196,42 @@ func TestRequestSigning(t *testing.T) {
 
 		publicAddress := crypto.PubkeyToAddress(*key)
 
-		request := auth.RandomStoreChunksRequest(rand)
-		request.Signature = nil
+		for j := 0; j < 100; j++ {
+			fmt.Printf("    request iteration %d\n", j) // TODO remove
 
-		signer := NewRequestSigner(region, localstackHost, keyID)
+			request := auth.RandomStoreChunksRequest(rand)
+			request.Signature = nil
 
-		signature, err := signer.SignStoreChunksRequest(context.Background(), request)
-		require.NoError(t, err)
+			signer := NewRequestSigner(region, localstackHost, keyID)
 
-		// TODO this doesn't belong here
-		signature, err = ParseSignature(
-			key,
-			auth.HashStoreChunksRequest(request),
-			signature)
+			signature, err := signer.SignStoreChunksRequest(context.Background(), request)
+			require.NoError(t, err)
 
-		require.Nil(t, request.Signature)
-		request.Signature = signature
+			// TODO this doesn't belong here
+			signature, err = ParseSignature(
+				key,
+				auth.HashStoreChunksRequest(request),
+				signature)
 
-		err = auth.VerifyStoreChunksRequest(publicAddress, request)
-		require.NoError(t, err)
+			require.Nil(t, request.Signature)
+			request.Signature = signature
 
-		// Changing a byte in the middle of the signature should make the verification fail
-		badSignature := make([]byte, len(signature))
-		copy(badSignature, signature)
-		badSignature[10] = badSignature[10] + 1
-		request.Signature = badSignature
-		err = auth.VerifyStoreChunksRequest(publicAddress, request)
-		require.Error(t, err)
+			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			require.NoError(t, err)
 
-		// Changing a byte in the middle of the request should make the verification fail
-		request.DisperserID = request.DisperserID + 1
-		request.Signature = signature
-		err = auth.VerifyStoreChunksRequest(publicAddress, request)
-		require.Error(t, err)
+			// Changing a byte in the middle of the signature should make the verification fail
+			badSignature := make([]byte, len(signature))
+			copy(badSignature, signature)
+			badSignature[10] = badSignature[10] + 1
+			request.Signature = badSignature
+			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			require.Error(t, err)
 
+			// Changing a byte in the middle of the request should make the verification fail
+			request.DisperserID = request.DisperserID + 1
+			request.Signature = signature
+			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			require.Error(t, err)
+		}
 	}
 }
