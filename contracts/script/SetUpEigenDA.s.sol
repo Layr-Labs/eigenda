@@ -129,6 +129,15 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         uint256 clientPrivateKey = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
+
+        _allocate(
+            IERC20(address(0)),
+            // Inline array creation for clients
+            toArray(vm.addr(clientPrivateKey)),
+            // Inline array creation for amounts
+            toArray(5 ether)
+        );
+
     
         vm.startBroadcast();
         _allocate(
