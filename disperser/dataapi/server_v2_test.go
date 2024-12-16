@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -24,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
@@ -37,7 +37,7 @@ var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *dataapi.ServerV2
 
-	logger = logging.NewNoopLogger()
+	logger = testutils.GetLogger()
 
 	// Local stack
 	localStackPort     = "4566"
