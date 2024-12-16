@@ -178,6 +178,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
 		Value:    9101,
 	}
+	DisperserSigningKeyNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-signing-key-name"),
+		Usage:    "Name of the key used to sign disperser requests (key must be stored in AWS KMS under this name)",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_SIGNING_KEY_NAME"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -192,6 +198,7 @@ var requiredFlags = []cli.Flag{
 	DispatcherPullIntervalFlag,
 	NodeRequestTimeoutFlag,
 	NumConnectionsToNodesFlag,
+	DisperserSigningKeyNameFlag,
 }
 
 var optionalFlags = []cli.Flag{

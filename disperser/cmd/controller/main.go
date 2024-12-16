@@ -150,7 +150,10 @@ func RunController(ctx *cli.Context) error {
 		}
 	}
 
-	requestSigner := clients.NewRequestSigner("", "", "") // TODO: fill in the parameters
+	requestSigner := clients.NewRequestSigner(
+		config.AwsClientConfig.Region,
+		config.AwsClientConfig.EndpointURL,
+		config.DisperserSigningKeyName)
 
 	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
 	if err != nil {
