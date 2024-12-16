@@ -340,5 +340,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
+
+	fmt.Println("GetPaymentState reply", reply, largestCumulativePayment, onDemandPayment.CumulativePayment)
 	return reply, nil
 }
