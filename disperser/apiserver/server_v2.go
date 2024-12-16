@@ -290,8 +290,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}
 	// build reply
 	reply := &pb.GetPaymentStateReply{
-		PaymentGlobalParams: &paymentGlobalParams,
-		BinRecords:          binRecords[:],
+		PaymentGlobalParams:      &paymentGlobalParams,
+		BinRecords:               binRecords[:],
+		CumulativePayment:        largestCumulativePayment.Bytes(),
+		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
 		Reservation: &pb.Reservation{
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   uint32(reservation.StartTimestamp),
@@ -299,8 +301,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			QuorumSplits:     quorumSplits,
 			QuorumNumbers:    quorumNumbers,
 		},
-		CumulativePayment:        largestCumulativePayment.Bytes(),
-		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
 	}
+
+	fmt.Println("GetPaymentState reply", reply, largestCumulativePayment, onDemandPayment.CumulativePayment)
 	return reply, nil
 }
