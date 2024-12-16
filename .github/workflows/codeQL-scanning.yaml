@@ -1,0 +1,49 @@
+name: "CodeQL scanning"
+
+on:
+  push:
+    branches:
+      - master
+      - 'release/*'
+  pull_request:
+    branches:
+      - master
+      - 'release/*'
+    paths:
+      - 'node/**'
+      - 'operators/**'
+      - 'retriever/**'
+      - 'disperser/**'
+      - 'core/**'
+      - 'common/**'
+      - 'api/**'
+      - '.github/codeql/**'
+      - '.github/workflows/codeql-analysis.yml'
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  CodeQL-Build:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: go
+        
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
