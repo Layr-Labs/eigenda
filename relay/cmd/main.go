@@ -54,7 +54,7 @@ func RunRelay(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}
-	logger.Info(fmt.Sprintf("Relay configuration: %#v", config))
+	logger.Info(fmt.Sprintf("Relay configuration: %#v", config.SanitizedConfig()))
 
 	dynamoClient, err := dynamodb.NewClient(config.AWS, logger)
 	if err != nil {
