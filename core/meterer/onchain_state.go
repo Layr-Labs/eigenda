@@ -2,7 +2,6 @@ package meterer
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -145,7 +144,6 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	pcs.ReservationsLock.Lock()
 	defer pcs.ReservationsLock.Unlock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
-		fmt.Println("found reservation in cache", accountID)
 		return reservation, nil
 	}
 
