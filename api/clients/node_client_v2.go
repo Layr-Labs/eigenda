@@ -2,9 +2,7 @@ package clients
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/node/auth"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -18,8 +16,6 @@ type NodeClientV2Config struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
-	// The .pem file containing the private key used to sign StoreChunks() requests. If "" then no signing is done.
-	PrivateKeyFile string
 }
 
 type NodeClientV2 interface {
@@ -31,7 +27,6 @@ type nodeClientV2 struct {
 	config   *NodeClientV2Config
 	initOnce sync.Once
 	conn     *grpc.ClientConn
-	key      *ecdsa.PrivateKey
 
 	dispersalClient nodegrpc.DispersalClient
 }
@@ -42,19 +37,8 @@ func NewNodeClientV2(config *NodeClientV2Config) (*nodeClientV2, error) {
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
-
-	var key *ecdsa.PrivateKey // TODO update flags
-	//if config.PrivateKeyFile != "" {
-	//	var err error
-	//	key, err = auth.ReadPrivateECDSAKeyFile(config.PrivateKeyFile)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("failed to read private key file: %v", err)
-	//	}
-	//}
-
 	return &nodeClientV2{
 		config: config,
-		key:    key,
 	}, nil
 }
 
@@ -76,7 +60,8 @@ func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*c
 		}
 	}
 
-	request := &nodegrpc.StoreChunksRequest{
+	// Call the gRPC method to store chunks
+	response, err := c.dispersalClient.StoreChunks(ctx, &nodegrpc.StoreChunksRequest{
 		Batch: &commonpb.Batch{
 			Header: &commonpb.BatchHeader{
 				BatchRoot:            batch.BatchHeader.BatchRoot[:],
@@ -84,19 +69,7 @@ func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*c
 			},
 			BlobCertificates: blobCerts,
 		},
-		DisperserID: uint32(0), // currently hard coded, update for decentralized dispersers
-	}
-
-	if c.key != nil {
-		signature, err := auth.SignStoreChunksRequest(c.key, request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to sign request: %v", err)
-		}
-		request.Signature = signature
-	}
-
-	// Call the gRPC method to store chunks
-	response, err := c.dispersalClient.StoreChunks(ctx, request)
+	})
 	if err != nil {
 		return nil, err
 	}
