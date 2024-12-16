@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -144,10 +145,12 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	pcs.ReservationsLock.Lock()
 	defer pcs.ReservationsLock.Unlock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
+		fmt.Println("found reservation in cache", accountID)
 		return reservation, nil
 	}
 
 	// pulls the chain state
+	fmt.Println("get reserved payment from onchain", accountID)
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -165,11 +168,11 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 		return payment, nil
 	}
 	// pulls the chain state
+	fmt.Println("pcs getOnDemandPaymentByAccount pulls the chain state", accountID)
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-
 	(pcs.OnDemandPayments)[accountID] = res
 	return res, nil
 }
