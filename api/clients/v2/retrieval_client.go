@@ -21,7 +21,7 @@ import (
 // To retrieve a blob from the relay, use RelayClient instead.
 type RetrievalClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
-	GetBlob(ctx context.Context, blobHeader corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
+	GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
 }
 
 type retrievalClient struct {
@@ -49,7 +49,11 @@ func NewRetrievalClient(
 	}
 }
 
-func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
+func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
+	if blobHeader == nil {
+		return nil, errors.New("blob header is nil")
+	}
+
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return nil, err
