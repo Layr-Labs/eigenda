@@ -3,13 +3,11 @@ package clients
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -77,25 +75,13 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
+	// Initialize the accountant if it is not provided
 	if accountant == nil {
 		accountID, err := signer.GetAccountID()
 		if err != nil {
 			return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 		}
-		accountant = &Accountant{
-			accountID:         accountID,
-			reservation:       &core.ReservedPayment{},
-			onDemand:          &core.OnDemandPayment{},
-			reservationWindow: 0,
-			pricePerSymbol:    0,
-			minNumSymbols:     0,
-			binRecords:        make([]BinRecord, 3),
-			usageLock:         sync.Mutex{},
-			cumulativePayment: big.NewInt(0),
-
-			// number of bins in the circular accounting, restricted by minNumBins which is 3
-			numBins: uint32(meterer.MinNumBins),
-		}
+		accountant = DummyAccountant(accountID)
 	}
 
 	return &disperserClient{
@@ -161,7 +147,6 @@ func (c *disperserClient) DisperseBlob(
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 
-	// TODO(hopeyen): uncomment this after the accountant is implemented
 	if c.accountant == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
 	}
@@ -215,7 +200,7 @@ func (c *disperserClient) DisperseBlob(
 		QuorumNumbers:   quorums,
 		PaymentMetadata: *payment,
 	}
-	// TODO(hopeyen): uncomment this and replace the payment metadata for authentication
+
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
