@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var errNoBlobsToDispatch = errors.New("no blobs to dispatch")
@@ -153,7 +154,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 
 		client, err := d.nodeClientManager.GetClient(host, dispersalPort)
 		if err != nil {
-			d.logger.Error("failed to get node client", "operator", opID, "err", err)
+			d.logger.Error("failed to get node client", "operator", opID.Hex(), "err", err)
 			continue
 		}
 
@@ -208,7 +209,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 					break
 				}
 
-				d.logger.Warn("failed to send chunks", "operator", opID, "NumAttempts", i, "err", err)
+				d.logger.Warn("failed to send chunks", "operator", opID.Hex(), "NumAttempts", i, "err", err)
 				time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
 			}
 			d.metrics.reportSendChunksRetryCount(float64(i))
