@@ -245,23 +245,28 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	accountID, err := c.signer.GetAccountID()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
 	signature, err := c.signer.SignPaymentStateRequest()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
+	fmt.Println("build request")
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID,
 		Signature: signature,
 	}
+	fmt.Println("built request", accountID, signature)
 	return c.client.GetPaymentState(ctx, request)
 }
 
