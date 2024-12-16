@@ -310,7 +310,6 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 		return nil, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	fmt.Println("Get largest cumulative payment", payments)
 	if len(payments) == 0 {
 		return big.NewInt(0), nil
 	}
