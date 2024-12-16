@@ -2,12 +2,13 @@ package controller_test
 
 import (
 	"context"
-	"github.com/prometheus/client_golang/prometheus"
 	"math/big"
 	"testing"
 	"time"
 
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/prometheus/client_golang/prometheus"
+
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -68,14 +69,14 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	bhh, err := batchHeader.Hash()
 	require.NoError(t, err)
 
-	mockClient0 := clientsmock.NewNodeClientV2()
+	mockClient0 := clientsmock.NewNodeClient()
 	sig0 := mockChainState.KeyPairs[opId0].SignMessage(bhh)
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(sig0, nil)
 	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
 	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
-	mockClient1 := clientsmock.NewNodeClientV2()
+	mockClient1 := clientsmock.NewNodeClient()
 	sig1 := mockChainState.KeyPairs[opId1].SignMessage(bhh)
 	mockClient1.On("StoreChunks", mock.Anything, mock.Anything).Return(sig1, nil)
 	components.NodeClientManager.On("GetClient", mock.Anything, op1Port).Return(mockClient1, nil)

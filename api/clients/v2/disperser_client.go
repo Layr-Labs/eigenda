@@ -16,21 +16,21 @@ import (
 	"google.golang.org/grpc"
 )
 
-type DisperserClientV2Config struct {
+type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
 }
 
-type DisperserClientV2 interface {
+type DisperserClient interface {
 	Close() error
 	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID, salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
 
-type disperserClientV2 struct {
-	config     *DisperserClientV2Config
+type disperserClient struct {
+	config     *DisperserClientConfig
 	signer     corev2.BlobRequestSigner
 	initOnce   sync.Once
 	conn       *grpc.ClientConn
@@ -39,18 +39,18 @@ type disperserClientV2 struct {
 	accountant *Accountant
 }
 
-var _ DisperserClientV2 = &disperserClientV2{}
+var _ DisperserClient = &disperserClient{}
 
-// DisperserClientV2 maintains a single underlying grpc connection to the disperser server,
+// DisperserClient maintains a single underlying grpc connection to the disperser server,
 // through which it sends requests to disperse blobs and get blob status.
 // The connection is established lazily on the first method call. Don't forget to call Close(),
 // which is safe to call even if the connection was never established.
 //
-// DisperserClientV2 is safe to be used concurrently by multiple goroutines.
+// DisperserClient is safe to be used concurrently by multiple goroutines.
 //
 // Example usage:
 //
-//	client := NewDisperserClientV2(config, signer)
+//	client := NewDisperserClient(config, signer)
 //	defer client.Close()
 //
 //	// The connection will be established on the first call
@@ -61,7 +61,7 @@ var _ DisperserClientV2 = &disperserClientV2{}
 //
 //	// Subsequent calls will use the existing connection
 //	status2, blobKey2, err := client.DisperseBlob(ctx, data, blobHeader)
-func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClientV2, error) {
+func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequestSigner, prover encoding.Prover, accountant *Accountant) (*disperserClient, error) {
 	if config == nil {
 		return nil, api.NewErrorInvalidArg("config must be provided")
 	}
@@ -75,7 +75,7 @@ func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobReq
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
-	return &disperserClientV2{
+	return &disperserClient{
 		config:     config,
 		signer:     signer,
 		prover:     prover,
@@ -85,7 +85,7 @@ func NewDisperserClientV2(config *DisperserClientV2Config, signer corev2.BlobReq
 }
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
-func (c *disperserClientV2) PopulateAccountant(ctx context.Context) error {
+func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
@@ -100,7 +100,7 @@ func (c *disperserClientV2) PopulateAccountant(ctx context.Context) error {
 
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *disperserClientV2) Close() error {
+func (c *disperserClient) Close() error {
 	if c.conn != nil {
 		err := c.conn.Close()
 		c.conn = nil
@@ -110,7 +110,7 @@ func (c *disperserClientV2) Close() error {
 	return nil
 }
 
-func (c *disperserClientV2) DisperseBlob(
+func (c *disperserClient) DisperseBlob(
 	ctx context.Context,
 	data []byte,
 	blobVersion corev2.BlobVersion,
@@ -217,7 +217,7 @@ func (c *disperserClientV2) DisperseBlob(
 }
 
 // GetBlobStatus returns the status of a blob with the given blob key.
-func (c *disperserClientV2) GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error) {
+func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -230,7 +230,7 @@ func (c *disperserClientV2) GetBlobStatus(ctx context.Context, blobKey corev2.Bl
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClientV2) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -257,7 +257,7 @@ func (c *disperserClientV2) GetPaymentState(ctx context.Context) (*disperser_rpc
 // While the blob commitment can be calculated by anyone, it requires SRS points to
 // be loaded. For service that does not have access to SRS points, this method can be
 // used to calculate the blob commitment in blob header, which is required for dispersal.
-func (c *disperserClientV2) GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error) {
+func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -271,7 +271,7 @@ func (c *disperserClientV2) GetBlobCommitment(ctx context.Context, data []byte) 
 
 // initOnceGrpcConnection initializes the grpc connection and client if they are not already initialized.
 // If initialization fails, it caches the error and will return it on every subsequent call.
-func (c *disperserClientV2) initOnceGrpcConnection() error {
+func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
