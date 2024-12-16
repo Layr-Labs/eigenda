@@ -238,7 +238,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}()
 
 	accountID := gethcommon.HexToAddress(req.AccountId)
-	s.logger.Debug("Serve getpaymentstate request", accountID)
 
 	// validate the signature
 	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
@@ -250,40 +249,30 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
 	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
-	s.logger.Debug("got on chain global params")
 
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	s.logger.Debug("now get bin records")
 	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records", err, accountID)
 	}
-	s.logger.Debug("got bin records, now get largest cumulative payment")
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment", err)
 	}
 	// on-Chain account state
-	fmt.Println("Getpaymentstate now getting reserved payment", accountID)
 	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
-	fmt.Println("Getpaymentstate getting reserved payment result", accountID)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", err)
 		reservation = core.DummyReservedPayment()
 	}
-	fmt.Println("Getpaymentstate now getting ondemand payment", accountID)
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get ondemand payment, use zero value", err)
 		onDemandPayment = core.DummyOnDemandPayment()
 	}
-	s.logger.Debug("Got onchain ondemand payment", onDemandPayment)
-	s.logger.Debug("Got onchain ondemand payment", onDemandPayment.CumulativePayment)
-	s.logger.Debug("Got onchain ondemand payment", onDemandPayment.CumulativePayment.Bytes())
 
-	s.logger.Debug("got payment global params; now build reply")
 	paymentGlobalParams := pb.PaymentGlobalParams{
 		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
 		MinNumSymbols:          minNumSymbols,

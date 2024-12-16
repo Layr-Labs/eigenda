@@ -58,7 +58,7 @@ func setup(m *testing.M) {
 		return
 	}
 
-	fmt.Println("Starting anvil                node plugin tests plugin_test.go")
+	fmt.Println("Starting anvil")
 	testConfig.StartAnvil()
 
 	fmt.Println("Deploying experiment")
