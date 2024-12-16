@@ -46,11 +46,11 @@ func NewOffchainStore(
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
+	err = CreateOnDemandTable(cfg, onDemandTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
+	err = CreateGlobalReservationTable(cfg, globalBinTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
