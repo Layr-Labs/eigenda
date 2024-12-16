@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -148,7 +149,10 @@ func RunController(ctx *cli.Context) error {
 			return err
 		}
 	}
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, logger)
+
+	requestSigner := clients.NewRequestSigner("", "", "") // TODO: fill in the parameters
+
+	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}

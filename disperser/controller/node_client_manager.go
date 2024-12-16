@@ -14,13 +14,18 @@ type NodeClientManager interface {
 
 type nodeClientManager struct {
 	// nodeClients is a cache of node clients keyed by socket address
-	nodeClients *lru.Cache[string, clients.NodeClientV2]
-	logger      logging.Logger
+	nodeClients   *lru.Cache[string, clients.NodeClientV2]
+	requestSigner clients.RequestSigner
+	logger        logging.Logger
 }
 
 var _ NodeClientManager = (*nodeClientManager)(nil)
 
-func NewNodeClientManager(cacheSize int, logger logging.Logger) (*nodeClientManager, error) {
+func NewNodeClientManager(
+	cacheSize int,
+	requestSigner clients.RequestSigner,
+	logger logging.Logger) (*nodeClientManager, error) {
+
 	closeClient := func(socket string, value clients.NodeClientV2) {
 		if err := value.Close(); err != nil {
 			logger.Error("failed to close node client", "err", err)
@@ -32,8 +37,9 @@ func NewNodeClientManager(cacheSize int, logger logging.Logger) (*nodeClientMana
 	}
 
 	return &nodeClientManager{
-		nodeClients: nodeClients,
-		logger:      logger,
+		nodeClients:   nodeClients,
+		requestSigner: requestSigner,
+		logger:        logger,
 	}, nil
 }
 
@@ -42,10 +48,12 @@ func (m *nodeClientManager) GetClient(host, port string) (clients.NodeClientV2, 
 	client, ok := m.nodeClients.Get(socket)
 	if !ok {
 		var err error
-		client, err = clients.NewNodeClientV2(&clients.NodeClientV2Config{
-			Hostname: host,
-			Port:     port,
-		})
+		client, err = clients.NewNodeClientV2(
+			&clients.NodeClientV2Config{
+				Hostname: host,
+				Port:     port,
+			},
+			m.requestSigner)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create node client at %s: %w", socket, err)
 		}
