@@ -14,6 +14,7 @@ import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMe
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 
@@ -75,7 +76,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             eigenDAThresholdRegistry,
-            eigenDARelayRegistry
+            eigenDARelayRegistry,
+            IPaymentVault(address(0))
         );
 
         address[] memory confirmers = new address[](1);

@@ -51,7 +51,7 @@ type Config struct {
 	EnableNodeApi                  bool
 	NodeApiPort                    string
 	EnableMetrics                  bool
-	MetricsPort                    string
+	MetricsPort                    int
 	OnchainMetricsInterval         int64
 	Timeout                        time.Duration
 	RegisterNodeAtStart            bool
@@ -218,7 +218,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
-		MetricsPort:                         ctx.GlobalString(flags.MetricsPortFlag.Name),
+		MetricsPort:                         ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		OnchainMetricsInterval:              ctx.GlobalInt64(flags.OnchainMetricsIntervalFlag.Name),
 		Timeout:                             timeout,
 		RegisterNodeAtStart:                 registerNodeAtStart,

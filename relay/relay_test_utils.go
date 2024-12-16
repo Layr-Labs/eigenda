@@ -183,7 +183,7 @@ func newMockChainReader() *coremock.MockWriter {
 	return w
 }
 
-func mockBlobParamsMap() map[uint8]*core.BlobVersionParameters {
+func mockBlobParamsMap() map[v2.BlobVersion]*core.BlobVersionParameters {
 	blobParams := &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,

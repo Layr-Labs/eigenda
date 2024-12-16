@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -39,13 +40,16 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
 
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
     IEigenDARelayRegistry public immutable eigenDARelayRegistry;
-
+    IPaymentVault public immutable paymentVault;
+    
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
-        IEigenDARelayRegistry _eigenDARelayRegistry
+        IEigenDARelayRegistry _eigenDARelayRegistry,
+        IPaymentVault _paymentVault
     ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDARelayRegistry = _eigenDARelayRegistry;
+        paymentVault = _paymentVault;
     }
 
     /// @notice The current batchId

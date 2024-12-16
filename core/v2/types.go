@@ -14,7 +14,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-type BlobVersion = uint8
+type BlobVersion = uint16
 
 // Assignment contains information about the set of chunks that a specific node will receive
 type Assignment struct {

@@ -18,7 +18,7 @@ var requiredQuorums = []uint8{0, 1}
 type Accountant struct {
 	// on-chain states
 	accountID         string
-	reservation       *core.ActiveReservation
+	reservation       *core.ReservedPayment
 	onDemand          *core.OnDemandPayment
 	reservationWindow uint32
 	pricePerSymbol    uint32
@@ -39,7 +39,7 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID string, reservation *core.ActiveReservation, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
+func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
 	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
@@ -65,7 +65,7 @@ func NewAccountant(accountID string, reservation *core.ActiveReservation, onDema
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
-// bin index for reservation payments and cumulative payment for on-demand payments,
+// reservation period for reservation payments and cumulative payment for on-demand payments,
 // and both fields are used to create the payment header and signature
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()

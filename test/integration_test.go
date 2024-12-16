@@ -222,10 +222,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState := &coremock.MockOnchainPaymentState{}
 	reservationLimit := uint64(1024)
 	paymentLimit := big.NewInt(512)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	})).Return(&core.ActiveReservation{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.Anything).Return(&core.ActiveReservation{}, errors.New("reservation not found"))
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
@@ -423,7 +423,14 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		var client common.EthClient
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2, err := nodegrpc.NewServerV2(context.Background(), config, n, logger, ratelimiter, client)
+		serverV2, err := nodegrpc.NewServerV2(
+			context.Background(),
+			config,
+			n,
+			logger,
+			ratelimiter,
+			prometheus.NewRegistry(),
+			client)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{

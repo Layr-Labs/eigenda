@@ -174,9 +174,9 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	r.GET("/v2/feed/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
+	r.GET("/v2/blob/:blob_key", testDataApiServerV2.FetchBlobHandler)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/feed/blobs/"+blobKey.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/blob/"+blobKey.Hex(), nil)
 	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer res.Body.Close()
@@ -190,7 +190,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "Queued", response.Status)
-	assert.Equal(t, uint8(0), response.BlobHeader.BlobVersion)
+	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
 	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
@@ -232,9 +232,9 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
 
-	r.GET("/v2/feed/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
+	r.GET("/v2/batch/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/feed/batches/"+batchHeaderHash, nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/batch/"+batchHeaderHash, nil)
 	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer res.Body.Close()
@@ -252,4 +252,87 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
 	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+}
+
+func TestCheckOperatorsReachability(t *testing.T) {
+	r := setUpRouter()
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+
+	operator_id := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfo, nil)
+
+	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+
+	w := httptest.NewRecorder()
+	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operator_id)
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
+	defer cancel()
+	req = req.WithContext(ctxWithDeadline)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, w.Code, http.StatusOK)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.OperatorPortCheckResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
+	assert.Equal(t, false, response.DispersalOnline)
+	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
+	assert.Equal(t, false, response.RetrievalOnline)
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+}
+
+func TestFetchOperatorsStake(t *testing.T) {
+	r := setUpRouter()
+
+	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+
+	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v2/operators/stake", nil)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, w.Code, http.StatusOK)
+	res := w.Result()
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.OperatorsStakeResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	// The quorums and the operators in the quorum are defined in "mockChainState"
+	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
+	assert.Equal(t, 3, len(response.StakeRankedOperators))
+	// Quorum 0
+	ops, ok := response.StakeRankedOperators["0"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(ops))
+	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
+	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
+	// Quorum 1
+	ops, ok = response.StakeRankedOperators["1"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(ops))
+	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
+	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
+	// "total"
+	ops, ok = response.StakeRankedOperators["total"]
+	assert.True(t, ok)
+	assert.Equal(t, 2, len(ops))
+	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
+	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
 }

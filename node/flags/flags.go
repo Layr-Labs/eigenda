@@ -66,11 +66,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_METRICS"),
 	}
-	MetricsPortFlag = cli.StringFlag{
+	MetricsPortFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
 		Usage:    "Port at which node listens for metrics calls",
 		Required: false,
-		Value:    "9091",
+		Value:    9091,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "METRICS_PORT"),
 	}
 	OnchainMetricsIntervalFlag = cli.StringFlag{
