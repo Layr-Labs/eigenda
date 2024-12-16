@@ -64,9 +64,17 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 
 func DummyAccountant(accountID string) *Accountant {
 	return &Accountant{
-		accountID:         accountID,
-		reservation:       &core.ReservedPayment{},
-		onDemand:          &core.OnDemandPayment{},
+		accountID: accountID,
+		reservation: &core.ReservedPayment{
+			SymbolsPerSecond: 0,
+			StartTimestamp:   0,
+			EndTimestamp:     0,
+			QuorumNumbers:    []uint8{},
+			QuorumSplits:     []byte{},
+		},
+		onDemand: &core.OnDemandPayment{
+			CumulativePayment: big.NewInt(0),
+		},
 		reservationWindow: 0,
 		pricePerSymbol:    0,
 		minNumSymbols:     0,
