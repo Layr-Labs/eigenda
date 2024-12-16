@@ -25,61 +25,12 @@ var _ = Describe("Inabox v2 Integration", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		defer cancel()
 
-		// cfg := aws.ClientConfig{
-		// 	Region:          "us-east-1",
-		// 	AccessKey:       "localstack",
-		// 	SecretAccessKey: "localstack",
-		// 	EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-		// }
-
-		// fmt.Println("Creating v2 tables     IN integration_v2_test.go")
-		// fmt.Println("Creating payment related tables v2")
-		// // create payment related tables
-		// err := meterer.CreateReservationTable(cfg, "e2e-v2-reservation")
-		// fmt.Println("err", err)
-		// Expect(err).To(BeNil())
-
-		// err = meterer.CreateOnDemandTable(cfg, "e2e-v2-ondemand")
-		// fmt.Println("err", err)
-		// Expect(err).To(BeNil())
-		// err = meterer.CreateGlobalReservationTable(cfg, "e2e-v2-global-reservation")
-		// fmt.Println("err", err)
-		// Expect(err).To(BeNil())
-		// fmt.Println("offchain store dynamodb created")
-
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
-
-		// reserved := core.ReservedPayment{
-		// 	SymbolsPerSecond: 452198,
-		// 	StartTimestamp:   1734305428,
-		// 	EndTimestamp:     2734305428,
-		// 	QuorumNumbers:    []uint8{0, 1},
-		// 	QuorumSplits:     []uint8{50, 50},
-		// }
-
-		// accountId, err := signer.GetAccountID()
-		// Expect(err).To(BeNil())
-
-		// // // Get public key
-		// // publicKey := privateKey.Public()
-		// // publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-		// // Expect(ok)
-		// // address := crypto.PubkeyToAddress(*publicKeyECDSA)
-		// fmt.Println("address", accountId)
-
-		// onDemand := core.OnDemandPayment{CumulativePayment: big.NewInt(100000)}
-		// reservationWindow := 60
-		// pricePerSymbol := 47000000
-		// minNumSymbols := 8192
-		// numBins := 3
-
-		// accountant := clients.NewAccountant(accountId, &reserved, &onDemand, uint32(reservationWindow), uint32(pricePerSymbol), uint32(minNumSymbols), uint32(numBins))
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
 			Port:     "32005",
-			// }, signer, nil, accountant)
 		}, signer, nil, nil)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))

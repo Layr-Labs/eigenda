@@ -694,7 +694,7 @@ func (env *Config) GenerateAllVariables() {
 		name := fmt.Sprintf("staker%v", i)
 		key, address := env.getKey(name)
 
-		// Create staker paritipants
+		// Create client paritipants
 		participant := Staker{
 			Address:    address,
 			PrivateKey: key[2:],
@@ -716,19 +716,17 @@ func (env *Config) GenerateAllVariables() {
 			filename, []string{grpcPort})
 	}
 
-	// // Payment clients
-	// for i := 0; i < env.Services.Counts.NumOpr; i++ {
+	// Disperser clients
+	for i := 0; i < 4; i++ {
+		name := fmt.Sprintf("client%v", i)
+		key, address := env.getKey(name)
 
-	// 	name := fmt.Sprintf("staker%v", i)
-	// 	key, address := env.getKey(name)
-
-	// 	// Create staker paritipants
-	// 	participant := Staker{
-	// 		Address:    address,
-	// 		PrivateKey: key[2:],
-	// 	}
-	// 	env.Stakers = append(env.Stakers, participant)
-	// }
+		participant := DisperserClient{
+			Address:       address,
+			PrivateKeyHex: key[2:],
+		}
+		env.DisperserClients = append(env.DisperserClients, participant)
+	}
 
 	name = "retriever0"
 	key, _ = env.getKey(name)

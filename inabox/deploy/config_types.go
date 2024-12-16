@@ -16,6 +16,11 @@ type Staker struct {
 	Stake      string `json:"stake"`
 }
 
+type DisperserClient struct {
+	Address       string `json:"address"`
+	PrivateKeyHex string `json:"privateKeyHex"`
+}
+
 // Docker compose
 type testbed struct {
 	Services map[string]map[string]interface{} `yaml:"services"`
@@ -174,15 +179,16 @@ type Config struct {
 
 	Telemetry TelemetryConfig `yaml:"telemetry"`
 
-	Churner    ChurnerVars
-	Dispersers []DisperserVars
-	Batcher    []BatcherVars
-	Encoder    []EncoderVars
-	Operators  []OperatorVars
-	Stakers    []Staker
-	Retriever  RetrieverVars
-	Controller ControllerVars
-	Relays     []RelayVars
+	Churner          ChurnerVars
+	Dispersers       []DisperserVars
+	Batcher          []BatcherVars
+	Encoder          []EncoderVars
+	Operators        []OperatorVars
+	Stakers          []Staker
+	Retriever        RetrieverVars
+	Controller       ControllerVars
+	Relays           []RelayVars
+	DisperserClients []DisperserClient
 }
 
 func (c Config) IsEigenDADeployed() bool {
