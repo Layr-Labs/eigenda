@@ -50,7 +50,7 @@ func setup() {
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = true
 
-	fmt.Println("Starting anvil  ---------- core thegraph state_integration_test")
+	fmt.Println("Starting anvil")
 	testConfig.StartAnvil()
 
 	fmt.Println("Starting graph node")

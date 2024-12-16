@@ -75,7 +75,7 @@ func setup(m *testing.M) {
 		return
 	}
 
-	fmt.Println("Starting anvil                 operators churner tests churner_test.go")
+	fmt.Println("Starting anvil")
 	testConfig.StartAnvil()
 
 	fmt.Println("Deploying experiment")

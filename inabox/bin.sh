@@ -236,7 +236,7 @@ function stop_detached {
 
 function start_anvil {
 
-    echo "Starting anvil server .... inabox bin.sh."
+    echo "Starting anvil server ....."
     anvil --host 0.0.0.0 > /dev/null &
     anvil_pid=$!
     echo "Anvil server started ....."

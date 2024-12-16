@@ -2,7 +2,6 @@ package meterer
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -156,22 +155,17 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	fmt.Println("get reserved payment from onchain", accountID)
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("Got reservation")
-	// pcs.ReservationsLock.Lock()
 	(pcs.ReservedPayments)[accountID] = res
-	// pcs.ReservationsLock.Unlock()
 
 	return res, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	fmt.Println("pcs getOnDemandPaymentByAccount", accountID)
 	pcs.OnDemandLocks.RLock()
 	if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
 		pcs.OnDemandLocks.RUnlock()
@@ -180,23 +174,17 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	pcs.OnDemandLocks.RUnlock()
 
 	// pulls the chain state
-	fmt.Println("pcs getOnDemandPaymentByAccount pulls the chain state", accountID)
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("pcs getOnDemandPaymentByAccount got from chain state", res)
-	pcs.OnDemandLocks.Lock()
+
 	(pcs.OnDemandPayments)[accountID] = res
-	pcs.OnDemandLocks.Unlock()
 	return res, nil
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
-	fmt.Println("Getting on demand quorum numbers")
-	fmt.Println("Getting on demand quorum numbers tx ", pcs.tx)
 	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
-
 	if err != nil {
 		return nil, err
 	}
