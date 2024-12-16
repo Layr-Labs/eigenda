@@ -28,10 +28,10 @@ func SignStoreChunksRequest(key *ecdsa.PrivateKey, request *grpc.StoreChunksRequ
 
 // VerifyStoreChunksRequest verifies the given signature of the given StoreChunksRequest with the given
 // public key.
-func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksRequest, signature []byte) error {
+func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksRequest) error {
 	requestHash := HashStoreChunksRequest(request)
 
-	signingPublicKey, err := crypto.SigToPub(requestHash, signature)
+	signingPublicKey, err := crypto.SigToPub(requestHash, request.Signature)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %w", err)
 	}

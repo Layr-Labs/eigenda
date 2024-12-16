@@ -24,7 +24,7 @@ var _ NodeClientManager = (*nodeClientManager)(nil)
 func NewNodeClientManager(
 	cacheSize int,
 	requestSigner clients.RequestSigner,
-	logger logging.Logger) (*nodeClientManager, error) {
+	logger logging.Logger) (NodeClientManager, error) {
 
 	closeClient := func(socket string, value clients.NodeClientV2) {
 		if err := value.Close(); err != nil {

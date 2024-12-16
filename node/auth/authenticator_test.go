@@ -33,7 +33,7 @@ func TestValidRequest(t *testing.T) {
 		start)
 	require.NoError(t, err)
 
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		start)
 	require.NoError(t, err)
 
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		start)
 	require.NoError(t, err)
 
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 
 	_, differentPrivateKey := rand.ECDSA()
@@ -130,7 +130,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 		start)
 	require.NoError(t, err)
 
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 1234
 
 	_, differentPrivateKey := rand.ECDSA()
@@ -163,7 +163,7 @@ func TestAuthCaching(t *testing.T) {
 	require.NoError(t, err)
 
 	// The first request will actually be validated.
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -176,7 +176,7 @@ func TestAuthCaching(t *testing.T) {
 	// With auth caching, those checks won't happen until the auth timeout has passed (configured to 1 minute).
 	now := start
 	for i := 0; i < 60; i++ {
-		request = randomStoreChunksRequest(rand)
+		request = RandomStoreChunksRequest(rand)
 		request.DisperserID = 0
 		signature, err = SignStoreChunksRequest(privateKey, request)
 		require.NoError(t, err)
@@ -195,7 +195,7 @@ func TestAuthCaching(t *testing.T) {
 
 	// The next request will be made after the auth timeout has passed, so it will be validated.
 	// Since it is actually invalid, the authenticator should reject it.
-	request = randomStoreChunksRequest(rand)
+	request = RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err = SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -228,7 +228,7 @@ func TestAuthCachingDisabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// The first request will always be validated.
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestAuthCachingDisabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make another request without moving time forward. It should be validated.
-	request = randomStoreChunksRequest(rand)
+	request = RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err = SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -273,7 +273,7 @@ func TestKeyExpiry(t *testing.T) {
 	// Preloading the cache should have grabbed Disperser 0's key
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -326,7 +326,7 @@ func TestAuthCacheSize(t *testing.T) {
 
 	// Make requests from cacheSize different origins.
 	for i := 0; i < cacheSize; i++ {
-		request := randomStoreChunksRequest(rand)
+		request := RandomStoreChunksRequest(rand)
 		request.DisperserID = 0
 		signature, err := SignStoreChunksRequest(privateKey, request)
 		require.NoError(t, err)
@@ -341,7 +341,7 @@ func TestAuthCacheSize(t *testing.T) {
 	// All origins should be authenticated in the auth cache. If we send invalid requests from the same origins,
 	// they should still be authenticated (since the authenticator won't re-check).
 	for i := 0; i < cacheSize; i++ {
-		request := randomStoreChunksRequest(rand)
+		request := RandomStoreChunksRequest(rand)
 		request.DisperserID = 0
 		signature, err := SignStoreChunksRequest(privateKey, request)
 		require.NoError(t, err)
@@ -356,7 +356,7 @@ func TestAuthCacheSize(t *testing.T) {
 	}
 
 	// Make a request from a new origin. This should boot origin 0 from the cache.
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err := SignStoreChunksRequest(privateKey, request)
 	require.NoError(t, err)
@@ -366,7 +366,7 @@ func TestAuthCacheSize(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < cacheSize; i++ {
-		request = randomStoreChunksRequest(rand)
+		request = RandomStoreChunksRequest(rand)
 		request.DisperserID = 0
 		signature, err = SignStoreChunksRequest(privateKey, request)
 		require.NoError(t, err)
@@ -419,7 +419,7 @@ func TestKeyCacheSize(t *testing.T) {
 
 	// Make a request for each key (except for the last one, which won't fit in the cache).
 	for i := 0; i < cacheSize; i++ {
-		request := randomStoreChunksRequest(rand)
+		request := RandomStoreChunksRequest(rand)
 		request.DisperserID = uint32(i)
 		signature, err := SignStoreChunksRequest(keyMap[uint32(i)], request)
 		require.NoError(t, err)
@@ -436,7 +436,7 @@ func TestKeyCacheSize(t *testing.T) {
 
 	// Make another request for each key. None should require a read from the chain.
 	for i := 0; i < cacheSize; i++ {
-		request := randomStoreChunksRequest(rand)
+		request := RandomStoreChunksRequest(rand)
 		request.DisperserID = uint32(i)
 		signature, err := SignStoreChunksRequest(keyMap[uint32(i)], request)
 		require.NoError(t, err)
@@ -451,7 +451,7 @@ func TestKeyCacheSize(t *testing.T) {
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
 
 	// Make a request for the last key. This should require a read from the chain and will boot key 0 from the cache.
-	request := randomStoreChunksRequest(rand)
+	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = uint32(cacheSize)
 	signature, err := SignStoreChunksRequest(keyMap[uint32(cacheSize)], request)
 	require.NoError(t, err)
@@ -464,7 +464,7 @@ func TestKeyCacheSize(t *testing.T) {
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+1)
 
 	// Make another request for key 0. This should require a read from the chain.
-	request = randomStoreChunksRequest(rand)
+	request = RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 	signature, err = SignStoreChunksRequest(keyMap[0], request)
 	require.NoError(t, err)

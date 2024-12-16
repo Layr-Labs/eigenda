@@ -115,8 +115,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}
 
-	signature := request.Signature
-	err = VerifyStoreChunksRequest(*key, request, signature)
+	err = VerifyStoreChunksRequest(*key, request)
 	if err != nil {
 		return fmt.Errorf("failed to verify request: %w", err)
 	}
