@@ -3,11 +3,13 @@ package clients
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -73,6 +75,27 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 	if signer == nil {
 		return nil, api.NewErrorInvalidArg("signer must be provided")
+	}
+
+	if accountant == nil {
+		accountID, err := signer.GetAccountID()
+		if err != nil {
+			return nil, fmt.Errorf("error getting signer's account ID: %w", err)
+		}
+		accountant = &Accountant{
+			accountID:         accountID,
+			reservation:       &core.ReservedPayment{},
+			onDemand:          &core.OnDemandPayment{},
+			reservationWindow: 0,
+			pricePerSymbol:    0,
+			minNumSymbols:     0,
+			binRecords:        make([]BinRecord, 3),
+			usageLock:         sync.Mutex{},
+			cumulativePayment: big.NewInt(0),
+
+			// number of bins in the circular accounting, restricted by minNumBins which is 3
+			numBins: uint32(meterer.MinNumBins),
+		}
 	}
 
 	return &disperserClient{
@@ -237,23 +260,28 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, api.NewErrorInternal(err.Error())
 	}
 
 	accountID, err := c.signer.GetAccountID()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
 	signature, err := c.signer.SignPaymentStateRequest()
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
+	fmt.Println("build request")
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID,
 		Signature: signature,
 	}
+	fmt.Println("built request", accountID, signature)
 	return c.client.GetPaymentState(ctx, request)
 }
 

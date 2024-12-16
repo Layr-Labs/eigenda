@@ -193,7 +193,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address reservedClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
+        // address reservedClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
+        address reservedClient = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
         // vm.prank(msg.sender);
         vm.broadcast(msg.sender);
         paymentVault.setReservation(reservedClient, reservation);
