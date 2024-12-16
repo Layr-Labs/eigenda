@@ -140,7 +140,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	t.logger.Debug("Addresses!!!!!!!!!!!!!!", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
@@ -217,7 +217,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	if err != nil {
 		t.logger.Error("Failed to fetch PaymentVault address", "err", err)
 		//TODO(hopeyen): return err when the contract is deployed
-		return err
+		// return err
 	} else {
 		contractPaymentVault, err = paymentvault.NewContractPaymentVault(paymentVaultAddr, t.ethClient)
 		if err != nil {
@@ -225,8 +225,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 			return err
 		}
 	}
-
-	t.logger.Debug("Made payment vault binding", "contract addr", paymentVaultAddr, "contract struct", contractPaymentVault)
 
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,

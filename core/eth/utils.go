@@ -140,15 +140,7 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 // ConvertToReservedPayment converts a upstream binding data structure to local definition.
 // Returns an error if the input reservation is zero-valued.
 func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation) (*core.ReservedPayment, error) {
-	fmt.Println("Convert to reserved payment",
-		"SymbolsPerSecond", reservation.SymbolsPerSecond,
-		"StartTimestamp", reservation.StartTimestamp,
-		"EndTimestamp", reservation.EndTimestamp,
-		"QuorumNumbers", reservation.QuorumNumbers,
-		"QuorumSplits", reservation.QuorumSplits,
-	)
 	if isZeroValuedReservation(reservation) {
-		fmt.Println("zer valued")
 		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
 

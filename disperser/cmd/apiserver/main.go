@@ -138,7 +138,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create offchain store (cmd apiserver main): %w", err)
+			return fmt.Errorf("failed to create offchain store: %w", err)
 		}
 		// add some default sensible configs
 		meterer = mt.NewMeterer(
