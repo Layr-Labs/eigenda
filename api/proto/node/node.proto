@@ -59,7 +59,7 @@ message StoreBlobsRequest {
 }
 
 message StoreBlobsReply {
-	// The operator's BLS sgnature signed on the blob header hashes.
+	// The operator's BLS signature signed on the blob header hashes.
 	// The ordering of the signatures must match the ordering of the blobs sent
 	// in the request, with empty signatures in the places for discarded blobs.
 	repeated google.protobuf.BytesValue signatures = 1;
@@ -131,7 +131,7 @@ message MerkleProof {
 // Types
 
 // In EigenDA, the original blob to disperse is encoded as a polynomial via taking
-// taking different point evaluations (i.e. erasure coding). These points are split
+// different point evaluations (i.e. erasure coding). These points are split
 // into disjoint subsets which are assigned to different operator nodes in the EigenDA
 // network.
 // The data in this message is a subset of these points that are assigned to a
