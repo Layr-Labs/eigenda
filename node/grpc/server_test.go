@@ -85,7 +85,7 @@ func makeConfig(t *testing.T) *node.Config {
 		ID:                             opID,
 		NumBatchValidators:             runtime.GOMAXPROCS(0),
 		EnableV2:                       false,
-		DisableDispersalAuthentication: true, // TODO re-enable
+		DisableDispersalAuthentication: true, // TODO enable
 	}
 }
 

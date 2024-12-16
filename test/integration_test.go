@@ -363,7 +363,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			PrivateBls:                     string(op.KeyPair.GetPubKeyG1().Serialize()),
 			ID:                             id,
 			QuorumIDList:                   registeredQuorums,
-			DisableDispersalAuthentication: true, // TODO re-enable
+			DisableDispersalAuthentication: true, // TODO enable
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
@@ -419,7 +419,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
-		// TODO enable request validation
+		// TODO this needs to be non-null once we enable dispersal authentication
 		var client common.EthClient
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
