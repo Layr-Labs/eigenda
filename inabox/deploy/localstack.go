@@ -143,101 +143,24 @@ func DeployResources(
 			return err
 		}
 
-		// fmt.Println("Creating payment related tables  ---- in localstack")
-		// // create payment related tables
-		// err = meterer.CreateReservationTable(cfg, v2MetadataTableName+"_reservation")
-		// if err != nil {
-		// 	fmt.Println("err", err)
-		// 	return err
-		// }
-		// err = meterer.CreateOnDemandTable(cfg, v2MetadataTableName+"_ondemand")
-		// if err != nil {
-		// 	fmt.Println("err", err)
-		// 	return err
-		// }
-		// err = meterer.CreateGlobalReservationTable(cfg, v2MetadataTableName+"_global_reservation")
-		// if err != nil {
-		// 	fmt.Println("err", err)
-		// 	return err
-		// }
-	}
-
-	v2PaymentName := "e2e_v2_"
-	// create payment related tables
-	err = meterer.CreateReservationTable(cfg, v2PaymentName+"reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateOnDemandTable(cfg, v2PaymentName+"ondemand")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateGlobalReservationTable(cfg, v2PaymentName+"global_reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-
-	return err
-
-}
-
-func DeployPaymentRelatedTables(
-	pool *dockertest.Pool,
-	localStackPort string,
-) error {
-
-	if pool == nil {
-		var err error
-		pool, err = dockertest.NewPool("")
+		v2PaymentName := "e2e_v2"
+		fmt.Println("Creating payment related tables  ---- in localstack")
+		// create payment related tables
+		err = meterer.CreateReservationTable(cfg, v2PaymentName+"_reservation")
 		if err != nil {
-			fmt.Println("Could not construct pool: %w", err)
+			fmt.Println("err", err)
 			return err
 		}
-	}
-
-	// exponential backoff-retry, because the application in
-	// the container might not be ready to accept connections yet
-	pool.MaxWait = 10 * time.Second
-	_, b, _, _ := runtime.Caller(0)
-	rootPath := filepath.Join(filepath.Dir(b), "../..")
-	changeDirectory(filepath.Join(rootPath, "inabox"))
-	if err := pool.Retry(func() error {
-		fmt.Println("Creating S3 bucket")
-		return execCmd("./create-s3-bucket.sh", []string{}, []string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)})
-	}); err != nil {
-		fmt.Println("Might be connected already:", err)
-		// return err
-	}
-
-	cfg := aws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-	}
-
-	fmt.Println("Creating v2 tables   deploy hleper")
-
-	v2TableName := "test_v2"
-	fmt.Println("Creating payment related tables")
-	// create payment related tables
-	err := meterer.CreateReservationTable(cfg, v2TableName+"_reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateOnDemandTable(cfg, v2TableName+"_ondemand")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateGlobalReservationTable(cfg, v2TableName+"_global_reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
+		err = meterer.CreateOnDemandTable(cfg, v2PaymentName+"_ondemand")
+		if err != nil {
+			fmt.Println("err", err)
+			return err
+		}
+		err = meterer.CreateGlobalReservationTable(cfg, v2PaymentName+"_global_reservation")
+		if err != nil {
+			fmt.Println("err", err)
+			return err
+		}
 	}
 
 	return err
