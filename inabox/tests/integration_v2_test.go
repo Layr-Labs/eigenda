@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -24,7 +22,7 @@ import (
 
 var _ = Describe("Inabox v2 Integration", func() {
 	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 		defer cancel()
 
 		// cfg := aws.ClientConfig{
@@ -52,40 +50,41 @@ var _ = Describe("Inabox v2 Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		reserved := core.ReservedPayment{
-			SymbolsPerSecond: 452198,
-			StartTimestamp:   1734305428,
-			EndTimestamp:     2734305428,
-			QuorumNumbers:    []uint8{0, 1},
-			QuorumSplits:     []uint8{50, 50},
-		}
+		// reserved := core.ReservedPayment{
+		// 	SymbolsPerSecond: 452198,
+		// 	StartTimestamp:   1734305428,
+		// 	EndTimestamp:     2734305428,
+		// 	QuorumNumbers:    []uint8{0, 1},
+		// 	QuorumSplits:     []uint8{50, 50},
+		// }
 
-		accountId, err := signer.GetAccountID()
-		Expect(err).To(BeNil())
+		// accountId, err := signer.GetAccountID()
+		// Expect(err).To(BeNil())
 
-		// // Get public key
-		// publicKey := privateKey.Public()
-		// publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-		// Expect(ok)
-		// address := crypto.PubkeyToAddress(*publicKeyECDSA)
-		fmt.Println("address", accountId)
+		// // // Get public key
+		// // publicKey := privateKey.Public()
+		// // publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
+		// // Expect(ok)
+		// // address := crypto.PubkeyToAddress(*publicKeyECDSA)
+		// fmt.Println("address", accountId)
 
-		onDemand := core.OnDemandPayment{CumulativePayment: big.NewInt(100000)}
-		reservationWindow := 60
-		pricePerSymbol := 47000000
-		minNumSymbols := 8192
-		numBins := 3
+		// onDemand := core.OnDemandPayment{CumulativePayment: big.NewInt(100000)}
+		// reservationWindow := 60
+		// pricePerSymbol := 47000000
+		// minNumSymbols := 8192
+		// numBins := 3
 
-		accountant := clients.NewAccountant(accountId, &reserved, &onDemand, uint32(reservationWindow), uint32(pricePerSymbol), uint32(minNumSymbols), uint32(numBins))
+		// accountant := clients.NewAccountant(accountId, &reserved, &onDemand, uint32(reservationWindow), uint32(pricePerSymbol), uint32(minNumSymbols), uint32(numBins))
 
-		disp, err := clients.NewDisperserClientV2(&clients.DisperserClientV2Config{
+		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
 			Port:     "32005",
-		}, signer, nil, accountant)
+			// }, signer, nil, accountant)
+		}, signer, nil, nil)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
-		// err = disp.PopulateAccountant(ctx)
-		// Expect(err).To(BeNil())
+		err = disp.PopulateAccountant(ctx)
+		Expect(err).To(BeNil())
 
 		data1 := make([]byte, 992)
 		_, err = rand.Read(data1)

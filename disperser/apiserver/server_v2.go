@@ -261,14 +261,24 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, errors.New("payment meterer is not enabled")
 	}
 	start := time.Now()
+	fmt.Println("Disperser server v2 GetPaymentState start:", start)
+
 	defer func() {
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
+	deadline, ok := ctx.Deadline()
+	if ok {
+		fmt.Println("Disperser server v2 GetPaymentState Deadline:", deadline)
+	} else {
+		fmt.Println("Disperser server v2 GetPaymentState No deadline set")
+	}
 	accountID := gethcommon.HexToAddress(req.AccountId)
+	s.logger.Debug("Serve getpaymentstate request", accountID)
 
 	// validate the signature
 	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
+		s.logger.Debug("failed to validate signature", err)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
@@ -276,10 +286,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
 	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	s.logger.Debug("got on chain global params")
 
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
+	s.logger.Debug("now get bin records")
 	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
@@ -295,6 +307,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// on-Chain account state
 	var pbReservation *pb.Reservation
 	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	fmt.Println("Getpaymentstate getting reserved payment result", accountID)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
@@ -323,7 +336,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	} else {
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
+	s.logger.Debug("Got onchain ondemand payment", onDemandPayment)
+	s.logger.Debug("Got onchain ondemand payment", onDemandPayment.CumulativePayment)
+	s.logger.Debug("Got onchain ondemand payment", onDemandPayment.CumulativePayment.Bytes())
 
+	s.logger.Debug("got payment global params; now build reply")
 	paymentGlobalParams := pb.PaymentGlobalParams{
 		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
 		MinNumSymbols:          minNumSymbols,

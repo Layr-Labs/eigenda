@@ -41,18 +41,34 @@ func NewOffchainStore(
 		return OffchainStore{}, err
 	}
 
-	err = dynamoClient.TableExists(context.Background(), reservationTableName)
+	// fmt.Println("check if reservation exists", reservationTableName)
+	// err = dynamoClient.TableExists(context.Background(), reservationTableName)
+	// if err != nil {
+	// 	return OffchainStore{}, err
+	// }
+	// fmt.Println("check if ondemand exists", onDemandTableName)
+	// err = dynamoClient.TableExists(context.Background(), onDemandTableName)
+	// if err != nil {
+	// 	return OffchainStore{}, err
+	// }
+	// fmt.Println("check if global exists", globalBinTableName)
+	// err = dynamoClient.TableExists(context.Background(), globalBinTableName)
+	// if err != nil {
+	// 	return OffchainStore{}, err
+	// }
+	err = CreateReservationTable(cfg, reservationTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
+	err = CreateOnDemandTable(cfg, onDemandTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
+	err = CreateGlobalReservationTable(cfg, globalBinTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
+
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
 	return OffchainStore{

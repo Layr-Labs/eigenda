@@ -141,7 +141,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses!!!!!!!!!!!!!!", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
@@ -211,12 +211,14 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
+	t.logger.Debug("Make payment vault binding")
+
 	var contractPaymentVault *paymentvault.ContractPaymentVault
 	paymentVaultAddr, err := contractEigenDAServiceManager.PaymentVault(&bind.CallOpts{})
 	if err != nil {
 		t.logger.Error("Failed to fetch PaymentVault address", "err", err)
 		//TODO(hopeyen): return err when the contract is deployed
-		// return err
+		return err
 	} else {
 		contractPaymentVault, err = paymentvault.NewContractPaymentVault(paymentVaultAddr, t.ethClient)
 		if err != nil {
@@ -224,6 +226,8 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 			return err
 		}
 	}
+
+	t.logger.Debug("Made payment vault binding", "contract addr", paymentVaultAddr, "contract struct", contractPaymentVault)
 
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
@@ -735,9 +739,12 @@ func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
+	fmt.Println("Get reserved payment as reader", accountID)
 	if t.bindings.PaymentVault == nil {
+		fmt.Println("payment vault not deployed")
 		return nil, errors.New("payment vault not deployed")
 	}
+	fmt.Println("payment vault query")
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
@@ -773,6 +780,7 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	fmt.Println("Reader getOnDemandPaymentByAccount", accountID)
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}

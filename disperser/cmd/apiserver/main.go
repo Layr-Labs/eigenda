@@ -103,7 +103,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			UpdateInterval:   time.Duration(config.UpdateInterval) * time.Second,
 		}
 
-		logger.Info("Creating onchain payment state")
+		logger.Info("Creating onchain payment state apiserver main.go")
 		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
@@ -111,6 +111,25 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
+
+		logger.Info("table names",
+			"res",
+			config.ReservationsTableName,
+			"ondemand",
+			config.OnDemandTableName,
+			"global",
+			config.GlobalRateTableName,
+			"config",
+			config.AwsClientConfig,
+			"paymentChainState min num symbols",
+			paymentChainState.GetMinNumSymbols(),
+			"paymentChainState GetGlobalSymbolsPerSecond",
+			paymentChainState.GetGlobalSymbolsPerSecond(),
+			"paymentChainState GetGlobalRatePeriodInterval",
+			paymentChainState.GetGlobalRatePeriodInterval(),
+			"paymentChainState GetPricePerSymbol",
+			paymentChainState.GetPricePerSymbol(),
+		)
 
 		offchainStore, err := mt.NewOffchainStore(
 			config.AwsClientConfig,
@@ -120,7 +139,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create offchain store: %w", err)
+			return fmt.Errorf("failed to create offchain store (cmd apiserver main): %w", err)
 		}
 		// add some default sensible configs
 		meterer = mt.NewMeterer(
