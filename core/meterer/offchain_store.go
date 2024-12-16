@@ -41,30 +41,16 @@ func NewOffchainStore(
 		return OffchainStore{}, err
 	}
 
-	// fmt.Println("check if reservation exists", reservationTableName)
-	// err = dynamoClient.TableExists(context.Background(), reservationTableName)
-	// if err != nil {
-	// 	return OffchainStore{}, err
-	// }
-	// fmt.Println("check if ondemand exists", onDemandTableName)
-	// err = dynamoClient.TableExists(context.Background(), onDemandTableName)
-	// if err != nil {
-	// 	return OffchainStore{}, err
-	// }
-	// fmt.Println("check if global exists", globalBinTableName)
-	// err = dynamoClient.TableExists(context.Background(), globalBinTableName)
-	// if err != nil {
-	// 	return OffchainStore{}, err
-	// }
-	err = CreateReservationTable(cfg, reservationTableName)
+	fmt.Println("check if payment tables exist", reservationTableName)
+	err = dynamoClient.TableExists(context.Background(), reservationTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = CreateOnDemandTable(cfg, onDemandTableName)
+	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
-	err = CreateGlobalReservationTable(cfg, globalBinTableName)
+	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}

@@ -227,9 +227,9 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
 
 		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
-		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e-v2-reservation",
-		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e-v2-ondemand",
-		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e-v2-global-reservation",
+		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
+		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
+		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -714,17 +714,17 @@ func (env *Config) GenerateAllVariables() {
 			filename, []string{grpcPort})
 	}
 
-	// Disperser clients
-	for i := 0; i < 4; i++ {
-		name := fmt.Sprintf("client%v", i)
-		key, address := env.getKey(name)
+	// // Disperser clients
+	// for i := 0; i < 4; i++ {
+	// 	name := fmt.Sprintf("client%v", i)
+	// 	key, address := env.getKey(name)
 
-		participant := DisperserClient{
-			Address:       address,
-			PrivateKeyHex: key[2:],
-		}
-		env.DisperserClients = append(env.DisperserClients, participant)
-	}
+	// 	participant := DisperserClient{
+	// 		Address:       address,
+	// 		PrivateKeyHex: key[2:],
+	// 	}
+	// 	env.DisperserClients = append(env.DisperserClients, participant)
+	// }
 
 	name = "retriever0"
 	key, _ = env.getKey(name)
