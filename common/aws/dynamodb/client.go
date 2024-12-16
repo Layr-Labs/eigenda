@@ -483,11 +483,14 @@ func (c *client) TableExists(ctx context.Context, name string) error {
 	if name == "" {
 		return errors.New("table name is empty")
 	}
-	_, err := c.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+	describe, err := c.dynamoClient.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(name),
 	})
+	fmt.Println("desribe table check exists", describe)
+	fmt.Printf("desribe table check exists: %s\n", *describe.Table.TableName)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

@@ -142,37 +142,43 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 
 // GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
-	pcs.ReservationsLock.RLock()
-	defer pcs.ReservationsLock.RUnlock()
+	fmt.Println("Getting reserved payment by account as onchainpaymentstate", accountID)
+	pcs.ReservationsLock.Lock()
+	defer pcs.ReservationsLock.Unlock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
+		fmt.Println("found reservation in cache", accountID)
 		return reservation, nil
 	}
 
 	// pulls the chain state
+	fmt.Println("get reserved payment from onchain", accountID)
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-	pcs.ReservationsLock.Lock()
+	fmt.Println("Got reservation")
+	// pcs.ReservationsLock.Lock()
 	(pcs.ReservedPayments)[accountID] = res
-	pcs.ReservationsLock.Unlock()
+	// pcs.ReservationsLock.Unlock()
 
 	return res, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	fmt.Println("pcs getOnDemandPaymentByAccount", accountID)
 	pcs.OnDemandLocks.RLock()
 	defer pcs.OnDemandLocks.RUnlock()
 	if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
 		return payment, nil
 	}
 	// pulls the chain state
+	fmt.Println("pcs getOnDemandPaymentByAccount pulls the chain state", accountID)
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-
+	fmt.Println("pcs getOnDemandPaymentByAccount got from chain state", res)
 	pcs.OnDemandLocks.Lock()
 	(pcs.OnDemandPayments)[accountID] = res
 	pcs.OnDemandLocks.Unlock()
