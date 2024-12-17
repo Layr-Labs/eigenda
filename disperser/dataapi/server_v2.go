@@ -105,13 +105,13 @@ func (s *ServerV2) Start() error {
 	{
 		blob := v2.Group("/blob")
 		{
-			blob.GET("/blob/feed", s.FetchBlobFeedHandler)
-			blob.GET("/blob/:blob_key", s.FetchBlobHandler)
+			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
+			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
 		}
 		batch := v2.Group("/batch")
 		{
-			batch.GET("/batch/feed", s.FetchBatchFeedHandler)
-			batch.GET("/batch/:batch_header_hash", s.FetchBatchHandler)
+			batch.GET("/batches/feed", s.FetchBatchFeedHandler)
+			batch.GET("/batches/:batch_header_hash", s.FetchBatchHandler)
 		}
 		operators := v2.Group("/operators")
 		{
@@ -180,7 +180,7 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/blob/{blob_key} [get]
+//	@Router		/blobs/{blob_key} [get]
 func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 	start := time.Now()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
@@ -221,7 +221,7 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/batch/{batch_header_hash} [get]
+//	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	start := time.Now()
 	batchHeaderHashHex := c.Param("batch_header_hash")
