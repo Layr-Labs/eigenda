@@ -109,6 +109,22 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg("blob header must contain commitments")
 	}
 
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	if err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
+	}
+
+	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+		return api.NewErrorInvalidArg("payment metadata is required")
+	}
+	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+	}
+
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+		return api.NewErrorInvalidArg("invalid payment metadata")
+	}
+
 	if len(blobHeaderProto.GetQuorumNumbers()) == 0 {
 		return api.NewErrorInvalidArg("blob header must contain at least one quorum number")
 	}
@@ -124,7 +140,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	}
 
 	// validate every 32 bytes is a valid field element
-	_, err := rs.ToFrArray(data)
+	_, err = rs.ToFrArray(data)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
 		return api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
@@ -132,22 +148,6 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 
 	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeaderProto.GetVersion())); !ok {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys()))
-	}
-
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
-	if err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
-	}
-
-	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
-		return api.NewErrorInvalidArg("payment metadata is required")
-	}
-	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
-	}
-
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil) {
-		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
 	// handle payments and check rate limits
