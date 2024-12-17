@@ -295,7 +295,7 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	}
 
 	if len(payments) == 0 {
-		return nil, nil
+		return big.NewInt(0), nil
 	}
 
 	var payment *big.Int

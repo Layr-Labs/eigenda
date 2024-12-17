@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -254,20 +255,42 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get active reservation")
+		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 	}
 	// on-Chain account state
+	var pbReservation *pb.Reservation
 	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get active reservation")
+		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
+	} else {
+		quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
+		for i, v := range reservation.QuorumNumbers {
+			quorumNumbers[i] = uint32(v)
+		}
+		quorumSplits := make([]uint32, len(reservation.QuorumSplits))
+		for i, v := range reservation.QuorumSplits {
+			quorumSplits[i] = uint32(v)
+		}
+
+		pbReservation = &pb.Reservation{
+			SymbolsPerSecond: reservation.SymbolsPerSecond,
+			StartTimestamp:   uint32(reservation.StartTimestamp),
+			EndTimestamp:     uint32(reservation.EndTimestamp),
+			QuorumSplits:     quorumSplits,
+			QuorumNumbers:    quorumNumbers,
+		}
 	}
+
+	var onchainCumulativePayment *big.Int
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
+	} else {
+		onchainCumulativePayment = onDemandPayment.CumulativePayment
 	}
 
 	paymentGlobalParams := pb.PaymentGlobalParams{
@@ -277,27 +300,13 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		ReservationWindow:      reservationWindow,
 	}
 
-	quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
-	for i, v := range reservation.QuorumNumbers {
-		quorumNumbers[i] = uint32(v)
-	}
-	quorumSplits := make([]uint32, len(reservation.QuorumSplits))
-	for i, v := range reservation.QuorumSplits {
-		quorumSplits[i] = uint32(v)
-	}
 	// build reply
 	reply := &pb.GetPaymentStateReply{
-		PaymentGlobalParams: &paymentGlobalParams,
-		BinRecords:          binRecords[:],
-		Reservation: &pb.Reservation{
-			SymbolsPerSecond: reservation.SymbolsPerSecond,
-			StartTimestamp:   uint32(reservation.StartTimestamp),
-			EndTimestamp:     uint32(reservation.EndTimestamp),
-			QuorumSplits:     quorumSplits,
-			QuorumNumbers:    quorumNumbers,
-		},
+		PaymentGlobalParams:      &paymentGlobalParams,
+		BinRecords:               binRecords[:],
+		Reservation:              pbReservation,
 		CumulativePayment:        largestCumulativePayment.Bytes(),
-		OnchainCumulativePayment: onDemandPayment.CumulativePayment.Bytes(),
+		OnchainCumulativePayment: onchainCumulativePayment.Bytes(),
 	}
 	return reply, nil
 }
