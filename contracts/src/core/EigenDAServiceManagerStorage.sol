@@ -5,6 +5,7 @@ import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -41,15 +42,18 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
     IEigenDARelayRegistry public immutable eigenDARelayRegistry;
     IPaymentVault public immutable paymentVault;
+    IEigenDADisperserRegistry public immutable eigenDADisperserRegistry;
     
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
         IEigenDARelayRegistry _eigenDARelayRegistry,
-        IPaymentVault _paymentVault
+        IPaymentVault _paymentVault,
+        IEigenDADisperserRegistry _eigenDADisperserRegistry
     ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDARelayRegistry = _eigenDARelayRegistry;
         paymentVault = _paymentVault;
+        eigenDADisperserRegistry = _eigenDADisperserRegistry;
     }
 
     /// @notice The current batchId
