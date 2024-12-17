@@ -212,9 +212,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	// TODO(hopeyen); re-enable this validation after adding signature verification
 	assert.ErrorContains(t, err, "authentication failed")
-	// assert.NoError(t, err)
 
 	// request with invalid payment metadata
 	invalidReqProto = &pbcommonv2.BlobHeader{
@@ -237,9 +235,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	// TODO(ian-shim): re-enable this validation after fixing the payment metadata validation
 	assert.ErrorContains(t, err, "invalid payment metadata")
-	// assert.NoError(t, err)
 
 	// request with invalid commitment
 	invalidCommitment := commitmentProto

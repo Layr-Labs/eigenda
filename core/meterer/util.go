@@ -2,7 +2,6 @@ package meterer
 
 import (
 	"context"
-	"fmt"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
@@ -13,7 +12,7 @@ import (
 
 func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()
-	res, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
+	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
 				AttributeName: aws.String("AccountID"),
@@ -41,7 +40,6 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 		},
 	})
 
-	fmt.Printf("Made table %s\n", res)
 	return err
 }
 
