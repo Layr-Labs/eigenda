@@ -138,7 +138,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	if err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
 	}
-	// TODO(ian-shim): enable this check for authentication
+
 	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
 		return api.NewErrorInvalidArg("payment metadata is required")
 	}
@@ -146,8 +146,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	// TODO(ian-shim): enable this check when we have payment metadata + authentication in disperser client
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil {
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil) {
 		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
