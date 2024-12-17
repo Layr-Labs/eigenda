@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -82,7 +82,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		RelayClient: atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-	server := grpc.NewServerV2(config, node, logger, ratelimiter)
+	server, err := grpc.NewServerV2(config, node, logger, ratelimiter, prometheus.NewRegistry())
+	require.NoError(t, err)
 	return &testComponents{
 		server:      server,
 		node:        node,

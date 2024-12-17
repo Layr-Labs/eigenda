@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"time"
@@ -45,8 +46,12 @@ func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPa
 		return nil, errors.New("quorumIDs cannot be empty")
 	}
 	// generate salt
-	privateKeyBytes := []byte(keyPair.PrivKey.String())
-	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumIDs[:], privateKeyBytes)
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumIDs[:], bytes)
 
 	churnRequest := &churner.ChurnRequest{
 		OperatorAddress:            gethcommon.HexToAddress(operatorAddress),

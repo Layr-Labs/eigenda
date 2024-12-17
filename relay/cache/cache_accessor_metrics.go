@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
@@ -110,5 +111,5 @@ func (m *CacheAccessorMetrics) ReportAverageWeight(averageWeight float64) {
 }
 
 func (m *CacheAccessorMetrics) ReportCacheMissLatency(duration time.Duration) {
-	m.cacheMissLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.cacheMissLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }

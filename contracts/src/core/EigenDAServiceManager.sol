@@ -31,7 +31,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
     modifier onlyBatchConfirmer() {
-        require(isBatchConfirmer[msg.sender], "onlyBatchConfirmer: not from batch confirmer");
+        require(isBatchConfirmer[msg.sender]);
         _;
     }
 
@@ -80,21 +80,21 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer() {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
-        require(tx.origin == msg.sender, "EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata");
+        require(tx.origin == msg.sender, "header and nonsigner data must be in calldata");
         // make sure the stakes against which the Batch is being confirmed are not stale
         require(
-            batchHeader.referenceBlockNumber < block.number, "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"
+            batchHeader.referenceBlockNumber < block.number, "specified referenceBlockNumber is in future"
         );
 
         require(
             (batchHeader.referenceBlockNumber + BLOCK_STALE_MEASURE) >= uint32(block.number),
-            "EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"
+            "specified referenceBlockNumber is too far in past"
         );
 
         //make sure that the quorumNumbers and signedStakeForQuorums are of the same length
         require(
             batchHeader.quorumNumbers.length == batchHeader.signedStakeForQuorums.length,
-            "EigenDAServiceManager.confirmBatch: quorumNumbers and signedStakeForQuorums must be of the same length"
+            "quorumNumbers and signedStakeForQuorums must be same length"
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
@@ -118,7 +118,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
                 quorumStakeTotals.totalStakeForQuorum[i] * uint8(batchHeader.signedStakeForQuorums[i]),
-                "EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"
+                "signatories do not own threshold percentage of a quorum"
             );
         }
 

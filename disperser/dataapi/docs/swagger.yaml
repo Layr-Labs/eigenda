@@ -361,7 +361,7 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
-  /batch/{batch_header_hash}:
+  /batches/{batch_header_hash}:
     get:
       parameters:
       - description: Batch header hash in hex string
@@ -391,7 +391,7 @@ paths:
       summary: Fetch batch by the batch header hash
       tags:
       - Feed
-  /blob/{blob_key}:
+  /blobs/{blob_key}:
     get:
       parameters:
       - description: Blob key in hex string

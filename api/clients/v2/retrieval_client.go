@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -16,14 +17,14 @@ import (
 	"github.com/gammazero/workerpool"
 )
 
-// RetrievalClientV2 is an object that can retrieve blobs from the DA nodes.
+// RetrievalClient is an object that can retrieve blobs from the DA nodes.
 // To retrieve a blob from the relay, use RelayClient instead.
-type RetrievalClientV2 interface {
+type RetrievalClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
-	GetBlob(ctx context.Context, blobHeader corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
+	GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
 }
 
-type retrievalClientV2 struct {
+type retrievalClient struct {
 	logger            logging.Logger
 	ethClient         core.Reader
 	indexedChainState core.IndexedChainState
@@ -31,15 +32,15 @@ type retrievalClientV2 struct {
 	numConnections    int
 }
 
-// NewRetrievalClientV2 creates a new retrieval client.
-func NewRetrievalClientV2(
+// NewRetrievalClient creates a new retrieval client.
+func NewRetrievalClient(
 	logger logging.Logger,
 	ethClient core.Reader,
 	chainState core.IndexedChainState,
 	verifier encoding.Verifier,
 	numConnections int,
-) RetrievalClientV2 {
-	return &retrievalClientV2{
+) RetrievalClient {
+	return &retrievalClient{
 		logger:            logger.With("component", "RetrievalClient"),
 		ethClient:         ethClient,
 		indexedChainState: chainState,
@@ -48,7 +49,11 @@ func NewRetrievalClientV2(
 	}
 }
 
-func (r *retrievalClientV2) GetBlob(ctx context.Context, blobHeader corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
+func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
+	if blobHeader == nil {
+		return nil, errors.New("blob header is nil")
+	}
+
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return nil, err
@@ -90,7 +95,7 @@ func (r *retrievalClientV2) GetBlob(ctx context.Context, blobHeader corev2.BlobH
 	}
 
 	// Fetch chunks from all operators
-	chunksChan := make(chan RetrievedChunks, len(operators))
+	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
 		opID := opID
@@ -139,13 +144,13 @@ func (r *retrievalClientV2) GetBlob(ctx context.Context, blobHeader corev2.BlobH
 	)
 }
 
-func (r *retrievalClientV2) getChunksFromOperator(
+func (r *retrievalClient) getChunksFromOperator(
 	ctx context.Context,
 	opID core.OperatorID,
 	opInfo *core.IndexedOperatorInfo,
 	blobKey corev2.BlobKey,
 	quorumID core.QuorumID,
-	chunksChan chan RetrievedChunks,
+	chunksChan chan clients.RetrievedChunks,
 ) {
 	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
@@ -158,7 +163,7 @@ func (r *retrievalClientV2) getChunksFromOperator(
 		}
 	}()
 	if err != nil {
-		chunksChan <- RetrievedChunks{
+		chunksChan <- clients.RetrievedChunks{
 			OperatorID: opID,
 			Err:        err,
 			Chunks:     nil,
@@ -174,7 +179,7 @@ func (r *retrievalClientV2) getChunksFromOperator(
 
 	reply, err := n.GetChunks(ctx, request)
 	if err != nil {
-		chunksChan <- RetrievedChunks{
+		chunksChan <- clients.RetrievedChunks{
 			OperatorID: opID,
 			Err:        err,
 			Chunks:     nil,
@@ -187,7 +192,7 @@ func (r *retrievalClientV2) getChunksFromOperator(
 		var chunk *encoding.Frame
 		chunk, err = new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
-			chunksChan <- RetrievedChunks{
+			chunksChan <- clients.RetrievedChunks{
 				OperatorID: opID,
 				Err:        err,
 				Chunks:     nil,
@@ -197,7 +202,7 @@ func (r *retrievalClientV2) getChunksFromOperator(
 
 		chunks[i] = chunk
 	}
-	chunksChan <- RetrievedChunks{
+	chunksChan <- clients.RetrievedChunks{
 		OperatorID: opID,
 		Err:        nil,
 		Chunks:     chunks,
