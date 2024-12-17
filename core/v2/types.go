@@ -314,7 +314,7 @@ type Attestation struct {
 	QuorumNumbers []core.QuorumID
 }
 
-func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
+func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 	nonSignerPubKeys := make([][]byte, len(a.NonSignerPubKeys))
 	for i, p := range a.NonSignerPubKeys {
 		pubkeyBytes := p.Bytes()
@@ -322,14 +322,16 @@ func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
 	}
 
 	quorumAPKs := make([][]byte, len(a.QuorumAPKs))
-	for i, p := range a.QuorumAPKs {
-		apkBytes := p.Bytes()
-		quorumAPKs[i] = apkBytes[:]
-	}
-
 	quorumNumbers := make([]uint32, len(a.QuorumNumbers))
 	for i, q := range a.QuorumNumbers {
 		quorumNumbers[i] = uint32(q)
+
+		apk, ok := a.QuorumAPKs[q]
+		if !ok {
+			return nil, fmt.Errorf("missing quorum APK for quorum %d", q)
+		}
+		apkBytes := apk.Bytes()
+		quorumAPKs[i] = apkBytes[:]
 	}
 
 	apkG2Bytes := a.APKG2.Bytes()
@@ -341,7 +343,7 @@ func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
 		QuorumApks:       quorumAPKs,
 		Sigma:            sigmaBytes[:],
 		QuorumNumbers:    quorumNumbers,
-	}
+	}, nil
 }
 
 type BlobVerificationInfo struct {
