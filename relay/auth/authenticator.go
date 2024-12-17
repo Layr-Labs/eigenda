@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -106,11 +105,6 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	origin string,
 	request *pb.GetChunksRequest,
 	now time.Time) error {
-
-	if strings.HasPrefix(origin, "127.0.0.1") {
-		// TODO(ian-shim): Remove this block once we have a way to authenticate requests.
-		return nil
-	}
 
 	if a.isAuthenticationStillValid(now, origin) {
 		// We've recently authenticated this client. Do not authenticate again for a while.

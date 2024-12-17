@@ -133,7 +133,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		// Test retrieval from relay
 		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
+			Sockets:    relays,
+			OperatorID: nil, // TODO
 		}, logger)
 		Expect(err).To(BeNil())
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)

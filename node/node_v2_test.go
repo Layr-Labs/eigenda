@@ -182,7 +182,8 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 		0: "http://localhost:8080",
 	}
 	relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-		Sockets: relayURLs,
+		Sockets:    relayURLs,
+		OperatorID: c.node.Config.ID,
 	}, c.node.Logger)
 	require.NoError(t, err)
 	// set up non-mock client
