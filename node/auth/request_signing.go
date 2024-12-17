@@ -36,8 +36,6 @@ func VerifyStoreChunksRequest(key gethcommon.Address, request *grpc.StoreChunksR
 		return fmt.Errorf("failed to recover public key from signature: %w", err)
 	}
 
-	fmt.Printf("     public key: %v\n", signingPublicKey)
-
 	signingAddress := crypto.PubkeyToAddress(*signingPublicKey)
 
 	if key.Cmp(signingAddress) != 0 {
