@@ -498,7 +498,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
-	s := apiserver.NewDispersalServerV2(
+	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
 			GrpcTimeout: 1 * time.Second,
@@ -513,6 +513,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		time.Hour,
 		logger,
 		prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

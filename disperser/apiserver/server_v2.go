@@ -75,7 +75,32 @@ func NewDispersalServerV2(
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
-) *DispersalServerV2 {
+) (*DispersalServerV2, error) {
+	if serverConfig.GrpcPort == "" {
+		return nil, errors.New("grpc port is required")
+	}
+	if blobStore == nil {
+		return nil, errors.New("blob store is required")
+	}
+	if blobMetadataStore == nil {
+		return nil, errors.New("blob metadata store is required")
+	}
+	if chainReader == nil {
+		return nil, errors.New("chain reader is required")
+	}
+	if authenticator == nil {
+		return nil, errors.New("authenticator is required")
+	}
+	if prover == nil {
+		return nil, errors.New("prover is required")
+	}
+	if maxNumSymbolsPerBlob == 0 {
+		return nil, errors.New("maxNumSymbolsPerBlob is required")
+	}
+	if _logger == nil {
+		return nil, errors.New("logger is required")
+	}
+
 	logger := _logger.With("component", "DispersalServerV2")
 
 	return &DispersalServerV2{
@@ -93,7 +118,7 @@ func NewDispersalServerV2(
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
 		metrics: newAPIServerV2Metrics(registry),
-	}
+	}, nil
 }
 
 func (s *DispersalServerV2) Start(ctx context.Context) error {
@@ -233,6 +258,9 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 }
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	if s.meterer == nil {
+		return nil, errors.New("payment meterer is not enabled")
+	}
 	start := time.Now()
 	defer func() {
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
