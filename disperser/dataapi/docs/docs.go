@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/batch/{batch_header_hash}": {
+        "/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -61,7 +61,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/blob/{blob_key}": {
+        "/blobs/{blob_key}": {
             "get": {
                 "produces": [
                     "application/json"
