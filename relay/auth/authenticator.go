@@ -111,6 +111,10 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		return nil
 	}
 
+	if request.OperatorId == nil || len(request.OperatorId) != 32 {
+		return errors.New("invalid operator ID")
+	}
+
 	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
