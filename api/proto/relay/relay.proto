@@ -1,5 +1,5 @@
 syntax = "proto3";
-package node;
+package relay;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 /////////////////////////////////////////////////////////////////////////////////////
