@@ -184,7 +184,13 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	}
 
 	if paymentState.GetReservation() == nil {
-		a.reservation = core.DummyReservedPayment()
+		a.reservation = &core.ReservedPayment{
+			SymbolsPerSecond: 0,
+			StartTimestamp:   0,
+			EndTimestamp:     0,
+			QuorumNumbers:    []uint8{},
+			QuorumSplits:     []byte{},
+		}
 	} else {
 		a.reservation.SymbolsPerSecond = uint64(paymentState.GetReservation().GetSymbolsPerSecond())
 		a.reservation.StartTimestamp = uint64(paymentState.GetReservation().GetStartTimestamp())
