@@ -121,9 +121,7 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 func (c *relayClient) GetChunksByRange(
 	ctx context.Context,
 	relayKey corev2.RelayKey,
-	requests []*ChunkRequestByRange,
-	operatorID *core.OperatorID,
-	messageSigner MessageSigner) ([][]byte, error) {
+	requests []*ChunkRequestByRange) ([][]byte, error) {
 
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")

@@ -47,7 +47,6 @@ func defaultConfig() *Config {
 			GetChunkBytesBurstinessClient:   2 * 1024 * 1024,
 			MaxConcurrentGetChunkOpsClient:  1,
 		},
-		AuthenticationDisabled: true,
 		Timeouts: TimeoutConfig{
 			GetBlobTimeout:                 10 * time.Second,
 			GetChunksTimeout:               10 * time.Second,

@@ -131,11 +131,18 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
+		// These values are only used by the relay client to get chunks, which we do not call from the relay
+		// client below. So ok to use dummy values here.
+		var dummyOperatorID core.OperatorID
+		dummySigner := func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+			return nil, nil
+		}
+
 		// Test retrieval from relay
 		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
-			//OperatorID: &dummyOperatorID, // TODO
-			//MessageSigner: nil,
+			Sockets:       relays,
+			OperatorID:    &dummyOperatorID,
+			MessageSigner: dummySigner,
 		}, logger)
 		Expect(err).To(BeNil())
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
