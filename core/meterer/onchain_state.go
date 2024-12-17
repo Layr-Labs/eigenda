@@ -159,7 +159,9 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	pcs.ReservationsLock.Lock()
 	(pcs.ReservedPayments)[accountID] = res
+	pcs.ReservationsLock.Unlock()
 
 	return res, nil
 }
@@ -178,7 +180,10 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+
+	pcs.OnDemandLocks.Lock()
 	(pcs.OnDemandPayments)[accountID] = res
+	pcs.OnDemandLocks.Unlock()
 	return res, nil
 }
 
