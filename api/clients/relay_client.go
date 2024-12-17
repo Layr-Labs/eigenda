@@ -20,7 +20,7 @@ type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, er
 type RelayClientConfig struct {
 	Sockets           map[corev2.RelayKey]string
 	UseSecureGrpcFlag bool
-	OperatorID        core.OperatorID
+	OperatorID        *core.OperatorID
 	MessageSigner     MessageSigner
 }
 
@@ -70,9 +70,7 @@ var _ RelayClient = (*relayClient)(nil)
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
 func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
-
-	var zeroID core.OperatorID
-	if config == nil || len(config.Sockets) <= 0 || config.OperatorID == zeroID || config.MessageSigner == nil {
+	if config == nil || len(config.Sockets) <= 0 || config.OperatorID == nil || config.MessageSigner == nil {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 
@@ -123,7 +121,9 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 func (c *relayClient) GetChunksByRange(
 	ctx context.Context,
 	relayKey corev2.RelayKey,
-	requests []*ChunkRequestByRange) ([][]byte, error) {
+	requests []*ChunkRequestByRange,
+	operatorID *core.OperatorID,
+	messageSigner MessageSigner) ([][]byte, error) {
 
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")
