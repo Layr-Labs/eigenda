@@ -170,7 +170,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
-		server := apiserver.NewDispersalServerV2(
+		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
 			blobMetadataStore,
@@ -183,6 +183,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			reg,
 		)
+		if err != nil {
+			return err
+		}
 		return server.Start(context.Background())
 	}
 
