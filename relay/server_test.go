@@ -30,6 +30,7 @@ func defaultConfig() *Config {
 		ChunkCacheSize:             1024 * 1024,
 		ChunkMaxConcurrency:        32,
 		MaxKeysPerGetChunksRequest: 1024,
+		AuthenticationDisabled:     true,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
