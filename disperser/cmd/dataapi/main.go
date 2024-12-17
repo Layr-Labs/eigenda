@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -33,10 +34,6 @@ var (
 	gitDate   string
 )
 
-// @title			EigenDA Data Access API
-// @description	This is the EigenDA Data Access API server.
-// @version		1
-// @Schemes		https http
 func main() {
 	app := cli.NewApp()
 	app.Flags = flags.Flags
