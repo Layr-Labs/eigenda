@@ -39,13 +39,6 @@ type BinRecord struct {
 	Usage uint64
 }
 
-func DummyBinRecord() *BinRecord {
-	return &BinRecord{
-		Index: 0,
-		Usage: 0,
-	}
-}
-
 func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
@@ -161,6 +154,12 @@ func (a *Accountant) GetRelativeBinRecord(index uint32) *BinRecord {
 	return &a.binRecords[relativeIndex]
 }
 
+// SetPaymentState sets the accountant's state from the disperser's response
+// We require disperser to return a valid set of global parameters, but optional
+// account level on/off-chain state. If on-chain fields are not present, we use
+// dummy values that disable accountant from using the corresponding payment method.
+// If off-chain fields are not present, we assume the account has no payment history
+// and set accoutant state to use initial values.
 func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
@@ -206,7 +205,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	binRecords := make([]BinRecord, len(paymentState.GetBinRecords()))
 	for i, record := range paymentState.GetBinRecords() {
 		if record == nil {
-			binRecords[i] = *DummyBinRecord()
+			binRecords[i] = BinRecord{Index: 0, Usage: 0}
 		} else {
 			binRecords[i] = BinRecord{
 				Index: record.Index,
