@@ -16,6 +16,7 @@ import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfac
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
+import {IEigenDADisperserRegistry} from "../../src/interfaces/IEigenDADisperserRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
@@ -77,7 +78,8 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             stakeRegistry,
             eigenDAThresholdRegistry,
             eigenDARelayRegistry,
-            IPaymentVault(address(0))
+            IPaymentVault(address(0)),
+            IEigenDADisperserRegistry(address(0))
         );
 
         address[] memory confirmers = new address[](1);

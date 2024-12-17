@@ -19,6 +19,7 @@ import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
 import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "../../src/payments/PaymentVault.sol";
+import {IEigenDADisperserRegistry} from "../../src/interfaces/IEigenDADisperserRegistry.sol";
 
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
@@ -82,7 +83,8 @@ contract EigenDABlobUtilsUnit is BLSMockAVSDeployer {
             stakeRegistry,
             eigenDAThresholdRegistry,
             eigenDARelayRegistry,
-            IPaymentVault(address(0))
+            IPaymentVault(address(0)),
+            IEigenDADisperserRegistry(address(0))
         );
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
