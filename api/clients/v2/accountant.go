@@ -39,6 +39,13 @@ type BinRecord struct {
 	Usage uint64
 }
 
+func DummyBinRecord() *BinRecord {
+	return &BinRecord{
+		Index: 0,
+		Usage: 0,
+	}
+}
+
 func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
