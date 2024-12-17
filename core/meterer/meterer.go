@@ -60,7 +60,7 @@ func (m *Meterer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
 			case <-ctx.Done():
