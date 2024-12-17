@@ -147,9 +147,9 @@ func (c *disperserClient) DisperseBlob(
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 
-	if c.accountant == nil {
-		return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
-	}
+	// if c.accountant == nil {
+	// 	return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
+	// }
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
 	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
