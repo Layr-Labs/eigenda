@@ -716,18 +716,6 @@ func (env *Config) GenerateAllVariables() {
 			filename, []string{grpcPort})
 	}
 
-	// // Disperser clients
-	// for i := 0; i < 4; i++ {
-	// 	name := fmt.Sprintf("client%v", i)
-	// 	key, address := env.getKey(name)
-
-	// 	participant := DisperserClient{
-	// 		Address:       address,
-	// 		PrivateKeyHex: key[2:],
-	// 	}
-	// 	env.DisperserClients = append(env.DisperserClients, participant)
-	// }
-
 	name = "retriever0"
 	key, _ = env.getKey(name)
 	logPath, _, _, envFile = env.getPaths(name)

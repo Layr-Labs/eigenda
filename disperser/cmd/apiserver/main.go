@@ -111,25 +111,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
-		logger.Info("table names",
-			"res",
-			config.ReservationsTableName,
-			"ondemand",
-			config.OnDemandTableName,
-			"global",
-			config.GlobalRateTableName,
-			"config",
-			config.AwsClientConfig,
-			"paymentChainState min num symbols",
-			paymentChainState.GetMinNumSymbols(),
-			"paymentChainState GetGlobalSymbolsPerSecond",
-			paymentChainState.GetGlobalSymbolsPerSecond(),
-			"paymentChainState GetGlobalRatePeriodInterval",
-			paymentChainState.GetGlobalRatePeriodInterval(),
-			"paymentChainState GetPricePerSymbol",
-			paymentChainState.GetPricePerSymbol(),
-		)
-
 		offchainStore, err := mt.NewOffchainStore(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
