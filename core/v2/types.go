@@ -312,6 +312,8 @@ type Attestation struct {
 	Sigma *core.Signature
 	// QuorumNumbers contains the quorums relevant for the attestation
 	QuorumNumbers []core.QuorumID
+	// QuorumResults contains the results of the quorum verification
+	QuorumResults map[core.QuorumID]uint8
 }
 
 func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
@@ -323,6 +325,7 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 
 	quorumAPKs := make([][]byte, len(a.QuorumAPKs))
 	quorumNumbers := make([]uint32, len(a.QuorumNumbers))
+	quorumResults := make([]uint8, len(a.QuorumResults))
 	for i, q := range a.QuorumNumbers {
 		quorumNumbers[i] = uint32(q)
 
@@ -332,17 +335,19 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 		}
 		apkBytes := apk.Bytes()
 		quorumAPKs[i] = apkBytes[:]
+		quorumResults[i] = a.QuorumResults[q]
 	}
 
 	apkG2Bytes := a.APKG2.Bytes()
 	sigmaBytes := a.Sigma.Bytes()
 
 	return &disperserpb.Attestation{
-		NonSignerPubkeys: nonSignerPubKeys,
-		ApkG2:            apkG2Bytes[:],
-		QuorumApks:       quorumAPKs,
-		Sigma:            sigmaBytes[:],
-		QuorumNumbers:    quorumNumbers,
+		NonSignerPubkeys:        nonSignerPubKeys,
+		ApkG2:                   apkG2Bytes[:],
+		QuorumApks:              quorumAPKs,
+		Sigma:                   sigmaBytes[:],
+		QuorumNumbers:           quorumNumbers,
+		QuorumSignedPercentages: quorumResults,
 	}, nil
 }
 
