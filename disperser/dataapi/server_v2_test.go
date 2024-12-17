@@ -174,9 +174,9 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	r.GET("/v2/blob/:blob_key", testDataApiServerV2.FetchBlobHandler)
+	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/blob/"+blobKey.Hex(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex(), nil)
 	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer res.Body.Close()
@@ -232,9 +232,9 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
 
-	r.GET("/v2/batch/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
+	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/batch/"+batchHeaderHash, nil)
+	req := httptest.NewRequest(http.MethodGet, "/v2/batches/"+batchHeaderHash, nil)
 	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer res.Body.Close()
