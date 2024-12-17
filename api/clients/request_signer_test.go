@@ -158,9 +158,16 @@ func ParseSignature(
 		return nil, fmt.Errorf("trailing data after signature (%d bytes)", len(rest))
 	}
 
+	rBytes := si.R.Bytes()
+	sBytes := si.S.Bytes()
+	rPadded := make([]byte, 32)
+	sPadded := make([]byte, 32)
+	copy(rPadded[32-len(rBytes):], rBytes)
+	copy(sPadded[32-len(sBytes):], sBytes)
+
 	result := make([]byte, 65)
-	copy(result[0:32], si.R.Bytes())
-	copy(result[32:64], si.S.Bytes())
+	copy(result[0:32], rPadded)
+	copy(result[32:64], sPadded)
 
 	recoveryID, err := ComputeRecoveryID(hash, si.R, si.S, publicKey)
 	if err != nil {
