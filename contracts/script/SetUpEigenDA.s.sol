@@ -130,21 +130,10 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         uint256 clientPrivateKey = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
 
-        _allocate(
-            IERC20(address(0)),
-            // Inline array creation for clients
-            toArray(vm.addr(clientPrivateKey)),
-            // Inline array creation for amounts
-            toArray(5 ether)
-        );
-
-    
         vm.startBroadcast();
         _allocate(
             IERC20(address(0)),
-            // Inline array creation for clients
             toArray(vm.addr(clientPrivateKey)),
-            // Inline array creation for amounts
             toArray(5 ether)
         );
 
@@ -192,7 +181,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
 
-        // Register Reservations for client 0 and 1 as the eigenDACommunityMultisig
+        // Register Reservations for client as the eigenDACommunityMultisig
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
             symbolsPerSecond: 452198,
             startTimestamp: uint64(block.timestamp),
@@ -200,20 +189,13 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        // address reservedClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
         address reservedClient = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
-        // vm.prank(msg.sender);
         vm.broadcast(msg.sender);
         paymentVault.setReservation(reservedClient, reservation);
 
-        // vm.broadcast(clientPrivateKey);
-        // address reservedClient1 = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
-        // paymentVault.setReservation(reservedClient1, reservation);
-
-        // Deposit OnDemand for client 0 and 2
+        // Deposit OnDemand 
         vm.broadcast(clientPrivateKey);
         address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
-        // vm.prank(ondemandClient);
         paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
 
         // Deposit stakers into EigenLayer and delegate to operators
