@@ -106,6 +106,14 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.Expiry, uint64(now.Unix()))
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
+
+	// Try dispersing the same blob
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: blobHeaderProto,
+	})
+	assert.Nil(t, reply)
+	assert.ErrorContains(t, err, "blob already exists")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
