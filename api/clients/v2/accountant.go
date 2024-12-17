@@ -39,6 +39,13 @@ type BinRecord struct {
 	Usage uint64
 }
 
+func DummyBinRecord() *BinRecord {
+	return &BinRecord{
+		Index: 0,
+		Usage: 0,
+	}
+}
+
 func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
 	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
 	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
@@ -159,51 +166,55 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
 		return fmt.Errorf("payment global params cannot be nil")
-	} else if paymentState.GetOnchainCumulativePayment() == nil {
-		return fmt.Errorf("onchain cumulative payment cannot be nil")
-	} else if paymentState.GetCumulativePayment() == nil {
-		return fmt.Errorf("cumulative payment cannot be nil")
-	} else if paymentState.GetReservation() == nil {
-		return fmt.Errorf("reservation cannot be nil")
-	} else if paymentState.GetReservation().GetQuorumNumbers() == nil {
-		return fmt.Errorf("reservation quorum numbers cannot be nil")
-	} else if paymentState.GetReservation().GetQuorumSplits() == nil {
-		return fmt.Errorf("reservation quorum split cannot be nil")
-	} else if paymentState.GetBinRecords() == nil {
-		return fmt.Errorf("bin records cannot be nil")
 	}
 
-	a.minNumSymbols = uint32(paymentState.PaymentGlobalParams.MinNumSymbols)
-	a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.OnchainCumulativePayment)
-	a.cumulativePayment = new(big.Int).SetBytes(paymentState.CumulativePayment)
-	a.pricePerSymbol = uint32(paymentState.PaymentGlobalParams.PricePerSymbol)
+	a.minNumSymbols = uint32(paymentState.GetPaymentGlobalParams().GetMinNumSymbols())
+	a.pricePerSymbol = uint32(paymentState.GetPaymentGlobalParams().GetPricePerSymbol())
+	a.reservationWindow = uint32(paymentState.GetPaymentGlobalParams().GetReservationWindow())
 
-	a.reservation.SymbolsPerSecond = uint64(paymentState.PaymentGlobalParams.GlobalSymbolsPerSecond)
-	a.reservation.StartTimestamp = uint64(paymentState.Reservation.StartTimestamp)
-	a.reservation.EndTimestamp = uint64(paymentState.Reservation.EndTimestamp)
-	a.reservationWindow = uint32(paymentState.PaymentGlobalParams.ReservationWindow)
-
-	quorumNumbers := make([]uint8, len(paymentState.Reservation.QuorumNumbers))
-	for i, quorum := range paymentState.Reservation.QuorumNumbers {
-		quorumNumbers[i] = uint8(quorum)
+	if paymentState.GetOnchainCumulativePayment() == nil {
+		a.onDemand.CumulativePayment = big.NewInt(0)
+	} else {
+		a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.GetOnchainCumulativePayment())
 	}
-	a.reservation.QuorumNumbers = quorumNumbers
 
-	quorumSplits := make([]uint8, len(paymentState.Reservation.QuorumSplits))
-	for i, quorum := range paymentState.Reservation.QuorumSplits {
-		quorumSplits[i] = uint8(quorum)
+	if paymentState.GetCumulativePayment() == nil {
+		a.cumulativePayment = big.NewInt(0)
+	} else {
+		a.cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
-	a.reservation.QuorumSplits = quorumSplits
 
-	binRecords := make([]BinRecord, len(paymentState.BinRecords))
-	for i, record := range paymentState.BinRecords {
-		binRecords[i] = BinRecord{
-			Index: record.Index,
-			Usage: record.Usage,
+	if paymentState.GetReservation() == nil {
+		a.reservation = core.DummyReservedPayment()
+	} else {
+		a.reservation.SymbolsPerSecond = uint64(paymentState.GetReservation().GetSymbolsPerSecond())
+		a.reservation.StartTimestamp = uint64(paymentState.GetReservation().GetStartTimestamp())
+		a.reservation.EndTimestamp = uint64(paymentState.GetReservation().GetEndTimestamp())
+		quorumNumbers := make([]uint8, len(paymentState.GetReservation().GetQuorumNumbers()))
+		for i, quorum := range paymentState.GetReservation().GetQuorumNumbers() {
+			quorumNumbers[i] = uint8(quorum)
+		}
+		a.reservation.QuorumNumbers = quorumNumbers
+
+		quorumSplits := make([]uint8, len(paymentState.GetReservation().GetQuorumSplits()))
+		for i, quorum := range paymentState.GetReservation().GetQuorumSplits() {
+			quorumSplits[i] = uint8(quorum)
+		}
+		a.reservation.QuorumSplits = quorumSplits
+	}
+
+	binRecords := make([]BinRecord, len(paymentState.GetBinRecords()))
+	for i, record := range paymentState.GetBinRecords() {
+		if record == nil {
+			binRecords[i] = *DummyBinRecord()
+		} else {
+			binRecords[i] = BinRecord{
+				Index: record.Index,
+				Usage: record.Usage,
+			}
 		}
 	}
 	a.binRecords = binRecords
-
 	return nil
 }
 

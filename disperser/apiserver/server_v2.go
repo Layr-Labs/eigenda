@@ -254,20 +254,22 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get active reservation")
+		s.logger.Debug("failed to get reservation records, use placeholders", err, accountID)
 	}
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get largest cumulative payment")
+		s.logger.Debug("failed to get largest cumulative payment, use zero value", err)
 	}
 	// on-Chain account state
 	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get active reservation")
+		s.logger.Debug("failed to get onchain reservation, use zero values", err)
+		reservation = core.DummyReservedPayment()
 	}
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		return nil, api.NewErrorNotFound("failed to get on-demand payment")
+		s.logger.Debug("failed to get ondemand payment, use zero value", err)
+		onDemandPayment = core.DummyOnDemandPayment()
 	}
 
 	paymentGlobalParams := pb.PaymentGlobalParams{
