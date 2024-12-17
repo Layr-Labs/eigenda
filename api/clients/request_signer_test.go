@@ -92,7 +92,7 @@ func ParsePublicKey(keyBytes []byte) (*ecdsa.PublicKey, error) {
 
 	rightAlignedKey := cryptobyte.String(pki.PublicKey.RightAlign())
 
-	x, y := elliptic.Unmarshal(crypto.S256(), rightAlignedKey) // TODO deprecated method
+	x, y := elliptic.Unmarshal(crypto.S256(), rightAlignedKey)
 	if x == nil {
 		return nil, errors.New("x509: failed to unmarshal elliptic curve point")
 	}
@@ -115,13 +115,20 @@ func ComputeRecoveryID(hash []byte, r, s *big.Int, pubKey *ecdsa.PublicKey) (int
 	sBytes := s.Bytes()
 
 	// Ensure R and S are 32 bytes each
+	fmt.Printf("         len of rBytes: %d, %x\n", len(rBytes), rBytes) // TODO remove
+	fmt.Printf("         len of sBytes: %d, %x\n", len(sBytes), sBytes) // TODO remove
+
+	// TODO necessary?
 	rPadded := make([]byte, 32)
 	sPadded := make([]byte, 32)
 	copy(rPadded[32-len(rBytes):], rBytes)
 	copy(sPadded[32-len(sBytes):], sBytes)
 
-	for v := 0; v < 2; v++ {
-		sig := append(rPadded, append(sPadded, byte(v))...)
+	for v := 0; v < 4; v++ {
+		sig := make([]byte, 65)
+		copy(sig[0:32], rPadded)
+		copy(sig[32:64], sPadded)
+		sig[64] = byte(v)
 		recoveredPubKey, err := secp256k1.RecoverPubkey(hash, sig)
 		if err != nil {
 			return -1, fmt.Errorf("failed to recover public key: %w", err)
@@ -204,6 +211,9 @@ func TestRequestSigning(t *testing.T) {
 
 			signer := NewRequestSigner(region, localstackHost, keyID)
 
+			fmt.Printf("     >public key: %x\n", key) // TODO remove
+
+			// Test a valid signature.
 			signature, err := signer.SignStoreChunksRequest(context.Background(), request)
 			require.NoError(t, err)
 
@@ -215,7 +225,6 @@ func TestRequestSigning(t *testing.T) {
 
 			require.Nil(t, request.Signature)
 			request.Signature = signature
-
 			err = auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.NoError(t, err)
 
