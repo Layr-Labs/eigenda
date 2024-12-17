@@ -2,121 +2,16 @@ package auth
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-	"golang.org/x/crypto/cryptobyte"
 	"golang.org/x/crypto/sha3"
 	"hash"
-	"math/big"
 )
-
-type signatureInfo struct {
-	R *big.Int
-	S *big.Int
-}
-
-// AddRecoveryID computes the recovery ID for a given signature and public key and adds it to the signature.
-func addRecoveryID(hash []byte, pubKey *ecdsa.PublicKey, partialSignature []byte) error {
-	for v := 0; v < 4; v++ {
-		partialSignature[64] = byte(v)
-		recoveredPubKey, err := secp256k1.RecoverPubkey(hash, partialSignature)
-		if err != nil {
-			return fmt.Errorf("failed to recover public key: %w", err)
-		}
-
-		x, y := elliptic.Unmarshal(secp256k1.S256(), recoveredPubKey)
-		if x.Cmp(pubKey.X) == 0 && y.Cmp(pubKey.Y) == 0 {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("no valid recovery ID found")
-}
-
-// pad32 pads a byte slice to 32 bytes, inserting zeros at the beginning if necessary.
-func pad32(bytes []byte) []byte {
-	if len(bytes) == 32 {
-		return bytes
-	}
-
-	padded := make([]byte, 32)
-	copy(padded[32-len(bytes):], bytes)
-	return padded
-}
-
-// ParseKMSSignature parses a signature (KeySpecEccSecgP256k1) in the format returned by amazon KMS into the
-// 65-byte format used by Ethereum.
-func ParseKMSSignature(
-	publicKey *ecdsa.PublicKey,
-	hash []byte,
-	signatureBytes []byte) ([]byte, error) {
-
-	si := signatureInfo{}
-	rest, err := asn1.Unmarshal(signatureBytes, &si)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal signature: %w", err)
-	}
-	if len(rest) > 0 {
-		return nil, fmt.Errorf("trailing data after signature (%d bytes)", len(rest))
-	}
-
-	rBytes := pad32(si.R.Bytes())
-	sBytes := pad32(si.S.Bytes())
-
-	result := make([]byte, 65)
-	copy(result[0:32], rBytes)
-	copy(result[32:64], sBytes)
-
-	err = addRecoveryID(hash, publicKey, result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compute recovery ID: %w", err)
-	}
-
-	return result, nil
-}
-
-type publicKeyInfo struct {
-	Raw       asn1.RawContent
-	Algorithm pkix.AlgorithmIdentifier
-	PublicKey asn1.BitString
-}
-
-// ParseKMSPublicKey parses a public key (KeySpecEccSecgP256k1) in the format returned by amazon KMS
-// into an ecdsa.PublicKey.
-func ParseKMSPublicKey(keyBytes []byte) (*ecdsa.PublicKey, error) {
-	pki := publicKeyInfo{}
-	rest, err := asn1.Unmarshal(keyBytes, &pki)
-
-	if err != nil {
-		return nil, err
-	}
-	if len(rest) > 0 {
-		return nil, fmt.Errorf("trailing data after public key (%d bytes)", len(rest))
-	}
-
-	rightAlignedKey := cryptobyte.String(pki.PublicKey.RightAlign())
-
-	x, y := elliptic.Unmarshal(crypto.S256(), rightAlignedKey)
-	if x == nil {
-		return nil, errors.New("x509: failed to unmarshal elliptic curve point")
-	}
-
-	return &ecdsa.PublicKey{
-		Curve: crypto.S256(),
-		X:     x,
-		Y:     y,
-	}, nil
-}
 
 // SignStoreChunksRequest signs the given StoreChunksRequest with the given private key. Does not
 // write the signature into the request.

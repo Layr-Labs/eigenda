@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/auth"
@@ -83,12 +84,7 @@ func TestRequestSigning(t *testing.T) {
 
 		keyID := *createKeyOutput.KeyMetadata.KeyId
 
-		getPublicKeyOutput, err := keyManager.GetPublicKey(context.Background(), &kms.GetPublicKeyInput{
-			KeyId: aws.String(keyID),
-		})
-		require.NoError(t, err)
-
-		key, err := auth.ParseKMSPublicKey(getPublicKeyOutput.PublicKey)
+		key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
 		require.NoError(t, err)
 
 		publicAddress := crypto.PubkeyToAddress(*key)

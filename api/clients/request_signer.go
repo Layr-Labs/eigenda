@@ -5,10 +5,10 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 )
 
 // RequestSigner encapsulates the logic for signing GetChunks requests.
@@ -38,21 +38,14 @@ func NewRequestSigner(
 		BaseEndpoint: aws.String(endpoint),
 	})
 
-	getPublicKeyOutput, err := keyManager.GetPublicKey(ctx, &kms.GetPublicKeyInput{
-		KeyId: aws.String(keyID),
-	})
+	key, err := common.LoadPublicKeyKMS(ctx, keyManager, keyID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get public key: %w", err)
-	}
-
-	publicKey, err := auth.ParseKMSPublicKey(getPublicKeyOutput.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key: %w", err)
+		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
 
 	return &requestSigner{
 		keyID:      keyID,
-		publicKey:  publicKey,
+		publicKey:  key,
 		keyManager: keyManager,
 	}, nil
 }
@@ -60,22 +53,9 @@ func NewRequestSigner(
 func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
 	hash := auth.HashStoreChunksRequest(request)
 
-	signOutput, err := s.keyManager.Sign(
-		ctx,
-		&kms.SignInput{
-			KeyId:            aws.String(s.keyID),
-			Message:          hash,
-			SigningAlgorithm: types.SigningAlgorithmSpecEcdsaSha256,
-			MessageType:      types.MessageTypeDigest,
-		})
-
+	signature, err := common.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
-	}
-
-	signature, err := auth.ParseKMSSignature(s.publicKey, hash, signOutput.Signature)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse signature: %w", err)
 	}
 
 	return signature, nil
