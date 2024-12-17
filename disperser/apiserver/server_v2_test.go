@@ -387,7 +387,8 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.Equal(t, verificationInfo0.InclusionProof, reply.GetBlobVerificationInfo().GetInclusionProof())
 	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().BatchRoot)
 	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().ReferenceBlockNumber)
-	attestationProto := attestation.ToProtobuf()
+	attestationProto, err := attestation.ToProtobuf()
+	require.NoError(t, err)
 	require.Equal(t, attestationProto, reply.GetSignedBatch().GetAttestation())
 }
 
