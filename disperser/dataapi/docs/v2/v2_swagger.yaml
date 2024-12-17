@@ -1,0 +1,308 @@
+basePath: /api/v2
+definitions:
+  big.Int:
+    type: object
+  core.PaymentMetadata:
+    properties:
+      account_id:
+        description: AccountID is the ETH account address for the payer
+        type: string
+      cumulative_payment:
+        allOf:
+        - $ref: '#/definitions/big.Int'
+        description: |-
+          TODO: we are thinking the contract can use uint128 for cumulative payment,
+          but the definition on v2 uses uint64. Double check with team.
+      reservation_period:
+        description: ReservationPeriod represents the range of time at which the dispersal
+          is made
+        type: integer
+      salt:
+        description: Allow same blob to be dispersed multiple times within the same
+          reservation period
+        type: integer
+    type: object
+  encoding.BlobCommitments:
+    properties:
+      commitment:
+        $ref: '#/definitions/encoding.G1Commitment'
+      length:
+        type: integer
+      length_commitment:
+        $ref: '#/definitions/encoding.G2Commitment'
+      length_proof:
+        $ref: '#/definitions/encoding.LengthProof'
+    type: object
+  encoding.G1Commitment:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+      "y":
+        items:
+          type: integer
+        type: array
+    type: object
+  encoding.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  encoding.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
+    properties:
+      blobCommitments:
+        $ref: '#/definitions/encoding.BlobCommitments'
+      blobVersion:
+        type: integer
+      paymentMetadata:
+        allOf:
+        - $ref: '#/definitions/core.PaymentMetadata'
+        description: PaymentMetadata contains the payment information for the blob
+      quorumNumbers:
+        description: QuorumNumbers contains the quorums the blob is dispersed to
+        items:
+          type: integer
+        type: array
+      signature:
+        description: Signature is the signature of the blob header by the account
+          ID
+        items:
+          type: integer
+        type: array
+    type: object
+  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
+    properties:
+      a0:
+        items:
+          type: integer
+        type: array
+      a1:
+        items:
+          type: integer
+        type: array
+    type: object
+  semver.SemverMetrics:
+    properties:
+      count:
+        type: integer
+      operators:
+        items:
+          type: string
+        type: array
+      semver:
+        type: string
+      stake_percentage:
+        additionalProperties:
+          type: number
+        type: object
+    type: object
+  v2.BlobResponse:
+    properties:
+      blob_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
+      blob_size_bytes:
+        type: integer
+      dispersed_at:
+        type: integer
+      status:
+        type: string
+    type: object
+  v2.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  v2.OperatorPortCheckResponse:
+    properties:
+      dispersal_online:
+        type: boolean
+      dispersal_socket:
+        type: string
+      operator_id:
+        type: string
+      retrieval_online:
+        type: boolean
+      retrieval_socket:
+        type: string
+    type: object
+  v2.OperatorStake:
+    properties:
+      operator_id:
+        type: string
+      quorum_id:
+        type: string
+      rank:
+        type: integer
+      stake_percentage:
+        type: number
+    type: object
+  v2.OperatorsStakeResponse:
+    properties:
+      stake_ranked_operators:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/v2.OperatorStake'
+          type: array
+        type: object
+    type: object
+  v2.SemverReportResponse:
+    properties:
+      semver:
+        additionalProperties:
+          $ref: '#/definitions/semver.SemverMetrics'
+        type: object
+    type: object
+info:
+  contact: {}
+  description: This is the EigenDA Data Access API V2 server.
+  title: EigenDA Data Access API V2
+  version: "2.0"
+paths:
+  /batch/{batch_header_hash}:
+    get:
+      parameters:
+      - description: Batch header hash in hex string
+        in: path
+        name: batch_header_hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch batch by the batch header hash
+      tags:
+      - Feed
+  /blob/{blob_key}:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob metadata by blob key
+      tags:
+      - Feed
+  /operators/nodeinfo:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.SemverReportResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Active operator semver
+      tags:
+      - Operators
+  /operators/reachability:
+    get:
+      parameters:
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorPortCheckResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Operator node reachability check
+      tags:
+      - Operators
+  /operators/stake:
+    get:
+      parameters:
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorsStakeResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Operator stake distribution query
+      tags:
+      - Operators
+schemes:
+- https
+- http
+swagger: "2.0"

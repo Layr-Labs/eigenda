@@ -1,25 +1,6 @@
+basePath: /api/v1
 definitions:
   big.Int:
-    type: object
-  core.PaymentMetadata:
-    properties:
-      account_id:
-        description: AccountID is the ETH account address for the payer
-        type: string
-      cumulative_payment:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
-      reservation_period:
-        description: ReservationPeriod represents the range of time at which the dispersal
-          is made
-        type: integer
-      salt:
-        description: Allow same blob to be dispersed multiple times within the same
-          reservation period
-        type: integer
     type: object
   core.SecurityParam:
     properties:
@@ -42,7 +23,85 @@ definitions:
           data was posted to the DA node.
         type: integer
     type: object
-  dataapi.BlobMetadataResponse:
+  encoding.BlobCommitments:
+    properties:
+      commitment:
+        $ref: '#/definitions/encoding.G1Commitment'
+      length:
+        type: integer
+      length_commitment:
+        $ref: '#/definitions/encoding.G2Commitment'
+      length_proof:
+        $ref: '#/definitions/encoding.LengthProof'
+    type: object
+  encoding.G1Commitment:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+      "y":
+        items:
+          type: integer
+        type: array
+    type: object
+  encoding.G2Commitment:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  encoding.LengthProof:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
+  github_com_Layr-Labs_eigenda_disperser.BlobStatus:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    type: integer
+    x-enum-varnames:
+    - Processing
+    - Confirmed
+    - Failed
+    - Finalized
+    - InsufficientSignatures
+    - Dispersing
+  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
+    properties:
+      a0:
+        items:
+          type: integer
+        type: array
+      a1:
+        items:
+          type: integer
+        type: array
+    type: object
+  semver.SemverMetrics:
+    properties:
+      count:
+        type: integer
+      operators:
+        items:
+          type: string
+        type: array
+      semver:
+        type: string
+      stake_percentage:
+        additionalProperties:
+          type: number
+        type: object
+    type: object
+  v1.BlobMetadataResponse:
     properties:
       batch_header_hash:
         type: string
@@ -77,62 +136,54 @@ definitions:
       signatory_record_hash:
         type: string
     type: object
-  dataapi.BlobResponse:
-    properties:
-      blob_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      blob_size_bytes:
-        type: integer
-      dispersed_at:
-        type: integer
-      status:
-        type: string
-    type: object
-  dataapi.BlobsResponse:
+  v1.BlobsResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/dataapi.BlobMetadataResponse'
+          $ref: '#/definitions/v1.BlobMetadataResponse'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
-  dataapi.ErrorResponse:
+  v1.ErrorResponse:
     properties:
       error:
         type: string
     type: object
-  dataapi.Meta:
+  v1.Meta:
     properties:
       next_token:
         type: string
       size:
         type: integer
     type: object
-  dataapi.Metric:
+  v1.Metric:
     properties:
       cost_in_gas:
         type: number
       throughput:
         type: number
       total_stake:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
-          frontend is updated.'
+        $ref: '#/definitions/big.Int'
       total_stake_per_quorum:
         additionalProperties:
           $ref: '#/definitions/big.Int'
         type: object
     type: object
-  dataapi.NonSigner:
+  v1.NonSigner:
     properties:
-      count:
-        type: integer
-      operatorId:
+      error_rate:
+        type: number
+      operator_address:
         type: string
+      operator_id:
+        type: string
+      quorum_id:
+        type: integer
+      total_batches:
+        type: integer
     type: object
-  dataapi.OperatorNonsigningPercentageMetrics:
+  v1.OperatorNonsigningPercentageMetrics:
     properties:
       operator_address:
         type: string
@@ -149,7 +200,7 @@ definitions:
       total_unsigned_batches:
         type: integer
     type: object
-  dataapi.OperatorPortCheckResponse:
+  v1.OperatorPortCheckResponse:
     properties:
       dispersal_online:
         type: boolean
@@ -162,7 +213,7 @@ definitions:
       retrieval_socket:
         type: string
     type: object
-  dataapi.OperatorStake:
+  v1.OperatorStake:
     properties:
       operator_id:
         type: string
@@ -173,25 +224,25 @@ definitions:
       stake_percentage:
         type: number
     type: object
-  dataapi.OperatorsNonsigningPercentage:
+  v1.OperatorsNonsigningPercentage:
     properties:
       data:
         items:
-          $ref: '#/definitions/dataapi.OperatorNonsigningPercentageMetrics'
+          $ref: '#/definitions/v1.OperatorNonsigningPercentageMetrics'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
-  dataapi.OperatorsStakeResponse:
+  v1.OperatorsStakeResponse:
     properties:
       stake_ranked_operators:
         additionalProperties:
           items:
-            $ref: '#/definitions/dataapi.OperatorStake'
+            $ref: '#/definitions/v1.OperatorStake'
           type: array
         type: object
     type: object
-  dataapi.QueriedOperatorEjections:
+  v1.QueriedOperatorEjections:
     properties:
       block_number:
         type: integer
@@ -208,14 +259,14 @@ definitions:
       transaction_hash:
         type: string
     type: object
-  dataapi.QueriedOperatorEjectionsResponse:
+  v1.QueriedOperatorEjectionsResponse:
     properties:
       ejections:
         items:
-          $ref: '#/definitions/dataapi.QueriedOperatorEjections'
+          $ref: '#/definitions/v1.QueriedOperatorEjections'
         type: array
     type: object
-  dataapi.QueriedStateOperatorMetadata:
+  v1.QueriedStateOperatorMetadata:
     properties:
       block_number:
         type: integer
@@ -228,199 +279,51 @@ definitions:
       socket:
         type: string
     type: object
-  dataapi.QueriedStateOperatorsResponse:
+  v1.QueriedStateOperatorsResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/dataapi.QueriedStateOperatorMetadata'
+          $ref: '#/definitions/v1.QueriedStateOperatorMetadata'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
-  dataapi.SemverReportResponse:
+  v1.SemverReportResponse:
     properties:
       semver:
         additionalProperties:
           $ref: '#/definitions/semver.SemverMetrics'
         type: object
     type: object
-  dataapi.ServiceAvailability:
+  v1.ServiceAvailability:
     properties:
       service_name:
         type: string
       service_status:
         type: string
     type: object
-  dataapi.ServiceAvailabilityResponse:
+  v1.ServiceAvailabilityResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/dataapi.ServiceAvailability'
+          $ref: '#/definitions/v1.ServiceAvailability'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
-  dataapi.Throughput:
+  v1.Throughput:
     properties:
       throughput:
         type: number
       timestamp:
         type: integer
     type: object
-  encoding.BlobCommitments:
-    properties:
-      commitment:
-        $ref: '#/definitions/encoding.G1Commitment'
-      length:
-        type: integer
-      length_commitment:
-        $ref: '#/definitions/encoding.G2Commitment'
-      length_proof:
-        $ref: '#/definitions/encoding.LengthProof'
-    type: object
-  encoding.G1Commitment:
-    properties:
-      x:
-        items:
-          type: integer
-        type: array
-    type: object
-  encoding.G2Commitment:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  encoding.LengthProof:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
-    properties:
-      blobCommitments:
-        $ref: '#/definitions/encoding.BlobCommitments'
-      blobVersion:
-        type: integer
-      paymentMetadata:
-        allOf:
-        - $ref: '#/definitions/core.PaymentMetadata'
-        description: PaymentMetadata contains the payment information for the blob
-      quorumNumbers:
-        description: QuorumNumbers contains the quorums the blob is dispersed to
-        items:
-          type: integer
-        type: array
-      signature:
-        description: Signature is the signature of the blob header by the account
-          ID
-        items:
-          type: integer
-        type: array
-    type: object
-  github_com_Layr-Labs_eigenda_disperser.BlobStatus:
-    enum:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    type: integer
-    x-enum-varnames:
-    - Processing
-    - Confirmed
-    - Failed
-    - Finalized
-    - InsufficientSignatures
-    - Dispersing
-  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
-    properties:
-      a0:
-        items:
-          type: integer
-        type: array
-    type: object
-  semver.SemverMetrics:
-    properties:
-      count:
-        type: integer
-      operators:
-        items:
-          type: string
-        type: array
-      semver:
-        type: string
-      stake_percentage:
-        additionalProperties:
-          type: number
-        type: object
-    type: object
 info:
   contact: {}
-  description: This is the EigenDA Data Access API server.
-  title: EigenDA Data Access API
-  version: "1"
+  description: This is the EigenDA Data Access API V1 server.
+  title: EigenDA Data Access API V1
+  version: "1.0"
 paths:
-  /batches/{batch_header_hash}:
-    get:
-      parameters:
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch batch by the batch header hash
-      tags:
-      - Feed
-  /blobs/{blob_key}:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob metadata by blob key
-      tags:
-      - Feed
   /feed/batches/{batch_header_hash}/blobs:
     get:
       parameters:
@@ -443,19 +346,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobsResponse'
+            $ref: '#/definitions/v1.BlobsResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch blob metadata by batch header hash
       tags:
       - Feed
@@ -472,19 +375,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobsResponse'
+            $ref: '#/definitions/v1.BlobsResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch blobs metadata list
       tags:
       - Feed
@@ -502,19 +405,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.BlobMetadataResponse'
+            $ref: '#/definitions/v1.BlobMetadataResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch blob metadata by blob key
       tags:
       - Feed
@@ -539,19 +442,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.Metric'
+            $ref: '#/definitions/v1.Metric'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch metrics
       tags:
       - Metrics
@@ -563,22 +466,22 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+            $ref: '#/definitions/v1.ServiceAvailabilityResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of EigenDA batcher.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Get status of EigenDA batcher
       tags:
-      - Batcher Availability
+      - ServiceAvailability
   /metrics/churner-service-availability:
     get:
       produces:
@@ -587,22 +490,22 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+            $ref: '#/definitions/v1.ServiceAvailabilityResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of EigenDA churner service.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Get status of EigenDA churner service
       tags:
-      - Churner ServiceAvailability
+      - ServiceAvailability
   /metrics/disperser-service-availability:
     get:
       produces:
@@ -611,20 +514,20 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.ServiceAvailabilityResponse'
+            $ref: '#/definitions/v1.ServiceAvailabilityResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Get status of EigenDA Disperser service.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Get status of EigenDA Disperser service
       tags:
       - ServiceAvailability
   /metrics/non-signers:
@@ -641,20 +544,20 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dataapi.NonSigner'
+              $ref: '#/definitions/v1.NonSigner'
             type: array
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch non signers
       tags:
       - Metrics
@@ -681,19 +584,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.OperatorsNonsigningPercentage'
+            $ref: '#/definitions/v1.OperatorsNonsigningPercentage'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch operators non signing percentage
       tags:
       - Metrics
@@ -715,20 +618,20 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/dataapi.Throughput'
+              $ref: '#/definitions/v1.Throughput'
             type: array
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Fetch throughput time series
       tags:
       - Metrics
@@ -740,21 +643,20 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.QueriedStateOperatorsResponse'
+            $ref: '#/definitions/v1.QueriedStateOperatorsResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch list of operators that have been deregistered for days. Days
-        is a query parameter with a default value of 14 and max value of 30.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Fetch list of operators that have been deregistered for days
       tags:
       - OperatorsInfo
   /operators-info/operator-ejections:
@@ -782,20 +684,20 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.QueriedOperatorEjectionsResponse'
+            $ref: '#/definitions/v1.QueriedOperatorEjectionsResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch list of operator ejections over last N days.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Fetch list of operator ejections over last N days
       tags:
       - OperatorsInfo
   /operators-info/operators-stake:
@@ -812,19 +714,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.OperatorsStakeResponse'
+            $ref: '#/definitions/v1.OperatorsStakeResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Operator stake distribution query
       tags:
       - OperatorsStake
@@ -842,19 +744,19 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
+            $ref: '#/definitions/v1.OperatorPortCheckResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Operator node reachability port check
       tags:
       - OperatorsInfo
@@ -866,21 +768,20 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.QueriedStateOperatorsResponse'
+            $ref: '#/definitions/v1.QueriedStateOperatorsResponse'
         "400":
           description: 'error: Bad request'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "404":
           description: 'error: Not found'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch list of operators that have been registered for days. Days is
-        a query parameter with a default value of 14 and max value of 30.
+            $ref: '#/definitions/v1.ErrorResponse'
+      summary: Fetch list of operators that have been registered for days
       tags:
       - OperatorsInfo
   /operators-info/semver-scan:
@@ -891,88 +792,14 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/dataapi.SemverReportResponse'
+            $ref: '#/definitions/v1.SemverReportResponse'
         "500":
           description: 'error: Server error'
           schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
+            $ref: '#/definitions/v1.ErrorResponse'
       summary: Active operator semver scan
       tags:
       - OperatorsInfo
-  /operators/nodeinfo:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.SemverReportResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Active operator semver
-      tags:
-      - OperatorsNodeInfo
-  /operators/reachability:
-    get:
-      parameters:
-      - description: 'Operator ID in hex string [default: all operators if unspecified]'
-        in: query
-        name: operator_id
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.OperatorPortCheckResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Operator node reachability check
-      tags:
-      - OperatorsReachability
-  /operators/stake:
-    get:
-      parameters:
-      - description: 'Operator ID in hex string [default: all operators if unspecified]'
-        in: query
-        name: operator_id
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.OperatorsStakeResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Operator stake distribution query
-      tags:
-      - OperatorsStake
 schemes:
 - https
 - http
