@@ -23,7 +23,7 @@ import (
 func VerifyBlobStatusReply(
 	kzgVerifier *verifier.Verifier,
 	reply *disperserpb.BlobStatusReply,
-	// these bytes must represent the blob in coefficient form (i.e. IFFTed)
+// these bytes must represent the blob in coefficient form (i.e. IFFTed)
 	blobBytes []byte) error {
 
 	blobHeader, err := core.BlobHeaderFromProtobuf(reply.BlobVerificationInfo.BlobCertificate.BlobHeader)
@@ -120,20 +120,19 @@ func GenerateBlobCommitment(
 }
 
 // TODO: I don't think that any of the checks done in `verifySecurityParams` from the proxy code are necessary in v2. confirm this.
-// TODO: look at bug report https://eigenlabs.slack.com/archives/C07A5GD76AK/p1734118139046819
 
 // VerifyMerkleProof verifies the blob batch inclusion proof against the claimed batch root
 func VerifyMerkleProof(
-	// the key of the blob, which functions as the leaf in the batch merkle tree
+// the key of the blob, which functions as the leaf in the batch merkle tree
 	blobKey *core.BlobKey,
-	// the inclusion proof, which contains the sibling hashes necessary to compute the root hash starting at the leaf
+// the inclusion proof, which contains the sibling hashes necessary to compute the root hash starting at the leaf
 	inclusionProof []byte,
-	// the claimed merkle root hash, which must be verified
+// the claimed merkle root hash, which must be verified
 	claimedRoot []byte,
-	// the index of the blob in the batch. this informs whether the leaf being verified is a left or right child
+// the index of the blob in the batch. this informs whether the leaf being verified is a left or right child
 	blobIndex uint32) error {
 
-	generatedRoot, err := GenerateRootHash(inclusionProof, blobKey, uint64(blobIndex))
+	generatedRoot, err := ProcessInclusionProof(inclusionProof, blobKey, uint64(blobIndex))
 	if err != nil {
 		return err
 	}
@@ -146,8 +145,13 @@ func VerifyMerkleProof(
 	return nil
 }
 
-// GenerateRootHash computes the root hash, using the leaf and relevant inclusion proof
-func GenerateRootHash(proof []byte, blobKey *core.BlobKey, index uint64) (common.Hash, error) {
+// ProcessInclusionProof computes the root hash, using the leaf and relevant inclusion proof
+//
+// This logic is implemented here, rather than using merkletree.VerifyProofUsing, in order to exactly mirror
+// https://github.com/Layr-Labs/eigenlayer-contracts/blob/dev/src/contracts/libraries/Merkle.sol#L49-L76, which is the
+// verification method that executes on chain. It is important that the offchain verification result exactly matches
+// the onchain result
+func ProcessInclusionProof(proof []byte, blobKey *core.BlobKey, index uint64) (common.Hash, error) {
 	if len(proof)%32 != 0 {
 		return common.Hash{}, errors.New("proof length should be a multiple of 32 bytes or 256 bits")
 	}
