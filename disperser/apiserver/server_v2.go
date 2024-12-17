@@ -255,18 +255,17 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
-		s.logger.Debug("failed to get reservation records, use placeholders", err, accountID)
+		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
-		s.logger.Debug("failed to get largest cumulative payment, use zero value", err)
+		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 	}
 	// on-Chain account state
-	pbReservation := &pb.Reservation{}
+	var pbReservation *pb.Reservation
 	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
-		s.logger.Debug("failed to get onchain reservation, use zero values", err)
-		pbReservation = nil
+		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
 		quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
 		for i, v := range reservation.QuorumNumbers {
@@ -289,8 +288,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	var onchainCumulativePayment *big.Int
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		s.logger.Debug("failed to get ondemand payment, use zero value", err)
-		onchainCumulativePayment = nil
+		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
 	} else {
 		onchainCumulativePayment = onDemandPayment.CumulativePayment
 	}
