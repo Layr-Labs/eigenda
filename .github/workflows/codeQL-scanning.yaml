@@ -35,15 +35,27 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+
+    - name: Install golang
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.21.1'
+
+    - name: Custom build using make
+      run: |
+        go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+        make compile-el
+        
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: go
         
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
