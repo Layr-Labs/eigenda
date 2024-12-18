@@ -12,19 +12,19 @@ import (
 	"google.golang.org/grpc"
 )
 
-type NodeClientV2Config struct {
+type NodeClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
 }
 
-type NodeClientV2 interface {
+type NodeClient interface {
 	StoreChunks(ctx context.Context, certs *corev2.Batch) (*core.Signature, error)
 	Close() error
 }
 
-type nodeClientV2 struct {
-	config        *NodeClientV2Config
+type nodeClient struct {
+	config        *NodeClientConfig
 	initOnce      sync.Once
 	conn          *grpc.ClientConn
 	requestSigner RequestSigner
@@ -32,19 +32,19 @@ type nodeClientV2 struct {
 	dispersalClient nodegrpc.DispersalClient
 }
 
-var _ NodeClientV2 = (*nodeClientV2)(nil)
+var _ NodeClient = (*nodeClient)(nil)
 
-func NewNodeClientV2(config *NodeClientV2Config, requestSigner RequestSigner) (NodeClientV2, error) {
+func NewNodeClient(config *NodeClientConfig, requestSigner RequestSigner) (NodeClient, error) {
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
-	return &nodeClientV2{
+	return &nodeClient{
 		config:        config,
 		requestSigner: requestSigner,
 	}, nil
 }
 
-func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
+func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
 	if len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("no blob certificates in the batch")
 	}
@@ -101,7 +101,7 @@ func (c *nodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*c
 
 // Close closes the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *nodeClientV2) Close() error {
+func (c *nodeClient) Close() error {
 	if c.conn != nil {
 		err := c.conn.Close()
 		c.conn = nil
@@ -111,7 +111,7 @@ func (c *nodeClientV2) Close() error {
 	return nil
 }
 
-func (c *nodeClientV2) initOnceGrpcConnection() error {
+func (c *nodeClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)

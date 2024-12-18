@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -107,14 +106,13 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	request *pb.GetChunksRequest,
 	now time.Time) error {
 
-	if strings.HasPrefix(origin, "127.0.0.1") {
-		// TODO(ian-shim): Remove this block once we have a way to authenticate requests.
-		return nil
-	}
-
 	if a.isAuthenticationStillValid(now, origin) {
 		// We've recently authenticated this client. Do not authenticate again for a while.
 		return nil
+	}
+
+	if request.OperatorId == nil || len(request.OperatorId) != 32 {
+		return errors.New("invalid operator ID")
 	}
 
 	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))

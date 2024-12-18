@@ -60,7 +60,7 @@ func (m *Meterer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
 			case <-ctx.Done():
@@ -264,13 +264,13 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
-	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRateBinInterval())
+	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond() {
+	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil

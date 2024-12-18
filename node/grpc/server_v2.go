@@ -5,22 +5,21 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/node/auth"
-	"google.golang.org/grpc/peer"
-	"runtime"
-	"time"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/core"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
+	"google.golang.org/grpc/peer"
+	"runtime"
+	"time"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -121,6 +120,12 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	if s.node.StoreV2 == nil {
 		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
+
+	// TODO(ian-shim): support remote signer
+	if s.node.KeyPair == nil {
+		return nil, api.NewErrorInternal("missing key pair")
+	}
+
 	batch, err := s.validateStoreChunksRequest(in)
 	if err != nil {
 		return nil, err

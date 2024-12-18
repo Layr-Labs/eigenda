@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 	"crypto/ecdsa"
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/node/auth"
 )

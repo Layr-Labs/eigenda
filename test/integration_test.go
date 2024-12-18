@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"log"
 	"math"
 	"math/big"
@@ -17,6 +16,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -289,7 +290,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 

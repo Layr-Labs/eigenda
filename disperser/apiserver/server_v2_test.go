@@ -387,7 +387,8 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.Equal(t, verificationInfo0.InclusionProof, reply.GetBlobVerificationInfo().GetInclusionProof())
 	require.Equal(t, batchHeader.BatchRoot[:], reply.GetSignedBatch().GetHeader().BatchRoot)
 	require.Equal(t, batchHeader.ReferenceBlockNumber, reply.GetSignedBatch().GetHeader().ReferenceBlockNumber)
-	attestationProto := attestation.ToProtobuf()
+	attestationProto, err := attestation.ToProtobuf()
+	require.NoError(t, err)
 	require.Equal(t, attestationProto, reply.GetSignedBatch().GetAttestation())
 }
 
@@ -443,7 +444,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetReservationWindow", tmock.Anything).Return(uint32(1), nil)
 	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint32(2), nil)
 	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
-	mockState.On("GetGlobalRateBinInterval", tmock.Anything).Return(uint32(1), nil)
+	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint32(1), nil)
 	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint32(3), nil)
 
 	now := uint64(time.Now().Unix())
@@ -451,7 +452,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
@@ -497,7 +498,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
-	s := apiserver.NewDispersalServerV2(
+	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
 			GrpcTimeout: 1 * time.Second,
@@ -512,6 +513,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		time.Hour,
 		logger,
 		prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

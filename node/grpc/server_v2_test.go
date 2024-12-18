@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"

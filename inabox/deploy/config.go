@@ -357,6 +357,8 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_ONCHAIN_STATE_REFRESH_INTERVAL:        "1s",
 		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
+		// TODO(ian-shim): set this to false once there is request signing at the relay client
+		RELAY_AUTHENTICATION_DISABLED: "true",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 
@@ -455,6 +457,8 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
 		RETRIEVER_GRAPH_URL:           graphUrl,
+		RETRIEVER_GRAPH_BACKOFF:       "1s",
+		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
 
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 	}

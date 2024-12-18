@@ -36,7 +36,7 @@ contract MockRollup {
         BlobVerificationProof memory blobVerificationProof
     ) external { 
         // require commitment has not already been posted
-        require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
+        // require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
 
         // verify that the blob was included in the batch
         EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);

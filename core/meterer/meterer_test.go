@@ -154,7 +154,7 @@ func setup(_ *testing.M) {
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
-	if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
@@ -180,7 +180,7 @@ func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
-	paymentChainState.On("GetGlobalRateBinInterval", testifymock.Anything).Return(uint32(1), nil)
+	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
 	reservationPeriod := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())

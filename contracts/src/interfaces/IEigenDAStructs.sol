@@ -62,6 +62,10 @@ struct RelayInfo {
     string relayURL;
 }
 
+struct DisperserInfo {
+    address disperserAddress;
+}
+
 struct BlobVerificationProofV2 {
     BlobCertificate blobCertificate;
     uint32 blobIndex;
