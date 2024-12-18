@@ -225,6 +225,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
+		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:      "true",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
