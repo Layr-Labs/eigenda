@@ -87,6 +87,14 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
+	if c.accountant == nil {
+		accountId, err := c.signer.GetAccountID()
+		if err != nil {
+			return fmt.Errorf("error getting account ID: %w", err)
+		}
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+	}
+
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
