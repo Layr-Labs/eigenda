@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/ory/dockertest/v3"
@@ -140,6 +141,24 @@ func DeployResources(
 		if err != nil {
 			return err
 		}
+	}
+
+	v2PaymentName := "e2e_v2_"
+	// create payment related tables
+	err = meterer.CreateReservationTable(cfg, v2PaymentName+"reservation")
+	if err != nil {
+		fmt.Println("err", err)
+		return err
+	}
+	err = meterer.CreateOnDemandTable(cfg, v2PaymentName+"ondemand")
+	if err != nil {
+		fmt.Println("err", err)
+		return err
+	}
+	err = meterer.CreateGlobalReservationTable(cfg, v2PaymentName+"global_reservation")
+	if err != nil {
+		fmt.Println("err", err)
+		return err
 	}
 
 	return err
