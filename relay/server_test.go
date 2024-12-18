@@ -2,7 +2,7 @@ package relay
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	"github.com/Layr-Labs/eigenda/relay/mock"
 	"math/rand"
 	"testing"
 	"time"
@@ -108,9 +108,11 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 	chainReader := newMockChainReader()
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -194,9 +196,11 @@ func TestReadNonExistentBlob(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -255,9 +259,11 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -379,9 +385,11 @@ func TestReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -588,9 +596,11 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -718,9 +728,11 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
@@ -1002,9 +1014,11 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
-	ics, err := mock.NewChainDataMock(nil)
-	require.NoError(t, err)
-	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+	ics := &mock.IndexedChainState{}
+	blockNumber := uint(rand.Uint32())
+	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
 	config := defaultConfig()
