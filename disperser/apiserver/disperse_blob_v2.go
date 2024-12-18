@@ -117,9 +117,6 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
 		return api.NewErrorInvalidArg("payment metadata is required")
 	}
-	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
-		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
-	}
 
 	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
 		return api.NewErrorInvalidArg("invalid payment metadata")
@@ -148,6 +145,10 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 
 	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeaderProto.GetVersion())); !ok {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys()))
+	}
+
+	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
 	// handle payments and check rate limits
