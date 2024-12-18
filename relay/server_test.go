@@ -2,8 +2,10 @@ package relay
 
 import (
 	"context"
+	"encoding/binary"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/mock"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -78,7 +80,20 @@ func getBlob(t *testing.T, request *pb.GetBlobRequest) (*pb.GetBlobReply, error)
 	return response, err
 }
 
-func getChunks(t *testing.T, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+func getChunks(
+	t *testing.T,
+	random *random.TestRandom,
+	operatorKeys map[uint32]*core.KeyPair,
+	request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+
+	// Choose a random operator to send this request as. Operator IDs are expected to be sequential starting at 0.
+	operatorID := random.Uint32() % uint32(len(operatorKeys))
+	operatorIDBytes := make([]byte, 32)
+	binary.BigEndian.PutUint32(operatorIDBytes[24:], operatorID)
+	request.OperatorId = operatorIDBytes
+	signature := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	request.OperatorSignature = signature
+
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -95,7 +110,7 @@ func getChunks(t *testing.T, request *pb.GetChunksRequest) (*pb.GetChunksReply, 
 }
 
 func TestReadWriteBlobs(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -184,7 +199,7 @@ func TestReadWriteBlobs(t *testing.T) {
 }
 
 func TestReadNonExistentBlob(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -237,7 +252,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 }
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -373,7 +388,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 }
 
 func TestReadWriteChunks(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -385,10 +400,24 @@ func TestReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
+	operatorCount := rand.Intn(3) + 1
+	operatorKeys := make(map[uint32]*core.KeyPair)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	for i := 0; i < operatorCount; i++ {
+		keypair := rand.BLS()
+		operatorKeys[uint32(i)] = keypair
+
+		var operatorID core.OperatorID
+		binary.BigEndian.PutUint32(operatorID[24:], uint32(i))
+		operatorInfo[operatorID] = &core.IndexedOperatorInfo{
+			PubkeyG1: keypair.GetPubKeyG1(),
+			PubkeyG2: keypair.GetPubKeyG2(),
+		}
+	}
+
 	ics := &mock.IndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
@@ -464,7 +493,7 @@ func TestReadWriteChunks(t *testing.T) {
 			ChunkRequests: requestedChunks,
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -498,7 +527,7 @@ func TestReadWriteChunks(t *testing.T) {
 			ChunkRequests: requestedChunks,
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -531,7 +560,7 @@ func TestReadWriteChunks(t *testing.T) {
 			ChunkRequests: requestedChunks,
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -567,7 +596,7 @@ func TestReadWriteChunks(t *testing.T) {
 			ChunkRequests: requestedChunks,
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(response.Data))
@@ -584,7 +613,7 @@ func TestReadWriteChunks(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunks(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -596,10 +625,24 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
+	operatorCount := rand.Intn(3) + 1
+	operatorKeys := make(map[uint32]*core.KeyPair)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	for i := 0; i < operatorCount; i++ {
+		keypair := rand.BLS()
+		operatorKeys[uint32(i)] = keypair
+
+		var operatorID core.OperatorID
+		binary.BigEndian.PutUint32(operatorID[24:], uint32(i))
+		operatorInfo[operatorID] = &core.IndexedOperatorInfo{
+			PubkeyG1: keypair.GetPubKeyG1(),
+			PubkeyG2: keypair.GetPubKeyG2(),
+		}
+	}
+
 	ics := &mock.IndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
@@ -686,7 +729,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 			ChunkRequests: requestedChunks,
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		require.NoError(t, err)
 
 		require.Equal(t, keyCount, len(response.Data))
@@ -705,7 +748,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 }
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -728,10 +771,24 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
+	operatorCount := rand.Intn(3) + 1
+	operatorKeys := make(map[uint32]*core.KeyPair)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	for i := 0; i < operatorCount; i++ {
+		keypair := rand.BLS()
+		operatorKeys[uint32(i)] = keypair
+
+		var operatorID core.OperatorID
+		binary.BigEndian.PutUint32(operatorID[24:], uint32(i))
+		operatorInfo[operatorID] = &core.IndexedOperatorInfo{
+			PubkeyG1: keypair.GetPubKeyG1(),
+			PubkeyG2: keypair.GetPubKeyG2(),
+		}
+	}
+
 	ics := &mock.IndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
@@ -824,7 +881,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 
 		if isBlobInCorrectShard {
 			require.NoError(t, err)
@@ -874,7 +931,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := getChunks(t, request)
+			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -886,7 +943,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 				require.Equal(t, data[i], frame)
 			}
 		} else {
-			response, err := getChunks(t, request)
+			response, err := getChunks(t, rand, operatorKeys, request)
 			require.Error(t, err)
 			require.Nil(t, response)
 		}
@@ -922,7 +979,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := getChunks(t, request)
+			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -969,7 +1026,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 
 		if isBlobInCorrectShard {
-			response, err := getChunks(t, request)
+			response, err := getChunks(t, rand, operatorKeys, request)
 			require.NoError(t, err)
 
 			require.Equal(t, 1, len(response.Data))
@@ -983,7 +1040,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 				}
 			}
 		} else {
-			response, err := getChunks(t, request)
+			response, err := getChunks(t, rand, operatorKeys, request)
 			require.Error(t, err)
 			require.Nil(t, response)
 		}
@@ -991,7 +1048,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
-	tu.InitializeRandom()
+	rand := random.NewTestRandom(t)
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -1014,10 +1071,24 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
+	operatorCount := rand.Intn(3) + 1
+	operatorKeys := make(map[uint32]*core.KeyPair)
+	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
+	for i := 0; i < operatorCount; i++ {
+		keypair := rand.BLS()
+		operatorKeys[uint32(i)] = keypair
+
+		var operatorID core.OperatorID
+		binary.BigEndian.PutUint32(operatorID[24:], uint32(i))
+		operatorInfo[operatorID] = &core.IndexedOperatorInfo{
+			PubkeyG1: keypair.GetPubKeyG1(),
+			PubkeyG2: keypair.GetPubKeyG2(),
+		}
+	}
+
 	ics := &mock.IndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
-	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
 
 	// This is the server used to read it back
@@ -1143,7 +1214,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 			}
 		}
 
-		response, err := getChunks(t, request)
+		response, err := getChunks(t, rand, operatorKeys, request)
 		if allInCorrectShard {
 			require.NoError(t, err)
 
