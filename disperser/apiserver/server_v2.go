@@ -317,6 +317,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
+		onchainCumulativePayment = 
 	} else {
 		onchainCumulativePayment = onDemandPayment.CumulativePayment
 	}
