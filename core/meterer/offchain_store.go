@@ -41,7 +41,6 @@ func NewOffchainStore(
 		return OffchainStore{}, err
 	}
 
-	fmt.Println("check if payment tables exist", reservationTableName)
 	err = dynamoClient.TableExists(context.Background(), reservationTableName)
 	if err != nil {
 		return OffchainStore{}, err
@@ -54,7 +53,6 @@ func NewOffchainStore(
 	if err != nil {
 		return OffchainStore{}, err
 	}
-
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
 	return OffchainStore{

@@ -210,8 +210,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
-	t.logger.Debug("Make payment vault binding")
-
 	var contractPaymentVault *paymentvault.ContractPaymentVault
 	paymentVaultAddr, err := contractEigenDAServiceManager.PaymentVault(&bind.CallOpts{})
 	if err != nil {

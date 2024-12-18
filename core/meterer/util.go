@@ -39,7 +39,6 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-
 	return err
 }
 

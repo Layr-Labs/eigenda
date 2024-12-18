@@ -694,7 +694,7 @@ func (env *Config) GenerateAllVariables() {
 		name := fmt.Sprintf("staker%v", i)
 		key, address := env.getKey(name)
 
-		// Create client paritipants
+		// Create staker paritipants
 		participant := Staker{
 			Address:    address,
 			PrivateKey: key[2:],
