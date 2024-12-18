@@ -3,6 +3,7 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
+	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -45,6 +47,7 @@ type ContractBindings struct {
 	PaymentVault          *paymentvault.ContractPaymentVault
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
+	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
 }
 
 type Reader struct {
@@ -225,6 +228,21 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 
 	}
 
+	var contractEigenDADisperserRegistry *disperserreg.ContractEigenDADisperserRegistry
+	disperserRegistryAddr, err := contractEigenDAServiceManager.EigenDADisperserRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch EigenDADisperserRegistry address", "err", err)
+		// TODO(cody-littley): return err when the contract is deployed
+		// return err
+	} else {
+		contractEigenDADisperserRegistry, err =
+			disperserreg.NewContractEigenDADisperserRegistry(disperserRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch EigenDADisperserRegistry contract", "err", err)
+			return err
+		}
+	}
+
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
@@ -241,6 +259,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		RelayRegistry:         contractRelayRegistry,
 		PaymentVault:          contractPaymentVault,
 		ThresholdRegistry:     contractThresholdRegistry,
+		DisperserRegistry:     contractEigenDADisperserRegistry,
 	}
 	return nil
 }
@@ -918,8 +937,20 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 }
 
 func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
-	// TODO(cody-littley/arch): this is just a place holder until we register dispersers on chain
-	bytes := make([]byte, gethcommon.AddressLength)
-	address := gethcommon.BytesToAddress(bytes)
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		return gethcommon.Address{}, errors.New("disperser registry not deployed")
+	}
+
+	address, err := registry.DisperserKeyToAddress(
+		&bind.CallOpts{
+			Context: ctx,
+		},
+		disperserID)
+
+	if err != nil {
+		return gethcommon.Address{}, fmt.Errorf("failed to get disperser address: %w", err)
+	}
+
 	return address, nil
 }
