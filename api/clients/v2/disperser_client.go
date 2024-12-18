@@ -75,15 +75,6 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
 
-	// Initialize the accountant if it is not provided
-	if accountant == nil {
-		accountID, err := signer.GetAccountID()
-		if err != nil {
-			return nil, fmt.Errorf("error getting signer's account ID: %w", err)
-		}
-		accountant = DummyAccountant(accountID)
-	}
-
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
