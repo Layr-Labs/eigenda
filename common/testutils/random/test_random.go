@@ -15,6 +15,9 @@ import (
 	"time"
 )
 
+// charset is the set of characters that can be used to generate random strings
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 // TestRandom provides all the functionality of math/rand.Rand, plus additional randomness functionality useful for testing
 type TestRandom struct {
 	// The source of randomness
@@ -70,7 +73,6 @@ func (r *TestRandom) Time() time.Time {
 
 // String generates a random string out of printable ASCII characters.
 func (r *TestRandom) String(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[r.Intn(len(charset))]
@@ -85,6 +87,7 @@ type randIOReader struct {
 	rand *TestRandom
 }
 
+// Read reads random bytes into the provided buffer, returning the number of bytes read.
 func (i *randIOReader) Read(p []byte) (n int, err error) {
 	return i.rand.Read(p)
 }

@@ -106,6 +106,14 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.Expiry, uint64(now.Unix()))
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
+
+	// Try dispersing the same blob
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: blobHeaderProto,
+	})
+	assert.Nil(t, reply)
+	assert.ErrorContains(t, err, "blob already exists")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -452,7 +460,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
@@ -498,7 +506,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
-	s := apiserver.NewDispersalServerV2(
+	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
 			GrpcTimeout: 1 * time.Second,
@@ -513,6 +521,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		time.Hour,
 		logger,
 		prometheus.NewRegistry())
+	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)

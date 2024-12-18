@@ -179,38 +179,38 @@
             <ul>
               
                 <li>
-                  <a href="#node.ChunkRequest"><span class="badge">M</span>ChunkRequest</a>
+                  <a href="#relay.ChunkRequest"><span class="badge">M</span>ChunkRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.ChunkRequestByIndex"><span class="badge">M</span>ChunkRequestByIndex</a>
+                  <a href="#relay.ChunkRequestByIndex"><span class="badge">M</span>ChunkRequestByIndex</a>
                 </li>
               
                 <li>
-                  <a href="#node.ChunkRequestByRange"><span class="badge">M</span>ChunkRequestByRange</a>
+                  <a href="#relay.ChunkRequestByRange"><span class="badge">M</span>ChunkRequestByRange</a>
                 </li>
               
                 <li>
-                  <a href="#node.GetBlobReply"><span class="badge">M</span>GetBlobReply</a>
+                  <a href="#relay.GetBlobReply"><span class="badge">M</span>GetBlobReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.GetBlobRequest"><span class="badge">M</span>GetBlobRequest</a>
+                  <a href="#relay.GetBlobRequest"><span class="badge">M</span>GetBlobRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                  <a href="#relay.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                  <a href="#relay.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
                 </li>
               
               
               
               
                 <li>
-                  <a href="#node.Relay"><span class="badge">S</span>Relay</a>
+                  <a href="#relay.Relay"><span class="badge">S</span>Relay</a>
                 </li>
               
             </ul>
@@ -228,7 +228,7 @@
       <p></p>
 
       
-        <h3 id="node.ChunkRequest">ChunkRequest</h3>
+        <h3 id="relay.ChunkRequest">ChunkRequest</h3>
         <p>A request for chunks within a specific blob. Requests are fulfilled in all-or-nothing fashion. If any of the</p><p>requested chunks are not found or are unable to be fetched, the entire request will fail.</p>
 
         
@@ -240,14 +240,14 @@
               
                 <tr>
                   <td>by_index</td>
-                  <td><a href="#node.ChunkRequestByIndex">ChunkRequestByIndex</a></td>
+                  <td><a href="#relay.ChunkRequestByIndex">ChunkRequestByIndex</a></td>
                   <td></td>
                   <td><p>Request chunks by their individual indices. </p></td>
                 </tr>
               
                 <tr>
                   <td>by_range</td>
-                  <td><a href="#node.ChunkRequestByRange">ChunkRequestByRange</a></td>
+                  <td><a href="#relay.ChunkRequestByRange">ChunkRequestByRange</a></td>
                   <td></td>
                   <td><p>Request chunks by a range of indices. </p></td>
                 </tr>
@@ -259,7 +259,7 @@
 
         
       
-        <h3 id="node.ChunkRequestByIndex">ChunkRequestByIndex</h3>
+        <h3 id="relay.ChunkRequestByIndex">ChunkRequestByIndex</h3>
         <p>A request for chunks within a specific blob. Each chunk is requested individually by its index.</p>
 
         
@@ -290,7 +290,7 @@
 
         
       
-        <h3 id="node.ChunkRequestByRange">ChunkRequestByRange</h3>
+        <h3 id="relay.ChunkRequestByRange">ChunkRequestByRange</h3>
         <p>A request for chunks within a specific blob. Each chunk is requested a range of indices.</p>
 
         
@@ -328,7 +328,7 @@
 
         
       
-        <h3 id="node.GetBlobReply">GetBlobReply</h3>
+        <h3 id="relay.GetBlobReply">GetBlobReply</h3>
         <p>The reply to a GetBlobs request.</p>
 
         
@@ -352,7 +352,7 @@
 
         
       
-        <h3 id="node.GetBlobRequest">GetBlobRequest</h3>
+        <h3 id="relay.GetBlobRequest">GetBlobRequest</h3>
         <p>A request to fetch one or more blobs.</p>
 
         
@@ -376,7 +376,7 @@
 
         
       
-        <h3 id="node.GetChunksReply">GetChunksReply</h3>
+        <h3 id="relay.GetChunksReply">GetChunksReply</h3>
         <p>The reply to a GetChunks request.</p>
 
         
@@ -401,7 +401,7 @@ data is the raw data of the bundle (i.e. serialized byte array of the frames) </
 
         
       
-        <h3 id="node.GetChunksRequest">GetChunksRequest</h3>
+        <h3 id="relay.GetChunksRequest">GetChunksRequest</h3>
         <p>Request chunks from blobs stored by this relay.</p>
 
         
@@ -413,7 +413,7 @@ data is the raw data of the bundle (i.e. serialized byte array of the frames) </
               
                 <tr>
                   <td>chunk_requests</td>
-                  <td><a href="#node.ChunkRequest">ChunkRequest</a></td>
+                  <td><a href="#relay.ChunkRequest">ChunkRequest</a></td>
                   <td>repeated</td>
                   <td><p>The chunk requests. Chunks are returned in the same order as they are requested. </p></td>
                 </tr>
@@ -466,7 +466,7 @@ Perform a keccak256 hash on the following data in the following order:
       
 
       
-        <h3 id="node.Relay">Relay</h3>
+        <h3 id="relay.Relay">Relay</h3>
         <p>Relay is a service that provides access to public relay functionality.</p>
         <table class="enum-table">
           <thead>
@@ -476,15 +476,15 @@ Perform a keccak256 hash on the following data in the following order:
             
               <tr>
                 <td>GetBlob</td>
-                <td><a href="#node.GetBlobRequest">GetBlobRequest</a></td>
-                <td><a href="#node.GetBlobReply">GetBlobReply</a></td>
+                <td><a href="#relay.GetBlobRequest">GetBlobRequest</a></td>
+                <td><a href="#relay.GetBlobReply">GetBlobReply</a></td>
                 <td><p>GetBlob retrieves a blob stored by the relay.</p></td>
               </tr>
             
               <tr>
                 <td>GetChunks</td>
-                <td><a href="#node.GetChunksRequest">GetChunksRequest</a></td>
-                <td><a href="#node.GetChunksReply">GetChunksReply</a></td>
+                <td><a href="#relay.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#relay.GetChunksReply">GetChunksReply</a></td>
                 <td><p>GetChunks retrieves chunks from blobs stored by the relay.</p></td>
               </tr>
             

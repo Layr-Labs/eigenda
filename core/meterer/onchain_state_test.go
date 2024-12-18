@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +29,7 @@ func TestRefreshOnchainPaymentState(t *testing.T) {
 	ctx := context.Background()
 	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
 
-	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Reader{})
+	err := mockState.RefreshOnchainPaymentState(ctx)
 	assert.NoError(t, err)
 }
 
