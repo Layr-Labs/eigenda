@@ -364,7 +364,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			PrivateBls:                     string(op.KeyPair.GetPubKeyG1().Serialize()),
 			ID:                             id,
 			QuorumIDList:                   registeredQuorums,
-			DisableDispersalAuthentication: true, // TODO enable
+			DisableDispersalAuthentication: false, // TODO things break when this is enabled
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe

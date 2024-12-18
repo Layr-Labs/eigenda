@@ -915,10 +915,10 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 	}
 
 	res := make(map[uint32]string)
-	for relayKey := uint32(0); relayKey < uint32(numRelays); relayKey++ {
+	for relayKey := uint32(0); relayKey < numRelays; relayKey++ {
 		url, err := t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
 			Context: ctx,
-		}, uint32(relayKey))
+		}, relayKey)
 
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
 			break
