@@ -172,9 +172,13 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 	a.reservationWindow = uint32(paymentState.GetPaymentGlobalParams().GetReservationWindow())
 
 	if paymentState.GetOnchainCumulativePayment() == nil {
-		a.onDemand.CumulativePayment = big.NewInt(0)
+		a.onDemand = &core.OnDemandPayment{
+			CumulativePayment: big.NewInt(0),
+		}
 	} else {
-		a.onDemand.CumulativePayment = new(big.Int).SetBytes(paymentState.GetOnchainCumulativePayment())
+		a.onDemand = &core.OnDemandPayment{
+			CumulativePayment: new(big.Int).SetBytes(paymentState.GetOnchainCumulativePayment()),
+		}
 	}
 
 	if paymentState.GetCumulativePayment() == nil {
@@ -192,20 +196,21 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 			QuorumSplits:     []byte{},
 		}
 	} else {
-		a.reservation.SymbolsPerSecond = uint64(paymentState.GetReservation().GetSymbolsPerSecond())
-		a.reservation.StartTimestamp = uint64(paymentState.GetReservation().GetStartTimestamp())
-		a.reservation.EndTimestamp = uint64(paymentState.GetReservation().GetEndTimestamp())
 		quorumNumbers := make([]uint8, len(paymentState.GetReservation().GetQuorumNumbers()))
 		for i, quorum := range paymentState.GetReservation().GetQuorumNumbers() {
 			quorumNumbers[i] = uint8(quorum)
 		}
-		a.reservation.QuorumNumbers = quorumNumbers
-
 		quorumSplits := make([]uint8, len(paymentState.GetReservation().GetQuorumSplits()))
 		for i, quorum := range paymentState.GetReservation().GetQuorumSplits() {
 			quorumSplits[i] = uint8(quorum)
 		}
-		a.reservation.QuorumSplits = quorumSplits
+		a.reservation = &core.ReservedPayment{
+			SymbolsPerSecond: uint64(paymentState.GetReservation().GetSymbolsPerSecond()),
+			StartTimestamp:   uint64(paymentState.GetReservation().GetStartTimestamp()),
+			EndTimestamp:     uint64(paymentState.GetReservation().GetEndTimestamp()),
+			QuorumNumbers:    quorumNumbers,
+			QuorumSplits:     quorumSplits,
+		}
 	}
 
 	binRecords := make([]BinRecord, len(paymentState.GetBinRecords()))

@@ -30,13 +30,14 @@ type DisperserClient interface {
 }
 
 type disperserClient struct {
-	config     *DisperserClientConfig
-	signer     corev2.BlobRequestSigner
-	initOnce   sync.Once
-	conn       *grpc.ClientConn
-	client     disperser_rpc.DisperserClient
-	prover     encoding.Prover
-	accountant *Accountant
+	config             *DisperserClientConfig
+	signer             corev2.BlobRequestSigner
+	initOnceGrpc       sync.Once
+	initOnceAccountant sync.Once
+	conn               *grpc.ClientConn
+	client             disperser_rpc.DisperserClient
+	prover             encoding.Prover
+	accountant         *Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -86,6 +87,14 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
+	if c.accountant == nil {
+		accountId, err := c.signer.GetAccountID()
+		if err != nil {
+			return fmt.Errorf("error getting account ID: %w", err)
+		}
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+	}
+
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
@@ -118,6 +127,10 @@ func (c *disperserClient) DisperseBlob(
 	salt uint32,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+	err = c.initOncePopulateAccountant(ctx)
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
@@ -273,7 +286,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 // If initialization fails, it caches the error and will return it on every subsequent call.
 func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
-	c.initOnce.Do(func() {
+	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
 		conn, err := grpc.NewClient(addr, dialOptions...)
@@ -286,6 +299,25 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	})
 	if initErr != nil {
 		return fmt.Errorf("initializing grpc connection: %w", initErr)
+	}
+	return nil
+}
+
+// initOncePopulateAccountant initializes the accountant if it is not already initialized.
+// If initialization fails, it caches the error and will return it on every subsequent call.
+func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
+	var initErr error
+	c.initOnceAccountant.Do(func() {
+		if c.accountant == nil {
+			err := c.PopulateAccountant(ctx)
+			if err != nil {
+				initErr = err
+				return
+			}
+		}
+	})
+	if initErr != nil {
+		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
 }
