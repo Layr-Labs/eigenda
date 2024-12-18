@@ -62,29 +62,6 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 	return &a
 }
 
-func DummyAccountant(accountID string) *Accountant {
-	return &Accountant{
-		accountID: accountID,
-		reservation: &core.ReservedPayment{
-			SymbolsPerSecond: 0,
-			StartTimestamp:   0,
-			EndTimestamp:     0,
-			QuorumNumbers:    []uint8{},
-			QuorumSplits:     []byte{},
-		},
-		onDemand: &core.OnDemandPayment{
-			CumulativePayment: big.NewInt(0),
-		},
-		reservationWindow: 0,
-		pricePerSymbol:    0,
-		minNumSymbols:     0,
-		binRecords:        make([]BinRecord, 3),
-		usageLock:         sync.Mutex{},
-		cumulativePayment: big.NewInt(0),
-		numBins:           uint32(meterer.MinNumBins),
-	}
-}
-
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
