@@ -619,25 +619,9 @@ type ReservedPayment struct {
 	QuorumSplits []byte
 }
 
-func DummyReservedPayment() *ReservedPayment {
-	return &ReservedPayment{
-		SymbolsPerSecond: 0,
-		StartTimestamp:   0,
-		EndTimestamp:     0,
-		QuorumNumbers:    []uint8{},
-		QuorumSplits:     []byte{},
-	}
-}
-
 type OnDemandPayment struct {
 	// Total amount deposited by the user
 	CumulativePayment *big.Int
-}
-
-func DummyOnDemandPayment() *OnDemandPayment {
-	return &OnDemandPayment{
-		CumulativePayment: big.NewInt(0),
-	}
 }
 
 type BlobVersionParameters struct {
