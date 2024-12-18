@@ -107,13 +107,14 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
 
-	// Try dispersing the same blob
+	// Try dispersing the same blob; if payment is different, blob will be considered as a differernt blob
+	// payment will cause failure before commitment check
 	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Data:       data,
 		BlobHeader: blobHeaderProto,
 	})
 	assert.Nil(t, reply)
-	assert.ErrorContains(t, err, "blob already exists")
+	assert.ErrorContains(t, err, "payment already exists")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
