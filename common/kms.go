@@ -75,6 +75,11 @@ func ParsePublicKeyKMS(bytes []byte) (*ecdsa.PublicKey, error) {
 }
 
 func adjustSignatureLength(buffer []byte) []byte {
+
+	if len(buffer) > 32 {
+		buffer = buffer[len(buffer)-32:] // Take last 32 bytes
+	}
+
 	buffer = bytes.TrimLeft(buffer, "\x00")
 	for len(buffer) < 32 {
 		zeroBuf := []byte{0}
@@ -116,6 +121,10 @@ func ParseSignatureKMS(
 	publicKey *ecdsa.PublicKey,
 	hash []byte,
 	bytes []byte) ([]byte, error) {
+
+	if !secp256k1.S256().IsOnCurve(publicKey.X, publicKey.Y) {
+		return nil, errors.New("public key is not on curve")
+	}
 
 	publicKeyBytes := secp256k1.S256().Marshal(publicKey.X, publicKey.Y)
 
