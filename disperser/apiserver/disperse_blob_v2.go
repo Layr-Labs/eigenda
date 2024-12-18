@@ -2,12 +2,14 @@ package apiserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -60,6 +62,11 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 	}
 
 	if err := s.blobStore.StoreBlob(ctx, blobKey, data); err != nil {
+		s.logger.Warn("failed to store blob", "err", err, "blobKey", blobKey.Hex())
+		if errors.Is(err, common.ErrAlreadyExists) {
+			return corev2.BlobKey{}, api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
+		}
+
 		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob: %v", err))
 	}
 
@@ -73,6 +80,14 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 		UpdatedAt:   uint64(requestedAt.UnixNano()),
 	}
 	err = s.blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
+	if err != nil {
+		s.logger.Warn("failed to store blob metadata", "err", err, "blobKey", blobKey.Hex())
+		if errors.Is(err, common.ErrAlreadyExists) {
+			return corev2.BlobKey{}, api.NewErrorAlreadyExists(fmt.Sprintf("blob metadata already exists: %s", blobKey.Hex()))
+		}
+
+		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob metadata: %v", err))
+	}
 	return blobKey, err
 }
 
