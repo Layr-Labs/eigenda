@@ -22,7 +22,7 @@ import (
 
 var _ = Describe("Inabox v2 Integration", func() {
 	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
@@ -34,8 +34,6 @@ var _ = Describe("Inabox v2 Integration", func() {
 		}, signer, nil, nil)
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
-		err = disp.PopulateAccountant(ctx)
-		Expect(err).To(BeNil())
 
 		data1 := make([]byte, 992)
 		_, err = rand.Read(data1)
