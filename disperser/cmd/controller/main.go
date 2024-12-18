@@ -150,13 +150,16 @@ func RunController(ctx *cli.Context) error {
 		}
 	}
 
-	requestSigner, err := clients.NewRequestSigner(
-		context.Background(),
-		config.AwsClientConfig.Region,
-		config.AwsClientConfig.EndpointURL,
-		config.DisperserSigningKeyName)
-	if err != nil {
-		return fmt.Errorf("failed to create request signer: %v", err)
+	var requestSigner clients.RequestSigner
+	if config.DisperserSigningKeyName != "" {
+		requestSigner, err = clients.NewRequestSigner(
+			context.Background(),
+			config.AwsClientConfig.Region,
+			config.AwsClientConfig.EndpointURL,
+			config.DisperserSigningKeyName)
+		if err != nil {
+			return fmt.Errorf("failed to create request signer: %v", err)
+		}
 	}
 
 	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)

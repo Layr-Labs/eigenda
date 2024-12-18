@@ -73,12 +73,14 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 		DisperserID: 0, // this will need to be updated dispersers are decentralized
 	}
 
-	// Sign the request to store chunks
-	signature, err := c.requestSigner.SignStoreChunksRequest(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign store chunks request: %v", err)
+	if c.requestSigner != nil {
+		// Sign the request to store chunks
+		signature, err := c.requestSigner.SignStoreChunksRequest(ctx, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign store chunks request: %v", err)
+		}
+		request.Signature = signature
 	}
-	request.Signature = signature
 
 	// Call the gRPC method to store chunks
 	response, err := c.dispersalClient.StoreChunks(ctx, request)
