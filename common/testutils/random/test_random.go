@@ -87,6 +87,7 @@ type randIOReader struct {
 	rand *TestRandom
 }
 
+// Read reads random bytes into the provided buffer, returning the number of bytes read.
 func (i *randIOReader) Read(p []byte) (n int, err error) {
 	return i.rand.Read(p)
 }
