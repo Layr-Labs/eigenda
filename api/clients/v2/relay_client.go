@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/relay/auth"
@@ -70,7 +71,7 @@ var _ RelayClient = (*relayClient)(nil)
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
 func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
-	if config == nil || len(config.Sockets) <= 0 || config.OperatorID == nil || config.MessageSigner == nil {
+	if config == nil || len(config.Sockets) <= 0 {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 
@@ -107,6 +108,13 @@ func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blo
 // signGetChunksRequest signs the GetChunksRequest with the operator's private key
 // and sets the signature in the request.
 func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygrpc.GetChunksRequest) error {
+	if c.config.OperatorID == nil {
+		return errors.New("no operator ID provided in config, cannot sign get chunks request")
+	}
+	if c.config.MessageSigner == nil {
+		return errors.New("no message signer provided in config, cannot sign get chunks request")
+	}
+
 	hash := auth.HashGetChunksRequest(request)
 	hashArray := [32]byte{}
 	copy(hashArray[:], hash)

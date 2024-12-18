@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/core/mock"
 	"math/rand"
 	"testing"
 	"time"
@@ -30,7 +31,8 @@ func defaultConfig() *Config {
 		ChunkCacheSize:             1024 * 1024,
 		ChunkMaxConcurrency:        32,
 		MaxKeysPerGetChunksRequest: 1024,
-		AuthenticationDisabled:     true,
+		AuthenticationKeyCacheSize: 1024,
+		AuthenticationDisabled:     false,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
@@ -106,6 +108,10 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 	chainReader := newMockChainReader()
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	server, err := NewServer(
@@ -116,7 +122,7 @@ func TestReadWriteBlobs(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -188,6 +194,10 @@ func TestReadNonExistentBlob(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	chainReader := newMockChainReader()
@@ -199,7 +209,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test */
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -245,6 +255,10 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
@@ -257,7 +271,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		blobStore,
 		nil, /* not used in this test*/
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -365,6 +379,10 @@ func TestReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
@@ -380,7 +398,7 @@ func TestReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -570,6 +588,10 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	chunkReader, chunkWriter := buildChunkStore(t, logger)
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	chainReader := newMockChainReader()
@@ -581,7 +603,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -696,6 +718,10 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
@@ -712,7 +738,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test*/
 		chunkReader,
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
@@ -976,6 +1002,10 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	}
 	shardMap := make(map[v2.BlobKey][]v2.RelayKey)
 
+	ics, err := mock.NewChainDataMock(nil)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
 	// This is the server used to read it back
 	config := defaultConfig()
 	config.RelayIDs = shardList
@@ -992,7 +1022,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		nil, /* not used in this test */
 		chunkReader,
 		chainReader,
-		nil /* not used in this test*/)
+		ics)
 	require.NoError(t, err)
 
 	go func() {
