@@ -39,18 +39,18 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
 	require.NotNil(t, kzgVerifier)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
 	require.NotNil(t, commitment)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// make sure the commitment verifies correctly
 	err = GenerateAndCompareBlobCommitment(
 		kzgVerifier,
 		commitment,
 		randomBytes)
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
@@ -59,11 +59,11 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
 	require.NotNil(t, kzgVerifier)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
 	require.NotNil(t, commitment)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
@@ -80,15 +80,15 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
 	require.NotNil(t, kzgVerifier)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// generate two identical commitments
 	commitment1, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
 	require.NotNil(t, commitment1)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	commitment2, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
 	require.NotNil(t, commitment2)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// commitments to identical bytes should be equal
 	require.Equal(t, commitment1, commitment2)
@@ -97,7 +97,7 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 	randomlyModifyBytes(testRandom, randomBytes)
 	commitmentA, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
 	require.NotNil(t, commitmentA)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// commitments to non-identical bytes should not be equal
 	require.NotEqual(t, commitment1, commitmentA)
@@ -106,7 +106,7 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
 	require.NotNil(t, kzgVerifier)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// this is the absolute maximum number of bytes we can handle, given how the verifier was configured
 	almostTooLongByteCount := 2900 * 32
@@ -115,7 +115,7 @@ func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
 	commitment1, err := GenerateBlobCommitment(kzgVerifier, almostTooLongBytes)
 	require.NotNil(t, commitment1)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
