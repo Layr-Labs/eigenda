@@ -103,6 +103,22 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
+
+	fmt.Println("Populate accountant %w", "account",
+		c.accountant.accountID,
+		"binRecords",
+		c.accountant.binRecords,
+		"cumulativePayment",
+		c.accountant.cumulativePayment,
+		"minNumSymbols",
+		c.accountant.minNumSymbols,
+		"onDemand",
+		c.accountant.onDemand,
+		"pricePerSymbol",
+		c.accountant.pricePerSymbol,
+		"reservation",
+		c.accountant.reservation,
+	)
 	return nil
 }
 
@@ -139,7 +155,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
+	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
