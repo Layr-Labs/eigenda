@@ -119,6 +119,12 @@
   
     - [Retriever](#retriever-Retriever)
   
+- [retriever/v2/retriever.proto](#retriever_v2_retriever-proto)
+    - [BlobReply](#retriever-v2-BlobReply)
+    - [BlobRequest](#retriever-v2-BlobRequest)
+  
+    - [Retriever](#retriever-v2-Retriever)
+  
 - [Scalar Value Types](#scalar-value-types)
 
 
@@ -1732,6 +1738,76 @@ worse cost and performance.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+
+ 
+
+
+
+<a name="retriever_v2_retriever-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## retriever/v2/retriever.proto
+
+
+
+<a name="retriever-v2-BlobReply"></a>
+
+### BlobReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
+
+
+
+
+
+
+<a name="retriever-v2-BlobRequest"></a>
+
+### BlobRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | header of the blob to be retrieved |
+| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="retriever-v2-Retriever"></a>
+
+### Retriever
+The Retriever is a service for retrieving chunks corresponding to a blob from
+the EigenDA operator nodes and reconstructing the original blob from the chunks.
+This is a client-side library that the users are supposed to operationalize.
+
+Note: Users generally have two ways to retrieve a blob from EigenDA V2:
+  1) Retrieve from the relay that the blob is assigned to: the API
+     is Relay.GetBlob() as defined in api/proto/relay/relay.proto
+  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+
+The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the
+relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+(the 2nd approach here) removes the need to trust the relay, with the downside of
+worse cost and performance.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
 
  
 

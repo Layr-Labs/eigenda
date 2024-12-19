@@ -2,26 +2,28 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/retriever/flags"
+	retrieverv2 "github.com/Layr-Labs/eigenda/retriever/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -89,69 +91,65 @@ func RetrieverMain(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	// TODO(ian-shim): uncomment when https://github.com/Layr-Labs/eigenda-internal/issues/77 is done
-	// store, err := leveldb.NewHeaderStore(config.IndexerDataDir)
-	// if err != nil {
-	// 	return err
-	// }
-
 	tx, err := eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 	cs := eth.NewChainState(tx, gethClient)
-	rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	var ics core.IndexedChainState
-	if config.UseGraph {
-		logger.Info("Using graph node")
+	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
+	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
-		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
-	} else {
-		logger.Info("Using built-in indexer")
-
-		indexer, err := coreindexer.CreateNewIndexer(
-			&config.IndexerConfig,
-			gethClient,
-			rpcClient,
-			config.EigenDAServiceManagerAddr,
-			logger,
-		)
+	if config.EigenDAVersion == 1 {
+		agn := &core.StdAssignmentCoordinator{}
+		retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
 		if err != nil {
-			return err
+			log.Fatalln("could not start tcp listener", err)
 		}
-		ics, err = coreindexer.NewIndexedChainState(cs, indexer)
-		if err != nil {
-			return err
+
+		chainClient := retrivereth.NewChainClient(gethClient, logger)
+		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
+		if err = retrieverServiceServer.Start(context.Background()); err != nil {
+			log.Fatalln("failed to start retriever service server", err)
 		}
+
+		// Register reflection service on gRPC server
+		// This makes "grpcurl -plaintext localhost:9000 list" command work
+		reflection.Register(gs)
+
+		pb.RegisterRetrieverServer(gs, retrieverServiceServer)
+
+		// Register Server for Health Checks
+		name := pb.Retriever_ServiceDesc.ServiceName
+		healthcheck.RegisterHealthServer(name, gs)
+
+		log.Printf("server listening at %s", addr)
+		return gs.Serve(listener)
 	}
 
-	agn := &core.StdAssignmentCoordinator{}
-	retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+	if config.EigenDAVersion == 2 {
+		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, ics, v, config.NumConnections)
+		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, ics)
+		if err = retrieverServiceServer.Start(context.Background()); err != nil {
+			log.Fatalln("failed to start retriever service server", err)
+		}
+
+		// Register reflection service on gRPC server
+		// This makes "grpcurl -plaintext localhost:9000 list" command work
+		reflection.Register(gs)
+
+		pbv2.RegisterRetrieverServer(gs, retrieverServiceServer)
+
+		// Register Server for Health Checks
+		name := pb.Retriever_ServiceDesc.ServiceName
+		healthcheck.RegisterHealthServer(name, gs)
+
+		log.Printf("server listening at %s", addr)
+		return gs.Serve(listener)
 	}
 
-	chainClient := retrivereth.NewChainClient(gethClient, logger)
-	retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
-	if err = retrieverServiceServer.Start(context.Background()); err != nil {
-		log.Fatalln("failed to start retriever service server", err)
-	}
-
-	// Register reflection service on gRPC server
-	// This makes "grpcurl -plaintext localhost:9000 list" command work
-	reflection.Register(gs)
-
-	pb.RegisterRetrieverServer(gs, retrieverServiceServer)
-
-	// Register Server for Health Checks
-	name := pb.Retriever_ServiceDesc.ServiceName
-	healthcheck.RegisterHealthServer(name, gs)
-
-	log.Printf("server listening at %s", addr)
-	return gs.Serve(listener)
+	return errors.New("invalid EigenDA version")
 }

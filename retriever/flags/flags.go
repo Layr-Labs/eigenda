@@ -5,7 +5,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
 
@@ -55,12 +54,6 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "NUM_CONNECTIONS"),
 		Value:    20,
 	}
-	IndexerDataDirFlag = cli.StringFlag{
-		Name:   common.PrefixFlag(FlagPrefix, "indexer-data-dir"),
-		Usage:  "the data directory for the indexer",
-		EnvVar: common.PrefixEnvVar(envPrefix, "DATA_DIR"),
-		Value:  "./data/retriever",
-	}
 	MetricsHTTPPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-http-port"),
 		Usage:    "the http port which the metrics prometheus server is listening",
@@ -68,11 +61,12 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envPrefix, "METRICS_HTTP_PORT"),
 	}
-	UseGraphFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
-		Usage:    "Whether to use the graph node",
+	EigenDAVersionFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eigenda-version"),
+		Usage:    "EigenDA version: currently supports 1 and 2",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envPrefix, "USE_GRAPH"),
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_VERSION"),
+		Value:    1,
 	}
 )
 
@@ -84,9 +78,8 @@ func RetrieverFlags(envPrefix string) []cli.Flag {
 		BlsOperatorStateRetrieverFlag,
 		EigenDAServiceManagerFlag,
 		NumConnectionsFlag,
-		IndexerDataDirFlag,
 		MetricsHTTPPortFlag,
-		UseGraphFlag,
+		EigenDAVersionFlag,
 	}
 }
 
@@ -98,6 +91,5 @@ func init() {
 	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
-	Flags = append(Flags, indexer.CLIFlags(envPrefix)...)
 	Flags = append(Flags, thegraph.CLIFlags(envPrefix)...)
 }

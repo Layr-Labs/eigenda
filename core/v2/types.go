@@ -109,6 +109,9 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	}
 
 	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	if paymentMetadata == nil {
+		return nil, errors.New("payment metadata is nil")
+	}
 
 	return &BlobHeader{
 		BlobVersion: BlobVersion(proto.GetVersion()),

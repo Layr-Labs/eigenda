@@ -596,6 +596,10 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
 func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+	if ph == nil {
+		return nil
+	}
+
 	return &PaymentMetadata{
 		AccountID:         ph.AccountId,
 		ReservationPeriod: ph.ReservationPeriod,
