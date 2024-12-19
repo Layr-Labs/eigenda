@@ -88,8 +88,8 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 
 	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
-	if overflowBinRecord.Usage == relativeBinRecord.Usage-binLimit && relativeBinRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
+	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
+		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
@@ -98,7 +98,6 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 
 	// reservation not available, rollback reservation records, attempt on-demand
 	//todo: rollback on-demand if disperser respond with some type of rejection?
-	overflowBinRecord.Usage -= relativeBinRecord.Usage - binLimit
 	relativeBinRecord.Usage -= symbolUsage
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
