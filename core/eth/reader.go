@@ -222,7 +222,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 			t.logger.Error("Failed to fetch PaymentVault contract", "err", err)
 			return err
 		}
-
 	}
 
 	t.bindings = &ContractBindings{
@@ -791,7 +790,7 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRatePeriodInterval(&bind.CallOpts{
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalSymbolsPerPeriod(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
@@ -812,6 +811,7 @@ func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context) (uint32, error
 	}
 	return uint32(globalRateBinInterval), nil
 }
+
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
