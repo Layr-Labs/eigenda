@@ -1,0 +1,80 @@
+name: integration-tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add LocalStack AWS Credentials
+        run: |
+          mkdir -p ~/.aws
+          touch ~/.aws/credentials
+
+          echo '[default]' >> ~/.aws/credentials
+          echo 'aws_access_key_id=localstack' >> ~/.aws/credentials
+          echo 'aws_secret_access_key=localstack' >> ~/.aws/credentials
+
+      - name: Set Test Profile to default
+        run: |
+          aws configure --profile test-profile set region us-east-1
+          aws configure --profile test-profile set source_profile default
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "1.21" # The Go version to download (if necessary) and use.
+      - run: go version
+
+      - name: Checkout EigenDA
+        uses: actions/checkout@v3
+
+      - name: Update Submodule Commits
+        run: |
+          git submodule update --init --recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
+
+      - name: Install graph cli
+        run: |
+          yarn global add @graphprotocol/graph-cli@0.51.0
+
+      - name: Get Forge version
+        run: forge --version
+
+      - name: Build contracts
+        run: |
+          cd contracts && forge build
+
+      - name: Churner
+        run: go test -v ./operators/churner/tests
+
+      - name: Indexer
+        run: go test -v ./core/indexer
+
+      - name: Node Plugin
+        run: go test -v ./node/plugin/tests
+
+      - name: eigenda-client
+        run: go test -v ./api/clients --testnet-integration
+
+      - name: Inabox E2E
+        run: make build && cd inabox && make run-e2e-fuzz
+
+      - name: Save logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: inabox-logs
+          path: |
+            inabox/testdata/*/logs/
+            inabox/testdata/*/deploy.log
+
