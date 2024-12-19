@@ -118,7 +118,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg("payment metadata is required")
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil) {
 		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
@@ -162,6 +162,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		CumulativePayment: cumulativePayment,
 	}
 
+	fmt.Println("call the meterer", "paymentHeader", paymentHeader, "blobLength", blobLength)
 	err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())

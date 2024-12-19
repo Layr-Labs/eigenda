@@ -3,6 +3,7 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -790,9 +791,10 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRatePeriodInterval(&bind.CallOpts{
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalSymbolsPerPeriod(&bind.CallOpts{
 		Context: ctx,
 	})
+	fmt.Println("Reader get globalSymbolsPerSecond", "globalSymbolsPerSecond", globalSymbolsPerSecond)
 	if err != nil {
 		return 0, err
 	}
@@ -809,8 +811,10 @@ func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context) (uint32, error
 	if err != nil {
 		return 0, err
 	}
+	fmt.Println("reader -global rate bin interval", "globalRateBinInterval", globalRateBinInterval)
 	return uint32(globalRateBinInterval), nil
 }
+
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")

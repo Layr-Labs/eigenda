@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -76,6 +77,12 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("pcs get payment vault params", "globalSymbolsPerSecond", globalSymbolsPerSecond)
+
+	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx)
 	if err != nil {
@@ -93,11 +100,12 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	}
 
 	return &PaymentVaultParams{
-		OnDemandQuorumNumbers:  quorumNumbers,
-		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
-		MinNumSymbols:          minNumSymbols,
-		PricePerSymbol:         pricePerSymbol,
-		ReservationWindow:      reservationWindow,
+		OnDemandQuorumNumbers:    quorumNumbers,
+		GlobalSymbolsPerSecond:   globalSymbolsPerSecond,
+		GlobalRatePeriodInterval: globalRatePeriodInterval,
+		MinNumSymbols:            minNumSymbols,
+		PricePerSymbol:           pricePerSymbol,
+		ReservationWindow:        reservationWindow,
 	}, nil
 }
 
@@ -190,7 +198,9 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 }
 
 func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
-	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
+	res := pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
+	fmt.Println("onchain state cached", "pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond", res)
+	return res
 }
 
 func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint32 {

@@ -74,21 +74,29 @@ func (m *Meterer) Start(ctx context.Context) {
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
 	accountID := gethcommon.HexToAddress(header.AccountID)
+	fmt.Println("Serve meter request", "accountID", accountID, "payment", header, "numSymbols", numSymbols)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
 		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+		fmt.Println("reservation account %w", reservation)
+
 		if err != nil {
+			fmt.Println("failed to get active reservation by account: %w", err)
 			return fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
 		if err := m.ServeReservationRequest(ctx, header, reservation, numSymbols, quorumNumbers); err != nil {
+			fmt.Println("invalid reservation: %w", err)
 			return fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
 		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
+		fmt.Println("ondemand account %w", onDemandPayment)
 		if err != nil {
+			fmt.Println("failed to get on-demand payment by account: %w", err)
 			return fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
 		if err := m.ServeOnDemandRequest(ctx, header, onDemandPayment, numSymbols, quorumNumbers); err != nil {
+			fmt.Println("invalid on-demand request: %w", err)
 			return fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}
@@ -151,15 +159,19 @@ func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reserva
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
+	fmt.Println("Reservation usage update: ", "symbolsCharged", symbolsCharged, "newUsage", newUsage)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
 
 	// metered usage stays within the bin limit
 	usageLimit := m.GetReservationBinLimit(reservation)
+	fmt.Println("Reservation usage limit: ", "usageLimit", usageLimit)
 	if newUsage <= usageLimit {
+		fmt.Println("newUsage <= usageLimit")
 		return nil
-	} else if newUsage-uint64(numSymbols) >= usageLimit {
+	} else if newUsage-uint64(symbolsCharged) >= usageLimit {
+		fmt.Println("metered usage before updating the size already exceeded the limit")
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
@@ -176,6 +188,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
 func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
+	if binInterval == 0 {
+		return 0
+	}
 	return uint32(timestamp) / binInterval
 }
 
@@ -207,11 +222,11 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
-		err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
-		if err != nil {
-			return err
+		db_err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		if db_err != nil {
+			return db_err
 		}
-		return fmt.Errorf("failed global rate limiting")
+		return fmt.Errorf("failed global rate limiting: %w", err)
 	}
 
 	return nil
@@ -225,6 +240,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // <= PaymentMetadata.CumulativePayment
 // <= nextPmt - nextPmtnumSymbols * m.FixedFeePerByte > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, numSymbols uint) error {
+	fmt.Println("Validate payment", "header", header, "ondemand onchain", onDemandPayment, "numSymbols", numSymbols)
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
@@ -233,6 +249,7 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
+	fmt.Println("existing payments", "prevPmt", prevPmt, "nextPmt", nextPmt, "nextPmtnumSymbols", nextPmtnumSymbols)
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
 	if prevPmt.Add(prevPmt, m.PaymentCharged(numSymbols)).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
@@ -266,10 +283,13 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
 	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
+	fmt.Println("global bin usage", "symbolsCharged", symbolsCharged)
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
+	fmt.Println("global bin new usage", "newUsage", newUsage,
+		"globalSymbols", m.ChainPaymentState.GetGlobalSymbolsPerSecond(), "ePeriodInterval", uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()))
 	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
 		return fmt.Errorf("global bin usage overflows")
 	}
