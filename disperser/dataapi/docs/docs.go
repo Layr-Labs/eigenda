@@ -15,99 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/batches/{batch_header_hash}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Feed"
-                ],
-                "summary": "Fetch batch by the batch header hash",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BlobResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/blobs/{blob_key}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Feed"
-                ],
-                "summary": "Fetch blob metadata by blob key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Blob key in hex string",
-                        "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BlobResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/feed/batches/{batch_header_hash}/blobs": {
+        "/v1/feed/batches/{batch_header_hash}/blobs": {
             "get": {
                 "produces": [
                     "application/json"
@@ -165,7 +73,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/feed/blobs": {
+        "/v1/feed/blobs": {
             "get": {
                 "produces": [
                     "application/json"
@@ -210,7 +118,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/feed/blobs/{blob_key}": {
+        "/v1/feed/blobs/{blob_key}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -256,7 +164,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics": {
+        "/v1/metrics": {
             "get": {
                 "produces": [
                     "application/json"
@@ -313,13 +221,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/batcher-service-availability": {
+        "/v1/metrics/batcher-service-availability": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Batcher Availability"
+                    "Service Availability"
                 ],
                 "summary": "Get status of EigenDA batcher.",
                 "responses": {
@@ -350,13 +258,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/churner-service-availability": {
+        "/v1/metrics/churner-service-availability": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Churner ServiceAvailability"
+                    "Service Availability"
                 ],
                 "summary": "Get status of EigenDA churner service.",
                 "responses": {
@@ -387,13 +295,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/disperser-service-availability": {
+        "/v1/metrics/disperser-service-availability": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "ServiceAvailability"
+                    "Service Availability"
                 ],
                 "summary": "Get status of EigenDA Disperser service.",
                 "responses": {
@@ -424,7 +332,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/non-signers": {
+        "/v1/metrics/non-signers": {
             "get": {
                 "produces": [
                     "application/json"
@@ -472,7 +380,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/operator-nonsigning-percentage": {
+        "/v1/metrics/operator-nonsigning-percentage": {
             "get": {
                 "produces": [
                     "application/json"
@@ -529,7 +437,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/metrics/throughput": {
+        "/v1/metrics/throughput": {
             "get": {
                 "produces": [
                     "application/json"
@@ -583,7 +491,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/deregistered-operators": {
+        "/v1/operators-info/deregistered-operators": {
             "get": {
                 "produces": [
                     "application/json"
@@ -620,7 +528,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/operator-ejections": {
+        "/v1/operators-info/operator-ejections": {
             "get": {
                 "produces": [
                     "application/json"
@@ -683,13 +591,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/operators-stake": {
+        "/v1/operators-info/operators-stake": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsStake"
+                    "OperatorsInfo"
                 ],
                 "summary": "Operator stake distribution query",
                 "parameters": [
@@ -729,7 +637,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/port-check": {
+        "/v1/operators-info/port-check": {
             "get": {
                 "produces": [
                     "application/json"
@@ -775,7 +683,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/registered-operators": {
+        "/v1/operators-info/registered-operators": {
             "get": {
                 "produces": [
                     "application/json"
@@ -812,7 +720,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators-info/semver-scan": {
+        "/v1/operators-info/semver-scan": {
             "get": {
                 "produces": [
                     "application/json"
@@ -837,13 +745,105 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators/nodeinfo": {
+        "/v2/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsNodeInfo"
+                    "Feed"
+                ],
+                "summary": "Fetch batch by the batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/blobs/{blob_key}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feed"
+                ],
+                "summary": "Fetch blob metadata by blob key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/operators/nodeinfo": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
                 ],
                 "summary": "Active operator semver",
                 "responses": {
@@ -862,13 +862,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators/reachability": {
+        "/v2/operators/reachability": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsReachability"
+                    "Operators"
                 ],
                 "summary": "Operator node reachability check",
                 "parameters": [
@@ -907,13 +907,13 @@ const docTemplate = `{
                 }
             }
         },
-        "/operators/stake": {
+        "/v2/operators/stake": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsStake"
+                    "Operators"
                 ],
                 "summary": "Operator stake distribution query",
                 "parameters": [
@@ -1375,6 +1375,12 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -1383,6 +1389,9 @@ const docTemplate = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -1390,6 +1399,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -1450,6 +1462,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"

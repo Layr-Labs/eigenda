@@ -91,15 +91,16 @@ func RunDataApi(ctx *cli.Context) error {
 	}
 
 	var (
-		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
-		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
-		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
-		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
-		chainState        = coreeth.NewChainState(tx, client)
-		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
-		server            = dataapi.NewServer(
+		promClient          = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
+		blobMetadataStore   = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
+		blobMetadataStoreV2 = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobMetadataV2TableName)
+		sharedStorage       = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
+		subgraphApi         = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
+		subgraphClient      = dataapi.NewSubgraphClient(subgraphApi, logger)
+		chainState          = coreeth.NewChainState(tx, client)
+		indexedChainState   = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		metrics             = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		server              = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,
@@ -119,6 +120,7 @@ func RunDataApi(ctx *cli.Context) error {
 			nil,
 			nil,
 			nil,
+			blobMetadataStoreV2,
 		)
 	)
 
@@ -127,29 +129,6 @@ func RunDataApi(ctx *cli.Context) error {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
-	}
-
-	if config.ServerVersion == 2 {
-		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		serverv2 := dataapi.NewServerV2(
-			dataapi.Config{
-				ServerMode:         config.ServerMode,
-				SocketAddr:         config.SocketAddr,
-				AllowOrigins:       config.AllowOrigins,
-				DisperserHostname:  config.DisperserHostname,
-				ChurnerHostname:    config.ChurnerHostname,
-				BatcherHealthEndpt: config.BatcherHealthEndpt,
-			},
-			blobMetadataStorev2,
-			promClient,
-			subgraphClient,
-			tx,
-			chainState,
-			indexedChainState,
-			logger,
-			metrics,
-		)
-		return runServer(serverv2, logger)
 	}
 
 	return runServer(server, logger)

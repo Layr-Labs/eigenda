@@ -20,6 +20,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMO_TABLE_NAME"),
 	}
+	DynamoV2TableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dynamo-v2-table-name"),
+		Usage:    "Name of the dynamo table to store v2 blob metadata",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DYNAMO_V2_TABLE_NAME"),
+	}
 	S3BucketNameFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "s3-bucket-name"),
 		Usage:    "Name of the bucket to store blobs",
@@ -143,6 +149,7 @@ var (
 
 var requiredFlags = []cli.Flag{
 	DynamoTableNameFlag,
+	DynamoV2TableNameFlag,
 	SocketAddrFlag,
 	S3BucketNameFlag,
 	SubgraphApiBatchMetadataAddrFlag,
