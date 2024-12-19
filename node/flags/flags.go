@@ -238,6 +238,33 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
 		Value:    20 * time.Second,
 	}
+	DisableDispersalAuthenticationFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
+		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_DISPERSAL_AUTHENTICATION"),
+	}
+	DispersalAuthenticationKeyCacheSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dispersal-authentication-key-cache-size"),
+		Usage:    "The size of the dispersal authentication key cache",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_CACHE_SIZE"),
+		Value:    1024,
+	}
+	DisperserKeyTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-key-timeout"),
+		Usage:    "The duration for which a disperser key is cached",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSER_KEY_TIMEOUT"),
+		Value:    1 * time.Hour,
+	}
+	DispersalAuthenticationTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dispersal-authentication-timeout"),
+		Usage:    "The duration for which a disperser authentication is valid",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
+		Value:    5 * time.Minute,
+	}
 
 	// Test only, DO NOT USE the following flags in production
 
@@ -384,6 +411,10 @@ var optionalFlags = []cli.Flag{
 	ChunkDownloadTimeoutFlag,
 	PprofHttpPort,
 	EnablePprof,
+	DisableDispersalAuthenticationFlag,
+	DispersalAuthenticationKeyCacheSizeFlag,
+	DisperserKeyTimeoutFlag,
+	DispersalAuthenticationTimeoutFlag,
 }
 
 func init() {
