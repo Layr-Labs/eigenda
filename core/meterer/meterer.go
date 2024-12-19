@@ -210,9 +210,9 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
-		db_err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
-		if db_err != nil {
-			return db_err
+		dbErr := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		if dbErr != nil {
+			return dbErr
 		}
 		return fmt.Errorf("failed global rate limiting: %w", err)
 	}
