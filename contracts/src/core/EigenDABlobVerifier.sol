@@ -96,7 +96,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             blobVerificationProof,
             nonSignerStakesAndSignature,
             getDefaultSecurityThresholdsV2(),
-            quorumNumbersRequired()
+            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers
         );
     }
 
@@ -118,7 +118,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
             signedBatch,
             blobVerificationProof,
             getDefaultSecurityThresholdsV2(),
-            quorumNumbersRequired()
+            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers
         );
     }
 
