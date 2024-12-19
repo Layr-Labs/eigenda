@@ -112,6 +112,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	require.Len(t, att.QuorumAPKs, 2)
 	require.NotNil(t, att.Sigma)
 	require.ElementsMatch(t, att.QuorumNumbers, []core.QuorumID{0, 1})
+	require.InDeltaMapValues(t, map[core.QuorumID]uint8{0: 100, 1: 100}, att.QuorumResults, 0)
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
 }
