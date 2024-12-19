@@ -5,7 +5,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"runtime"
 	"testing"
 )
@@ -38,19 +38,19 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 	randomBytes := getRandomPaddedBytes(testRandom, 1000)
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	assert.NotNil(t, kzgVerifier)
-	assert.Nil(t, err)
+	require.NotNil(t, kzgVerifier)
+	require.Nil(t, err)
 
 	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
-	assert.NotNil(t, commitment)
-	assert.Nil(t, err)
+	require.NotNil(t, commitment)
+	require.Nil(t, err)
 
 	// make sure the commitment verifies correctly
 	err = GenerateAndCompareBlobCommitment(
 		kzgVerifier,
 		commitment,
 		randomBytes)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 }
 
 func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
@@ -58,12 +58,12 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 	randomBytes := getRandomPaddedBytes(testRandom, 1000)
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	assert.NotNil(t, kzgVerifier)
-	assert.Nil(t, err)
+	require.NotNil(t, kzgVerifier)
+	require.Nil(t, err)
 
 	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
-	assert.NotNil(t, commitment)
-	assert.Nil(t, err)
+	require.NotNil(t, commitment)
+	require.Nil(t, err)
 
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
@@ -71,7 +71,7 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 		kzgVerifier,
 		commitment,
 		randomBytes)
-	assert.NotNil(t, err)
+	require.NotNil(t, err)
 }
 
 func TestGenerateBlobCommitmentEquality(t *testing.T) {
@@ -79,34 +79,34 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 	randomBytes := getRandomPaddedBytes(testRandom, 1000)
 
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	assert.NotNil(t, kzgVerifier)
-	assert.Nil(t, err)
+	require.NotNil(t, kzgVerifier)
+	require.Nil(t, err)
 
 	// generate two identical commitments
 	commitment1, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
-	assert.NotNil(t, commitment1)
-	assert.Nil(t, err)
+	require.NotNil(t, commitment1)
+	require.Nil(t, err)
 	commitment2, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
-	assert.NotNil(t, commitment2)
-	assert.Nil(t, err)
+	require.NotNil(t, commitment2)
+	require.Nil(t, err)
 
 	// commitments to identical bytes should be equal
-	assert.Equal(t, commitment1, commitment2)
+	require.Equal(t, commitment1, commitment2)
 
 	// randomly modify a byte
 	randomlyModifyBytes(testRandom, randomBytes)
 	commitmentA, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
-	assert.NotNil(t, commitmentA)
-	assert.Nil(t, err)
+	require.NotNil(t, commitmentA)
+	require.Nil(t, err)
 
 	// commitments to non-identical bytes should not be equal
-	assert.NotEqual(t, commitment1, commitmentA)
+	require.NotEqual(t, commitment1, commitmentA)
 }
 
 func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	assert.NotNil(t, kzgVerifier)
-	assert.Nil(t, err)
+	require.NotNil(t, kzgVerifier)
+	require.Nil(t, err)
 
 	// this is the absolute maximum number of bytes we can handle, given how the verifier was configured
 	almostTooLongByteCount := 2900 * 32
@@ -114,12 +114,12 @@ func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	// an array of exactly this size should be fine
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
 	commitment1, err := GenerateBlobCommitment(kzgVerifier, almostTooLongBytes)
-	assert.NotNil(t, commitment1)
-	assert.Nil(t, err)
+	require.NotNil(t, commitment1)
+	require.Nil(t, err)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
 	commitment2, err := GenerateBlobCommitment(kzgVerifier, tooLongBytes)
-	assert.Nil(t, commitment2)
-	assert.NotNil(t, err)
+	require.Nil(t, commitment2)
+	require.NotNil(t, err)
 }
