@@ -1,15 +1,16 @@
 package e2e_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/stretchr/testify/require"
-
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func useMemory() bool {
@@ -29,6 +30,7 @@ func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
 	tsConfig := e2e.TestSuiteConfig(testCfg)
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	defer kill()
+
 	requireOPClientSetGet(t, ts, e2e.RandBytes(100), true)
 }
 
@@ -50,6 +52,105 @@ func TestOptimismClientWithGenericCommitment(t *testing.T) {
 
 	requireOPClientSetGet(t, ts, e2e.RandBytes(100), false)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.OptimismGeneric)
+}
+
+// TestProxyClientServerIntegration tests the proxy client and server integration by setting the data as a single byte,
+// many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
+// proxy server with empty byte, single byte and random string.
+func TestProxyClientServerIntegration(t *testing.T) {
+	t.Parallel()
+
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
+	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
+	ts, kill := e2e.CreateTestSuite(tsConfig)
+	t.Cleanup(kill)
+
+	cfg := &client.Config{
+		URL: ts.Address(),
+	}
+	daClient := client.New(cfg)
+
+	t.Run("single byte preimage set data case", func(t *testing.T) {
+		t.Parallel()
+		testPreimage := []byte{1} // single byte preimage
+		t.Log("Setting input data on proxy server...")
+		_, err := daClient.SetData(ts.Ctx, testPreimage)
+		require.NoError(t, err)
+	})
+
+	t.Run("unicode preimage set data case", func(t *testing.T) {
+		t.Parallel()
+		testPreimage := []byte("§§©ˆªªˆ˙√ç®∂§∞¶§ƒ¥√¨¥√¨¥ƒƒ©˙˜ø˜˜˜∫˙∫¥∫√†®®√ç¨ˆ¨˙ï") // many unicode characters
+		t.Log("Setting input data on proxy server...")
+		_, err := daClient.SetData(ts.Ctx, testPreimage)
+		require.NoError(t, err)
+
+		testPreimage = []byte("§") // single unicode character
+		t.Log("Setting input data on proxy server...")
+		_, err = daClient.SetData(ts.Ctx, testPreimage)
+		require.NoError(t, err)
+
+	})
+
+	t.Run("empty preimage set data case", func(t *testing.T) {
+		t.Parallel()
+		testPreimage := []byte("") // Empty preimage
+		t.Log("Setting input data on proxy server...")
+		_, err := daClient.SetData(ts.Ctx, testPreimage)
+		require.NoError(t, err)
+	})
+
+	t.Run("get data edge cases", func(t *testing.T) {
+		t.Parallel()
+		testCert := []byte("")
+		_, err := daClient.GetData(ts.Ctx, testCert)
+		require.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(),
+			"404") && !isNilPtrDerefPanic(err.Error()))
+
+		testCert = []byte{1}
+		_, err = daClient.GetData(ts.Ctx, testCert)
+		require.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(),
+			"400") && !isNilPtrDerefPanic(err.Error()))
+
+		testCert = e2e.RandBytes(10000)
+		_, err = daClient.GetData(ts.Ctx, testCert)
+		require.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "400") && !isNilPtrDerefPanic(err.Error()))
+	})
+
+}
+
+func TestProxyClient(t *testing.T) {
+	if !runIntegrationTests && !runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
+	}
+
+	t.Parallel()
+
+	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
+	ts, kill := e2e.CreateTestSuite(tsConfig)
+	defer kill()
+
+	cfg := &client.Config{
+		URL: ts.Address(),
+	}
+	daClient := client.New(cfg)
+
+	testPreimage := e2e.RandBytes(100)
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)
+	require.NoError(t, err)
+
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, testPreimage, preimage)
 }
 
 func TestProxyClientWriteRead(t *testing.T) {
