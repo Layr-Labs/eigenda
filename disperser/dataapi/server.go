@@ -209,6 +209,7 @@ type (
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
 
 		operatorHandler *operatorHandler
+		metricsHandler  *metricsHandler
 	}
 )
 
@@ -260,6 +261,7 @@ func NewServer(
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
 		operatorHandler:           newOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
+		metricsHandler:            newMetricsHandler(promClient),
 	}
 }
 
@@ -607,7 +609,7 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	ths, err := s.getThroughput(c.Request.Context(), start, end)
+	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsTroughput")
 		errorResponse(c, err)
