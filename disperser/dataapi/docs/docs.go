@@ -529,7 +529,112 @@ const docTemplate = `{
                 }
             }
         },
+        "/metrics/summary": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch metrics summary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.Metric"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/throughput": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch throughput time series",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dataapi.Throughput"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/timeseries/throughput": {
             "get": {
                 "produces": [
                     "application/json"
