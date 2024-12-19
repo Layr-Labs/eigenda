@@ -165,8 +165,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	if blsRemoteSignerEnabled && (ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name) == "" || ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name) == "") {
 		return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
 	}
-	if !blsRemoteSignerEnabled && (ctx.GlobalString(flags.BlsKeyFileFlag.Name) == "" || ctx.GlobalString(flags.BlsKeyPasswordFlag.Name) == "") {
-		return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+	if !blsRemoteSignerEnabled && ctx.GlobalString(flags.BlsKeyFileFlag.Name) == "" {
+		return nil, fmt.Errorf("BLS key file is required if BLS remote signer is disabled")
 	}
 
 	// Decrypt BLS key
