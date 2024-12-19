@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -84,7 +85,9 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
 	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
-	var client common.EthClient
+	// TODO enable auth for these tests
+	var reader *coreeth.Reader
+
 	server, err := grpc.NewServerV2(
 		context.Background(),
 		config,
@@ -92,7 +95,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		client)
+		reader)
 
 	require.NoError(t, err)
 	return &testComponents{

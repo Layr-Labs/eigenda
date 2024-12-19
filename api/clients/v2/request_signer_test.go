@@ -34,7 +34,7 @@ func setup(t *testing.T) {
 	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 
 	_, b, _, _ := runtime.Caller(0)
-	rootPath := filepath.Join(filepath.Dir(b), "../..")
+	rootPath := filepath.Join(filepath.Dir(b), "../../..")
 	changeDirectory(filepath.Join(rootPath, "inabox"))
 
 	if deployLocalStack {

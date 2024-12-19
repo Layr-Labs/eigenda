@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/core"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
@@ -43,7 +42,7 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	client common.EthClient) (*ServerV2, error) {
+	reader core.Reader) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -52,15 +51,6 @@ func NewServerV2(
 
 	var authenticator auth.RequestAuthenticator
 	if !config.DisableDispersalAuthentication {
-		reader, err := coreeth.NewReader(
-			logger,
-			client,
-			config.BLSOperatorStateRetrieverAddr,
-			config.EigenDAServiceManagerAddr)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create eth.Reader: %w", err)
-		}
-
 		authenticator, err = auth.NewRequestAuthenticator(
 			ctx,
 			reader,
