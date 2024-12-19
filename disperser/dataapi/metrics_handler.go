@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+const (
+	defaultThroughputRateSecs  = 240 // 4m rate is used for < 7d window to match $__rate_interval
+	sevenDayThroughputRateSecs = 660 // 11m rate is used for >= 7d window to match $__rate_interval
+)
+
 // metricHandler handles operations to collect metrics about the Disperser.
 type metricsHandler struct {
 	// For accessing metrics info

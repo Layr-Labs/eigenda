@@ -9,12 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-const (
-	maxWorkersGetOperatorState = 10  // The maximum number of workers to use when querying operator state.
-	defaultThroughputRateSecs  = 240 // 4m rate is used for < 7d window to match $__rate_interval
-	sevenDayThroughputRateSecs = 660 // 11m rate is used for >= 7d window to match $__rate_interval
-)
-
 func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) (*Metric, error) {
 	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
