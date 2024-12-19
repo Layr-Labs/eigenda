@@ -222,7 +222,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 			t.logger.Error("Failed to fetch PaymentVault contract", "err", err)
 			return err
 		}
-
 	}
 
 	t.bindings = &ContractBindings{
