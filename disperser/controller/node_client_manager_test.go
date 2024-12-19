@@ -45,5 +45,3 @@ func TestNodeClientManager(t *testing.T) {
 
 	require.NotSame(t, client0, client4)
 }
-
-// TODO add test for request signing

@@ -85,7 +85,6 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
 	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
-	// TODO enable auth for these tests
 	var reader *coreeth.Reader
 
 	server, err := grpc.NewServerV2(
