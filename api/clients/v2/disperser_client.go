@@ -145,7 +145,7 @@ func (c *disperserClient) DisperseBlob(
 	// }
 
 	// symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	// payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
+	// payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
 	// if err != nil {
 	// 	return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	// }
