@@ -67,14 +67,15 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // then on-demand if the reservation is not available. The returned values are
 // reservation period for reservation payments and cumulative payment for on-demand payments,
 // and both fields are used to create the payment header and signature
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8) (uint32, *big.Int, error) {
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
+	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
 	relativeBinRecord := a.GetRelativeBinRecord(currentReservationPeriod)
-	relativeBinRecord.Usage += numSymbols
+	relativeBinRecord.Usage += symbolUsage
 
 	// first attempt to use the active reservation
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
@@ -87,7 +88,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-numSymbols < binLimit && numSymbols <= binLimit {
+	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
@@ -97,8 +98,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 
 	// reservation not available, attempt on-demand
 	//todo: rollback later if disperser respond with some type of rejection?
-	relativeBinRecord.Usage -= numSymbols
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(uint(numSymbols))))
+	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
@@ -110,7 +110,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
+func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
 	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
@@ -128,14 +128,14 @@ func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint64, quorums
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(numSymbols uint) uint64 {
+func (a *Accountant) PaymentCharged(numSymbols uint32) uint64 {
 	return uint64(a.SymbolsCharged(numSymbols)) * uint64(a.pricePerSymbol)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(numSymbols uint) uint32 {
-	if numSymbols <= uint(a.minNumSymbols) {
+func (a *Accountant) SymbolsCharged(numSymbols uint32) uint32 {
+	if numSymbols <= a.minNumSymbols {
 		return a.minNumSymbols
 	}
 	// Round up to the nearest multiple of MinNumSymbols
