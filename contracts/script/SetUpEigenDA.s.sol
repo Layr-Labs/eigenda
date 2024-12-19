@@ -129,6 +129,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         uint256 clientPrivateKey = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
+        uint256 clientPrivateKeyRes = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdee;
+        // uint256 clientPrivateKeyOd = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef;
 
         vm.startBroadcast();
         _allocate(
@@ -136,6 +138,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             toArray(vm.addr(clientPrivateKey)),
             toArray(5 ether)
         );
+        // _allocate(
+        //     IERC20(address(0)),
+        //     toArray(vm.addr(clientPrivateKeyOd)),
+        //     toArray(5 ether)
+        // );
 
         // Allocate eth to stakers, operators, dispserser clients
         _allocate(
@@ -182,21 +189,35 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
 
         // Register Reservations for client as the eigenDACommunityMultisig
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
+        IPaymentVault.Reservation memory reservation1 = IPaymentVault.Reservation({
             symbolsPerSecond: 452198,
             startTimestamp: uint64(block.timestamp),
             endTimestamp: uint64(block.timestamp + 1000000000),
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address reservedClient = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
+        // address reservedClient1 = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
         vm.broadcast(msg.sender);
-        paymentVault.setReservation(reservedClient, reservation);
+        paymentVault.setReservation(address(0x641691973c98dFe68b07Ee3613E270406285DFE8), reservation1);
+        // Really small reservation
+        // IPaymentVault.Reservation memory reservation2 = IPaymentVault.Reservation({
+        //     symbolsPerSecond: 100,
+        //     startTimestamp: uint64(block.timestamp),
+        //     endTimestamp: uint64(block.timestamp + 1000000000),
+        //     quorumNumbers: hex"0001",
+        //     quorumSplits: hex"3232"
+        // });
+        // // address reservedClient2 = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
+        // vm.broadcast(msg.sender);
+        // paymentVault.setReservation(address(0x641691973c98dFe68b07Ee3613E270406285DFE8), reservation2);
 
         // Deposit OnDemand 
         vm.broadcast(clientPrivateKey);
-        address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
-        paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
+        // address ondemandClient1 = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
+        paymentVault.depositOnDemand{value: 0.1 ether}(address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey))))));
+        // vm.broadcast(clientPrivateKeyOd);
+        // // address ondemandClient2 = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKeyOd)))));
+        // paymentVault.depositOnDemand{value: 0.01 gwei}(address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKeyOd))))));
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
