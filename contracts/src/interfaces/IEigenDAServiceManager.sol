@@ -1,11 +1,13 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
+import "./IEigenDAStructs.sol";
 
-interface IEigenDAServiceManager is IServiceManager {
+interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     // EVENTS
     
     /**
@@ -22,46 +24,6 @@ interface IEigenDAServiceManager is IServiceManager {
      */
     event BatchConfirmerStatusChanged(address batchConfirmer, bool status);
 
-    // STRUCTS
-
-    struct QuorumBlobParam {
-        uint8 quorumNumber;
-        uint8 adversaryThresholdPercentage;
-        uint8 confirmationThresholdPercentage; 
-        uint32 chunkLength; // the length of the chunks in the quorum
-    }
-
-    struct BlobHeader {
-        BN254.G1Point commitment; // the kzg commitment to the blob
-        uint32 dataLength; // the length of the blob in coefficients of the polynomial
-        QuorumBlobParam[] quorumBlobParams; // the quorumBlobParams for each quorum
-    }
-
-    struct ReducedBatchHeader {
-        bytes32 blobHeadersRoot;
-        uint32 referenceBlockNumber;
-    }
-
-    struct BatchHeader {
-        bytes32 blobHeadersRoot;
-        bytes quorumNumbers; // each byte is a different quorum number
-        bytes signedStakeForQuorums; // every bytes is an amount less than 100 specifying the percentage of stake 
-                                     // that has signed in the corresponding quorum in `quorumNumbers` 
-        uint32 referenceBlockNumber;
-    }
-    
-    // Relevant metadata for a given datastore
-    struct BatchMetadata {
-        BatchHeader batchHeader; // the header of the data store
-        bytes32 signatoryRecordHash; // the hash of the signatory record
-        uint32 confirmationBlockNumber; // the block number at which the batch was confirmed
-    }
-
-    // FUNCTIONS
-
-    /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
-    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
-
     /**
      * @notice This function is used for
      * - submitting data availabilty certificates,
@@ -73,8 +35,8 @@ interface IEigenDAServiceManager is IServiceManager {
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external;
 
-    /// @notice This function is used for changing the batch confirmer
-    function setBatchConfirmer(address _batchConfirmer) external;
+    /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
+    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
 
     /// @notice Returns the current batchId
     function taskNumber() external view returns (uint32);
@@ -84,13 +46,4 @@ interface IEigenDAServiceManager is IServiceManager {
 
     /// @notice The maximum amount of blocks in the past that the service will consider stake amounts to still be 'valid'.
     function BLOCK_STALE_MEASURE() external view returns (uint32);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory);
-
-    /// @notice Returns the bytes array of quorumsNumbersRequired
-    function quorumNumbersRequired() external view returns (bytes memory);
 }

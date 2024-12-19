@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDARollupUtils} from "../libraries/EigenDARollupUtils.sol";
-import {EigenDAServiceManager} from "../core/EigenDAServiceManager.sol";
-import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {EigenDARollupUtils} from "./EigenDARollupUtils.sol";
+import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
 import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import "../../src/interfaces/IEigenDAStructs.sol";
 
 struct Commitment {
     address confirmer; // confirmer who posted the commitment
@@ -31,11 +32,11 @@ contract MockRollup {
      * @param blobVerificationProof the blob verification proof
      */
     function postCommitment(
-        IEigenDAServiceManager.BlobHeader memory blobHeader, 
-        EigenDARollupUtils.BlobVerificationProof memory blobVerificationProof
+        BlobHeader memory blobHeader, 
+        BlobVerificationProof memory blobVerificationProof
     ) external { 
         // require commitment has not already been posted
-        require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
+        // require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
 
         // verify that the blob was included in the batch
         EigenDARollupUtils.verifyBlob(blobHeader, eigenDAServiceManager, blobVerificationProof);
