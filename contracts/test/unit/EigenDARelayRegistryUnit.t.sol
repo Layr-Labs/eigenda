@@ -12,7 +12,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_initalize() public {
-        require(eigenDARelayRegistry.owner() == registryCoordinatorOwner, "EigenDARelayRegistry: owner is not set");
+        assertEq(eigenDARelayRegistry.owner(), registryCoordinatorOwner);
         vm.expectRevert("Initializable: contract is already initialized");
         eigenDARelayRegistry.initialize(address(this));
     }

@@ -31,7 +31,7 @@ contract PaymentVaultUnit is MockEigenDADeployer {
     }
 
     function test_initialize() public {
-        require(paymentVault.owner() == registryCoordinatorOwner, "Owner is not set");
+        assertEq(paymentVault.owner(), registryCoordinatorOwner);
         assertEq(paymentVault.minNumSymbols(), minNumSymbols);
         assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod);
         assertEq(paymentVault.pricePerSymbol(), pricePerSymbol);

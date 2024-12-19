@@ -12,7 +12,7 @@ contract EigenDADisperserRegistryUnit is MockEigenDADeployer {
     }
 
     function test_initalize() public {
-        require(eigenDADisperserRegistry.owner() == registryCoordinatorOwner, "EigenDADisperserRegistry: owner is not set");
+        assertEq(eigenDADisperserRegistry.owner(), registryCoordinatorOwner);
         vm.expectRevert("Initializable: contract is already initialized");
         eigenDADisperserRegistry.initialize(address(this));
     }
