@@ -128,15 +128,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             operatorETHAmounts[i] = 5 ether;
         }
 
-        uint256 clientPrivateKey = 0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded;
-
         vm.startBroadcast();
-        _allocate(
-            IERC20(address(0)),
-            toArray(vm.addr(clientPrivateKey)),
-            toArray(5 ether)
-        );
-
         // Allocate eth to stakers, operators, dispserser clients
         _allocate(
             IERC20(address(0)),
@@ -189,14 +181,12 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address reservedClient = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
-        vm.broadcast(msg.sender);
-        paymentVault.setReservation(reservedClient, reservation);
-
+        address clientAddress = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
+        vm.startBroadcast(msg.sender);
+        paymentVault.setReservation(clientAddress, reservation);
         // Deposit OnDemand 
-        vm.broadcast(clientPrivateKey);
-        address ondemandClient = address(uint160(uint256(keccak256(abi.encodePacked(clientPrivateKey)))));
-        paymentVault.depositOnDemand{value: 0.1 ether}(ondemandClient);
+        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
+        vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
