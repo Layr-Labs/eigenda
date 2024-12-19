@@ -151,7 +151,7 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	var requestSigner clients.RequestSigner
-	if config.DisperserKMSKeyID != "" {
+	if !config.DisperserStoreChunksSigningDisabled {
 		requestSigner, err = clients.NewRequestSigner(
 			context.Background(),
 			config.AwsClientConfig.Region,

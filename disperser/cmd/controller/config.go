@@ -25,13 +25,14 @@ type Config struct {
 
 	DynamoDBTableName string
 
-	EthClientConfig   geth.EthClientConfig
-	AwsClientConfig   aws.ClientConfig
-	DisperserKMSKeyID string
-	LoggerConfig      common.LoggerConfig
-	IndexerConfig     indexer.Config
-	ChainStateConfig  thegraph.Config
-	UseGraph          bool
+	EthClientConfig                     geth.EthClientConfig
+	AwsClientConfig                     aws.ClientConfig
+	DisperserStoreChunksSigningDisabled bool
+	DisperserKMSKeyID                   string
+	LoggerConfig                        common.LoggerConfig
+	IndexerConfig                       indexer.Config
+	ChainStateConfig                    thegraph.Config
+	UseGraph                            bool
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -61,11 +62,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		relays[i] = corev2.RelayKey(relay)
 	}
 	config := Config{
-		DynamoDBTableName: ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
-		EthClientConfig:   ethClientConfig,
-		AwsClientConfig:   aws.ReadClientConfig(ctx, flags.FlagPrefix),
-		DisperserKMSKeyID: ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
-		LoggerConfig:      *loggerConfig,
+		DynamoDBTableName:                   ctx.GlobalString(flags.DynamoDBTableNameFlag.Name),
+		EthClientConfig:                     ethClientConfig,
+		AwsClientConfig:                     aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		DisperserStoreChunksSigningDisabled: ctx.GlobalBool(flags.DisperserStoreChunksSigningDisabledFlag.Name),
+		DisperserKMSKeyID:                   ctx.GlobalString(flags.DisperserKMSKeyIDFlag.Name),
+		LoggerConfig:                        *loggerConfig,
 		EncodingManagerConfig: controller.EncodingManagerConfig{
 			PullInterval:                ctx.GlobalDuration(flags.EncodingPullIntervalFlag.Name),
 			EncodingRequestTimeout:      ctx.GlobalDuration(flags.EncodingRequestTimeoutFlag.Name),

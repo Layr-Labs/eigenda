@@ -178,10 +178,16 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
 		Value:    9101,
 	}
+	DisperserStoreChunksSigningDisabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "disperser-store-chunks-signing-disabled"),
+		Usage:    "Whether to disable signing of store chunks requests",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_STORE_CHUNKS_SIGNING_DISABLED"),
+	}
 	DisperserKMSKeyIDFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-kms-key-id"),
 		Usage:    "Name of the key used to sign disperser requests (key must be stored in AWS KMS under this name)",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
 )
@@ -198,7 +204,6 @@ var requiredFlags = []cli.Flag{
 	DispatcherPullIntervalFlag,
 	NodeRequestTimeoutFlag,
 	NumConnectionsToNodesFlag,
-	DisperserKMSKeyIDFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -217,6 +222,8 @@ var optionalFlags = []cli.Flag{
 	NodeClientCacheNumEntriesFlag,
 	MaxBatchSizeFlag,
 	MetricsPortFlag,
+	DisperserStoreChunksSigningDisabledFlag,
+	DisperserKMSKeyIDFlag,
 }
 
 var Flags []cli.Flag
