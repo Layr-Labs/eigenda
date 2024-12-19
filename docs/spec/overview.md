@@ -104,7 +104,7 @@ and any set of adversarial operators $U_a \subseteq U_q$ such
 
 $$ \sum_{i \in U_a} S_i \le \alpha \sum_{i \in O}S_i$$
 
-we we can reconstruct the original data blob from the chunks held by $U_q \setminus U_a$.
+we can reconstruct the original data blob from the chunks held by $U_q \setminus U_a$.
 
 ### Encoding Module
 
