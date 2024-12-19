@@ -284,15 +284,23 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
@@ -339,6 +347,10 @@ definitions:
         items:
           type: integer
         type: array
+      a1:
+        items:
+          type: integer
+        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -361,67 +373,7 @@ info:
   title: EigenDA Data Access API
   version: "1"
 paths:
-  /batches/{batch_header_hash}:
-    get:
-      parameters:
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch batch by the batch header hash
-      tags:
-      - Feed
-  /blobs/{blob_key}:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob metadata by blob key
-      tags:
-      - Feed
-  /feed/batches/{batch_header_hash}/blobs:
+  /v1/feed/batches/{batch_header_hash}/blobs:
     get:
       parameters:
       - description: Batch Header Hash
@@ -459,7 +411,7 @@ paths:
       summary: Fetch blob metadata by batch header hash
       tags:
       - Feed
-  /feed/blobs:
+  /v1/feed/blobs:
     get:
       parameters:
       - description: 'Limit [default: 10]'
@@ -488,7 +440,7 @@ paths:
       summary: Fetch blobs metadata list
       tags:
       - Feed
-  /feed/blobs/{blob_key}:
+  /v1/feed/blobs/{blob_key}:
     get:
       parameters:
       - description: Blob Key
@@ -518,7 +470,7 @@ paths:
       summary: Fetch blob metadata by blob key
       tags:
       - Feed
-  /metrics:
+  /v1/metrics:
     get:
       parameters:
       - description: 'Start unix timestamp [default: 1 hour ago]'
@@ -555,7 +507,7 @@ paths:
       summary: Fetch metrics
       tags:
       - Metrics
-  /metrics/batcher-service-availability:
+  /v1/metrics/batcher-service-availability:
     get:
       produces:
       - application/json
@@ -578,8 +530,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA batcher.
       tags:
-      - Batcher Availability
-  /metrics/churner-service-availability:
+      - Service Availability
+  /v1/metrics/churner-service-availability:
     get:
       produces:
       - application/json
@@ -602,8 +554,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA churner service.
       tags:
-      - Churner ServiceAvailability
-  /metrics/disperser-service-availability:
+      - Service Availability
+  /v1/metrics/disperser-service-availability:
     get:
       produces:
       - application/json
@@ -626,8 +578,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Get status of EigenDA Disperser service.
       tags:
-      - ServiceAvailability
-  /metrics/non-signers:
+      - Service Availability
+  /v1/metrics/non-signers:
     get:
       parameters:
       - description: 'Interval to query for non signers in seconds [default: 3600]'
@@ -658,7 +610,7 @@ paths:
       summary: Fetch non signers
       tags:
       - Metrics
-  /metrics/operator-nonsigning-percentage:
+  /v1/metrics/operator-nonsigning-percentage:
     get:
       parameters:
       - description: 'Interval to query for operators nonsigning percentage [default:
@@ -697,7 +649,7 @@ paths:
       summary: Fetch operators non signing percentage
       tags:
       - Metrics
-  /metrics/throughput:
+  /v1/metrics/throughput:
     get:
       parameters:
       - description: 'Start unix timestamp [default: 1 hour ago]'
@@ -732,7 +684,7 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
-  /operators-info/deregistered-operators:
+  /v1/operators-info/deregistered-operators:
     get:
       produces:
       - application/json
@@ -757,7 +709,7 @@ paths:
         is a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
-  /operators-info/operator-ejections:
+  /v1/operators-info/operator-ejections:
     get:
       parameters:
       - description: 'Lookback in days [default: 1]'
@@ -798,7 +750,7 @@ paths:
       summary: Fetch list of operator ejections over last N days.
       tags:
       - OperatorsInfo
-  /operators-info/operators-stake:
+  /v1/operators-info/operators-stake:
     get:
       parameters:
       - description: Operator ID
@@ -827,8 +779,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Operator stake distribution query
       tags:
-      - OperatorsStake
-  /operators-info/port-check:
+      - OperatorsInfo
+  /v1/operators-info/port-check:
     get:
       parameters:
       - description: Operator ID
@@ -858,7 +810,7 @@ paths:
       summary: Operator node reachability port check
       tags:
       - OperatorsInfo
-  /operators-info/registered-operators:
+  /v1/operators-info/registered-operators:
     get:
       produces:
       - application/json
@@ -883,7 +835,7 @@ paths:
         a query parameter with a default value of 14 and max value of 30.
       tags:
       - OperatorsInfo
-  /operators-info/semver-scan:
+  /v1/operators-info/semver-scan:
     get:
       produces:
       - application/json
@@ -899,7 +851,67 @@ paths:
       summary: Active operator semver scan
       tags:
       - OperatorsInfo
-  /operators/nodeinfo:
+  /v2/batches/{batch_header_hash}:
+    get:
+      parameters:
+      - description: Batch header hash in hex string
+        in: path
+        name: batch_header_hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch batch by the batch header hash
+      tags:
+      - Feed
+  /v2/blobs/{blob_key}:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dataapi.BlobResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/dataapi.ErrorResponse'
+      summary: Fetch blob metadata by blob key
+      tags:
+      - Feed
+  /v2/operators/nodeinfo:
     get:
       produces:
       - application/json
@@ -914,8 +926,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Active operator semver
       tags:
-      - OperatorsNodeInfo
-  /operators/reachability:
+      - Operators
+  /v2/operators/reachability:
     get:
       parameters:
       - description: 'Operator ID in hex string [default: all operators if unspecified]'
@@ -943,8 +955,8 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Operator node reachability check
       tags:
-      - OperatorsReachability
-  /operators/stake:
+      - Operators
+  /v2/operators/stake:
     get:
       parameters:
       - description: 'Operator ID in hex string [default: all operators if unspecified]'
@@ -972,7 +984,7 @@ paths:
             $ref: '#/definitions/dataapi.ErrorResponse'
       summary: Operator stake distribution query
       tags:
-      - OperatorsStake
+      - Operators
 schemes:
 - https
 - http

@@ -15,14 +15,15 @@ import (
 )
 
 type Config struct {
-	ServerVersion    uint
-	AwsClientConfig  aws.ClientConfig
-	BlobstoreConfig  blobstore.Config
-	EthClientConfig  geth.EthClientConfig
-	LoggerConfig     common.LoggerConfig
-	PrometheusConfig prometheus.Config
-	MetricsConfig    dataapi.MetricsConfig
-	ChainStateConfig thegraph.Config
+	ServerVersion     uint
+	AwsClientConfig   aws.ClientConfig
+	BlobstoreConfig   blobstore.Config
+	BlobstoreV2Config blobstore.Config
+	EthClientConfig   geth.EthClientConfig
+	LoggerConfig      common.LoggerConfig
+	PrometheusConfig  prometheus.Config
+	MetricsConfig     dataapi.MetricsConfig
+	ChainStateConfig  thegraph.Config
 
 	SocketAddr                   string
 	PrometheusApiAddr            string
@@ -37,6 +38,8 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+
+	BlobMetadataV2TableName string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -77,10 +80,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			HTTPPort:      ctx.GlobalString(flags.MetricsHTTPPort.Name),
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetricsFlag.Name),
 		},
-		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
-		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
-		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
-		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+		DisperserHostname:       ctx.GlobalString(flags.DisperserHostnameFlag.Name),
+		ChurnerHostname:         ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
+		BatcherHealthEndpt:      ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		ChainStateConfig:        thegraph.ReadCLIConfig(ctx),
+		BlobMetadataV2TableName: ctx.GlobalString(flags.DynamoV2TableNameFlag.Name),
 	}
 	return config, nil
 }

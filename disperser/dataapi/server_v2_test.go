@@ -35,7 +35,7 @@ import (
 
 var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
-	testDataApiServerV2 *dataapi.ServerV2
+	testDataApiServerV2 *dataapi.server
 
 	logger = logging.NewNoopLogger()
 
@@ -94,7 +94,9 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = dataapi.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	//testDataApiServerV2 = dataapi.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil, blobMetadataStoreV2)
+
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
