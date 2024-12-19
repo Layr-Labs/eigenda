@@ -151,12 +151,12 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	var requestSigner clients.RequestSigner
-	if config.DisperserSigningKeyName != "" {
+	if config.DisperserKMSKeyID != "" {
 		requestSigner, err = clients.NewRequestSigner(
 			context.Background(),
 			config.AwsClientConfig.Region,
 			config.AwsClientConfig.EndpointURL,
-			config.DisperserSigningKeyName)
+			config.DisperserKMSKeyID)
 		if err != nil {
 			return fmt.Errorf("failed to create request signer: %v", err)
 		}
