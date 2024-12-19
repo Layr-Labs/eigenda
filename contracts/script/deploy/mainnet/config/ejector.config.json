@@ -1,0 +1,24 @@
+{
+    "chainInfo": {
+      "chainId": 1
+    },
+  
+    "permissions" : {
+      "owner": "0xBE1685C81aA44FF9FB319dD389addd9374383e90",
+      "ejector": "0xD2Ee81Cf07B12140C793FcE5B26313CDd9d78eA8",
+      "deployer": "0x45B866E099a790cbddA655Ca20Cb11168B2cD088",
+      "emptyContract": "0x1f96861fEFa1065a5A96F20Deb6D8DC3ff48F7f9"
+    },
+  
+    "quorumEjectionParams": [
+      {
+        "0_rateLimitWindow": 604800,
+        "1_ejectableStakePercent": 3333
+      },
+      {
+        "0_rateLimitWindow": 604800,
+        "1_ejectableStakePercent": 3333
+      }
+    ]
+  
+  }

@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
+import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
 
 /**
  * @title Storage variables for the `EigenDAServiceManager` contract.
@@ -12,7 +16,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     // CONSTANTS
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
-    //TODO: mechanism to change any of these values?
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
     uint32 public constant STORE_DURATION_BLOCKS = 2 weeks / 12 seconds;
 
@@ -26,7 +29,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      * 
      * Note that this parameter needs to accommodate the delays which are introduced by the disperser, which are of two types: 
      *  - FinalizationBlockDelay: when initializing a batch, the disperser will use a ReferenceBlockNumber which is this many
-     *   blocks behind the current block number. This is to ensure that the the operator state associated with the reference block
+     *   blocks behind the current block number. This is to ensure that the operator state associated with the reference block
      *   will be stable.
      * - BatchInterval: the batch itself will only be confirmed after the batch interval has passed. 
      * 
@@ -36,26 +39,22 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 300;
 
-    /**
-     * @notice The quorum adversary threshold percentages stored as an ordered bytes array
-     * this is the percentage of the total stake that must be adversarial to consider a blob invalid.
-     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
-     */
-    bytes public constant quorumAdversaryThresholdPercentages = hex"21";
-
-    /**
-     * @notice The quorum confirmation threshold percentages stored as an ordered bytes array
-     * this is the percentage of the total stake needed to confirm a blob.
-     * The first byte is the threshold for quorum 0, the second byte is the threshold for quorum 1, etc.
-     */
-    bytes public constant quorumConfirmationThresholdPercentages = hex"37";
-
-    /**
-     * @notice The quorum numbers required for confirmation stored as an ordered bytes array
-     * these quorum numbers have respective canonical thresholds in the
-     * quorumConfirmationThresholdPercentages and quorumAdversaryThresholdPercentages above.
-     */
-    bytes public constant quorumNumbersRequired = hex"00";
+    IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+    IEigenDARelayRegistry public immutable eigenDARelayRegistry;
+    IPaymentVault public immutable paymentVault;
+    IEigenDADisperserRegistry public immutable eigenDADisperserRegistry;
+    
+    constructor(
+        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
+        IEigenDARelayRegistry _eigenDARelayRegistry,
+        IPaymentVault _paymentVault,
+        IEigenDADisperserRegistry _eigenDADisperserRegistry
+    ) {
+        eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
+        eigenDARelayRegistry = _eigenDARelayRegistry;
+        paymentVault = _paymentVault;
+        eigenDADisperserRegistry = _eigenDADisperserRegistry;
+    }
 
     /// @notice The current batchId
     uint32 public batchId;
