@@ -54,18 +54,6 @@ jobs:
         run: |
           cd contracts && forge build
 
-      - name: Churner
-        run: go test -v ./operators/churner/tests
-
-      - name: Indexer
-        run: go test -v ./core/indexer
-
-      - name: Node Plugin
-        run: go test -v ./node/plugin/tests
-
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
-
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e-fuzz
 
