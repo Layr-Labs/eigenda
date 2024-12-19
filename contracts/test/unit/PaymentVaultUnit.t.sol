@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "src/payments/PaymentVault.sol";
-import "src/interfaces/IPaymentVault.sol";
-import "forge-std/Test.sol";
-import "forge-std/StdStorage.sol";
+import "../MockEigenDADeployer.sol";
 
-contract PaymentVaultUnit is Test {
+contract PaymentVaultUnit is MockEigenDADeployer {
     using stdStorage for StdStorage;
 
     event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
@@ -25,54 +20,18 @@ contract PaymentVaultUnit is Test {
         uint64 newPriceUpdateCooldown
     );
 
-    PaymentVault paymentVault;
-    PaymentVault paymentVaultImplementation;
-    ERC20 mockToken;
-
-    address proxyAdmin = address(uint160(uint256(keccak256(abi.encodePacked("proxyAdmin")))));
-    address initialOwner = address(uint160(uint256(keccak256(abi.encodePacked("initialOwner")))));
     address user = address(uint160(uint256(keccak256(abi.encodePacked("user")))));
     address user2 = address(uint160(uint256(keccak256(abi.encodePacked("user2")))));
-
-    uint64 minNumSymbols = 1;
-    uint64 globalSymbolsPerPeriod = 2;
-    uint64 pricePerSymbol = 3;
-    uint64 reservationPeriodInterval = 4;
-    uint64 globalRatePeriodInterval = 5;
-    uint64 priceUpdateCooldown = 6 days;
 
     bytes quorumNumbers = hex"0001";
     bytes quorumSplits = hex"3232";
 
     function setUp() virtual public {
-        paymentVaultImplementation = new PaymentVault();
-
-        paymentVault = PaymentVault(
-            payable(
-                address(
-                    new TransparentUpgradeableProxy(
-                        address(paymentVaultImplementation),
-                        address(proxyAdmin),
-                        abi.encodeWithSelector(
-                            PaymentVault.initialize.selector,
-                            initialOwner,
-                            minNumSymbols,
-                            pricePerSymbol,
-                            priceUpdateCooldown,
-                            globalSymbolsPerPeriod,
-                            reservationPeriodInterval,
-                            globalRatePeriodInterval
-                        )
-                    )
-                )
-            )
-        );
-
-        mockToken = new ERC20("Mock Token", "MOCK");
+        _deployDA();
     }
 
     function test_initialize() public {
-        require(paymentVault.owner() == initialOwner, "Owner is not set");
+        require(paymentVault.owner() == registryCoordinatorOwner, "Owner is not set");
         assertEq(paymentVault.minNumSymbols(), minNumSymbols);
         assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod);
         assertEq(paymentVault.pricePerSymbol(), pricePerSymbol);
@@ -101,7 +60,7 @@ contract PaymentVaultUnit is Test {
 
         vm.expectEmit(address(paymentVault));
         emit ReservationUpdated(_account, reservation);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservation(_account, reservation);
 
         assertEq(keccak256(abi.encode(paymentVault.getReservation(_account))), keccak256(abi.encode(reservation)));
@@ -117,7 +76,7 @@ contract PaymentVaultUnit is Test {
         });
 
         vm.expectRevert("sum of quorumSplits must be 100");
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservation(user, reservation);
 
         reservation = IPaymentVault.Reservation({
@@ -129,7 +88,7 @@ contract PaymentVaultUnit is Test {
         });
 
         vm.expectRevert("sum of quorumSplits must be 100");
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservation(user, reservation);
 
         reservation = IPaymentVault.Reservation({
@@ -141,7 +100,7 @@ contract PaymentVaultUnit is Test {
         });
 
         vm.expectRevert("arrays must have the same length");
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservation(user, reservation);
     }
 
@@ -155,7 +114,7 @@ contract PaymentVaultUnit is Test {
         });
 
         vm.expectRevert("end timestamp must be greater than start timestamp");
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservation(user, reservation);
     }
 
@@ -219,7 +178,7 @@ contract PaymentVaultUnit is Test {
 
         vm.expectEmit(address(paymentVault));
         emit PriceParamsUpdated(minNumSymbols, minNumSymbols + 1, pricePerSymbol, pricePerSymbol + 1, priceUpdateCooldown, priceUpdateCooldown + 1);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
 
         assertEq(paymentVault.minNumSymbols(), minNumSymbols + 1);
@@ -232,14 +191,14 @@ contract PaymentVaultUnit is Test {
         vm.warp(block.timestamp + priceUpdateCooldown - 1);
 
         vm.expectRevert("price update cooldown not surpassed");
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
     }
 
     function test_setGlobalRatePeriodInterval() public {
         vm.expectEmit(address(paymentVault));
         emit GlobalRatePeriodIntervalUpdated(globalRatePeriodInterval, globalRatePeriodInterval + 1);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setGlobalRatePeriodInterval(globalRatePeriodInterval + 1);
         assertEq(paymentVault.globalRatePeriodInterval(), globalRatePeriodInterval + 1);
     }
@@ -247,7 +206,7 @@ contract PaymentVaultUnit is Test {
     function test_setGlobalSymbolsPerPeriod() public {
         vm.expectEmit(address(paymentVault));
         emit GlobalSymbolsPerPeriodUpdated(globalSymbolsPerPeriod, globalSymbolsPerPeriod + 1);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setGlobalSymbolsPerPeriod(globalSymbolsPerPeriod + 1);
         assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod + 1);
     }
@@ -255,23 +214,23 @@ contract PaymentVaultUnit is Test {
     function test_setReservationPeriodInterval() public {
         vm.expectEmit(address(paymentVault));
         emit ReservationPeriodIntervalUpdated(reservationPeriodInterval, reservationPeriodInterval + 1);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.setReservationPeriodInterval(reservationPeriodInterval + 1);
         assertEq(paymentVault.reservationPeriodInterval(), reservationPeriodInterval + 1);
     }
 
     function test_withdraw() public {
         test_depositOnDemand();
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.withdraw(100 ether);
         assertEq(address(paymentVault).balance, 100 ether);
     }
 
     function test_withdrawERC20() public {
         deal(address(mockToken), address(paymentVault), 100 ether);
-        vm.prank(initialOwner);
+        vm.prank(registryCoordinatorOwner);
         paymentVault.withdrawERC20(address(mockToken), 100 ether);
-        assertEq(mockToken.balanceOf(address(initialOwner)), 100 ether);
+        assertEq(mockToken.balanceOf(address(registryCoordinatorOwner)), 100 ether);
     }
 
     function test_ownedFunctions() public {
@@ -316,7 +275,7 @@ contract PaymentVaultUnit is Test {
             quorumSplits: hex"0163"
         });
 
-        vm.startPrank(initialOwner);
+        vm.startPrank(registryCoordinatorOwner);
         paymentVault.setReservation(user, reservation);
         paymentVault.setReservation(user2, reservation2);
         vm.stopPrank();
