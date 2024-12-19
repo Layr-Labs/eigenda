@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -285,9 +284,13 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
+	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+
+	} else {
+		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
 	// on-Chain account state
 	var pbReservation *pb.Reservation
@@ -313,12 +316,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		}
 	}
 
-	var onchainCumulativePayment *big.Int
+	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
 	} else {
-		onchainCumulativePayment = onDemandPayment.CumulativePayment
+		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
 
 	paymentGlobalParams := pb.PaymentGlobalParams{
@@ -333,8 +336,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		PaymentGlobalParams:      &paymentGlobalParams,
 		BinRecords:               binRecords[:],
 		Reservation:              pbReservation,
-		CumulativePayment:        largestCumulativePayment.Bytes(),
-		OnchainCumulativePayment: onchainCumulativePayment.Bytes(),
+		CumulativePayment:        largestCumulativePaymentBytes,
+		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
 }

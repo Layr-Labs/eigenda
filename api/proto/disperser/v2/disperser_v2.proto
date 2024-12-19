@@ -138,11 +138,15 @@ message Attestation {
   // Serialized bytes of G2 point that represents aggregate public key of all signers
   bytes apk_g2 = 2;
   // Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum
+  // The order of the quorum_apks should match the order of the quorum_numbers
   repeated bytes quorum_apks = 3;
   // Serialized bytes of aggregate signature
   bytes sigma = 4;
   // Relevant quorum numbers for the attestation
   repeated uint32 quorum_numbers = 5;
+  // The attestation rate for each quorum.
+  // The order of the quorum_signed_percentages should match the order of the quorum_numbers
+  bytes quorum_signed_percentages = 6;
 }
 
 message PaymentGlobalParams {

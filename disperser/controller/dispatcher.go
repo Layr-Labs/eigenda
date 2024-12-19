@@ -274,6 +274,10 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 		return fmt.Errorf("failed to aggregate signatures for batch %s: %w", batchHeaderHash, err)
 	}
 
+	quorumResults := make(map[core.QuorumID]uint8)
+	for quorumID, result := range quorumAttestation.QuorumResults {
+		quorumResults[quorumID] = result.PercentSigned
+	}
 	err = d.blobMetadataStore.PutAttestation(ctx, &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
@@ -282,6 +286,7 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 		QuorumAPKs:       aggSig.QuorumAggPubKeys,
 		Sigma:            aggSig.AggSignature,
 		QuorumNumbers:    nonZeroQuorums,
+		QuorumResults:    quorumResults,
 	})
 	putAttestationFinished := time.Now()
 	d.metrics.reportPutAttestationLatency(putAttestationFinished.Sub(aggregateSignaturesFinished))

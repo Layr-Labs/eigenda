@@ -460,6 +460,10 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
 		},
 		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
 	}
 
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
