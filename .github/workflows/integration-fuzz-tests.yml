@@ -9,7 +9,7 @@ on:
 
 jobs:
   integration-tests:
-    name: Integration Tests
+    name: Fuzz Tests
     runs-on: ubuntu-latest
     steps:
       - name: Add LocalStack AWS Credentials
