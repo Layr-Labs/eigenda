@@ -1,11 +1,33 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
 version: 2
 updates:
-  - package-ecosystem: "gomod" # See documentation for possible values
-    directory: "/" # Location of package manifests
+
+  # Group Security Updates
+  - package-ecosystem: "gomod"
+    directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    target-branch: "master"
+    commit-message:
+      prefix: "[golang-security]"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "-"
+    open-pull-requests-limit: 0
+    reviewers:
+      - "Layr-Labs/eigenda"
+    labels:
+      - "security"
+      - "golang"
+    allow:
+      - dependency-type: "direct"
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"

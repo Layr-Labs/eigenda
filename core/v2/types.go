@@ -312,9 +312,11 @@ type Attestation struct {
 	Sigma *core.Signature
 	// QuorumNumbers contains the quorums relevant for the attestation
 	QuorumNumbers []core.QuorumID
+	// QuorumResults contains the results of the quorum verification
+	QuorumResults map[core.QuorumID]uint8
 }
 
-func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
+func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 	nonSignerPubKeys := make([][]byte, len(a.NonSignerPubKeys))
 	for i, p := range a.NonSignerPubKeys {
 		pubkeyBytes := p.Bytes()
@@ -322,26 +324,31 @@ func (a *Attestation) ToProtobuf() *disperserpb.Attestation {
 	}
 
 	quorumAPKs := make([][]byte, len(a.QuorumAPKs))
-	for i, p := range a.QuorumAPKs {
-		apkBytes := p.Bytes()
-		quorumAPKs[i] = apkBytes[:]
-	}
-
 	quorumNumbers := make([]uint32, len(a.QuorumNumbers))
+	quorumResults := make([]uint8, len(a.QuorumResults))
 	for i, q := range a.QuorumNumbers {
 		quorumNumbers[i] = uint32(q)
+
+		apk, ok := a.QuorumAPKs[q]
+		if !ok {
+			return nil, fmt.Errorf("missing quorum APK for quorum %d", q)
+		}
+		apkBytes := apk.Bytes()
+		quorumAPKs[i] = apkBytes[:]
+		quorumResults[i] = a.QuorumResults[q]
 	}
 
 	apkG2Bytes := a.APKG2.Bytes()
 	sigmaBytes := a.Sigma.Bytes()
 
 	return &disperserpb.Attestation{
-		NonSignerPubkeys: nonSignerPubKeys,
-		ApkG2:            apkG2Bytes[:],
-		QuorumApks:       quorumAPKs,
-		Sigma:            sigmaBytes[:],
-		QuorumNumbers:    quorumNumbers,
-	}
+		NonSignerPubkeys:        nonSignerPubKeys,
+		ApkG2:                   apkG2Bytes[:],
+		QuorumApks:              quorumAPKs,
+		Sigma:                   sigmaBytes[:],
+		QuorumNumbers:           quorumNumbers,
+		QuorumSignedPercentages: quorumResults,
+	}, nil
 }
 
 type BlobVerificationInfo struct {

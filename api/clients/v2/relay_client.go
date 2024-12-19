@@ -2,7 +2,10 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/relay/auth"
 	"sync"
 
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
@@ -12,9 +15,14 @@ import (
 	"google.golang.org/grpc"
 )
 
+// MessageSigner is a function that signs a message with a private BLS key.
+type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, error)
+
 type RelayClientConfig struct {
 	Sockets           map[corev2.RelayKey]string
 	UseSecureGrpcFlag bool
+	OperatorID        *core.OperatorID
+	MessageSigner     MessageSigner
 }
 
 type ChunkRequestByRange struct {
@@ -62,7 +70,7 @@ var _ RelayClient = (*relayClient)(nil)
 
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
-func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (*relayClient, error) {
+func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
 	if config == nil || len(config.Sockets) <= 0 {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
@@ -97,7 +105,32 @@ func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blo
 	return res.GetBlob(), nil
 }
 
-func (c *relayClient) GetChunksByRange(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByRange) ([][]byte, error) {
+// signGetChunksRequest signs the GetChunksRequest with the operator's private key
+// and sets the signature in the request.
+func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygrpc.GetChunksRequest) error {
+	if c.config.OperatorID == nil {
+		return errors.New("no operator ID provided in config, cannot sign get chunks request")
+	}
+	if c.config.MessageSigner == nil {
+		return errors.New("no message signer provided in config, cannot sign get chunks request")
+	}
+
+	hash := auth.HashGetChunksRequest(request)
+	hashArray := [32]byte{}
+	copy(hashArray[:], hash)
+	signature, err := c.config.MessageSigner(ctx, hashArray)
+	if err != nil {
+		return fmt.Errorf("failed to sign get chunks request: %v", err)
+	}
+	request.OperatorSignature = signature.Serialize()
+	return nil
+}
+
+func (c *relayClient) GetChunksByRange(
+	ctx context.Context,
+	relayKey corev2.RelayKey,
+	requests []*ChunkRequestByRange) ([][]byte, error) {
+
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")
 	}
@@ -118,10 +151,17 @@ func (c *relayClient) GetChunksByRange(ctx context.Context, relayKey corev2.Rela
 			},
 		}
 	}
-	res, err := client.GetChunks(ctx, &relaygrpc.GetChunksRequest{
-		ChunkRequests: grpcRequests,
-	})
 
+	request := &relaygrpc.GetChunksRequest{
+		ChunkRequests: grpcRequests,
+		OperatorId:    c.config.OperatorID[:],
+	}
+	err = c.signGetChunksRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.GetChunks(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +169,11 @@ func (c *relayClient) GetChunksByRange(ctx context.Context, relayKey corev2.Rela
 	return res.GetData(), nil
 }
 
-func (c *relayClient) GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error) {
+func (c *relayClient) GetChunksByIndex(
+	ctx context.Context,
+	relayKey corev2.RelayKey,
+	requests []*ChunkRequestByIndex) ([][]byte, error) {
+
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")
 	}
@@ -150,9 +194,17 @@ func (c *relayClient) GetChunksByIndex(ctx context.Context, relayKey corev2.Rela
 			},
 		}
 	}
-	res, err := client.GetChunks(ctx, &relaygrpc.GetChunksRequest{
+
+	request := &relaygrpc.GetChunksRequest{
 		ChunkRequests: grpcRequests,
-	})
+		OperatorId:    c.config.OperatorID[:],
+	}
+	err = c.signGetChunksRequest(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := client.GetChunks(ctx, request)
 
 	if err != nil {
 		return nil, err

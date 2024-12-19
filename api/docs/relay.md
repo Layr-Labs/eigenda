@@ -4,15 +4,15 @@
 ## Table of Contents
 
 - [relay/relay.proto](#relay_relay-proto)
-    - [ChunkRequest](#node-ChunkRequest)
-    - [ChunkRequestByIndex](#node-ChunkRequestByIndex)
-    - [ChunkRequestByRange](#node-ChunkRequestByRange)
-    - [GetBlobReply](#node-GetBlobReply)
-    - [GetBlobRequest](#node-GetBlobRequest)
-    - [GetChunksReply](#node-GetChunksReply)
-    - [GetChunksRequest](#node-GetChunksRequest)
+    - [ChunkRequest](#relay-ChunkRequest)
+    - [ChunkRequestByIndex](#relay-ChunkRequestByIndex)
+    - [ChunkRequestByRange](#relay-ChunkRequestByRange)
+    - [GetBlobReply](#relay-GetBlobReply)
+    - [GetBlobRequest](#relay-GetBlobRequest)
+    - [GetChunksReply](#relay-GetChunksReply)
+    - [GetChunksRequest](#relay-GetChunksRequest)
   
-    - [Relay](#node-Relay)
+    - [Relay](#relay-Relay)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -25,7 +25,7 @@
 
 
 
-<a name="node-ChunkRequest"></a>
+<a name="relay-ChunkRequest"></a>
 
 ### ChunkRequest
 A request for chunks within a specific blob. Requests are fulfilled in all-or-nothing fashion. If any of the
@@ -34,15 +34,15 @@ requested chunks are not found or are unable to be fetched, the entire request w
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| by_index | [ChunkRequestByIndex](#node-ChunkRequestByIndex) |  | Request chunks by their individual indices. |
-| by_range | [ChunkRequestByRange](#node-ChunkRequestByRange) |  | Request chunks by a range of indices. |
+| by_index | [ChunkRequestByIndex](#relay-ChunkRequestByIndex) |  | Request chunks by their individual indices. |
+| by_range | [ChunkRequestByRange](#relay-ChunkRequestByRange) |  | Request chunks by a range of indices. |
 
 
 
 
 
 
-<a name="node-ChunkRequestByIndex"></a>
+<a name="relay-ChunkRequestByIndex"></a>
 
 ### ChunkRequestByIndex
 A request for chunks within a specific blob. Each chunk is requested individually by its index.
@@ -58,7 +58,7 @@ A request for chunks within a specific blob. Each chunk is requested individuall
 
 
 
-<a name="node-ChunkRequestByRange"></a>
+<a name="relay-ChunkRequestByRange"></a>
 
 ### ChunkRequestByRange
 A request for chunks within a specific blob. Each chunk is requested a range of indices.
@@ -75,7 +75,7 @@ A request for chunks within a specific blob. Each chunk is requested a range of 
 
 
 
-<a name="node-GetBlobReply"></a>
+<a name="relay-GetBlobReply"></a>
 
 ### GetBlobReply
 The reply to a GetBlobs request.
@@ -90,7 +90,7 @@ The reply to a GetBlobs request.
 
 
 
-<a name="node-GetBlobRequest"></a>
+<a name="relay-GetBlobRequest"></a>
 
 ### GetBlobRequest
 A request to fetch one or more blobs.
@@ -105,7 +105,7 @@ A request to fetch one or more blobs.
 
 
 
-<a name="node-GetChunksReply"></a>
+<a name="relay-GetChunksReply"></a>
 
 ### GetChunksReply
 The reply to a GetChunks request.
@@ -120,7 +120,7 @@ The reply to a GetChunks request.
 
 
 
-<a name="node-GetChunksRequest"></a>
+<a name="relay-GetChunksRequest"></a>
 
 ### GetChunksRequest
 Request chunks from blobs stored by this relay.
@@ -128,7 +128,7 @@ Request chunks from blobs stored by this relay.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| chunk_requests | [ChunkRequest](#node-ChunkRequest) | repeated | The chunk requests. Chunks are returned in the same order as they are requested. |
+| chunk_requests | [ChunkRequest](#relay-ChunkRequest) | repeated | The chunk requests. Chunks are returned in the same order as they are requested. |
 | operator_id | [bytes](#bytes) |  | If this is an authenticated request, this should hold the ID of the operator. If this is an unauthenticated request, this field should be empty. Relays may choose to reject unauthenticated requests. |
 | operator_signature | [bytes](#bytes) |  | If this is an authenticated request, this field will hold a BLS signature by the requester on the hash of this request. Relays may choose to reject unauthenticated requests.
 
@@ -149,15 +149,15 @@ Perform a keccak256 hash on the following data in the following order: 1. the op
  
 
 
-<a name="node-Relay"></a>
+<a name="relay-Relay"></a>
 
 ### Relay
 Relay is a service that provides access to public relay functionality.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetBlob | [GetBlobRequest](#node-GetBlobRequest) | [GetBlobReply](#node-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
-| GetChunks | [GetChunksRequest](#node-GetChunksRequest) | [GetChunksReply](#node-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
+| GetBlob | [GetBlobRequest](#relay-GetBlobRequest) | [GetBlobReply](#relay-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
+| GetChunks | [GetChunksRequest](#relay-GetChunksRequest) | [GetChunksReply](#relay-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
 
  
 

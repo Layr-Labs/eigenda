@@ -60,7 +60,7 @@ func (m *Meterer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx, nil); err != nil {
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
 			case <-ctx.Done():
@@ -176,6 +176,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
 func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
+	if binInterval == 0 {
+		return 0
+	}
 	return uint32(timestamp) / binInterval
 }
 
@@ -207,11 +210,11 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
-		err := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
-		if err != nil {
-			return err
+		dbErr := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		if dbErr != nil {
+			return dbErr
 		}
-		return fmt.Errorf("failed global rate limiting")
+		return fmt.Errorf("failed global rate limiting: %w", err)
 	}
 
 	return nil
