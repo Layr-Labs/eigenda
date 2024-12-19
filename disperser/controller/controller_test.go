@@ -154,7 +154,7 @@ func teardown() {
 	}
 }
 
-func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
+func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *corev2.BlobHeader) {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	require.NoError(t, err)
 	bh := &corev2.BlobHeader{
 		BlobVersion:     0,
-		QuorumNumbers:   []core.QuorumID{0, 1},
+		QuorumNumbers:   quorumNumbers,
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,

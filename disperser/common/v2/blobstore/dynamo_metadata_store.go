@@ -42,10 +42,11 @@ const (
 
 var (
 	statusUpdatePrecondition = map[v2.BlobStatus][]v2.BlobStatus{
-		v2.Queued:    {},
-		v2.Encoded:   {v2.Queued},
-		v2.Certified: {v2.Encoded},
-		v2.Failed:    {v2.Queued, v2.Encoded},
+		v2.Queued:                  {},
+		v2.Encoded:                 {v2.Queued},
+		v2.Certified:               {v2.Encoded},
+		v2.Failed:                  {v2.Queued, v2.Encoded},
+		v2.INSUFFICIENT_SIGNATURES: {v2.Encoded},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )

@@ -99,6 +99,7 @@ message GetPaymentStateReply {
 // Terminal states are states that will not be updated to a different state:
 // - CERTIFIED
 // - FAILED
+// - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
   UNKNOWN = 0;
 
@@ -113,6 +114,9 @@ enum BlobStatus {
 
   // FAILED means that the blob has failed permanently
   FAILED = 4;
+
+  // INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation
+  INSUFFICIENT_SIGNATURES = 5;
 }
 
 // SignedBatch is a batch of blobs with a signature.

@@ -789,7 +789,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -824,6 +824,12 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                 <td>FAILED</td>
                 <td>4</td>
                 <td><p>FAILED means that the blob has failed permanently</p></td>
+              </tr>
+            
+              <tr>
+                <td>INSUFFICIENT_SIGNATURES</td>
+                <td>5</td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation</p></td>
               </tr>
             
           </tbody>
