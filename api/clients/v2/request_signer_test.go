@@ -47,7 +47,13 @@ func setup(t *testing.T) {
 func changeDirectory(path string) {
 	err := os.Chdir(path)
 	if err != nil {
-		log.Panicf("Failed to change directories. Error: %s", err)
+
+		currentDirectory, err := os.Getwd()
+		if err != nil {
+			log.Printf("Failed to get current directory. Error: %s", err)
+		}
+
+		log.Panicf("Failed to change directories. CWD: %s, Error: %s", currentDirectory, err)
 	}
 
 	newDir, err := os.Getwd()
