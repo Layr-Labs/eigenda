@@ -94,6 +94,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Controller build stage
 FROM common-builder AS controller-builder
+COPY node/auth /app/node/auth
 WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

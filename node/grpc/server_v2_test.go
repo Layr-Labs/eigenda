@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -82,7 +83,19 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		RelayClient: atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
-	server, err := grpc.NewServerV2(config, node, logger, ratelimiter, prometheus.NewRegistry())
+
+	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
+	var reader *coreeth.Reader
+
+	server, err := grpc.NewServerV2(
+		context.Background(),
+		config,
+		node,
+		logger,
+		ratelimiter,
+		prometheus.NewRegistry(),
+		reader)
+
 	require.NoError(t, err)
 	return &testComponents{
 		server:      server,

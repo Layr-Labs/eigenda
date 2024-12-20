@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -148,7 +149,22 @@ func RunController(ctx *cli.Context) error {
 			return err
 		}
 	}
-	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, logger)
+
+	var requestSigner clients.DispersalRequestSigner
+	if config.DisperserStoreChunksSigningDisabled {
+		logger.Warn("StoreChunks() signing is disabled")
+	} else {
+		requestSigner, err = clients.NewDispersalRequestSigner(
+			context.Background(),
+			config.AwsClientConfig.Region,
+			config.AwsClientConfig.EndpointURL,
+			config.DisperserKMSKeyID)
+		if err != nil {
+			return fmt.Errorf("failed to create request signer: %v", err)
+		}
+	}
+
+	nodeClientManager, err := controller.NewNodeClientManager(config.NodeClientCacheSize, requestSigner, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
