@@ -329,3 +329,45 @@ func PairingsVerify(a1 *bn254.G1Affine, a2 *bn254.G2Affine, b1 *bn254.G1Affine, 
 
 	return nil
 }
+
+// GenerateBlobCommitment computes a kzg-bn254 commitment of blob data using SRS
+func (v *Verifier) GenerateBlobCommitment(blob []byte) (*encoding.G1Commitment, error) {
+	inputFr, err := rs.ToFrArray(blob)
+	if err != nil {
+		return nil, fmt.Errorf("convert bytes to field elements, %w", err)
+	}
+
+	if len(v.Srs.G1) < len(inputFr) {
+		return nil, fmt.Errorf(
+			"insufficient SRS in memory: have %v, need %v",
+			len(v.Srs.G1),
+			len(inputFr))
+	}
+
+	var commitment bn254.G1Affine
+	_, err = commitment.MultiExp(v.Srs.G1[:len(inputFr)], inputFr, ecc.MultiExpConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("MultiExp: %w", err)
+	}
+
+	return &encoding.G1Commitment{X: commitment.X, Y: commitment.Y}, nil
+}
+
+// GenerateAndCompareBlobCommitment generates the kzg-bn254 commitment of the blob, and compares it with a claimed
+// commitment. An error is returned if there is a problem generating the commitment, or if the comparison fails.
+func (v *Verifier) GenerateAndCompareBlobCommitment(claimedCommitment *encoding.G1Commitment, blobBytes []byte) error {
+
+	computedCommitment, err := v.GenerateBlobCommitment(blobBytes)
+	if err != nil {
+		return fmt.Errorf("compute commitment: %w", err)
+	}
+
+	if claimedCommitment.X.Equal(&computedCommitment.X) &&
+		claimedCommitment.Y.Equal(&computedCommitment.Y) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"commitment field elements do not match. computed commitment: (x: %x, y: %x), claimed commitment (x: %x, y: %x)",
+		computedCommitment.X, computedCommitment.Y, claimedCommitment.X, claimedCommitment.Y)
+}

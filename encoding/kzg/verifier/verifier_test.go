@@ -3,6 +3,7 @@ package verifier_test
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"log"
 	"os"
 	"runtime"
@@ -55,6 +56,16 @@ func setup() {
 func teardown() {
 	log.Println("Tearing down")
 	os.RemoveAll("./data")
+}
+
+// randomlyModifyBytes picks a random byte from the input array, and increments it
+func randomlyModifyBytes(testRandom *random.TestRandom, inputBytes []byte) {
+	indexToModify := testRandom.Intn(len(inputBytes))
+	inputBytes[indexToModify] = inputBytes[indexToModify] + 1
+}
+
+func getRandomPaddedBytes(testRandom *random.TestRandom, count int) []byte {
+	return codec.ConvertByPaddingEmptyByte(testRandom.Bytes(count))
 }
 
 // var control interface{ Stop() }
@@ -145,4 +156,89 @@ func BenchmarkVerifyBlob(b *testing.B) {
 		assert.NoError(b, err)
 	}
 
+}
+
+func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
+	testRandom := random.NewTestRandom(t)
+	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NotNil(t, kzgVerifier)
+	require.NoError(t, err)
+
+	commitment, err := kzgVerifier.GenerateBlobCommitment(randomBytes)
+	require.NotNil(t, commitment)
+	require.NoError(t, err)
+
+	// make sure the commitment verifies correctly
+	err = kzgVerifier.GenerateAndCompareBlobCommitment(commitment, randomBytes)
+	require.NoError(t, err)
+}
+
+func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
+	testRandom := random.NewTestRandom(t)
+	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NotNil(t, kzgVerifier)
+	require.NoError(t, err)
+
+	commitment, err := kzgVerifier.GenerateBlobCommitment(randomBytes)
+	require.NotNil(t, commitment)
+	require.NoError(t, err)
+
+	// randomly modify the bytes, and make sure the commitment verification fails
+	randomlyModifyBytes(testRandom, randomBytes)
+	err = kzgVerifier.GenerateAndCompareBlobCommitment(commitment, randomBytes)
+	require.NotNil(t, err)
+}
+
+func TestGenerateBlobCommitmentEquality(t *testing.T) {
+	testRandom := random.NewTestRandom(t)
+	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NotNil(t, kzgVerifier)
+	require.NoError(t, err)
+
+	// generate two identical commitments
+	commitment1, err := kzgVerifier.GenerateBlobCommitment(randomBytes)
+	require.NotNil(t, commitment1)
+	require.NoError(t, err)
+	commitment2, err := kzgVerifier.GenerateBlobCommitment(randomBytes)
+	require.NotNil(t, commitment2)
+	require.NoError(t, err)
+
+	// commitments to identical bytes should be equal
+	require.Equal(t, commitment1, commitment2)
+
+	// randomly modify a byte
+	randomlyModifyBytes(testRandom, randomBytes)
+	commitmentA, err := kzgVerifier.GenerateBlobCommitment(randomBytes)
+	require.NotNil(t, commitmentA)
+	require.NoError(t, err)
+
+	// commitments to non-identical bytes should not be equal
+	require.NotEqual(t, commitment1, commitmentA)
+}
+
+func TestGenerateBlobCommitmentTooLong(t *testing.T) {
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NotNil(t, kzgVerifier)
+	require.NoError(t, err)
+
+	// this is the absolute maximum number of bytes we can handle, given how the verifier was configured
+	almostTooLongByteCount := 2900 * 32
+
+	// an array of exactly this size should be fine
+	almostTooLongBytes := make([]byte, almostTooLongByteCount)
+	commitment1, err := kzgVerifier.GenerateBlobCommitment(almostTooLongBytes)
+	require.NotNil(t, commitment1)
+	require.NoError(t, err)
+
+	// but 1 more byte is more than we can handle
+	tooLongBytes := make([]byte, almostTooLongByteCount+1)
+	commitment2, err := kzgVerifier.GenerateBlobCommitment(tooLongBytes)
+	require.Nil(t, commitment2)
+	require.NotNil(t, err)
 }
