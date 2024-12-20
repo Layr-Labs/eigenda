@@ -173,7 +173,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	for _, blobKey := range failedObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.INSUFFICIENT_SIGNATURES, bm.BlobStatus)
+		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
 	}
 	for _, blobKey := range successfulObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
@@ -203,6 +203,70 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 
 	deleteBlobs(t, components.BlobMetadataStore, failedObjs.blobKeys, [][32]byte{bhh})
 	deleteBlobs(t, components.BlobMetadataStore, successfulObjs.blobKeys, [][32]byte{bhh})
+}
+
+func TestDispatcherInsufficientSignatures2(t *testing.T) {
+	components := newDispatcherComponents(t)
+	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
+	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
+	ctx := context.Background()
+
+	// Get batch header hash to mock signatures
+	certs := make([]*corev2.BlobCertificate, 0, len(objsInBothQuorum.blobCerts)+len(objsInQuorum1.blobCerts))
+	certs = append(certs, objsInBothQuorum.blobCerts...)
+	certs = append(certs, objsInQuorum1.blobCerts...)
+	merkleTree, err := corev2.BuildMerkleTree(certs)
+	require.NoError(t, err)
+	require.NotNil(t, merkleTree)
+	require.NotNil(t, merkleTree.Root())
+
+	// no operators sign, all blobs will have insufficient signatures
+	mockClient0 := clientsmock.NewNodeClient()
+	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	require.NotEqual(t, op0Port, op1Port)
+	require.NotEqual(t, op0Port, op2Port)
+	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
+	mockClient1 := clientsmock.NewNodeClient()
+	mockClient1.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+	components.NodeClientManager.On("GetClient", mock.Anything, op1Port).Return(mockClient1, nil)
+	mockClient2 := clientsmock.NewNodeClient()
+	mockClient2.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
+	components.NodeClientManager.On("GetClient", mock.Anything, op2Port).Return(mockClient2, nil)
+
+	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
+	require.NoError(t, err)
+	err = components.Dispatcher.HandleSignatures(ctx, batchData, sigChan)
+	require.ErrorContains(t, err, "all quorums received no attestation")
+
+	// Test that the blob metadata status are updated
+	for _, blobKey := range objsInBothQuorum.blobKeys {
+		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
+		require.NoError(t, err)
+		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+	}
+	for _, blobKey := range objsInQuorum1.blobKeys {
+		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
+		require.NoError(t, err)
+		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+	}
+
+	// Get batch header
+	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, objsInBothQuorum.blobKeys[0])
+	require.NoError(t, err)
+	require.Len(t, vis, 1)
+	bhh, err := vis[0].BatchHeader.Hash()
+	require.NoError(t, err)
+
+	// Test that attestation is written
+	att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
+	require.Error(t, err)
+	require.Nil(t, att)
+
+	deleteBlobs(t, components.BlobMetadataStore, objsInBothQuorum.blobKeys, [][32]byte{bhh})
+	deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
 }
 
 func TestDispatcherMaxBatchSize(t *testing.T) {

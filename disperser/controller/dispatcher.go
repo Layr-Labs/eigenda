@@ -254,6 +254,10 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 	batchHeaderHash := hex.EncodeToString(batchData.BatchHeaderHash[:])
 	quorumAttestation, err := d.aggregator.ReceiveSignatures(ctx, batchData.OperatorState, batchData.BatchHeaderHash, sigChan)
 	if err != nil {
+		dbErr := d.failBatch(ctx, batchData)
+		if dbErr != nil {
+			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
+		}
 		return fmt.Errorf("failed to receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 	}
 	receiveSignaturesFinished := time.Now()
@@ -269,6 +273,10 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 		}
 	}
 	if len(nonZeroQuorums) == 0 {
+		err = d.updateBatchStatus(ctx, batchData, quorumResults)
+		if err != nil {
+			return fmt.Errorf("failed to update blob statuses for batch %s: %w", batchHeaderHash, err)
+		}
 		return fmt.Errorf("all quorums received no attestation for batch %s", batchHeaderHash)
 	}
 
@@ -276,6 +284,10 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 	aggregateSignaturesFinished := time.Now()
 	d.metrics.reportAggregateSignaturesLatency(aggregateSignaturesFinished.Sub(receiveSignaturesFinished))
 	if err != nil {
+		dbErr := d.failBatch(ctx, batchData)
+		if dbErr != nil {
+			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
+		}
 		return fmt.Errorf("failed to aggregate signatures for batch %s: %w", batchHeaderHash, err)
 	}
 
@@ -293,10 +305,14 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 	putAttestationFinished := time.Now()
 	d.metrics.reportPutAttestationLatency(putAttestationFinished.Sub(aggregateSignaturesFinished))
 	if err != nil {
+		dbErr := d.failBatch(ctx, batchData)
+		if dbErr != nil {
+			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
+		}
 		return fmt.Errorf("failed to put attestation for batch %s: %w", batchHeaderHash, err)
 	}
 
-	err = d.updateBatchStatus(ctx, batchData, attestation)
+	err = d.updateBatchStatus(ctx, batchData, attestation.QuorumResults)
 	updateBatchStatusFinished := time.Now()
 	d.metrics.reportUpdateBatchStatusLatency(updateBatchStatusFinished.Sub(putAttestationFinished))
 	if err != nil {
@@ -491,7 +507,7 @@ func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClient, 
 	return sig, nil
 }
 
-func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, attestation *corev2.Attestation) error {
+func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, quorumResults map[core.QuorumID]uint8) error {
 	var multierr error
 	for i, cert := range batch.Batch.BlobCertificates {
 		blobKey := batch.BlobKeys[i]
@@ -506,7 +522,7 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, at
 
 		failed := false
 		for _, q := range cert.BlobHeader.QuorumNumbers {
-			if res, ok := attestation.QuorumResults[q]; !ok || res == 0 {
+			if res, ok := quorumResults[q]; !ok || res == 0 {
 				d.logger.Error("quorum result not found", "quorumID", q, "blobKey", blobKey.Hex())
 				failed = true
 				break
@@ -514,7 +530,7 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, at
 		}
 
 		if failed {
-			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.INSUFFICIENT_SIGNATURES)
+			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.InsufficientSignatures)
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
@@ -524,6 +540,18 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, at
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
 		if err != nil {
 			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to certified: %w", blobKey.Hex(), err))
+		}
+	}
+
+	return multierr
+}
+
+func (d *Dispatcher) failBatch(ctx context.Context, batch *batchData) error {
+	var multierr error
+	for _, blobKey := range batch.BlobKeys {
+		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
+		if err != nil {
+			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 		}
 	}
 
