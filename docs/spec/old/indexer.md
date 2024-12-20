@@ -151,7 +151,7 @@ type HeaderStore interface{
     // GetObject takes in a header and retrieves the accumulator object attached to the latest header prior to the supplied header having the requested object type. 
     GetObject(header Header, acc Accumulator) (AccumulatorObject, Header, error)
 
-    // GetObject retrieves the accumulator object attached to the latest header having the requested object type. 
+    // GetLatestObject retrieves the accumulator object attached to the latest header having the requested object type. 
     GetLatestObject(acc Accumulator) (AccumulatorObject, Header, error)
 
 }
