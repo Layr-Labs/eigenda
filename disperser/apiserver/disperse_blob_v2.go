@@ -13,6 +13,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
@@ -41,8 +42,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, api.NewErrorInternal(err.Error())
 	}
 
+	publicKeyBytes, err := hexutil.Decode(blobHeader.PaymentMetadata.AccountID)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to decode public key: %v", err))
+	}
 	s.logger.Debug("received a new blob dispersal request",
-		"accountId", blobHeader.PaymentMetadata.AccountID,
+		"accountId", publicKeyBytes,
 		"blobSizeBytes", len(data),
 		"quorums", req.GetBlobHeader().GetQuorumNumbers(),
 	)
