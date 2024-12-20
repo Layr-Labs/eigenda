@@ -334,7 +334,7 @@ RetrieveBlobRequest contains parameters to retrieve the blob.
 BlobStatus represents the status of a blob.
 The status of a blob is updated as the blob is processed by the disperser.
 The status of a blob can be queried by the client using the GetBlobStatus API.
-Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 - PROCESSING
 - DISPERSING
 - CONFIRMED
