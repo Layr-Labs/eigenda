@@ -40,49 +40,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		encoderConfig = encoding.DefaultConfig()
 	}
 
-	if kzgConfig.SRSNumberToLoad > kzgConfig.SRSOrder {
-		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
-	}
-
-	// read the whole order, and treat it as entire SRS for low degree proof
-	s1, err := kzg.ReadG1Points(kzgConfig.G1Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
-	if err != nil {
-		log.Println("failed to read G1 points", err)
-		return nil, err
-	}
-
-	s2 := make([]bn254.G2Affine, 0)
-	g2Trailing := make([]bn254.G2Affine, 0)
-
-	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if kzgConfig.LoadG2Points {
-		if len(kzgConfig.G2Path) == 0 {
-			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
-		}
-
-		s2, err = kzg.ReadG2Points(kzgConfig.G2Path, kzgConfig.SRSNumberToLoad, kzgConfig.NumWorker)
-		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
-		}
-
-		g2Trailing, err = kzg.ReadG2PointSection(
-			kzgConfig.G2Path,
-			kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-			kzgConfig.SRSOrder, // last exclusive
-			kzgConfig.NumWorker,
-		)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// todo, there are better ways to handle it
-		if len(kzgConfig.G2PowerOf2Path) == 0 {
-			return nil, errors.New("G2PowerOf2Path is empty. However, object needs to load G2Points")
-		}
-	}
-
-	srs, err := kzg.NewSrs(s1, s2)
+	srs, err := kzg.NewSrs(kzgConfig)
 	if err != nil {
 		log.Println("Could not create srs", err)
 		return nil, err
@@ -102,7 +60,6 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		encoder:             rsEncoder,
 		KzgConfig:           kzgConfig,
 		Srs:                 srs,
-		G2Trailing:          g2Trailing,
 		ParametrizedProvers: make(map[encoding.EncodingParams]*ParametrizedProver),
 	}
 
@@ -405,9 +362,8 @@ func (p *Prover) createGnarkBackendProver(params encoding.EncodingParams, fs *ff
 
 	// Set KZG Commitments gnark backend
 	commitmentsBackend := &gnarkprover.KzgCommitmentsGnarkBackend{
-		Srs:        p.Srs,
-		G2Trailing: p.G2Trailing,
-		KzgConfig:  p.KzgConfig,
+		Srs:       p.Srs,
+		KzgConfig: p.KzgConfig,
 	}
 
 	return &ParametrizedProver{
