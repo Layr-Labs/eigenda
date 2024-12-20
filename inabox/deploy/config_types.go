@@ -103,6 +103,7 @@ type EigenDAContract struct {
 	OperatorStateRetreiver string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
+	BlobVerifier           string `json:"blobVerifier"`
 }
 
 type Stakes struct {
