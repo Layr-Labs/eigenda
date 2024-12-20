@@ -26,6 +26,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
@@ -136,7 +138,23 @@ func (s *DispersalServer) DisperseBlobAuthenticated(stream pb.Disperser_Disperse
 		return api.NewErrorInvalidArg(err.Error())
 	}
 
-	authenticatedAddress := blob.RequestHeader.BlobAuthHeader.AccountID
+	// Get the ethereum address associated with the public key. This is just for convenience so we can put addresses instead of public keys in the allowlist.
+	// Decode public key
+	publicKeyBytes, err := hexutil.Decode(blob.RequestHeader.AccountID)
+	if err != nil {
+		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to decode account ID (%v): %v", blob.RequestHeader.AccountID, err))
+	}
+
+	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		s.metrics.HandleInvalidArgRpcRequest("DisperseBlobAuthenticated")
+		s.metrics.HandleInvalidArgRequest("DisperseBlobAuthenticated")
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to decode public key (%v): %v", hexutil.Encode(publicKeyBytes), err))
+	}
+
+	authenticatedAddress := crypto.PubkeyToAddress(*pubKey).String()
 
 	// Send back challenge to client
 	challengeBytes := make([]byte, 32)

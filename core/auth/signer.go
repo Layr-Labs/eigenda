@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -48,8 +49,8 @@ func (s *LocalBlobRequestSigner) SignBlobRequest(header core.BlobAuthHeader) ([]
 
 func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
 
-	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey).Hex()
-	return accountId, nil
+	publicKeyBytes := crypto.FromECDSAPub(&s.PrivateKey.PublicKey)
+	return hexutil.Encode(publicKeyBytes), nil
 
 }
 
