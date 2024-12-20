@@ -1,9 +1,16 @@
 package deploy
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"log"
 	"math/big"
 	"path/filepath"
@@ -321,7 +328,11 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	return v
 }
 
-func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
+func (env *Config) generateControllerVars(
+	ind int,
+	graphUrl string,
+	disperserKeyID string) ControllerVars {
+
 	v := ControllerVars{
 		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
 		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:             env.EigenDA.OperatorStateRetreiver,
@@ -344,6 +355,7 @@ func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVa
 		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "true",
+		CONTROLLER_DISPERSER_KMS_KEY_ID:                    disperserKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -567,6 +579,33 @@ func (env *Config) getKey(name string) (key, address string) {
 	return
 }
 
+// GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
+func generateDisperserKeypair() (string, gethcommon.Address, error) {
+	keyManager := kms.New(kms.Options{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String("0.0.0.0:4570"), // TODO don't hard code this
+	})
+
+	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
+		KeySpec:  types.KeySpecEccSecgP256k1,
+		KeyUsage: types.KeyUsageTypeSignVerify,
+	})
+	if err != nil {
+		return "", gethcommon.Address{}, err
+	}
+
+	keyID := *createKeyOutput.KeyMetadata.KeyId
+
+	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
+	if err != nil {
+		return "", gethcommon.Address{}, err
+	}
+
+	publicAddress := crypto.PubkeyToAddress(*key)
+
+	return keyID, publicAddress, nil
+}
+
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
@@ -582,6 +621,13 @@ func (env *Config) GenerateAllVariables() {
 	// keyData := readFile(gethPrivateKeys)
 	// keys := strings.Split(string(keyData), "\n")
 	// id := 1
+
+	disperserKeyID, disperserAddress, err := generateDisperserKeypair()
+	if err != nil {
+		log.Fatalf("Error generating disperser keypair: %v", err)
+	}
+	// TODO do something more with the key ID
+	log.Printf("Disperser key ID: %s, address: %s", disperserKeyID, disperserAddress.Hex())
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
@@ -728,7 +774,7 @@ func (env *Config) GenerateAllVariables() {
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl)
+	controllerConfig := env.generateControllerVars(0, graphUrl, disperserKeyID)
 	writeEnv(controllerConfig.getEnvMap(), envFile)
 	env.Controller = controllerConfig
 
