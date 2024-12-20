@@ -4,6 +4,9 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -13,8 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
-	"sync"
-	"testing"
 )
 
 func TestBlobWriter(t *testing.T) {
@@ -56,7 +57,7 @@ func TestBlobWriter(t *testing.T) {
 	}
 
 	disperserClient := &MockDisperserClient{}
-	unconfirmedKeyChannel := make(chan *UnconfirmedKey, 100)
+	unconfirmedKeyChannel := make(chan *UncertifiedKey, 100)
 
 	generatorMetrics := metrics.NewMockMetrics()
 

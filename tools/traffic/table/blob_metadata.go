@@ -1,6 +1,10 @@
 package table
 
-import "errors"
+import (
+	"errors"
+
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+)
 
 // BlobMetadata encapsulates various information about a blob written by the traffic generator.
 type BlobMetadata struct {
@@ -12,6 +16,9 @@ type BlobMetadata struct {
 
 	// Hash of the batch header that the blob was written in.
 	BatchHeaderHash [32]byte
+
+	// Blob header of the blob.
+	BlobHeader *corev2.BlobHeader
 
 	// Checksum of the blob.
 	Checksum [16]byte

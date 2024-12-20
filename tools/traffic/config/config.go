@@ -2,14 +2,12 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/retriever"
-
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
 
@@ -20,16 +18,13 @@ type Config struct {
 	LoggingConfig common.LoggerConfig
 
 	// Configuration for the disperser client.
-	DisperserClientConfig *clients.Config
+	DisperserClientConfig *clients.DisperserClientConfig
 
-	// Configuration for the retriever client.
-	RetrievalClientConfig *retriever.Config
+	// Signer private key
+	SignerPrivateKey string
 
 	// Configuration for the graph.
 	TheGraphConfig *thegraph.Config
-
-	// Configuration for the EigenDA client.
-	EigenDAClientConfig *clients.EigenDAClientConfig
 
 	// Configures the traffic generator workers.
 	WorkerConfig WorkerConfig
@@ -62,25 +57,18 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	config := &Config{
-		DisperserClientConfig: &clients.Config{
+		DisperserClientConfig: &clients.DisperserClientConfig{
 			Hostname:          ctx.GlobalString(HostnameFlag.Name),
 			Port:              ctx.GlobalString(GrpcPortFlag.Name),
-			Timeout:           ctx.Duration(TimeoutFlag.Name),
 			UseSecureGrpcFlag: ctx.GlobalBool(UseSecureGrpcFlag.Name),
 		},
 
-		RetrievalClientConfig: retrieverConfig,
+		SignerPrivateKey: ctx.String(SignerPrivateKeyFlag.Name),
 
 		TheGraphConfig: &thegraph.Config{
 			Endpoint:     ctx.String(TheGraphUrlFlag.Name),
 			PullInterval: ctx.Duration(TheGraphPullIntervalFlag.Name),
 			MaxRetries:   ctx.Int(TheGraphRetriesFlag.Name),
-		},
-
-		EigenDAClientConfig: &clients.EigenDAClientConfig{
-			RPC:                 fmt.Sprintf("%s:%s", ctx.GlobalString(HostnameFlag.Name), ctx.GlobalString(GrpcPortFlag.Name)),
-			SignerPrivateKeyHex: ctx.String(SignerPrivateKeyFlag.Name),
-			DisableTLS:          ctx.GlobalBool(DisableTLSFlag.Name),
 		},
 
 		LoggingConfig: *loggerConfig,
@@ -107,18 +95,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			RetrieveBlobChunksTimeout:    ctx.Duration(RetrieveBlobChunksTimeoutFlag.Name),
 			StatusTrackerChannelCapacity: ctx.Uint(VerificationChannelCapacityFlag.Name),
 
-			EigenDAServiceManager: retrieverConfig.EigenDAServiceManagerAddr,
-			SignerPrivateKey:      ctx.String(SignerPrivateKeyFlag.Name),
-			CustomQuorums:         customQuorumsUint8,
+			CustomQuorums: customQuorumsUint8,
 
 			MetricsBlacklist:      ctx.StringSlice(MetricsBlacklistFlag.Name),
 			MetricsFuzzyBlacklist: ctx.StringSlice(MetricsFuzzyBlacklistFlag.Name),
 		},
-	}
-
-	err = config.EigenDAClientConfig.CheckAndSetDefaults()
-	if err != nil {
-		return nil, err
 	}
 
 	return config, nil

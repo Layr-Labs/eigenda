@@ -8,7 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
@@ -32,8 +33,8 @@ type BlobWriter struct {
 	// disperser is the client used to send blobs to the disperser.
 	disperser clients.DisperserClient
 
-	// Unconfirmed keys are sent here.
-	unconfirmedKeyChannel chan *UnconfirmedKey
+	// Uncertified keys are sent here.
+	uncertifiedKeyChannel chan *UncertifiedKey
 
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData []byte
@@ -55,7 +56,7 @@ func NewBlobWriter(
 	logger logging.Logger,
 	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
-	unconfirmedKeyChannel chan *UnconfirmedKey,
+	uncertifiedKeyChannel chan *UncertifiedKey,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
@@ -78,7 +79,7 @@ func NewBlobWriter(
 		logger:                logger,
 		config:                config,
 		disperser:             disperser,
-		unconfirmedKeyChannel: unconfirmedKeyChannel,
+		uncertifiedKeyChannel: uncertifiedKeyChannel,
 		fixedRandomData:       fixedRandomData,
 		writeLatencyMetric:    generatorMetrics.NewLatencyMetric("write"),
 		writeSuccessMetric:    generatorMetrics.NewCountMetric("write_success"),
@@ -128,7 +129,7 @@ func (writer *BlobWriter) writeNextBlob() {
 
 	checksum := md5.Sum(data)
 
-	writer.unconfirmedKeyChannel <- &UnconfirmedKey{
+	writer.uncertifiedKeyChannel <- &UncertifiedKey{
 		Key:            key,
 		Checksum:       checksum,
 		Size:           uint(len(data)),
@@ -153,20 +154,24 @@ func (writer *BlobWriter) getRandomData() ([]byte, error) {
 }
 
 // sendRequest sends a blob to a disperser.
-func (writer *BlobWriter) sendRequest(data []byte) (key []byte, err error) {
+func (writer *BlobWriter) sendRequest(data []byte) (key v2.BlobKey, err error) {
 	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.WriteTimeout)
 	defer cancel()
 
-	if writer.config.SignerPrivateKey != "" {
-		_, key, err = writer.disperser.DisperseBlobAuthenticated(
-			ctxTimeout,
-			data,
-			writer.config.CustomQuorums)
-	} else {
-		_, key, err = writer.disperser.DisperseBlob(
-			ctxTimeout,
-			data,
-			writer.config.CustomQuorums)
+	writer.logger.Info("sending blob request", "size", len(data))
+	status, key, err := writer.disperser.DisperseBlob(
+		ctxTimeout,
+		data,
+		0,
+		writer.config.CustomQuorums,
+		0,
+	)
+	if err != nil {
+		writer.logger.Error("failed to send blob request", "err", err)
+		return
 	}
+
+	writer.logger.Info("blob request sent", "key", key.Hex(), "status", status.String())
+
 	return
 }
