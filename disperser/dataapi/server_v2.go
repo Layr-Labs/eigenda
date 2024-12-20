@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,10 @@ type (
 		SignedBatch           *SignedBatch                   `json:"signed_batch"`
 		BlobVerificationInfos []*corev2.BlobVerificationInfo `json:"blob_verification_infos"`
 	}
+
+	MetricSummary struct {
+		AvgThroughput float64 `json:"avg_throughput"`
+	}
 )
 
 type ServerInterface interface {
@@ -61,6 +66,7 @@ type ServerV2 struct {
 	metrics           *Metrics
 
 	operatorHandler *operatorHandler
+	metricsHandler  *metricsHandler
 }
 
 func NewServerV2(
@@ -88,6 +94,7 @@ func NewServerV2(
 		indexedChainState: indexedChainState,
 		metrics:           metrics,
 		operatorHandler:   newOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
+		metricsHandler:    newMetricsHandler(promClient),
 	}
 }
 
@@ -115,15 +122,15 @@ func (s *ServerV2) Start() error {
 		}
 		operators := v2.Group("/operators")
 		{
-			operators.GET("/non-signers", s.FetchNonSingers)
+			operators.GET("/nonsigners", s.FetchNonSingers)
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
 			operators.GET("/reachability", s.CheckOperatorsReachability)
 		}
 		metrics := v2.Group("/metrics")
 		{
-			metrics.GET("/overview", s.FetchMetricsOverviewHandler)
-			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
+			metrics.GET("/summary", s.FetchMetricsSummaryHandler)
+			metrics.GET("/timeseries/throughput", s.FetchMetricsThroughputTimeseriesHandler)
 		}
 		swagger := v2.Group("/swagger")
 		{
@@ -347,10 +354,88 @@ func (s *ServerV2) FetchNonSingers(c *gin.Context) {
 	errorResponse(c, errors.New("FetchNonSingers unimplemented"))
 }
 
-func (s *ServerV2) FetchMetricsOverviewHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchMetricsOverviewHandler unimplemented"))
+// FetchMetricsSummaryHandler godoc
+//
+//	@Summary	Fetch metrics summary
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		start	query		int	false	"Start unix timestamp [default: 1 hour ago]"
+//	@Param		end		query		int	false	"End unix timestamp [default: unix time now]"
+//	@Success	200		{object}	Metric
+//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404		{object}	ErrorResponse	"error: Not found"
+//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/summary  [get]
+func (s *ServerV2) FetchMetricsSummaryHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchMetricsSummary", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	now := time.Now()
+	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+	if err != nil || start == 0 {
+		start = now.Add(-time.Hour * 1).Unix()
+	}
+
+	end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
+	if err != nil || end == 0 {
+		end = now.Unix()
+	}
+
+	avgThroughput, err := s.metricsHandler.getAvgThroughput(c.Request.Context(), start, end)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchMetricsSummary")
+		errorResponse(c, err)
+		return
+	}
+
+	metricSummary := &MetricSummary{
+		AvgThroughput: avgThroughput,
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsSummary")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAage))
+	c.JSON(http.StatusOK, metricSummary)
 }
 
-func (s *ServerV2) FetchMetricsThroughputHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchMetricsThroughputHandler unimplemented"))
+// FetchMetricsThroughputTimeseriesHandler godoc
+//
+//	@Summary	Fetch throughput time series
+//	@Tags		Metrics
+//	@Produce	json
+//	@Param		start	query		int	false	"Start unix timestamp [default: 1 hour ago]"
+//	@Param		end		query		int	false	"End unix timestamp [default: unix time now]"
+//	@Success	200		{object}	[]Throughput
+//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404		{object}	ErrorResponse	"error: Not found"
+//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Router		/metrics/timeseries/throughput  [get]
+func (s *ServerV2) FetchMetricsThroughputTimeseriesHandler(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchMetricsThroughputTimeseriesHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	now := time.Now()
+	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+	if err != nil || start == 0 {
+		start = now.Add(-time.Hour * 1).Unix()
+	}
+
+	end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
+	if err != nil || end == 0 {
+		end = now.Unix()
+	}
+
+	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchMetricsThroughputTimeseriesHandler")
+		errorResponse(c, err)
+		return
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsThroughputTimeseriesHandler")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
+	c.JSON(http.StatusOK, ths)
 }
