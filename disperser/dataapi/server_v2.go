@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -99,19 +99,19 @@ func (s *ServerV2) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v2"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv2.SwaggerInfoV2.BasePath = basePath
+	docsv2.SwaggerInfoV2.Host = os.Getenv("SWAGGER_HOST")
 	v2 := router.Group(basePath)
 	{
 		blob := v2.Group("/blob")
 		{
-			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
-			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
+			blob.GET("/feed", s.FetchBlobFeedHandler)
+			blob.GET("/:blob_key", s.FetchBlobHandler)
 		}
 		batch := v2.Group("/batch")
 		{
-			batch.GET("/batches/feed", s.FetchBatchFeedHandler)
-			batch.GET("/batches/:batch_header_hash", s.FetchBatchHandler)
+			batch.GET("/feed", s.FetchBatchFeedHandler)
+			batch.GET("/:batch_header_hash", s.FetchBatchHandler)
 		}
 		operators := v2.Group("/operators")
 		{
@@ -127,7 +127,7 @@ func (s *ServerV2) Start() error {
 		}
 		swagger := v2.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V2"), ginswagger.URL("/api/v2/swagger/doc.json")))
 		}
 	}
 
@@ -170,17 +170,6 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchBlobFeedHandler unimplemented"))
 }
 
-// FetchBlobHandler godoc
-//
-//	@Summary	Fetch blob metadata by blob key
-//	@Tags		Feed
-//	@Produce	json
-//	@Param		blob_key	path		string	true	"Blob key in hex string"
-//	@Success	200			{object}	BlobResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/{blob_key} [get]
 func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 	start := time.Now()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
@@ -211,17 +200,6 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchBatchFeedHandler unimplemented"))
 }
 
-// FetchBatchHandler godoc
-//
-//	@Summary	Fetch batch by the batch header hash
-//	@Tags		Feed
-//	@Produce	json
-//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
-//	@Success	200					{object}	BlobResponse
-//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404					{object}	ErrorResponse	"error: Not found"
-//	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	start := time.Now()
 	batchHeaderHashHex := c.Param("batch_header_hash")
@@ -251,17 +229,6 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, batchResponse)
 }
 
-// FetchOperatorsStake godoc
-//
-//	@Summary	Operator stake distribution query
-//	@Tags		OperatorsStake
-//	@Produce	json
-//	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
-//	@Success	200			{object}	OperatorsStakeResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/stake [get]
 func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsStake", f*1000) // make milliseconds
@@ -283,14 +250,6 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	c.JSON(http.StatusOK, operatorsStakeResponse)
 }
 
-// FetchOperatorsNodeInfo godoc
-//
-//	@Summary	Active operator semver
-//	@Tags		OperatorsNodeInfo
-//	@Produce	json
-//	@Success	200	{object}	SemverReportResponse
-//	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/nodeinfo [get]
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchOperatorsNodeInfo", f*1000) // make milliseconds
@@ -307,17 +266,6 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
-// CheckOperatorsReachability godoc
-//
-//	@Summary	Operator node reachability check
-//	@Tags		OperatorsReachability
-//	@Produce	json
-//	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
-//	@Success	200			{object}	OperatorPortCheckResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/reachability [get]
 func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
