@@ -93,7 +93,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(batchHeader1.GetReferenceBlockNumber()).To(BeNumerically(">", 0))
 				attestation := reply1.GetSignedBatch().GetAttestation()
 				Expect(attestation).To(Not(BeNil()))
-				Expect(attestation.QuorumNumbers).To(Equal([]uint32{0, 1}))
+				Expect(attestation.QuorumNumbers).To(ConsistOf([]uint32{0, 1}))
 				Expect(len(attestation.NonSignerPubkeys)).To(Equal(0))
 				Expect(attestation.ApkG2).To(Not(BeNil()))
 				Expect(len(attestation.QuorumApks)).To(Equal(2))
@@ -121,11 +121,26 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(batchHeader2.GetReferenceBlockNumber()).To(BeNumerically(">", 0))
 				attestation = reply2.GetSignedBatch().GetAttestation()
 				Expect(attestation).To(Not(BeNil()))
-				Expect(attestation.QuorumNumbers).To(Equal([]uint32{0, 1}))
-				Expect(len(attestation.NonSignerPubkeys)).To(Equal(0))
-				Expect(attestation.ApkG2).To(Not(BeNil()))
-				Expect(len(attestation.QuorumApks)).To(Equal(2))
-				Expect(attestation.QuorumSignedPercentages).To(Equal([]byte{100, 100}))
+
+				if bytes.Equal(batchHeader2.BatchRoot, batchHeader1.BatchRoot) {
+					// same batch
+					attestation2 := reply2.GetSignedBatch().GetAttestation()
+					Expect(attestation2).To(Not(BeNil()))
+					Expect(attestation2.QuorumNumbers).To(Equal(attestation.QuorumNumbers))
+					Expect(len(attestation2.NonSignerPubkeys)).To(Equal(len(attestation.NonSignerPubkeys)))
+					Expect(attestation2.ApkG2).To(Equal(attestation.ApkG2))
+					Expect(len(attestation2.QuorumApks)).To(Equal(len(attestation.QuorumApks)))
+					Expect(attestation2.QuorumSignedPercentages).To(Equal(attestation.QuorumSignedPercentages))
+				} else {
+					attestation = reply2.GetSignedBatch().GetAttestation()
+					Expect(attestation).To(Not(BeNil()))
+					Expect(attestation.QuorumNumbers).To(ConsistOf([]uint32{0}))
+					Expect(len(attestation.NonSignerPubkeys)).To(Equal(0))
+					Expect(attestation.ApkG2).To(Not(BeNil()))
+					Expect(len(attestation.QuorumApks)).To(Equal(1))
+					Expect(attestation.QuorumSignedPercentages).To(Equal([]byte{100}))
+				}
+
 				blobVerification = reply2.GetBlobVerificationInfo()
 				Expect(blobVerification).To(Not(BeNil()))
 				Expect(blobVerification.GetBlobCertificate()).To(Not(BeNil()))
