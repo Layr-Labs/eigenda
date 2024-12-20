@@ -104,7 +104,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 		}
 		return 0, a.cumulativePayment, nil
 	}
-	fmt.Println("accoutant calcu", "numSymbols", symbolUsage, "relativeBinRecord", relativeBinRecord.Usage, "overflowBin", overflowBinRecord, "incrementRequired", incrementRequired, "a.cumulativePayment", a.cumulativePayment)
+
 	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
