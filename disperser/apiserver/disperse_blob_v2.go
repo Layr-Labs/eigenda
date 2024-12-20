@@ -145,7 +145,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	// }
 
 	// TODO(ian-shim): enable this check when we have payment metadata + authentication in disperser client
-	// if len(blobHeader.PaymentMetadata.AccountID) == 0 || blobHeader.PaymentMetadata.ReservationPeriod == 0 || blobHeader.PaymentMetadata.CumulativePayment == nil {
+	// if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil) {
 	// 	return api.NewErrorInvalidArg("invalid payment metadata")
 	// }
 
