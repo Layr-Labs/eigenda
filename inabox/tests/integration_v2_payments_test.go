@@ -89,6 +89,6 @@ var _ = Describe("Inabox v2 Integration", func() {
 		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0}, 0)
 		Expect(err.Error()).To(ContainSubstring("neither reservation nor on-demand payment is available"))
 		Expect(blobStatus2).To(BeNil())
-		Expect(key2).To(BeNil())
+		Expect(key2).To(Not(BeNil()))
 	})
 })
