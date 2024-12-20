@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -91,7 +92,7 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKey(ctx, now, EigenLabsDisperserID)
+	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}

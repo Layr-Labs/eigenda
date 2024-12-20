@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"sync"
 	"time"
 
@@ -129,7 +130,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		G1Point: g1Point,
 	}
 
-	hash := HashGetChunksRequest(request)
+	hash := hashing.HashGetChunksRequest(request)
 	isValid := signature.Verify(key, ([32]byte)(hash))
 
 	if !isValid {
