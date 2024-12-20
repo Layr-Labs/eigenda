@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -24,21 +25,23 @@ type NodeClient interface {
 }
 
 type nodeClient struct {
-	config   *NodeClientConfig
-	initOnce sync.Once
-	conn     *grpc.ClientConn
+	config        *NodeClientConfig
+	initOnce      sync.Once
+	conn          *grpc.ClientConn
+	requestSigner DispersalRequestSigner
 
 	dispersalClient nodegrpc.DispersalClient
 }
 
 var _ NodeClient = (*nodeClient)(nil)
 
-func NewNodeClient(config *NodeClientConfig) (*nodeClient, error) {
+func NewNodeClient(config *NodeClientConfig, requestSigner DispersalRequestSigner) (NodeClient, error) {
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 	return &nodeClient{
-		config: config,
+		config:        config,
+		requestSigner: requestSigner,
 	}, nil
 }
 
@@ -60,8 +63,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 		}
 	}
 
-	// Call the gRPC method to store chunks
-	response, err := c.dispersalClient.StoreChunks(ctx, &nodegrpc.StoreChunksRequest{
+	request := &nodegrpc.StoreChunksRequest{
 		Batch: &commonpb.Batch{
 			Header: &commonpb.BatchHeader{
 				BatchRoot:            batch.BatchHeader.BatchRoot[:],
@@ -69,7 +71,20 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			},
 			BlobCertificates: blobCerts,
 		},
-	})
+		DisperserID: api.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
+	}
+
+	if c.requestSigner != nil {
+		// Sign the request to store chunks
+		signature, err := c.requestSigner.SignStoreChunksRequest(ctx, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign store chunks request: %v", err)
+		}
+		request.Signature = signature
+	}
+
+	// Call the gRPC method to store chunks
+	response, err := c.dispersalClient.StoreChunks(ctx, request)
 	if err != nil {
 		return nil, err
 	}
