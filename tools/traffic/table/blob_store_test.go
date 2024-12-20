@@ -1,10 +1,11 @@
 package table
 
 import (
+	"testing"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
-	"testing"
 )
 
 // randomMetadata generates a random BlobMetadata instance.

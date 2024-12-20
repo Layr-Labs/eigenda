@@ -1,14 +1,13 @@
 package config
 
 import (
+	"time"
+
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
-	"github.com/Layr-Labs/eigenda/retriever/flags"
-	"time"
-
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
 )
 
@@ -261,7 +260,6 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, flags.RetrieverFlags(envPrefix)...)
 	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
