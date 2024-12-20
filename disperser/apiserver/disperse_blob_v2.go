@@ -118,7 +118,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg("payment metadata is required")
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment == nil) {
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0) {
 		return api.NewErrorInvalidArg("invalid payment metadata")
 	}
 
