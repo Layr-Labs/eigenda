@@ -91,7 +91,7 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKey(ctx, now, 0)
+	_, err := a.getDisperserKey(ctx, now, EigenLabsDisperserID)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}

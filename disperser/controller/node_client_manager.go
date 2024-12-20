@@ -15,7 +15,7 @@ type NodeClientManager interface {
 type nodeClientManager struct {
 	// nodeClients is a cache of node clients keyed by socket address
 	nodeClients   *lru.Cache[string, clients.NodeClient]
-	requestSigner clients.RequestSigner
+	requestSigner clients.DispersalRequestSigner
 	logger        logging.Logger
 }
 
@@ -23,7 +23,7 @@ var _ NodeClientManager = (*nodeClientManager)(nil)
 
 func NewNodeClientManager(
 	cacheSize int,
-	requestSigner clients.RequestSigner,
+	requestSigner clients.DispersalRequestSigner,
 	logger logging.Logger) (NodeClientManager, error) {
 
 	closeClient := func(socket string, value clients.NodeClient) {

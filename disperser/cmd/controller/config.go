@@ -97,5 +97,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 	}
+	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
+		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")
+	}
 	return config, nil
 }

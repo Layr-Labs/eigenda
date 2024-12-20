@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/node/auth"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -27,14 +28,14 @@ type nodeClient struct {
 	config        *NodeClientConfig
 	initOnce      sync.Once
 	conn          *grpc.ClientConn
-	requestSigner RequestSigner
+	requestSigner DispersalRequestSigner
 
 	dispersalClient nodegrpc.DispersalClient
 }
 
 var _ NodeClient = (*nodeClient)(nil)
 
-func NewNodeClient(config *NodeClientConfig, requestSigner RequestSigner) (NodeClient, error) {
+func NewNodeClient(config *NodeClientConfig, requestSigner DispersalRequestSigner) (NodeClient, error) {
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
@@ -70,7 +71,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			},
 			BlobCertificates: blobCerts,
 		},
-		DisperserID: 0, // this will need to be updated dispersers are decentralized
+		DisperserID: auth.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
 	}
 
 	if c.requestSigner != nil {

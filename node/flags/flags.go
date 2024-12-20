@@ -263,7 +263,7 @@ var (
 		Usage:    "The duration for which a disperser authentication is valid",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
-		Value:    5 * time.Minute,
+		Value:    time.Minute,
 	}
 
 	// Test only, DO NOT USE the following flags in production

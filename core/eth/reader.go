@@ -948,8 +948,12 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 		},
 		disperserID)
 
+	var defaultAddress gethcommon.Address
 	if err != nil {
-		return gethcommon.Address{}, fmt.Errorf("failed to get disperser address: %w", err)
+		return defaultAddress, fmt.Errorf("failed to get disperser address: %w", err)
+	}
+	if address == defaultAddress {
+		return defaultAddress, fmt.Errorf("disperser with id %d not found", disperserID)
 	}
 
 	return address, nil

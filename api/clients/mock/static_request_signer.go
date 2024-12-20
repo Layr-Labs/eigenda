@@ -8,15 +8,15 @@ import (
 	"github.com/Layr-Labs/eigenda/node/auth"
 )
 
-var _ clients.RequestSigner = &staticRequestSigner{}
+var _ clients.DispersalRequestSigner = &staticRequestSigner{}
 
-// StaticRequestSigner is a RequestSigner that signs requests with a static key (i.e. it doesn't use AWS KMS).
+// StaticRequestSigner is a DispersalRequestSigner that signs requests with a static key (i.e. it doesn't use AWS KMS).
 // Useful for testing.
 type staticRequestSigner struct {
 	key *ecdsa.PrivateKey
 }
 
-func NewStaticRequestSigner(key *ecdsa.PrivateKey) clients.RequestSigner {
+func NewStaticRequestSigner(key *ecdsa.PrivateKey) clients.DispersalRequestSigner {
 	return &staticRequestSigner{
 		key: key,
 	}

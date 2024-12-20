@@ -11,14 +11,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
-// RequestSigner encapsulates the logic for signing GetChunks requests.
-type RequestSigner interface {
+// DispersalRequestSigner encapsulates the logic for signing GetChunks requests.
+type DispersalRequestSigner interface {
 	// SignStoreChunksRequest signs a StoreChunksRequest. Does not modify the request
 	// (i.e. it does not insert the signature).
 	SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error)
 }
 
-var _ RequestSigner = &requestSigner{}
+var _ DispersalRequestSigner = &requestSigner{}
 
 type requestSigner struct {
 	keyID      string
@@ -26,12 +26,12 @@ type requestSigner struct {
 	keyManager *kms.Client
 }
 
-// NewRequestSigner creates a new RequestSigner.
-func NewRequestSigner(
+// NewDispersalRequestSigner creates a new DispersalRequestSigner.
+func NewDispersalRequestSigner(
 	ctx context.Context,
 	region string,
 	endpoint string,
-	keyID string) (RequestSigner, error) {
+	keyID string) (DispersalRequestSigner, error) {
 
 	keyManager := kms.New(kms.Options{
 		Region:       region,

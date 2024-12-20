@@ -150,9 +150,11 @@ func RunController(ctx *cli.Context) error {
 		}
 	}
 
-	var requestSigner clients.RequestSigner
-	if !config.DisperserStoreChunksSigningDisabled {
-		requestSigner, err = clients.NewRequestSigner(
+	var requestSigner clients.DispersalRequestSigner
+	if config.DisperserStoreChunksSigningDisabled {
+		logger.Warn("StoreChunks() signing is disabled")
+	} else {
+		requestSigner, err = clients.NewDispersalRequestSigner(
 			context.Background(),
 			config.AwsClientConfig.Region,
 			config.AwsClientConfig.EndpointURL,
