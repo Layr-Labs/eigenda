@@ -1,4 +1,4 @@
-package dataapi
+package v1
 
 import (
 	"context"
@@ -23,7 +23,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	docsv1 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v1"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
@@ -85,6 +86,98 @@ type (
 		BlobStatus              disperser.BlobStatus      `json:"blob_status"`
 	}
 
+	BlobsResponse struct {
+		Meta dataapi.Meta            `json:"meta"`
+		Data []*BlobMetadataResponse `json:"data"`
+	}
+
+	OperatorNonsigningPercentageMetrics struct {
+		OperatorId           string  `json:"operator_id"`
+		OperatorAddress      string  `json:"operator_address"`
+		QuorumId             uint8   `json:"quorum_id"`
+		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
+		TotalBatches         int     `json:"total_batches"`
+		Percentage           float64 `json:"percentage"`
+		StakePercentage      float64 `json:"stake_percentage"`
+	}
+
+	OperatorsNonsigningPercentage struct {
+		Meta dataapi.Meta                           `json:"meta"`
+		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
+	}
+
+	QueriedStateOperatorMetadata struct {
+		OperatorId           string `json:"operator_id"`
+		BlockNumber          uint   `json:"block_number"`
+		Socket               string `json:"socket"`
+		IsOnline             bool   `json:"is_online"`
+		OperatorProcessError string `json:"operator_process_error"`
+	}
+
+	QueriedStateOperatorsResponse struct {
+		Meta dataapi.Meta                    `json:"meta"`
+		Data []*QueriedStateOperatorMetadata `json:"data"`
+	}
+
+	QueriedOperatorEjectionsResponse struct {
+		Ejections []*dataapi.QueriedOperatorEjections `json:"ejections"`
+	}
+
+	ServiceAvailability struct {
+		ServiceName   string `json:"service_name"`
+		ServiceStatus string `json:"service_status"`
+	}
+
+	ServiceAvailabilityResponse struct {
+		Meta dataapi.Meta           `json:"meta"`
+		Data []*ServiceAvailability `json:"data"`
+	}
+
+	OperatorPortCheckRequest struct {
+		OperatorId string `json:"operator_id"`
+	}
+
+	ErrorResponse struct {
+		Error string `json:"error"`
+	}
+
+	MetricSummary struct {
+		AvgThroughput float64 `json:"avg_throughput"`
+	}
+
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
+
+	QueriedOperatorEjections struct {
+		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
+		Quorum          uint8   `json:"quorum"`
+		BlockNumber     uint64  `json:"block_number"`
+		BlockTimestamp  string  `json:"block_timestamp"`
+		TransactionHash string  `json:"transaction_hash"`
+		StakePercentage float64 `json:"stake_percentage"`
+	}
+
+	SemverReportResponse struct {
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
+	}
+
 	Metric struct {
 		Throughput float64 `json:"throughput"`
 		CostInGas  float64 `json:"cost_in_gas"`
@@ -103,105 +196,23 @@ type (
 		NextToken string `json:"next_token,omitempty"`
 	}
 
-	BlobsResponse struct {
-		Meta Meta                    `json:"meta"`
-		Data []*BlobMetadataResponse `json:"data"`
+	NonSigner struct {
+		OperatorId string
+		Count      int
 	}
-
-	OperatorNonsigningPercentageMetrics struct {
-		OperatorId           string  `json:"operator_id"`
-		OperatorAddress      string  `json:"operator_address"`
-		QuorumId             uint8   `json:"quorum_id"`
-		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
-		TotalBatches         int     `json:"total_batches"`
-		Percentage           float64 `json:"percentage"`
-		StakePercentage      float64 `json:"stake_percentage"`
-	}
-
-	OperatorsNonsigningPercentage struct {
-		Meta Meta                                   `json:"meta"`
-		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
-	}
-
-	OperatorStake struct {
-		QuorumId        string  `json:"quorum_id"`
-		OperatorId      string  `json:"operator_id"`
-		StakePercentage float64 `json:"stake_percentage"`
-		Rank            int     `json:"rank"`
-	}
-
-	OperatorsStakeResponse struct {
-		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
-	}
-
-	QueriedStateOperatorMetadata struct {
-		OperatorId           string `json:"operator_id"`
-		BlockNumber          uint   `json:"block_number"`
-		Socket               string `json:"socket"`
-		IsOnline             bool   `json:"is_online"`
-		OperatorProcessError string `json:"operator_process_error"`
-	}
-
-	QueriedStateOperatorsResponse struct {
-		Meta Meta                            `json:"meta"`
-		Data []*QueriedStateOperatorMetadata `json:"data"`
-	}
-
-	QueriedOperatorEjections struct {
-		OperatorId      string  `json:"operator_id"`
-		OperatorAddress string  `json:"operator_address"`
-		Quorum          uint8   `json:"quorum"`
-		BlockNumber     uint64  `json:"block_number"`
-		BlockTimestamp  string  `json:"block_timestamp"`
-		TransactionHash string  `json:"transaction_hash"`
-		StakePercentage float64 `json:"stake_percentage"`
-	}
-	QueriedOperatorEjectionsResponse struct {
-		Ejections []*QueriedOperatorEjections `json:"ejections"`
-	}
-
-	ServiceAvailability struct {
-		ServiceName   string `json:"service_name"`
-		ServiceStatus string `json:"service_status"`
-	}
-
-	ServiceAvailabilityResponse struct {
-		Meta Meta                   `json:"meta"`
-		Data []*ServiceAvailability `json:"data"`
-	}
-
-	OperatorPortCheckRequest struct {
-		OperatorId string `json:"operator_id"`
-	}
-
-	OperatorPortCheckResponse struct {
-		OperatorId      string `json:"operator_id"`
-		DispersalSocket string `json:"dispersal_socket"`
-		RetrievalSocket string `json:"retrieval_socket"`
-		DispersalOnline bool   `json:"dispersal_online"`
-		RetrievalOnline bool   `json:"retrieval_online"`
-	}
-	SemverReportResponse struct {
-		Semver map[string]*semver.SemverMetrics `json:"semver"`
-	}
-
-	ErrorResponse struct {
-		Error string `json:"error"`
-	}
-
 	server struct {
 		serverMode        string
 		socketAddr        string
 		allowOrigins      []string
 		logger            logging.Logger
 		blobstore         disperser.BlobStore
-		promClient        PrometheusClient
-		subgraphClient    SubgraphClient
+		promClient        dataapi.PrometheusClient
+		subgraphClient    dataapi.SubgraphClient
 		transactor        core.Reader
 		chainState        core.ChainState
 		indexedChainState core.IndexedChainState
 
-		metrics                   *Metrics
+		metrics                   *dataapi.Metrics
 		disperserHostName         string
 		churnerHostName           string
 		batcherHealthEndpt        string
@@ -214,15 +225,15 @@ type (
 )
 
 func NewServer(
-	config Config,
+	config dataapi.Config,
 	blobstore disperser.BlobStore,
-	promClient PrometheusClient,
-	subgraphClient SubgraphClient,
+	promClient dataapi.PrometheusClient,
+	subgraphClient dataapi.SubgraphClient,
 	transactor core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
-	metrics *Metrics,
+	metrics *dataapi.Metrics,
 	grpcConn GRPCConn,
 	eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker,
 	eigenDAHttpServiceChecker EigenDAHttpServiceChecker,
@@ -273,8 +284,8 @@ func (s *server) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v1"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv1.SwaggerInfoV1.BasePath = basePath
+	docsv1.SwaggerInfoV1.Host = os.Getenv("SWAGGER_HOST")
 	v1 := router.Group(basePath)
 	{
 		feed := v1.Group("/feed")
@@ -304,7 +315,8 @@ func (s *server) Start() error {
 		}
 		swagger := v1.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V1"), ginswagger.URL("/api/v1/swagger/doc.json")))
+
 		}
 	}
 
@@ -404,7 +416,7 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 	defer timer.ObserveDuration()
 
 	batchHeaderHash := c.Param("batch_header_hash")
-	batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
+	batchHeaderHashBytes, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHash))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
 		errorResponse(c, fmt.Errorf("invalid batch header hash"))
@@ -454,7 +466,7 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size:      len(metadatas),
 			NextToken: nextPageToken,
 		},
@@ -531,7 +543,7 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobs")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobsAge))
 	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(metadatas),
 		},
 		Data: metadatas,
@@ -609,7 +621,7 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+	ths, err := s.metricsHandler.GetThroughputTimeseries(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsTroughput")
 		errorResponse(c, err)
@@ -787,7 +799,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
@@ -836,7 +848,7 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
@@ -1012,7 +1024,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,
@@ -1066,7 +1078,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,
@@ -1120,7 +1132,7 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatcherAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
+		Meta: dataapi.Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,

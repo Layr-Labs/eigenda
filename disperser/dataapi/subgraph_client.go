@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/gammazero/workerpool"

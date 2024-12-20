@@ -1,4 +1,4 @@
-package dataapi_test
+package v1_test
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	v1 "github.com/Layr-Labs/eigenda/disperser/dataapi/v1"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -71,7 +72,7 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	testDataApiServer               = v1.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedRequestedAt             = uint64(5567830000000000000)
 	expectedDataLength              = 32
 	expectedBatchId                 = uint32(99)

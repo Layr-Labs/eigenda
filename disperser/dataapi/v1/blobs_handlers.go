@@ -1,4 +1,4 @@
-package dataapi
+package v1
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 )
 
 func (s *server) getBlob(ctx context.Context, key string) (*BlobMetadataResponse, error) {
@@ -90,7 +91,7 @@ func convertMetadataToBlobMetadataResponse(metadata *disperser.BlobMetadata) (*B
 		return &BlobMetadataResponse{
 			BlobKey:        metadata.GetBlobKey().String(),
 			SecurityParams: metadata.RequestMetadata.SecurityParams,
-			RequestAt:      ConvertNanosecondToSecond(metadata.RequestMetadata.RequestedAt),
+			RequestAt:      dataapi.ConvertNanosecondToSecond(metadata.RequestMetadata.RequestedAt),
 			BlobStatus:     metadata.BlobStatus,
 		}, nil
 	}
@@ -109,15 +110,15 @@ func convertMetadataToBlobMetadataResponse(metadata *disperser.BlobMetadata) (*B
 		ConfirmationTxnHash:     metadata.ConfirmationInfo.ConfirmationTxnHash.String(),
 		Fee:                     hex.EncodeToString(metadata.ConfirmationInfo.Fee),
 		SecurityParams:          metadata.RequestMetadata.SecurityParams,
-		RequestAt:               ConvertNanosecondToSecond(metadata.RequestMetadata.RequestedAt),
+		RequestAt:               dataapi.ConvertNanosecondToSecond(metadata.RequestMetadata.RequestedAt),
 		BlobStatus:              metadata.BlobStatus,
 	}, nil
 }
 
-func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
+func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*dataapi.Batch, []*disperser.BlobMetadata, error) {
 	var (
 		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
-		batches         = make([]*Batch, 0)
+		batches         = make([]*dataapi.Batch, 0)
 		blobKeyPresence = make(map[string]struct{})
 		batchPresence   = make(map[string]struct{})
 	)
@@ -141,7 +142,7 @@ func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit in
 			if batch == nil {
 				continue
 			}
-			batchHeaderHash, err := ConvertHexadecimalToBytes(batch.BatchHeaderHash)
+			batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes(batch.BatchHeaderHash)
 			if err != nil {
 				s.logger.Error("Failed to convert batch header hash to hex string", "error", err)
 				continue

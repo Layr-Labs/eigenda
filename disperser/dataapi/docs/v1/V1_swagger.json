@@ -5,12 +5,14 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "This is the EigenDA Data Access API server.",
-        "title": "EigenDA Data Access API",
+        "description": "This is the EigenDA Data Access API V2 server.",
+        "title": "EigenDA Data Access API V1",
         "contact": {},
-        "version": "1"
+        "version": "1.0"
     },
+    "basePath": "/api/v1",
     "paths": {
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         "/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
@@ -202,6 +204,8 @@
                 }
             }
         },
+=======
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
         "/feed/batches/{batch_header_hash}/blobs": {
             "get": {
                 "produces": [
@@ -236,25 +240,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobsResponse"
+                            "$ref": "#/definitions/v1.BlobsResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -281,25 +285,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobsResponse"
+                            "$ref": "#/definitions/v1.BlobsResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -327,25 +331,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobMetadataResponse"
+                            "$ref": "#/definitions/v1.BlobMetadataResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -384,25 +388,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.Metric"
+                            "$ref": "#/definitions/v1.Metric"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -421,25 +425,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                            "$ref": "#/definitions/v1.ServiceAvailabilityResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -458,25 +462,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                            "$ref": "#/definitions/v1.ServiceAvailabilityResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -495,25 +499,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ServiceAvailabilityResponse"
+                            "$ref": "#/definitions/v1.ServiceAvailabilityResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -542,26 +546,26 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dataapi.NonSigner"
+                                "$ref": "#/definitions/v1.NonSigner"
                             }
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -600,76 +604,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorsNonsigningPercentage"
+                            "$ref": "#/definitions/v1.OperatorsNonsigningPercentage"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/metrics/summary": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Metrics"
-                ],
-                "summary": "Fetch metrics summary",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Start unix timestamp [default: 1 hour ago]",
-                        "name": "start",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "End unix timestamp [default: unix time now]",
-                        "name": "end",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.Metric"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -704,80 +657,26 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/dataapi.Throughput"
+                                "$ref": "#/definitions/v1.Throughput"
                             }
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/metrics/timeseries/throughput": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Metrics"
-                ],
-                "summary": "Fetch throughput time series",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Start unix timestamp [default: 1 hour ago]",
-                        "name": "start",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "End unix timestamp [default: unix time now]",
-                        "name": "end",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dataapi.Throughput"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -796,25 +695,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.QueriedStateOperatorsResponse"
+                            "$ref": "#/definitions/v1.QueriedStateOperatorsResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -859,25 +758,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.QueriedOperatorEjectionsResponse"
+                            "$ref": "#/definitions/v1.QueriedOperatorEjectionsResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -905,25 +804,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorsStakeResponse"
+                            "$ref": "#/definitions/v1.OperatorsStakeResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -951,25 +850,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
+                            "$ref": "#/definitions/v1.OperatorPortCheckResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -988,25 +887,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.QueriedStateOperatorsResponse"
+                            "$ref": "#/definitions/v1.QueriedStateOperatorsResponse"
                         }
                     },
                     "400": {
                         "description": "error: Bad request",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "error: Not found",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -1025,128 +924,13 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.SemverReportResponse"
+                            "$ref": "#/definitions/v1.SemverReportResponse"
                         }
                     },
                     "500": {
                         "description": "error: Server error",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/operators/nodeinfo": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OperatorsNodeInfo"
-                ],
-                "summary": "Active operator semver",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.SemverReportResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/operators/reachability": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OperatorsReachability"
-                ],
-                "summary": "Operator node reachability check",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Operator ID in hex string [default: all operators if unspecified]",
-                        "name": "operator_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorPortCheckResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/operators/stake": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "OperatorsStake"
-                ],
-                "summary": "Operator stake distribution query",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Operator ID in hex string [default: all operators if unspecified]",
-                        "name": "operator_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.OperatorsStakeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                            "$ref": "#/definitions/v1.ErrorResponse"
                         }
                     }
                 }
@@ -1157,6 +941,7 @@
         "big.Int": {
             "type": "object"
         },
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         "core.G1Point": {
             "type": "object",
             "properties": {
@@ -1201,6 +986,8 @@
                 }
             }
         },
+=======
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -1221,7 +1008,65 @@
                 }
             }
         },
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         "core.Signature": {
+=======
+        "dataapi.Meta": {
+            "type": "object",
+            "properties": {
+                "next_token": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dataapi.QueriedOperatorEjections": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "block_timestamp": {
+                    "type": "string"
+                },
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum": {
+                    "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                },
+                "transaction_hash": {
+                    "type": "string"
+                }
+            }
+        },
+        "encoding.BlobCommitments": {
+            "type": "object",
+            "properties": {
+                "commitment": {
+                    "$ref": "#/definitions/encoding.G1Commitment"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "length_commitment": {
+                    "$ref": "#/definitions/encoding.G2Commitment"
+                },
+                "length_proof": {
+                    "$ref": "#/definitions/encoding.LengthProof"
+                }
+            }
+        },
+        "encoding.G1Commitment": {
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
             "type": "object",
             "properties": {
                 "x": {
@@ -1229,6 +1074,7 @@
                     "items": {
                         "type": "integer"
                     }
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
                 }
             }
         },
@@ -1258,6 +1104,99 @@
             }
         },
         "dataapi.BlobMetadataResponse": {
+=======
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "encoding.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "encoding.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser.BlobStatus": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "x-enum-varnames": [
+                "Processing",
+                "Confirmed",
+                "Failed",
+                "Finalized",
+                "InsufficientSignatures",
+                "Dispersing"
+            ]
+        },
+        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
+            "type": "object",
+            "properties": {
+                "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "a1": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "semver.SemverMetrics": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "semver": {
+                    "type": "string"
+                },
+                "stake_percentage": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "v1.BlobMetadataResponse": {
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
             "type": "object",
             "properties": {
                 "batch_header_hash": {
@@ -1310,6 +1249,7 @@
                 }
             }
         },
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         "dataapi.BlobResponse": {
             "type": "object",
             "properties": {
@@ -1336,12 +1276,15 @@
             }
         },
         "dataapi.BlobsResponse": {
+=======
+        "v1.BlobsResponse": {
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dataapi.BlobMetadataResponse"
+                        "$ref": "#/definitions/v1.BlobMetadataResponse"
                     }
                 },
                 "meta": {
@@ -1349,7 +1292,7 @@
                 }
             }
         },
-        "dataapi.ErrorResponse": {
+        "v1.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {
@@ -1357,18 +1300,7 @@
                 }
             }
         },
-        "dataapi.Meta": {
-            "type": "object",
-            "properties": {
-                "next_token": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dataapi.Metric": {
+        "v1.Metric": {
             "type": "object",
             "properties": {
                 "cost_in_gas": {
@@ -1393,7 +1325,7 @@
                 }
             }
         },
-        "dataapi.NonSigner": {
+        "v1.NonSigner": {
             "type": "object",
             "properties": {
                 "count": {
@@ -1404,7 +1336,7 @@
                 }
             }
         },
-        "dataapi.OperatorNonsigningPercentageMetrics": {
+        "v1.OperatorNonsigningPercentageMetrics": {
             "type": "object",
             "properties": {
                 "operator_address": {
@@ -1430,7 +1362,7 @@
                 }
             }
         },
-        "dataapi.OperatorPortCheckResponse": {
+        "v1.OperatorPortCheckResponse": {
             "type": "object",
             "properties": {
                 "dispersal_online": {
@@ -1450,7 +1382,7 @@
                 }
             }
         },
-        "dataapi.OperatorStake": {
+        "v1.OperatorStake": {
             "type": "object",
             "properties": {
                 "operator_id": {
@@ -1467,13 +1399,13 @@
                 }
             }
         },
-        "dataapi.OperatorsNonsigningPercentage": {
+        "v1.OperatorsNonsigningPercentage": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dataapi.OperatorNonsigningPercentageMetrics"
+                        "$ref": "#/definitions/v1.OperatorNonsigningPercentageMetrics"
                     }
                 },
                 "meta": {
@@ -1481,7 +1413,7 @@
                 }
             }
         },
-        "dataapi.OperatorsStakeResponse": {
+        "v1.OperatorsStakeResponse": {
             "type": "object",
             "properties": {
                 "stake_ranked_operators": {
@@ -1489,39 +1421,13 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/dataapi.OperatorStake"
+                            "$ref": "#/definitions/v1.OperatorStake"
                         }
                     }
                 }
             }
         },
-        "dataapi.QueriedOperatorEjections": {
-            "type": "object",
-            "properties": {
-                "block_number": {
-                    "type": "integer"
-                },
-                "block_timestamp": {
-                    "type": "string"
-                },
-                "operator_address": {
-                    "type": "string"
-                },
-                "operator_id": {
-                    "type": "string"
-                },
-                "quorum": {
-                    "type": "integer"
-                },
-                "stake_percentage": {
-                    "type": "number"
-                },
-                "transaction_hash": {
-                    "type": "string"
-                }
-            }
-        },
-        "dataapi.QueriedOperatorEjectionsResponse": {
+        "v1.QueriedOperatorEjectionsResponse": {
             "type": "object",
             "properties": {
                 "ejections": {
@@ -1532,7 +1438,7 @@
                 }
             }
         },
-        "dataapi.QueriedStateOperatorMetadata": {
+        "v1.QueriedStateOperatorMetadata": {
             "type": "object",
             "properties": {
                 "block_number": {
@@ -1552,13 +1458,13 @@
                 }
             }
         },
-        "dataapi.QueriedStateOperatorsResponse": {
+        "v1.QueriedStateOperatorsResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dataapi.QueriedStateOperatorMetadata"
+                        "$ref": "#/definitions/v1.QueriedStateOperatorMetadata"
                     }
                 },
                 "meta": {
@@ -1566,7 +1472,7 @@
                 }
             }
         },
-        "dataapi.SemverReportResponse": {
+        "v1.SemverReportResponse": {
             "type": "object",
             "properties": {
                 "semver": {
@@ -1577,7 +1483,7 @@
                 }
             }
         },
-        "dataapi.ServiceAvailability": {
+        "v1.ServiceAvailability": {
             "type": "object",
             "properties": {
                 "service_name": {
@@ -1588,13 +1494,13 @@
                 }
             }
         },
-        "dataapi.ServiceAvailabilityResponse": {
+        "v1.ServiceAvailabilityResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dataapi.ServiceAvailability"
+                        "$ref": "#/definitions/v1.ServiceAvailability"
                     }
                 },
                 "meta": {
@@ -1602,6 +1508,7 @@
                 }
             }
         },
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         "dataapi.SignedBatch": {
             "type": "object",
             "properties": {
@@ -1614,6 +1521,9 @@
             }
         },
         "dataapi.Throughput": {
+=======
+        "v1.Throughput": {
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
             "type": "object",
             "properties": {
                 "throughput": {
@@ -1623,6 +1533,7 @@
                     "type": "integer"
                 }
             }
+<<<<<<< HEAD:disperser/dataapi/docs/swagger.json
         },
         "encoding.BlobCommitments": {
             "type": "object",
@@ -1879,6 +1790,8 @@
                     }
                 }
             }
+=======
+>>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.json
         }
     }
 }

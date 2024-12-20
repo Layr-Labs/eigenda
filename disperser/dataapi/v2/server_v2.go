@@ -1,18 +1,25 @@
-package dataapi
+package v2
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
+
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -21,6 +28,31 @@ import (
 	swaggerfiles "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
 )
+
+const (
+	maxWorkerPoolLimit   = 10
+	maxQueryBatchesLimit = 2
+
+	cacheControlParam = "Cache-Control"
+
+	// Cache control for responses.
+	// The time unit is second for max age.
+	maxOperatorsNonsigningPercentageAge = 10
+	maxOperatorPortCheckAge             = 60
+	maxNonSignerAge                     = 10
+	maxDeregisteredOperatorAge          = 10
+	maxEjectedOperatorAge               = 10
+	maxThroughputAge                    = 10
+	maxMetricAage                       = 10
+	maxFeedBlobsAge                     = 10
+	maxFeedBlobAge                      = 300 // this is completely static
+	maxDisperserAvailabilityAge         = 3
+	maxChurnerAvailabilityAge           = 3
+	maxBatcherAvailabilityAge           = 3
+	maxOperatorsStakeAge                = 300 // not expect the stake change to happen frequently
+)
+
+var errNotFound = errors.New("not found")
 
 type (
 	SignedBatch struct {
@@ -49,8 +81,68 @@ type (
 		BlobVerificationInfos []*corev2.BlobVerificationInfo `json:"blob_verification_infos"`
 	}
 
-	MetricSummary struct {
-		AvgThroughput float64 `json:"avg_throughput"`
+	QueriedStateOperatorMetadata struct {
+		OperatorId           string `json:"operator_id"`
+		BlockNumber          uint   `json:"block_number"`
+		Socket               string `json:"socket"`
+		IsOnline             bool   `json:"is_online"`
+		OperatorProcessError string `json:"operator_process_error"`
+	}
+
+	QueriedStateOperatorsResponse struct {
+		Meta dataapi.Meta                    `json:"meta"`
+		Data []*QueriedStateOperatorMetadata `json:"data"`
+	}
+
+	QueriedOperatorEjectionsResponse struct {
+		Ejections []*dataapi.QueriedOperatorEjections `json:"ejections"`
+	}
+
+	OperatorPortCheckRequest struct {
+		OperatorId string `json:"operator_id"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
+
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+	SemverReportResponse struct {
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
+	}
+	Metric struct {
+		Throughput float64 `json:"throughput"`
+		CostInGas  float64 `json:"cost_in_gas"`
+		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
+		TotalStake          *big.Int                   `json:"total_stake"`
+		TotalStakePerQuorum map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
+	}
+
+	Throughput struct {
+		Throughput float64 `json:"throughput"`
+		Timestamp  uint64  `json:"timestamp"`
+	}
+
+	Meta struct {
+		Size      int    `json:"size"`
+		NextToken string `json:"next_token,omitempty"`
+	}
+
+	ErrorResponse struct {
+		Error string `json:"error"`
 	}
 )
 
@@ -66,27 +158,27 @@ type ServerV2 struct {
 	logger       logging.Logger
 
 	blobMetadataStore *blobstore.BlobMetadataStore
-	subgraphClient    SubgraphClient
+	subgraphClient    dataapi.SubgraphClient
 	chainReader       core.Reader
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
-	promClient        PrometheusClient
-	metrics           *Metrics
+	promClient        dataapi.PrometheusClient
+	metrics           *dataapi.Metrics
 
 	operatorHandler *operatorHandler
 	metricsHandler  *metricsHandler
 }
 
 func NewServerV2(
-	config Config,
+	config dataapi.Config,
 	blobMetadataStore *blobstore.BlobMetadataStore,
-	promClient PrometheusClient,
-	subgraphClient SubgraphClient,
+	promClient dataapi.PrometheusClient,
+	subgraphClient dataapi.SubgraphClient,
 	chainReader core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
-	metrics *Metrics,
+	metrics *dataapi.Metrics,
 ) *ServerV2 {
 	l := logger.With("component", "DataAPIServerV2")
 	return &ServerV2{
@@ -102,7 +194,7 @@ func NewServerV2(
 		indexedChainState: indexedChainState,
 		metrics:           metrics,
 		operatorHandler:   newOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
-		metricsHandler:    newMetricsHandler(promClient),
+		//metricsHandler:    dataapi.NewMetricsHandler(promClient),
 	}
 }
 
@@ -114,8 +206,8 @@ func (s *ServerV2) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v2"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv2.SwaggerInfoV2.BasePath = basePath
+	docsv2.SwaggerInfoV2.Host = os.Getenv("SWAGGER_HOST")
 	v2 := router.Group(basePath)
 	{
 		blob := v2.Group("/blob")
@@ -144,7 +236,7 @@ func (s *ServerV2) Start() error {
 		}
 		swagger := v2.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V2"), ginswagger.URL("/api/v2/swagger/doc.json")))
 		}
 	}
 
@@ -319,7 +411,7 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	start := time.Now()
 	batchHeaderHashHex := c.Param("batch_header_hash")
-	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBatch")
 		errorResponse(c, errors.New("invalid batch header hash"))
@@ -470,14 +562,14 @@ func (s *ServerV2) FetchMetricsSummaryHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	avgThroughput, err := s.metricsHandler.getAvgThroughput(c.Request.Context(), start, end)
+	avgThroughput, err := s.metricsHandler.GetAvgThroughput(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsSummary")
 		errorResponse(c, err)
 		return
 	}
 
-	metricSummary := &MetricSummary{
+	metricSummary := &dataapi.MetricSummary{
 		AvgThroughput: avgThroughput,
 	}
 
@@ -515,7 +607,7 @@ func (s *ServerV2) FetchMetricsThroughputTimeseriesHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+	ths, err := s.metricsHandler.GetThroughputTimeseries(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsThroughputTimeseriesHandler")
 		errorResponse(c, err)
@@ -525,4 +617,53 @@ func (s *ServerV2) FetchMetricsThroughputTimeseriesHandler(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsThroughputTimeseriesHandler")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
 	c.JSON(http.StatusOK, ths)
+}
+
+func errorResponse(c *gin.Context, err error) {
+	_ = c.Error(err)
+	var code int
+	switch {
+	case errors.Is(err, errNotFound):
+		code = http.StatusNotFound
+	default:
+		code = http.StatusInternalServerError
+	}
+	c.JSON(code, dataapi.ErrorResponse{
+		Error: err.Error(),
+	})
+}
+
+func run(logger logging.Logger, httpServer *http.Server) <-chan error {
+	errChan := make(chan error, 1)
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+
+	go func() {
+		<-ctx.Done()
+
+		logger.Info("shutdown signal received")
+
+		defer func() {
+			stop()
+			close(errChan)
+		}()
+
+		if err := httpServer.Shutdown(context.Background()); err != nil {
+			errChan <- err
+		}
+		logger.Info("shutdown completed")
+	}()
+
+	go func() {
+		logger.Info("server running", "addr", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil {
+			errChan <- err
+		}
+	}()
+
+	return errChan
 }

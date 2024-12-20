@@ -1,8 +1,10 @@
-package dataapi
+package v1
 
 import (
 	"context"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 )
 
 const (
@@ -13,16 +15,16 @@ const (
 // metricHandler handles operations to collect metrics about the Disperser.
 type metricsHandler struct {
 	// For accessing metrics info
-	promClient PrometheusClient
+	promClient dataapi.PrometheusClient
 }
 
-func newMetricsHandler(promClient PrometheusClient) *metricsHandler {
+func newMetricsHandler(promClient dataapi.PrometheusClient) *metricsHandler {
 	return &metricsHandler{
 		promClient: promClient,
 	}
 }
 
-func (mh *metricsHandler) getAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
+func (mh *metricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
 	result, err := mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
 	if err != nil {
 		return 0, err
@@ -36,7 +38,7 @@ func (mh *metricsHandler) getAvgThroughput(ctx context.Context, startTime int64,
 	return totalBytes / timeDuration, nil
 }
 
-func (mh *metricsHandler) getThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {
+func (mh *metricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*dataapi.Throughput, error) {
 	throughputRateSecs := uint16(defaultThroughputRateSecs)
 	if endTime-startTime >= 7*24*60*60 {
 		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
@@ -47,13 +49,13 @@ func (mh *metricsHandler) getThroughputTimeseries(ctx context.Context, startTime
 	}
 
 	if len(result.Values) <= 1 {
-		return []*Throughput{}, nil
+		return []*dataapi.Throughput{}, nil
 	}
 
-	throughputs := make([]*Throughput, 0)
+	throughputs := make([]*dataapi.Throughput, 0)
 	for i := throughputRateSecs; i < uint16(len(result.Values)); i++ {
 		v := result.Values[i]
-		throughputs = append(throughputs, &Throughput{
+		throughputs = append(throughputs, &dataapi.Throughput{
 			Timestamp:  uint64(v.Timestamp.Unix()),
 			Throughput: v.Value,
 		})

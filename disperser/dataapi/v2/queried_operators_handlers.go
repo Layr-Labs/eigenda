@@ -1,4 +1,4 @@
-package dataapi
+package v2
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
 
 type OperatorOnlineStatus struct {
-	OperatorInfo         *Operator
+	OperatorInfo         *dataapi.Operator
 	IndexedOperatorInfo  *core.IndexedOperatorInfo
 	OperatorProcessError string
 }
@@ -30,11 +31,11 @@ var (
 // Queries subgraph for deregistered operators
 // Process operator online status
 // Returns list of Operators with their online status, socket address and block number they deregistered
-func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
+func (s *ServerV2) getDeregisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
-	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Deregistered)
+	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, dataapi.Deregistered)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +66,11 @@ func (s *server) getDeregisteredOperatorForDays(ctx context.Context, days int32)
 // Queries subgraph for registered operators
 // Process operator online status
 // Returns list of Operators with their online status, socket address and block number they registered
-func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
+func (s *ServerV2) getRegisteredOperatorForDays(ctx context.Context, days int32) ([]*QueriedStateOperatorMetadata, error) {
 	// Track time taken to get registered operators
 	startTime := time.Now()
 
-	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Registered)
+	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, dataapi.Registered)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +99,7 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 
 // Function to get operator ejection over last N days
 // Returns list of Ejections with operatorId, quorum, block number, txn and timestemp if ejection
-func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
+func (s *ServerV2) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*dataapi.QueriedOperatorEjections, error) {
 	startTime := time.Now()
 
 	operatorEjections, err := s.subgraphClient.QueryOperatorEjectionsForTimeWindow(ctx, days, operatorId, first, skip)
@@ -144,7 +145,7 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 	for opID := range ejectedOperatorIds {
 		operatorIDs = append(operatorIDs, opID)
 	}
-	operatorAddresses, err := s.transactor.BatchOperatorIDToAddress(ctx, operatorIDs)
+	operatorAddresses, err := s.chainReader.BatchOperatorIDToAddress(ctx, operatorIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +175,7 @@ func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorI
 	return operatorEjections, nil
 }
 
-func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
+func processOperatorOnlineCheck(queriedOperatorsInfo *dataapi.IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)
 

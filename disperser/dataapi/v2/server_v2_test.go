@@ -1,4 +1,4 @@
-package dataapi_test
+package v2_test
 
 import (
 	"context"
@@ -18,10 +18,16 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
+	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
+	"github.com/gin-gonic/gin"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -36,15 +42,42 @@ import (
 
 var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
-	testDataApiServerV2 *dataapi.ServerV2
+	testDataApiServerV2 *serverv2.ServerV2
 
-	logger = logging.NewNoopLogger()
+	logger     = logging.NewNoopLogger()
+	mockLogger = logging.NewNoopLogger()
 
 	// Local stack
 	localStackPort     = "4566"
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
+	mockPrometheusApi  = &prommock.MockPrometheusApi{}
+
+	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
+	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
+	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
+	mockTx            = &coremock.MockWriter{}
+	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
+	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
+	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
+		0: {
+			opId0: 1,
+			opId1: 1,
+		},
+		1: {
+			opId0: 1,
+			opId1: 3,
+		},
+	})
+	mockIndexedChainState, _ = coremock.MakeChainDataMock(map[uint8]int{
+		0: 10,
+		1: 10,
+		2: 10,
+	})
+
+	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 )
 
 func TestMain(m *testing.M) {
@@ -95,7 +128,11 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = dataapi.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+}
+
+func setUpRouter() *gin.Engine {
+	return gin.Default()
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
@@ -184,7 +221,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobResponse
+	var response serverv2.BlobResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -328,7 +365,7 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BatchResponse
+	var response serverv2.BatchResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -448,7 +485,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.MetricSummary
+	var response serverv2.MetricSummary
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
