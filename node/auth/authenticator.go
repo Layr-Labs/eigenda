@@ -121,7 +121,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 		return fmt.Errorf("failed to verify request: %w", err)
 	}
 
-	a.saveAuthenticationResult(now, origin)
+	a.cacheAuthenticationResult(now, origin)
 	return nil
 }
 
@@ -151,8 +151,8 @@ func (a *requestAuthenticator) getDisperserKey(
 	return &address, nil
 }
 
-// saveAuthenticationResult saves the result of an auth.
-func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, origin string) {
+// cacheAuthenticationResult saves the result of an auth.
+func (a *requestAuthenticator) cacheAuthenticationResult(now time.Time, origin string) {
 	if a.authenticationTimeoutDuration == 0 {
 		// Authentication saving is disabled.
 		return
