@@ -99,10 +99,28 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
+	fmt.Println("paymentState", paymentState)
+
 	err = c.accountant.SetPaymentState(paymentState)
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
+
+	fmt.Println("Populate accountant %w", "account",
+		c.accountant.accountID,
+		"binRecords",
+		c.accountant.binRecords,
+		"cumulativePayment",
+		c.accountant.cumulativePayment,
+		"minNumSymbols",
+		c.accountant.minNumSymbols,
+		"onDemand",
+		c.accountant.onDemand,
+		"pricePerSymbol",
+		c.accountant.pricePerSymbol,
+		"reservation",
+		c.accountant.reservation,
+	)
 	return nil
 }
 
