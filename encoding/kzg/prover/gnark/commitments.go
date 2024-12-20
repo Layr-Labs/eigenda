@@ -10,9 +10,8 @@ import (
 )
 
 type KzgCommitmentsGnarkBackend struct {
-	KzgConfig  *kzg.KzgConfig
-	Srs        *kzg.SRS
-	G2Trailing []bn254.G2Affine
+	KzgConfig *kzg.KzgConfig
+	Srs       *kzg.SRS
 }
 
 func (p *KzgCommitmentsGnarkBackend) ComputeLengthProof(coeffs []fr.Element) (*bn254.G2Affine, error) {
@@ -26,7 +25,7 @@ func (p *KzgCommitmentsGnarkBackend) ComputeLengthProofForLength(coeffs []fr.Ele
 	}
 
 	start := p.KzgConfig.SRSNumberToLoad - length
-	shiftedSecret := p.G2Trailing[start : start+uint64(len(coeffs))]
+	shiftedSecret := p.Srs.G2Trailing[start : start+uint64(len(coeffs))]
 	config := ecc.MultiExpConfig{}
 
 	//The proof of low degree is commitment of the polynomial shifted to the largest srs degree
