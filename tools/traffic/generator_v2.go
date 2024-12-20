@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Generator simulates read/write traffic to the DA service.
@@ -52,8 +53,6 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		return nil, err
 	}
 
-	// var signer corev2.BlobRequestSigner
-
 	var signer *auth.LocalBlobRequestSigner
 	if config.SignerPrivateKey != "" {
 		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKey)
@@ -62,11 +61,12 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		return nil, fmt.Errorf("signer private key is required")
 	}
 
-	// logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
-	// client, err := clients.NewEigenDAClient(logger2, *config.EigenDAClientConfig)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	signerAccountId, err := signer.GetAccountID()
+	if err != nil {
+		return nil, fmt.Errorf("error getting account ID: %w", err)
+	}
+	accountId := gethcommon.HexToAddress(signerAccountId)
+	logger.Info("Initializing traffic generator", "accountId", accountId)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
