@@ -24,21 +24,23 @@ type NodeClient interface {
 }
 
 type nodeClient struct {
-	config   *NodeClientConfig
-	initOnce sync.Once
-	conn     *grpc.ClientConn
+	config        *NodeClientConfig
+	initOnce      sync.Once
+	conn          *grpc.ClientConn
+	requestSigner RequestSigner
 
 	dispersalClient nodegrpc.DispersalClient
 }
 
 var _ NodeClient = (*nodeClient)(nil)
 
-func NewNodeClient(config *NodeClientConfig) (*nodeClient, error) {
+func NewNodeClient(config *NodeClientConfig, requestSigner RequestSigner) (NodeClient, error) {
 	if config == nil || config.Hostname == "" || config.Port == "" {
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 	return &nodeClient{
-		config: config,
+		config:        config,
+		requestSigner: requestSigner,
 	}, nil
 }
 
@@ -60,8 +62,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 		}
 	}
 
-	// Call the gRPC method to store chunks
-	response, err := c.dispersalClient.StoreChunks(ctx, &nodegrpc.StoreChunksRequest{
+	request := &nodegrpc.StoreChunksRequest{
 		Batch: &commonpb.Batch{
 			Header: &commonpb.BatchHeader{
 				BatchRoot:            batch.BatchHeader.BatchRoot[:],
@@ -69,7 +70,20 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			},
 			BlobCertificates: blobCerts,
 		},
-	})
+		DisperserID: 0, // this will need to be updated dispersers are decentralized
+	}
+
+	if c.requestSigner != nil {
+		// Sign the request to store chunks
+		signature, err := c.requestSigner.SignStoreChunksRequest(ctx, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign store chunks request: %v", err)
+		}
+		request.Signature = signature
+	}
+
+	// Call the gRPC method to store chunks
+	response, err := c.dispersalClient.StoreChunks(ctx, request)
 	if err != nil {
 		return nil, err
 	}
