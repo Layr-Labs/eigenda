@@ -129,6 +129,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
+
+		logger.Info("Enabled payment meterer",
+			"interval", config.UpdateInterval,
+			"chainReadTimeout", config.ChainReadTimeout,
+			"reservationsTable", config.ReservationsTableName,
+			"onDemandTable", config.OnDemandTableName,
+			"globalRateTable", config.GlobalRateTableName,
+		)
 	}
 
 	var ratelimiter common.RateLimiter
