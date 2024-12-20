@@ -2,17 +2,11 @@ package dataapi
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"math"
 	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -23,13 +17,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	swaggerfiles "github.com/swaggo/files"     // swagger embed files
-	ginswagger "github.com/swaggo/gin-swagger" // gin-swagger middleware
+	// swagger embed files
+	// gin-swagger middleware
 )
 
 const (
@@ -272,41 +265,43 @@ func (s *server) Start() error {
 	}
 
 	router := gin.New()
-	basePath := "/api/v1"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
-	v1 := router.Group(basePath)
-	{
-		feed := v1.Group("/feed")
+	/*
+		basePath := "/api/v1"
+		docs.SwaggerInfo.BasePath = basePath
+		docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+		v1 := router.Group(basePath)
 		{
-			feed.GET("/blobs", s.FetchBlobsHandler)
-			feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
-			feed.GET("/batches/:batch_header_hash/blobs", s.FetchBlobsFromBatchHeaderHash)
+			feed := v1.Group("/feed")
+			{
+				feed.GET("/blobs", s.FetchBlobsHandler)
+				feed.GET("/blobs/:blob_key", s.FetchBlobHandler)
+				feed.GET("/batches/:batch_header_hash/blobs", s.FetchBlobsFromBatchHeaderHash)
+			}
+			operatorsInfo := v1.Group("/operators-info")
+			{
+				operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
+				operatorsInfo.GET("/operator-ejections", s.FetchOperatorEjections)
+				operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
+				operatorsInfo.GET("/port-check", s.OperatorPortCheck)
+				operatorsInfo.GET("/semver-scan", s.SemverScan)
+				operatorsInfo.GET("/operators-stake", s.OperatorsStake)
+			}
+			metrics := v1.Group("/metrics")
+			{
+				metrics.GET("/", s.FetchMetricsHandler)
+				metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
+				metrics.GET("/non-signers", s.FetchNonSigners)
+				metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
+				metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
+				metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
+				metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
+			}
+			swagger := v1.Group("/swagger")
+			{
+				swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			}
 		}
-		operatorsInfo := v1.Group("/operators-info")
-		{
-			operatorsInfo.GET("/deregistered-operators", s.FetchDeregisteredOperators)
-			operatorsInfo.GET("/operator-ejections", s.FetchOperatorEjections)
-			operatorsInfo.GET("/registered-operators", s.FetchRegisteredOperators)
-			operatorsInfo.GET("/port-check", s.OperatorPortCheck)
-			operatorsInfo.GET("/semver-scan", s.SemverScan)
-			operatorsInfo.GET("/operators-stake", s.OperatorsStake)
-		}
-		metrics := v1.Group("/metrics")
-		{
-			metrics.GET("/", s.FetchMetricsHandler)
-			metrics.GET("/throughput", s.FetchMetricsThroughputHandler)
-			metrics.GET("/non-signers", s.FetchNonSigners)
-			metrics.GET("/operator-nonsigning-percentage", s.FetchOperatorsNonsigningPercentageHandler)
-			metrics.GET("/disperser-service-availability", s.FetchDisperserServiceAvailability)
-			metrics.GET("/churner-service-availability", s.FetchChurnerServiceAvailability)
-			metrics.GET("/batcher-service-availability", s.FetchBatcherAvailability)
-		}
-		swagger := v1.Group("/swagger")
-		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
-		}
-	}
+	*/
 
 	router.GET("/", func(g *gin.Context) {
 		g.JSON(http.StatusAccepted, gin.H{"status": "OK"})
@@ -353,6 +348,7 @@ func (s *server) Shutdown() error {
 	return nil
 }
 
+/*
 // FetchBlobHandler godoc
 //
 //	@Summary	Fetch blob metadata by blob key
@@ -364,25 +360,26 @@ func (s *server) Shutdown() error {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/blobs/{blob_key} [get]
-func (s *server) FetchBlobHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlob", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	blobKey := c.Param("blob_key")
+	func (s *server) FetchBlobHandler(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchBlob", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	metadata, err := s.getBlob(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlob")
-		errorResponse(c, err)
-		return
+		blobKey := c.Param("blob_key")
+
+		metadata, err := s.getBlob(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlob")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+		c.JSON(http.StatusOK, metadata)
 	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
-	c.JSON(http.StatusOK, metadata)
-}
 
 // FetchBlobsFromBatchHeaderHash godoc
 //
@@ -397,100 +394,101 @@ func (s *server) FetchBlobHandler(c *gin.Context) {
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/batches/{batch_header_hash}/blobs [get]
-func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlobsFromBatchHeaderHash", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	batchHeaderHash := c.Param("batch_header_hash")
-	batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("invalid batch header hash"))
-		return
-	}
+	func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchBlobsFromBatchHeaderHash", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("invalid limit parameter"))
-		return
-	}
-	if limit <= 0 || limit > 1000 {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("limit must be between 0 and 1000"))
-		return
-	}
-
-	var exclusiveStartKey *disperser.BatchIndexExclusiveStartKey
-	nextToken := c.Query("next_token")
-	if nextToken != "" {
-		exclusiveStartKey, err = decodeNextToken(nextToken)
+		batchHeaderHash := c.Param("batch_header_hash")
+		batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-			errorResponse(c, fmt.Errorf("invalid next_token"))
+			errorResponse(c, fmt.Errorf("invalid batch header hash"))
 			return
 		}
-	}
 
-	metadatas, newExclusiveStartKey, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHashBytes, limit, exclusiveStartKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, err)
-		return
-	}
-
-	var nextPageToken string
-	if newExclusiveStartKey != nil {
-		nextPageToken, err = encodeNextToken(newExclusiveStartKey)
+		limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-			errorResponse(c, fmt.Errorf("failed to generate next page token"))
+			errorResponse(c, fmt.Errorf("invalid limit parameter"))
 			return
 		}
+		if limit <= 0 || limit > 1000 {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, fmt.Errorf("limit must be between 0 and 1000"))
+			return
+		}
+
+		var exclusiveStartKey *disperser.BatchIndexExclusiveStartKey
+		nextToken := c.Query("next_token")
+		if nextToken != "" {
+			exclusiveStartKey, err = decodeNextToken(nextToken)
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+				errorResponse(c, fmt.Errorf("invalid next_token"))
+				return
+			}
+		}
+
+		metadatas, newExclusiveStartKey, err := s.getBlobsFromBatchHeaderHash(c.Request.Context(), batchHeaderHashBytes, limit, exclusiveStartKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, err)
+			return
+		}
+
+		var nextPageToken string
+		if newExclusiveStartKey != nil {
+			nextPageToken, err = encodeNextToken(newExclusiveStartKey)
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+				errorResponse(c, fmt.Errorf("failed to generate next page token"))
+				return
+			}
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+		c.JSON(http.StatusOK, BlobsResponse{
+			Meta: Meta{
+				Size:      len(metadatas),
+				NextToken: nextPageToken,
+			},
+			Data: metadatas,
+		})
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
-	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: Meta{
-			Size:      len(metadatas),
-			NextToken: nextPageToken,
-		},
-		Data: metadatas,
-	})
-}
+	func decodeNextToken(token string) (*disperser.BatchIndexExclusiveStartKey, error) {
+		// Decode the base64 string
+		decodedBytes, err := base64.URLEncoding.DecodeString(token)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode token: %w", err)
+		}
 
-func decodeNextToken(token string) (*disperser.BatchIndexExclusiveStartKey, error) {
-	// Decode the base64 string
-	decodedBytes, err := base64.URLEncoding.DecodeString(token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode token: %w", err)
+		// Unmarshal the JSON into a BatchIndexExclusiveStartKey
+		var key disperser.BatchIndexExclusiveStartKey
+		err = json.Unmarshal(decodedBytes, &key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal token: %w", err)
+		}
+
+		return &key, nil
 	}
 
-	// Unmarshal the JSON into a BatchIndexExclusiveStartKey
-	var key disperser.BatchIndexExclusiveStartKey
-	err = json.Unmarshal(decodedBytes, &key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal token: %w", err)
+	func encodeNextToken(key *disperser.BatchIndexExclusiveStartKey) (string, error) {
+		// Marshal the key to JSON
+		jsonBytes, err := json.Marshal(key)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal key: %w", err)
+		}
+
+		// Encode the JSON as a base64 string
+		token := base64.URLEncoding.EncodeToString(jsonBytes)
+
+		return token, nil
 	}
-
-	return &key, nil
-}
-
-func encodeNextToken(key *disperser.BatchIndexExclusiveStartKey) (string, error) {
-	// Marshal the key to JSON
-	jsonBytes, err := json.Marshal(key)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal key: %w", err)
-	}
-
-	// Encode the JSON as a base64 string
-	token := base64.URLEncoding.EncodeToString(jsonBytes)
-
-	return token, nil
-}
 
 // FetchBlobsHandler godoc
 //
@@ -503,40 +501,41 @@ func encodeNextToken(key *disperser.BatchIndexExclusiveStartKey) (string, error)
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/blobs [get]
-func (s *server) FetchBlobsHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlobs", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("invalid limit parameter"))
-		return
-	}
-	if limit <= 0 {
-		s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
-		errorResponse(c, fmt.Errorf("limit must be greater than 0"))
-		return
-	}
+	func (s *server) FetchBlobsHandler(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchBlobs", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	metadatas, err := s.getBlobs(c.Request.Context(), limit)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobs")
-		errorResponse(c, err)
-		return
-	}
+		limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, fmt.Errorf("invalid limit parameter"))
+			return
+		}
+		if limit <= 0 {
+			s.metrics.IncrementFailedRequestNum("FetchBlobsFromBatchHeaderHash")
+			errorResponse(c, fmt.Errorf("limit must be greater than 0"))
+			return
+		}
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobs")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobsAge))
-	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: Meta{
-			Size: len(metadatas),
-		},
-		Data: metadatas,
-	})
-}
+		metadatas, err := s.getBlobs(c.Request.Context(), limit)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobs")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchBlobs")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobsAge))
+		c.JSON(http.StatusOK, BlobsResponse{
+			Meta: Meta{
+				Size: len(metadatas),
+			},
+			Data: metadatas,
+		})
+	}
 
 // FetchMetricsHandler godoc
 //
@@ -551,34 +550,35 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics  [get]
-func (s *server) FetchMetricsHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetrics", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	now := time.Now()
-	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
-	if err != nil || start == 0 {
-		start = now.Add(-time.Hour * 1).Unix()
+	func (s *server) FetchMetricsHandler(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchMetrics", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
+
+		now := time.Now()
+		start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+		if err != nil || start == 0 {
+			start = now.Add(-time.Hour * 1).Unix()
+		}
+
+		end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
+		if err != nil || end == 0 {
+			end = now.Unix()
+		}
+
+		metric, err := s.getMetric(c.Request.Context(), start, end)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchMetrics")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchMetrics")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAage))
+		c.JSON(http.StatusOK, metric)
 	}
-
-	end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
-	if err != nil || end == 0 {
-		end = now.Unix()
-	}
-
-	metric, err := s.getMetric(c.Request.Context(), start, end)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchMetrics")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchMetrics")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAage))
-	c.JSON(http.StatusOK, metric)
-}
 
 // FetchMetricsThroughputHandler godoc
 //
@@ -592,34 +592,35 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/throughput  [get]
-func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetricsTroughput", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	now := time.Now()
-	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
-	if err != nil || start == 0 {
-		start = now.Add(-time.Hour * 1).Unix()
+	func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchMetricsTroughput", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
+
+		now := time.Now()
+		start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
+		if err != nil || start == 0 {
+			start = now.Add(-time.Hour * 1).Unix()
+		}
+
+		end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
+		if err != nil || end == 0 {
+			end = now.Unix()
+		}
+
+		ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchMetricsTroughput")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchMetricsTroughput")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
+		c.JSON(http.StatusOK, ths)
 	}
-
-	end, err := strconv.ParseInt(c.DefaultQuery("end", "0"), 10, 64)
-	if err != nil || end == 0 {
-		end = now.Unix()
-	}
-
-	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchMetricsTroughput")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsTroughput")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
-	c.JSON(http.StatusOK, ths)
-}
 
 // FetchNonSigners godoc
 //
@@ -632,27 +633,28 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/non-signers  [get]
-func (s *server) FetchNonSigners(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchNonSigners", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
-	if err != nil || interval == 0 {
-		interval = 3600
-	}
-	metric, err := s.getNonSigners(c.Request.Context(), interval)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchNonSigners")
-		errorResponse(c, err)
-		return
-	}
+	func (s *server) FetchNonSigners(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchNonSigners", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxNonSignerAge))
-	c.JSON(http.StatusOK, metric)
-}
+		interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+		if err != nil || interval == 0 {
+			interval = 3600
+		}
+		metric, err := s.getNonSigners(c.Request.Context(), interval)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchNonSigners")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchNonSigners")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxNonSignerAge))
+		c.JSON(http.StatusOK, metric)
+	}
 
 // FetchOperatorsNonsigningPercentageHandler godoc
 //
@@ -667,50 +669,51 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/operator-nonsigning-percentage  [get]
-func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	endTime := time.Now()
-	if c.Query("end") != "" {
+	func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-		var err error
-		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		endTime := time.Now()
+		if c.Query("end") != "" {
+
+			var err error
+			endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+			if err != nil {
+				errorResponse(c, err)
+				return
+			}
+		}
+
+		interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
+		if err != nil || interval == 0 {
+			interval = 3600
+		}
+
+		liveOnly := "true"
+		if c.Query("live_only") != "" {
+			liveOnly = c.Query("live_only")
+			if liveOnly != "true" && liveOnly != "false" {
+				errorResponse(c, errors.New("the live_only param must be \"true\" or \"false\""))
+				return
+			}
+		}
+
+		startTime := endTime.Add(-time.Duration(interval) * time.Second)
+
+		metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix(), liveOnly == "true")
 		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
 			errorResponse(c, err)
 			return
 		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsNonsigningPercentageAge))
+		c.JSON(http.StatusOK, metric)
 	}
-
-	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
-	if err != nil || interval == 0 {
-		interval = 3600
-	}
-
-	liveOnly := "true"
-	if c.Query("live_only") != "" {
-		liveOnly = c.Query("live_only")
-		if liveOnly != "true" && liveOnly != "false" {
-			errorResponse(c, errors.New("the live_only param must be \"true\" or \"false\""))
-			return
-		}
-	}
-
-	startTime := endTime.Add(-time.Duration(interval) * time.Second)
-
-	metric, err := s.getOperatorNonsigningRate(c.Request.Context(), startTime.Unix(), endTime.Unix(), liveOnly == "true")
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchOperatorsNonsigningPercentageHandler")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNonsigningPercentageHandler")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsNonsigningPercentageAge))
-	c.JSON(http.StatusOK, metric)
-}
 
 // OperatorsStake godoc
 //
@@ -723,26 +726,27 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/operators-stake [get]
-func (s *server) OperatorsStake(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("OperatorsStake", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	operatorId := c.DefaultQuery("operator_id", "")
-	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
+	func (s *server) OperatorsStake(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("OperatorsStake", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("OperatorsStake")
-		errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
-		return
+		operatorId := c.DefaultQuery("operator_id", "")
+		s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
+
+		operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("OperatorsStake")
+			errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("OperatorsStake")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
+		c.JSON(http.StatusOK, operatorsStakeResponse)
 	}
-
-	s.metrics.IncrementSuccessfulRequestNum("OperatorsStake")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
-	c.JSON(http.StatusOK, operatorsStakeResponse)
-}
 
 // FetchDeregisteredOperators godoc
 //
@@ -754,45 +758,46 @@ func (s *server) OperatorsStake(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/deregistered-operators [get]
-func (s *server) FetchDeregisteredOperators(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	// Get query parameters
-	// Default Value 14 days
-	days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+	func (s *server) FetchDeregisteredOperators(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	// Convert days to integer
-	daysInt, err := strconv.Atoi(days)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
-		return
+		// Get query parameters
+		// Default Value 14 days
+		days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+
+		// Convert days to integer
+		daysInt, err := strconv.Atoi(days)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+			return
+		}
+
+		if daysInt > 30 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+			return
+		}
+
+		operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
+		if err != nil {
+			s.logger.Error("Failed to fetch deregistered operators", "error", err)
+			s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
+		c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
+			Meta: Meta{
+				Size: len(operatorMetadatas),
+			},
+			Data: operatorMetadatas,
+		})
 	}
-
-	if daysInt > 30 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
-		return
-	}
-
-	operatorMetadatas, err := s.getDeregisteredOperatorForDays(c.Request.Context(), int32(daysInt))
-	if err != nil {
-		s.logger.Error("Failed to fetch deregistered operators", "error", err)
-		s.metrics.IncrementFailedRequestNum("FetchDeregisteredOperators")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
-	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: Meta{
-			Size: len(operatorMetadatas),
-		},
-		Data: operatorMetadatas,
-	})
-}
 
 // FetchRegisteredOperators godoc
 //
@@ -804,44 +809,45 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/registered-operators [get]
-func (s *server) FetchRegisteredOperators(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchRegisteredOperators", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	// Get query parameters
-	// Default Value 14 days
-	days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+	func (s *server) FetchRegisteredOperators(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchRegisteredOperators", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	// Convert days to integer
-	daysInt, err := strconv.Atoi(days)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
-		return
+		// Get query parameters
+		// Default Value 14 days
+		days := c.DefaultQuery("days", "14") // If not specified, defaults to 14
+
+		// Convert days to integer
+		daysInt, err := strconv.Atoi(days)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+			return
+		}
+
+		if daysInt > 30 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
+			return
+		}
+
+		operatorMetadatas, err := s.getRegisteredOperatorForDays(c.Request.Context(), int32(daysInt))
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchRegisteredOperators")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
+		c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
+			Meta: Meta{
+				Size: len(operatorMetadatas),
+			},
+			Data: operatorMetadatas,
+		})
 	}
-
-	if daysInt > 30 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter. Max value is 30"})
-		return
-	}
-
-	operatorMetadatas, err := s.getRegisteredOperatorForDays(c.Request.Context(), int32(daysInt))
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchRegisteredOperators")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
-	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: Meta{
-			Size: len(operatorMetadatas),
-		},
-		Data: operatorMetadatas,
-	})
-}
 
 // FetchOperatorEjections godoc
 //
@@ -857,52 +863,53 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/operator-ejections [get]
-func (s *server) FetchOperatorEjections(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
+	func (s *server) FetchOperatorEjections(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
-	parsedDays, err := strconv.ParseInt(days, 10, 32)
-	if err != nil || parsedDays < math.MinInt32 || parsedDays > math.MaxInt32 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
-		return
+		operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
+
+		days := c.DefaultQuery("days", "1") // If not specified, defaults to 1
+		parsedDays, err := strconv.ParseInt(days, 10, 32)
+		if err != nil || parsedDays < math.MinInt32 || parsedDays > math.MaxInt32 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'days' parameter"})
+			return
+		}
+		daysInt := int32(parsedDays)
+
+		first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
+		parsedFirst, err := strconv.ParseInt(first, 10, 32)
+		if err != nil || parsedFirst < 1 || parsedFirst > 10000 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
+			return
+		}
+		firstInt := int32(parsedFirst)
+
+		skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
+		parsedSkip, err := strconv.ParseInt(skip, 10, 32)
+		if err != nil || parsedSkip < 0 || parsedSkip > 1000000000 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
+			return
+		}
+		skipInt := int32(parsedSkip)
+
+		operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
+		if err != nil {
+			s.logger.Error("Failed to fetch ejected operators", "error", err)
+			s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")
+			errorResponse(c, err)
+			return
+		}
+
+		s.metrics.IncrementSuccessfulRequestNum("FetchOperatorEjections")
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
+		c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
+			Ejections: operatorEjections,
+		})
 	}
-	daysInt := int32(parsedDays)
-
-	first := c.DefaultQuery("first", "1000") // If not specified, defaults to 1000
-	parsedFirst, err := strconv.ParseInt(first, 10, 32)
-	if err != nil || parsedFirst < 1 || parsedFirst > 10000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'first' parameter. Value must be between 1..10000"})
-		return
-	}
-	firstInt := int32(parsedFirst)
-
-	skip := c.DefaultQuery("skip", "0") // If not specified, defaults to 0
-	parsedSkip, err := strconv.ParseInt(skip, 10, 32)
-	if err != nil || parsedSkip < 0 || parsedSkip > 1000000000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid 'skip' parameter. Value must be between 0..1000000000"})
-		return
-	}
-	skipInt := int32(parsedSkip)
-
-	operatorEjections, err := s.getOperatorEjections(c.Request.Context(), int32(daysInt), operatorId, uint(firstInt), uint(skipInt))
-	if err != nil {
-		s.logger.Error("Failed to fetch ejected operators", "error", err)
-		s.metrics.IncrementFailedRequestNum("FetchOperatorEjections")
-		errorResponse(c, err)
-		return
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorEjections")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxEjectedOperatorAge))
-	c.JSON(http.StatusOK, QueriedOperatorEjectionsResponse{
-		Ejections: operatorEjections,
-	})
-}
 
 // OperatorPortCheck godoc
 //
@@ -915,31 +922,32 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/port-check [get]
-func (s *server) OperatorPortCheck(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	operatorId := c.DefaultQuery("operator_id", "")
-	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			err = errNotFound
-			s.logger.Warn("operator not found", "operatorId", operatorId)
-			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
-		} else {
-			s.logger.Error("operator port check failed", "error", err)
-			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+	func (s *server) OperatorPortCheck(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
+
+		operatorId := c.DefaultQuery("operator_id", "")
+		s.logger.Info("checking operator ports", "operatorId", operatorId)
+		portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				err = errNotFound
+				s.logger.Warn("operator not found", "operatorId", operatorId)
+				s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+			} else {
+				s.logger.Error("operator port check failed", "error", err)
+				s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+			}
+			errorResponse(c, err)
+			return
 		}
-		errorResponse(c, err)
-		return
-	}
 
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
-	c.JSON(http.StatusOK, portCheckResponse)
-}
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+		c.JSON(http.StatusOK, portCheckResponse)
+	}
 
 // Semver scan godoc
 //
@@ -949,21 +957,22 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 //	@Success	200	{object}	SemverReportResponse
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/semver-scan [get]
-func (s *server) SemverScan(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("SemverScan", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
-	if err != nil {
-		s.logger.Error("failed to scan operators host info", "error", err)
-		s.metrics.IncrementFailedRequestNum("SemverScan")
-		errorResponse(c, err)
+	func (s *server) SemverScan(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("SemverScan", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
+
+		report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
+		if err != nil {
+			s.logger.Error("failed to scan operators host info", "error", err)
+			s.metrics.IncrementFailedRequestNum("SemverScan")
+			errorResponse(c, err)
+		}
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
+		c.JSON(http.StatusOK, report)
 	}
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
-	c.JSON(http.StatusOK, report)
-}
 
 // FetchDisperserServiceAvailability godoc
 //
@@ -975,49 +984,50 @@ func (s *server) SemverScan(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/disperser-service-availability [get]
-func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	// Check Disperser
-	services := []string{"Disperser"}
+	func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
+		// Check Disperser
+		services := []string{"Disperser"}
 
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchDisperserServiceAvailability")
-		errorResponse(c, err)
-		return
-	}
+		s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchDisperserServiceAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
+		availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchDisperserServiceAvailability")
+			errorResponse(c, err)
+			return
 		}
 
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
+		s.metrics.IncrementSuccessfulRequestNum("FetchDisperserServiceAvailability")
+
+		// Set the status code to 503 if any of the services are not serving
+		availabilityStatus := http.StatusOK
+		for _, status := range availabilityStatuses {
+			if status.ServiceStatus == "NOT_SERVING" {
+				availabilityStatus = http.StatusServiceUnavailable
+				break
+			}
+
+			if status.ServiceStatus == "UNKNOWN" {
+				availabilityStatus = http.StatusInternalServerError
+				break
+			}
+
 		}
 
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
+		c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+			Meta: Meta{
+				Size: len(availabilityStatuses),
+			},
+			Data: availabilityStatuses,
+		})
 	}
-
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
-	})
-}
 
 // FetchChurnerServiceAvailability godoc
 //
@@ -1029,49 +1039,50 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/churner-service-availability [get]
-func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	// Check Disperser
-	services := []string{"Churner"}
+	func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
+		// Check Disperser
+		services := []string{"Churner"}
 
-	availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchChurnerServiceAvailability")
-		errorResponse(c, err)
-		return
-	}
+		s.logger.Info("Getting service availability for", "services", strings.Join(services, ", "))
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchChurnerServiceAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
+		availabilityStatuses, err := s.getServiceAvailability(c.Request.Context(), services)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchChurnerServiceAvailability")
+			errorResponse(c, err)
+			return
 		}
 
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
+		s.metrics.IncrementSuccessfulRequestNum("FetchChurnerServiceAvailability")
+
+		// Set the status code to 503 if any of the services are not serving
+		availabilityStatus := http.StatusOK
+		for _, status := range availabilityStatuses {
+			if status.ServiceStatus == "NOT_SERVING" {
+				availabilityStatus = http.StatusServiceUnavailable
+				break
+			}
+
+			if status.ServiceStatus == "UNKNOWN" {
+				availabilityStatus = http.StatusInternalServerError
+				break
+			}
+
 		}
 
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
+		c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+			Meta: Meta{
+				Size: len(availabilityStatuses),
+			},
+			Data: availabilityStatuses,
+		})
 	}
-
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
-	})
-}
 
 // FetchBatcherAvailability godoc
 //
@@ -1083,49 +1094,51 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure	404	{object}	ErrorResponse	"error: Not found"
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/batcher-service-availability [get]
-func (s *server) FetchBatcherAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
 
-	// Check Batcher
-	services := []HttpServiceAvailabilityCheck{{"Batcher", s.batcherHealthEndpt}}
+	func (s *server) FetchBatcherAvailability(c *gin.Context) {
+		timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+			s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
+		}))
+		defer timer.ObserveDuration()
 
-	s.logger.Info("Getting service availability for", "service", services[0].ServiceName, "endpoint", services[0].HealthEndPt)
+		// Check Batcher
+		services := []HttpServiceAvailabilityCheck{{"Batcher", s.batcherHealthEndpt}}
 
-	availabilityStatuses, err := s.getServiceHealth(c.Request.Context(), services)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBatcherAvailability")
-		errorResponse(c, err)
-		return
-	}
+		s.logger.Info("Getting service availability for", "service", services[0].ServiceName, "endpoint", services[0].HealthEndPt)
 
-	s.metrics.IncrementSuccessfulRequestNum("FetchBatcherAvailability")
-
-	// Set the status code to 503 if any of the services are not serving
-	availabilityStatus := http.StatusOK
-	for _, status := range availabilityStatuses {
-		if status.ServiceStatus == "NOT_SERVING" {
-			availabilityStatus = http.StatusServiceUnavailable
-			break
+		availabilityStatuses, err := s.getServiceHealth(c.Request.Context(), services)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatcherAvailability")
+			errorResponse(c, err)
+			return
 		}
 
-		if status.ServiceStatus == "UNKNOWN" {
-			availabilityStatus = http.StatusInternalServerError
-			break
+		s.metrics.IncrementSuccessfulRequestNum("FetchBatcherAvailability")
+
+		// Set the status code to 503 if any of the services are not serving
+		availabilityStatus := http.StatusOK
+		for _, status := range availabilityStatuses {
+			if status.ServiceStatus == "NOT_SERVING" {
+				availabilityStatus = http.StatusServiceUnavailable
+				break
+			}
+
+			if status.ServiceStatus == "UNKNOWN" {
+				availabilityStatus = http.StatusInternalServerError
+				break
+			}
+
 		}
 
+		c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatcherAvailabilityAge))
+		c.JSON(availabilityStatus, ServiceAvailabilityResponse{
+			Meta: Meta{
+				Size: len(availabilityStatuses),
+			},
+			Data: availabilityStatuses,
+		})
 	}
-
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatcherAvailabilityAge))
-	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: Meta{
-			Size: len(availabilityStatuses),
-		},
-		Data: availabilityStatuses,
-	})
-}
+*/
 
 func errorResponse(c *gin.Context, err error) {
 	_ = c.Error(err)
