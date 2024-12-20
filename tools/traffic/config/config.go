@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/urfave/cli"
 )
 

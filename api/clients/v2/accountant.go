@@ -87,7 +87,6 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	}
 
 	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
-	fmt.Println("accoutant calcu", "relativeBinRecord", relativeBinRecord.Usage, "overflowBin", overflowBinRecord, "binLimit", binLimit)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
@@ -108,7 +107,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 		}
 		return 0, a.cumulativePayment, nil
 	}
-	fmt.Println("accoutant calcu", "numSymbols", symbolUsage, "relativeBinRecord", relativeBinRecord.Usage, "overflowBin", overflowBinRecord, "incrementRequired", incrementRequired, "a.cumulativePayment", a.cumulativePayment)
+
 	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
