@@ -159,7 +159,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	usageLimit := m.GetReservationBinLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
-	} else if newUsage-uint64(numSymbols) >= usageLimit {
+	} else if newUsage-uint64(symbolsCharged) >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
