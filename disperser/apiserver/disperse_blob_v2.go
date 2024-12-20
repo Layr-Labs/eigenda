@@ -40,7 +40,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
 	}
-	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
+
+	s.logger.Debug("received a new blob dispersal request",
+		"accountId", blobHeader.PaymentMetadata.AccountID,
+		"blobSizeBytes", len(data),
+		"quorums", req.GetBlobHeader().GetQuorumNumbers(),
+	)
 
 	blobKey, err := s.StoreBlob(ctx, data, blobHeader, time.Now(), onchainState.TTL)
 	if err != nil {
