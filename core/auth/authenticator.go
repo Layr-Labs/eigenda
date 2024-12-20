@@ -1,14 +1,12 @@
 package auth
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/core"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -31,25 +29,15 @@ func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error 
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, header.Nonce)
 	hash := crypto.Keccak256(buf)
-
-	publicKeyBytes, err := hexutil.Decode(header.AccountID)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
-	}
-
-	// Decode public key
-	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", header.AccountID, err)
-	}
-
 	// Verify the signature
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash, sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}
 
-	if !bytes.Equal(pubKey.X.Bytes(), sigPublicKeyECDSA.X.Bytes()) || !bytes.Equal(pubKey.Y.Bytes(), sigPublicKeyECDSA.Y.Bytes()) {
+	pubKey := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+
+	if pubKey != header.AccountID {
 		return errors.New("signature doesn't match with provided public key")
 	}
 

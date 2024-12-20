@@ -1,12 +1,10 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
 	geth "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -25,24 +23,14 @@ func VerifySignature(message []byte, accountAddr geth.Address, sig []byte) error
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
-	publicKeyBytes, err := hexutil.Decode(accountAddr.Hex())
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", accountAddr.Hex(), err)
-	}
-
-	// Decode public key
-	pubKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to decode public key (%v): %v", accountAddr.Hex(), err)
-	}
-
 	// Verify the signature
 	sigPublicKeyECDSA, err := crypto.SigToPub(message, sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}
 
-	if !bytes.Equal(pubKey.X.Bytes(), sigPublicKeyECDSA.X.Bytes()) || !bytes.Equal(pubKey.Y.Bytes(), sigPublicKeyECDSA.Y.Bytes()) {
+	pubKey := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	if pubKey != accountAddr.Hex() {
 		return errors.New("signature doesn't match with provided public key")
 	}
 
