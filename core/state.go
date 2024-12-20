@@ -96,6 +96,8 @@ type OperatorInfo struct {
 	Stake StakeAmount
 	// Index is the index of the operator within the quorum
 	Index OperatorIndex
+	// Socket is the socket address of the operator, in the form "host:port"
+	Socket string
 }
 
 // OperatorState contains information about the current state of operators which is stored in the blockchain state

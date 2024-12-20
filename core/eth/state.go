@@ -28,7 +28,14 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 		return nil, err
 	}
 
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
+	socketMap := make(map[core.OperatorID]string)
+	socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
+	if err != nil {
+		return nil, err
+	}
+	socketMap[operator] = socket
+
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber), socketMap)
 
 }
 
@@ -38,7 +45,12 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
+	socketMap, err := cs.buildSocketMap(ctx, operatorsByQuorum)
+	if err != nil {
+		return nil, err
+	}
+
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber), socketMap)
 }
 
 func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
@@ -59,7 +71,26 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 	return socket, nil
 }
 
-func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
+// buildSocketMap returns a map from operatorID to socket address for the operators in the operatorsByQuorum
+func (cs *ChainState) buildSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) (map[core.OperatorID]string, error) {
+	socketMap := make(map[core.OperatorID]string)
+	for _, quorum := range operatorsByQuorum {
+		for _, op := range quorum {
+			// if the socket is already in the map, skip
+			if _, ok := socketMap[op.OperatorID]; ok {
+				continue
+			}
+			socket, err := cs.Tx.GetOperatorSocket(ctx, op.OperatorID)
+			if err != nil {
+				return nil, err
+			}
+			socketMap[op.OperatorID] = socket
+		}
+	}
+	return socketMap, nil
+}
+
+func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32, socketMap map[core.OperatorID]string) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
 
@@ -69,8 +100,9 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32)
 
 		for ind, op := range quorum {
 			operators[quorumID][op.OperatorID] = &core.OperatorInfo{
-				Stake: op.Stake,
-				Index: core.OperatorIndex(ind),
+				Stake:  op.Stake,
+				Index:  core.OperatorIndex(ind),
+				Socket: socketMap[op.OperatorID],
 			}
 			totalStake.Add(totalStake, op.Stake)
 		}
@@ -78,6 +110,8 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32)
 		totals[quorumID] = &core.OperatorInfo{
 			Stake: totalStake,
 			Index: core.OperatorIndex(len(quorum)),
+			// no socket for the total
+			Socket: "",
 		}
 	}
 

@@ -46,7 +46,7 @@ func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batch
 func (c *MockNodeClient) GetChunks(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.IndexedOperatorInfo,
+	opInfo *core.OperatorInfo,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 	quorumID core.QuorumID,
