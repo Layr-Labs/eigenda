@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+
 	"math"
 	"math/big"
 	"net"
@@ -22,7 +23,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	p "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
@@ -37,6 +37,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -718,7 +719,7 @@ func teardown() {
 }
 
 func newTestServer(transactor core.Writer, testName string) *apiserver.DispersalServer {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	awsConfig := aws.ClientConfig{
 		Region:          "us-east-1",

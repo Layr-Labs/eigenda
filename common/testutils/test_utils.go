@@ -3,8 +3,10 @@ package testutils
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
+	"os"
 	"testing"
 	"time"
 )
@@ -111,4 +113,8 @@ func RandomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func GetLogger() logging.Logger {
+	return logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 }

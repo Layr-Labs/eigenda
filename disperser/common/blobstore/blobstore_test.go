@@ -10,10 +10,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 
 	awsmock "github.com/Layr-Labs/eigenda/common/aws/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	logger         = logging.NewNoopLogger()
+	logger         = testutils.GetLogger()
 	securityParams = []*core.SecurityParam{{
 		QuorumID:           1,
 		AdversaryThreshold: 80,

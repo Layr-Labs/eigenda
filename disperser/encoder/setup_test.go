@@ -5,15 +5,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 )
 
 var (
-	logger         = logging.NewNoopLogger()
+	logger         = testutils.GetLogger()
 	UUID           = uuid.New()
 	s3BucketName   = "test-eigenda"
 	mockCommitment = encoding.BlobCommitments{}
