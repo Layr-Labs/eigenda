@@ -35,6 +35,14 @@ type (
 		BlobSizeBytes uint64             `json:"blob_size_bytes"`
 	}
 
+	BlobCertificateResponse struct {
+		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
+	}
+
+	BlobVerificationInfoResponse struct {
+		VerificationInfo *corev2.BlobVerificationInfo `json:"blob_verification_info"`
+	}
+
 	BatchResponse struct {
 		BatchHeaderHash       string                         `json:"batch_header_hash"`
 		SignedBatch           *SignedBatch                   `json:"signed_batch"`
@@ -114,6 +122,8 @@ func (s *ServerV2) Start() error {
 		{
 			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
 			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
+			blob.GET("/blobs/:blob_key/certificate", s.FetchBlobCertificateHandler)
+			blob.GET("/blobs/:blob_key/verification-info", s.FetchBlobVerificationInfoHandler)
 		}
 		batch := v2.Group("/batch")
 		{
@@ -180,7 +190,7 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 // FetchBlobHandler godoc
 //
 //	@Summary	Fetch blob metadata by blob key
-//	@Tags		Feed
+//	@Tags		Blob
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
 //	@Success	200			{object}	BlobResponse
@@ -214,6 +224,83 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// FetchBlobCertificateHandler godoc
+//
+//	@Summary	Fetch blob certificate by blob key
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		blob_key	path		string	true	"Blob key in hex string"
+//	@Success	200			{object}	BlobCertificateResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/{blob_key}/certificate [get]
+func (s *ServerV2) FetchBlobCertificateHandler(c *gin.Context) {
+	start := time.Now()
+	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobCertificate")
+		errorResponse(c, err)
+		return
+	}
+	cert, _, err := s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
+		errorResponse(c, err)
+		return
+	}
+	response := &BlobCertificateResponse{
+		Certificate: cert,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobCertificate")
+	s.metrics.ObserveLatency("FetchBlobCertificate", float64(time.Since(start).Milliseconds()))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, response)
+}
+
+// FetchBlobVerificationInfoHandler godoc
+//
+//	@Summary	Fetch blob verification info by blob key and batch header hash
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		blob_key			path		string	true	"Blob key in hex string"
+//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
+//
+//	@Success	200					{object}	BlobVerificationInfoResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/{blob_key}/verification-info [get]
+func (s *ServerV2) FetchBlobVerificationInfoHandler(c *gin.Context) {
+	start := time.Now()
+	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
+		errorResponse(c, err)
+		return
+	}
+	batchHeaderHashHex := c.Query("batch_header_hash")
+	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
+		errorResponse(c, err)
+		return
+	}
+	bvi, err := s.blobMetadataStore.GetBlobVerificationInfo(c.Request.Context(), blobKey, batchHeaderHash)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobVerificationInfo")
+		errorResponse(c, err)
+		return
+	}
+	response := &BlobVerificationInfoResponse{
+		VerificationInfo: bvi,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobVerificationInfo")
+	s.metrics.ObserveLatency("FetchBlobVerificationInfo", float64(time.Since(start).Milliseconds()))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, response)
+}
+
 func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 	errorResponse(c, errors.New("FetchBatchFeedHandler unimplemented"))
 }
@@ -221,10 +308,10 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 // FetchBatchHandler godoc
 //
 //	@Summary	Fetch batch by the batch header hash
-//	@Tags		Feed
+//	@Tags		Batch
 //	@Produce	json
 //	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
-//	@Success	200					{object}	BlobResponse
+//	@Success	200					{object}	BatchResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"

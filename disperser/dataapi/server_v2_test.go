@@ -198,6 +198,92 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
+func TestFetchBlobCertificateHandler(t *testing.T) {
+	r := setUpRouter()
+
+	// Set up blob certificate in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+	fragmentInfo := &encoding.FragmentInfo{
+		TotalChunkSizeBytes: 100,
+		FragmentSizeBytes:   1024 * 1024 * 4,
+	}
+	err = blobMetadataStore.PutBlobCertificate(context.Background(), blobCert, fragmentInfo)
+	require.NoError(t, err)
+
+	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificateHandler)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate", nil)
+	r.ServeHTTP(w, req)
+	res := w.Result()
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobCertificateResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
+	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
+	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
+}
+
+func TestFetchBlobVerificationInfoHandler(t *testing.T) {
+	r := setUpRouter()
+
+	// Set up blob verification info in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 100,
+	}
+	batchHeaderHash, err := batchHeader.Hash()
+	require.NoError(t, err)
+	fmt.Println("XXt batchHeaderHash bytes:", batchHeaderHash)
+	fmt.Println("XXt batchHeaderHash hex:", hex.EncodeToString(batchHeaderHash[:]))
+
+	ctx := context.Background()
+	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
+	require.NoError(t, err)
+	verificationInfo := &corev2.BlobVerificationInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey,
+		BlobIndex:      123,
+		InclusionProof: []byte("inclusion proof"),
+	}
+	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	require.NoError(t, err)
+
+	r.GET("/v2/blobs/:blob_key/verification-info", testDataApiServerV2.FetchBlobVerificationInfoHandler)
+	w := httptest.NewRecorder()
+	reqStr := fmt.Sprintf("/v2/blobs/%s/verification-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	r.ServeHTTP(w, req)
+	res := w.Result()
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response dataapi.BlobVerificationInfoResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, verificationInfo.InclusionProof, response.VerificationInfo.InclusionProof)
+}
+
 func TestFetchBatchHandlerV2(t *testing.T) {
 	r := setUpRouter()
 
