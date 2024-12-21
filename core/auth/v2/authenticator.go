@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -37,9 +38,10 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader) error {
 	}
 
 	accountId := header.PaymentMetadata.AccountID
-	pubKey := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	accountAddr := common.HexToAddress(accountId)
+	pubKeyAddr := crypto.PubkeyToAddress(*sigPublicKeyECDSA)
 
-	if pubKey != accountId {
+	if accountAddr.Cmp(pubKeyAddr) != 0 {
 		return errors.New("signature doesn't match with provided public key")
 	}
 
@@ -59,9 +61,10 @@ func (*authenticator) AuthenticatePaymentStateRequest(sig []byte, accountId stri
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}
 
-	pubKey := crypto.PubkeyToAddress(*sigPublicKeyECDSA).Hex()
+	accountAddr := common.HexToAddress(accountId)
+	pubKeyAddr := crypto.PubkeyToAddress(*sigPublicKeyECDSA)
 
-	if pubKey != accountId {
+	if accountAddr.Cmp(pubKeyAddr) != 0 {
 		return errors.New("signature doesn't match with provided public key")
 	}
 
