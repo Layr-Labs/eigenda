@@ -203,19 +203,19 @@ target "traffic-generator-internal" {
   ]
 }
 
-target "traffic-generator2" {
+target "traffic-generator-v2" {
   context    = "."
-  dockerfile = "./trafficgenerator2.Dockerfile"
+  dockerfile = "./trafficgenerator-v2.Dockerfile"
   target     = "generator2"
-  tags       = ["${REGISTRY}/${REPO}/traffic-generator2:${BUILD_TAG}"]
+  tags       = ["${REGISTRY}/${REPO}/traffic-generator-v2:${BUILD_TAG}"]
 }
 
-target "traffic-generator2-internal" {
-  inherits = ["traffic-generator2"]
+target "traffic-generator-v2-internal" {
+  inherits = ["traffic-generator-v2"]
   tags     = [
-    "${REGISTRY}/eigenda-traffic-generator2:${BUILD_TAG}",
-    "${REGISTRY}/eigenda-traffic-generator2:${GIT_SHA}",
-    "${REGISTRY}/eigenda-traffic-generator2:sha-${GIT_SHORT_SHA}"
+    "${REGISTRY}/eigenda-traffic-generator-v2:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-traffic-generator-v2:${GIT_SHA}",
+    "${REGISTRY}/eigenda-traffic-generator-v2:sha-${GIT_SHORT_SHA}"
   ]
 }
 
