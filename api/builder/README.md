@@ -19,5 +19,5 @@ Once the docker image is built, you can build the protobufs via the following co
 # Caveats
 
 I've tested this on my m3 macbook. It's possible that the docker image may have trouble on other architectures.
-Please report any issues you encounter with this build process to the EigenDA team. The goal is to be arcihtecturally
+Please report any issues you encounter with this build process to the EigenDA team. The goal is to be architecturally
 agnostic, but that isn't a priority in the very short term.
