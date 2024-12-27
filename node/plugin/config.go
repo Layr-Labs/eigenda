@@ -23,7 +23,7 @@ var (
 
 	PubIPProviderFlag = cli.StringFlag{
 		Name:     "public-ip-provider",
-		Usage:    "The ip provider service used to obtain a operator's public IP [seeip (default), ipify)",
+		Usage:    "The ip provider service used to obtain an operator's public IP [seeip (default), ipify)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
 	}
