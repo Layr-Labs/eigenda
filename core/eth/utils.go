@@ -137,7 +137,7 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 		len(reservation.QuorumSplits) == 0
 }
 
-// ConvertToReservedPayment converts a upstream binding data structure to local definition.
+// ConvertToReservedPayment converts an upstream binding data structure to local definition.
 // Returns an error if the input reservation is zero-valued.
 func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation) (*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
