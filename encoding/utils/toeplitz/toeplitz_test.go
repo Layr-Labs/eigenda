@@ -51,7 +51,7 @@ func TestNewToeplitz_InvalidSize(t *testing.T) {
 }
 
 // Expand toeplitz matrix into circular matrix
-// the outcome is a also concise representation
+// the outcome is also a concise representation
 // if   V is (v_0, v_1, v_2, v_3, v_4, v_5, v_6)
 // then E is (v_0, v_6, v_5, v_4, 0,   v_3, v_2, v_1)
 func TestExtendCircularVec(t *testing.T) {
