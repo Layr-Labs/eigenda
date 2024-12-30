@@ -4,9 +4,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
 )
@@ -132,7 +129,7 @@ var (
 	TheGraphUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "the-graph-url"),
 		Usage:    "URL of the subgraph instance.",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "THE_GRAPH_URL"),
 	}
 	TheGraphPullIntervalFlag = cli.DurationFlag{
@@ -224,7 +221,6 @@ var (
 var requiredFlags = []cli.Flag{
 	HostnameFlag,
 	GrpcPortFlag,
-	TheGraphUrlFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -242,6 +238,7 @@ var optionalFlags = []cli.Flag{
 	RequiredDownloadsFlag,
 	DisableTLSFlag,
 	MetricsHTTPPortFlag,
+	TheGraphUrlFlag,
 	TheGraphPullIntervalFlag,
 	TheGraphRetriesFlag,
 	VerifierIntervalFlag,
@@ -260,9 +257,6 @@ var Flags []cli.Flag
 
 func init() {
 	Flags = append(requiredFlags, optionalFlags...)
-	Flags = append(Flags, kzg.CLIFlags(envPrefix)...)
 	Flags = append(Flags, common.LoggerCLIFlags(envPrefix, FlagPrefix)...)
-	Flags = append(Flags, geth.EthClientFlags(envPrefix)...)
 	Flags = append(Flags, indexer.CLIFlags(envPrefix)...)
-	Flags = append(Flags, thegraph.CLIFlags(envPrefix)...)
 }
