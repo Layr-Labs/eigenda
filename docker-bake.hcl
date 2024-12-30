@@ -44,7 +44,7 @@ group "all" {
     "churner",
     "dataapi",
     "traffic-generator",
-    "traffic-generator2",
+    "traffic-generator-v2",
     "controller",
     "relay"
   ]
@@ -85,7 +85,7 @@ group "internal-release" {
     "churner-internal",
     "dataapi-internal",
     "traffic-generator-internal",
-    "traffic-generator2-internal",
+    "traffic-generator-v2-internal",
     "controller-internal",
     "relay-internal"
   ]
