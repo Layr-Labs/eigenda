@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/rand"
 	"fmt"
 	"sync"
@@ -33,9 +32,6 @@ type BlobWriter struct {
 	// disperser is the client used to send blobs to the disperser.
 	disperser clients.DisperserClient
 
-	// Uncertified keys are sent here.
-	uncertifiedKeyChannel chan *UncertifiedKey
-
 	// fixedRandomData contains random data for blobs if RandomizeBlobs is false, and nil otherwise.
 	fixedRandomData []byte
 
@@ -56,7 +52,6 @@ func NewBlobWriter(
 	logger logging.Logger,
 	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
-	uncertifiedKeyChannel chan *UncertifiedKey,
 	generatorMetrics metrics.Metrics) BlobWriter {
 
 	var fixedRandomData []byte
@@ -74,67 +69,63 @@ func NewBlobWriter(
 	}
 
 	return BlobWriter{
-		ctx:                   ctx,
-		waitGroup:             waitGroup,
-		logger:                logger,
-		config:                config,
-		disperser:             disperser,
-		uncertifiedKeyChannel: uncertifiedKeyChannel,
-		fixedRandomData:       fixedRandomData,
-		writeLatencyMetric:    generatorMetrics.NewLatencyMetric("write"),
-		writeSuccessMetric:    generatorMetrics.NewCountMetric("write_success"),
-		writeFailureMetric:    generatorMetrics.NewCountMetric("write_failure"),
+		ctx:                ctx,
+		waitGroup:          waitGroup,
+		logger:             logger,
+		config:             config,
+		disperser:          disperser,
+		fixedRandomData:    fixedRandomData,
+		writeLatencyMetric: generatorMetrics.NewLatencyMetric("write"),
+		writeSuccessMetric: generatorMetrics.NewCountMetric("write_success"),
+		writeFailureMetric: generatorMetrics.NewCountMetric("write_failure"),
 	}
 }
 
 // Start begins the blob writer goroutine.
 func (writer *BlobWriter) Start() {
+	writer.logger.Info("Starting blob writer")
 	writer.waitGroup.Add(1)
 	ticker := time.NewTicker(writer.config.WriteRequestInterval)
 
 	go func() {
 		defer writer.waitGroup.Done()
+		defer ticker.Stop()
 
 		for {
 			select {
 			case <-(*writer.ctx).Done():
+				writer.logger.Info("context cancelled, stopping blob writer")
 				return
 			case <-ticker.C:
-				writer.writeNextBlob()
+				if err := writer.writeNextBlob(); err != nil {
+					writer.logger.Error("failed to write blob", "err", err)
+				}
 			}
 		}
 	}()
 }
 
 // writeNextBlob attempts to send a random blob to the disperser.
-func (writer *BlobWriter) writeNextBlob() {
+func (writer *BlobWriter) writeNextBlob() error {
 	data, err := writer.getRandomData()
 	if err != nil {
 		writer.logger.Error("failed to get random data", "err", err)
-		return
+		return err
 	}
 	start := time.Now()
-	key, err := writer.sendRequest(data)
+	_, err = writer.sendRequest(data)
 	if err != nil {
 		writer.writeFailureMetric.Increment()
 		writer.logger.Error("failed to send blob request", "err", err)
-		return
-	} else {
-		end := time.Now()
-		duration := end.Sub(start)
-		writer.writeLatencyMetric.ReportLatency(duration)
+		return err
 	}
 
+	end := time.Now()
+	duration := end.Sub(start)
+	writer.writeLatencyMetric.ReportLatency(duration)
 	writer.writeSuccessMetric.Increment()
 
-	checksum := md5.Sum(data)
-
-	writer.uncertifiedKeyChannel <- &UncertifiedKey{
-		Key:            key,
-		Checksum:       checksum,
-		Size:           uint(len(data)),
-		SubmissionTime: time.Now(),
-	}
+	return nil
 }
 
 // getRandomData returns a slice of random data to be used for a blob.

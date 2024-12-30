@@ -1,19 +1,24 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
-	"strings"
 )
 
 // Metrics allows the creation of metrics for the traffic generator.
 type Metrics interface {
 	// Start starts the metrics server.
-	Start()
+	Start() error
+	// Shutdown shuts down the metrics server.
+	Shutdown() error
 	// NewLatencyMetric creates a new LatencyMetric instance. Useful for reporting the latency of an operation.
 	NewLatencyMetric(description string) LatencyMetric
 	// NewCountMetric creates a new CountMetric instance. Useful for tracking the count of a type of event.
@@ -35,6 +40,8 @@ type metrics struct {
 
 	metricsBlacklist      []string
 	metricsFuzzyBlacklist []string
+
+	shutdown func() error
 }
 
 // NewMetrics creates a new Metrics instance.
@@ -69,19 +76,49 @@ func NewMetrics(
 	return metrics
 }
 
-// Start starts the metrics server.
-func (metrics *metrics) Start() {
-	metrics.logger.Info("Starting metrics server at ", "port", metrics.httpPort)
+func (metrics *metrics) Start() error {
+	metrics.logger.Info("Starting metrics server", "port", metrics.httpPort)
 	addr := fmt.Sprintf(":%s", metrics.httpPort)
+	// Create mux and add /metrics handler
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(
+		metrics.registry,
+		promhttp.HandlerOpts{},
+	))
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
 	go func() {
-		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.HandlerFor(
-			metrics.registry,
-			promhttp.HandlerOpts{},
-		))
-		err := http.ListenAndServe(addr, mux)
-		panic(fmt.Sprintf("Prometheus server failed: %s", err))
+		metrics.logger.Info("Starting metrics server", "port", metrics.httpPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			metrics.logger.Error("Prometheus server failed", "err", err)
+		}
 	}()
+
+	// Store shutdown function
+	metrics.shutdown = func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		metrics.logger.Info("Shutting down metrics server")
+		if err := srv.Shutdown(ctx); err != nil {
+			metrics.logger.Error("Metrics server shutdown failed", "err", err)
+			return err
+		}
+		return nil
+	}
+
+	return nil
+}
+
+func (metrics *metrics) Shutdown() error {
+	if metrics.shutdown != nil {
+		return metrics.shutdown()
+	}
+	return nil
 }
 
 // NewLatencyMetric creates a new LatencyMetric instance.

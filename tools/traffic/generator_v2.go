@@ -3,10 +3,7 @@ package traffic
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -39,7 +36,7 @@ type Generator struct {
 	cancel           *context.CancelFunc
 	waitGroup        *sync.WaitGroup
 	generatorMetrics metrics.Metrics
-	logger           *logging.Logger
+	logger           logging.Logger
 	disperserClient  clients.DisperserClient
 	// eigenDAClient    *clients.EigenDAClient #TODO: Add this back in when the client is implemented
 	config *config.Config
@@ -77,9 +74,8 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		config.WorkerConfig.MetricsBlacklist,
 		config.WorkerConfig.MetricsFuzzyBlacklist)
 
-	uncertifiedKeyChannel := make(chan *workers.UncertifiedKey, 100)
+	// uncertifiedKeyChannel := make(chan *workers.UncertifiedKey, 100)
 
-	// TODO: create a dedicated reservation for traffic generator
 	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
 	if err != nil {
 		cancel()
@@ -94,7 +90,6 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 			logger,
 			&config.WorkerConfig,
 			disperserClient,
-			uncertifiedKeyChannel,
 			generatorMetrics)
 		writers = append(writers, &writer)
 	}
@@ -104,35 +99,58 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		cancel:           &cancel,
 		waitGroup:        &waitGroup,
 		generatorMetrics: generatorMetrics,
-		logger:           &logger,
+		logger:           logger,
 		disperserClient:  disperserClient,
 		config:           config,
 		writers:          writers,
 	}, nil
 }
 
-// Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
+// Start instantiates goroutines that generate read/write traffic.
 func (generator *Generator) Start() error {
-
+	// Start metrics server
 	generator.generatorMetrics.Start()
 
-	// generator.statusTracker.Start()
-
+	// Start writers
+	generator.logger.Info("Starting writers")
 	for _, writer := range generator.writers {
+		generator.logger.Info("Starting writer", "writer", writer)
 		writer.Start()
 		time.Sleep(generator.config.InstanceLaunchInterval)
 	}
 
-	// for _, reader := range generator.readers {
-	// 	reader.Start()
-	// 	time.Sleep(generator.config.InstanceLaunchInterval)
-	// }
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	<-signals
-
-	(*generator.cancel)()
-	generator.waitGroup.Wait()
+	// Wait for context cancellation to keep the process running
+	<-(*generator.ctx).Done()
+	generator.logger.Info("Generator received stop signal")
 	return nil
+}
+
+func (generator *Generator) Stop() error {
+	// Cancel context to stop all workers
+	(*generator.cancel)()
+
+	// Set a timeout for graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	// Shutdown metrics server
+	if err := generator.generatorMetrics.Shutdown(); err != nil {
+		generator.logger.Error("Failed to shutdown metrics server", "err", err)
+	}
+
+	// Wait for all workers with timeout
+	done := make(chan struct{})
+	go func() {
+		generator.waitGroup.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		generator.logger.Info("All workers shut down gracefully")
+		return nil
+	case <-shutdownCtx.Done():
+		generator.logger.Warn("Shutdown timed out, forcing exit")
+		return fmt.Errorf("shutdown timed out after 10 seconds")
+	}
 }
