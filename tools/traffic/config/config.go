@@ -43,6 +43,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 	customQuorums := ctx.GlobalIntSlice(CustomQuorumNumbersFlag.Name)
+	if len(customQuorums) == 0 {
+		return nil, errors.New("no custom quorum numbers provided")
+	}
+
 	customQuorumsUint8 := make([]uint8, len(customQuorums))
 	for i, q := range customQuorums {
 		if q < 0 || q > 255 {
