@@ -38,8 +38,7 @@ type WorkerConfig struct {
 
 	// The address of the EigenDA service manager smart contract, in hex.
 	EigenDAServiceManager string
-	// The private key to use for signing requests.
-	SignerPrivateKey string
+
 	// Custom quorum numbers to use for the traffic generator.
 	CustomQuorums []uint8
 

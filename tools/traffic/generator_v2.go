@@ -3,29 +3,17 @@ package traffic
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/auth"
-	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common"
+	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
-	"github.com/Layr-Labs/eigenda/tools/traffic/table"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
-
-	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core"
 )
 
 // Generator simulates read/write traffic to the DA service.
@@ -37,7 +25,7 @@ import (
 //	    └------------┘                                           └------------┘
 //
 // The traffic generator is built from three principal components: one or more writers
-// that write blobs, a statusTracker that polls the dispenser service until blobs are confirmed,
+// that write blobs, a statusTracker that polls the disperser service until blobs are confirmed,
 // and one or more readers that read blobs.
 //
 // When a writer finishes writing a blob, it sends information about that blob to the statusTracker.
@@ -48,14 +36,12 @@ type Generator struct {
 	cancel           *context.CancelFunc
 	waitGroup        *sync.WaitGroup
 	generatorMetrics metrics.Metrics
-	logger           *logging.Logger
+	logger           logging.Logger
 	disperserClient  clients.DisperserClient
-	eigenDAClient    *clients.EigenDAClient
-	config           *config.Config
+	// eigenDAClient    *clients.EigenDAClient #TODO: Add this back in when the client is implemented
+	config *config.Config
 
-	writers       []*workers.BlobWriter
-	statusTracker *workers.BlobStatusTracker
-	readers       []*workers.BlobReader
+	writers []*workers.BlobWriter
 }
 
 func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
@@ -64,16 +50,20 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		return nil, err
 	}
 
-	var signer core.BlobRequestSigner
-	if config.EigenDAClientConfig.SignerPrivateKeyHex != "" {
-		signer = auth.NewLocalBlobRequestSigner(config.EigenDAClientConfig.SignerPrivateKeyHex)
+	var signer *auth.LocalBlobRequestSigner
+	if config.SignerPrivateKey != "" {
+		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKey)
+	} else {
+		logger.Error("signer private key is required")
+		return nil, fmt.Errorf("signer private key is required")
 	}
 
-	logger2 := log.NewLogger(log.NewTerminalHandler(os.Stderr, true))
-	client, err := clients.NewEigenDAClient(logger2, *config.EigenDAClientConfig)
+	signerAccountId, err := signer.GetAccountID()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting account ID: %w", err)
 	}
+	accountId := gethcommon.HexToAddress(signerAccountId)
+	logger.Info("Initializing traffic generator", "accountId", accountId)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
@@ -84,25 +74,13 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		config.WorkerConfig.MetricsBlacklist,
 		config.WorkerConfig.MetricsFuzzyBlacklist)
 
-	blobTable := table.NewBlobStore()
+	// uncertifiedKeyChannel := make(chan *workers.UncertifiedKey, 100)
 
-	unconfirmedKeyChannel := make(chan *workers.UnconfirmedKey, 100)
-
-	// TODO: create a dedicated reservation for traffic generator
-	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer)
+	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
-	statusVerifier := workers.NewBlobStatusTracker(
-		&ctx,
-		&waitGroup,
-		logger,
-		&config.WorkerConfig,
-		unconfirmedKeyChannel,
-		blobTable,
-		disperserClient,
-		generatorMetrics)
 
 	writers := make([]*workers.BlobWriter, 0)
 	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
@@ -112,25 +90,8 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 			logger,
 			&config.WorkerConfig,
 			disperserClient,
-			unconfirmedKeyChannel,
 			generatorMetrics)
 		writers = append(writers, &writer)
-	}
-
-	retriever, chainClient := buildRetriever(config)
-
-	readers := make([]*workers.BlobReader, 0)
-	for i := 0; i < int(config.WorkerConfig.NumReadInstances); i++ {
-		reader := workers.NewBlobReader(
-			&ctx,
-			&waitGroup,
-			logger,
-			&config.WorkerConfig,
-			retriever,
-			chainClient,
-			blobTable,
-			generatorMetrics)
-		readers = append(readers, &reader)
 	}
 
 	return &Generator{
@@ -138,91 +99,58 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		cancel:           &cancel,
 		waitGroup:        &waitGroup,
 		generatorMetrics: generatorMetrics,
-		logger:           &logger,
+		logger:           logger,
 		disperserClient:  disperserClient,
-		eigenDAClient:    client,
 		config:           config,
 		writers:          writers,
-		statusTracker:    &statusVerifier,
-		readers:          readers,
 	}, nil
 }
 
-// buildRetriever creates a retriever client for the traffic generator.
-func buildRetriever(config *config.Config) (clients.RetrievalClient, retrivereth.ChainClient) {
-	loggerConfig := common.DefaultLoggerConfig()
-
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to instantiate logger: %s", err))
-	}
-
-	gethClient, err := geth.NewMultiHomingClient(config.RetrievalClientConfig.EthClientConfig, gethcommon.Address{}, logger)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to instantiate geth client: %s", err))
-	}
-
-	tx, err := eth.NewReader(
-		logger,
-		gethClient,
-		config.RetrievalClientConfig.BLSOperatorStateRetrieverAddr,
-		config.RetrievalClientConfig.EigenDAServiceManagerAddr)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to instantiate transactor: %s", err))
-	}
-
-	cs := eth.NewChainState(tx, gethClient)
-
-	chainState := thegraph.MakeIndexedChainState(*config.TheGraphConfig, cs, logger)
-
-	var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
-
-	nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
-
-	config.RetrievalClientConfig.EncoderConfig.LoadG2Points = true
-	v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, nil)
-	if err != nil {
-		panic(fmt.Sprintf("Unable to build statusTracker: %s", err))
-	}
-
-	retriever, err := clients.NewRetrievalClient(
-		logger,
-		chainState,
-		assignmentCoordinator,
-		nodeClient,
-		v,
-		config.RetrievalClientConfig.NumConnections)
-
-	if err != nil {
-		panic(fmt.Sprintf("Unable to build retriever: %s", err))
-	}
-
-	chainClient := retrivereth.NewChainClient(gethClient, logger)
-
-	return retriever, chainClient
-}
-
-// Start instantiates goroutines that generate read/write traffic, continues until a SIGTERM is observed.
+// Start instantiates goroutines that generate read/write traffic.
 func (generator *Generator) Start() error {
-
+	// Start metrics server
 	generator.generatorMetrics.Start()
-	generator.statusTracker.Start()
 
+	// Start writers
+	generator.logger.Info("Starting writers")
 	for _, writer := range generator.writers {
+		generator.logger.Info("Starting writer", "writer", writer)
 		writer.Start()
 		time.Sleep(generator.config.InstanceLaunchInterval)
 	}
 
-	for _, reader := range generator.readers {
-		reader.Start()
-		time.Sleep(generator.config.InstanceLaunchInterval)
+	// Wait for context cancellation to keep the process running
+	<-(*generator.ctx).Done()
+	generator.logger.Info("Generator received stop signal")
+	return nil
+}
+
+func (generator *Generator) Stop() error {
+	// Cancel context to stop all workers
+	(*generator.cancel)()
+
+	// Set a timeout for graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	// Shutdown metrics server
+	if err := generator.generatorMetrics.Shutdown(); err != nil {
+		generator.logger.Error("Failed to shutdown metrics server", "err", err)
 	}
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	<-signals
+	// Wait for all workers with timeout
+	done := make(chan struct{})
+	go func() {
+		generator.waitGroup.Wait()
+		close(done)
+	}()
 
-	(*generator.cancel)()
-	generator.waitGroup.Wait()
-	return nil
+	select {
+	case <-done:
+		generator.logger.Info("All workers shut down gracefully")
+		return nil
+	case <-shutdownCtx.Done():
+		generator.logger.Warn("Shutdown timed out, forcing exit")
+		return fmt.Errorf("shutdown timed out after 10 seconds")
+	}
 }
