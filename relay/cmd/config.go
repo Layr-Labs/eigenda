@@ -106,3 +106,10 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 	}
 	return config, nil
 }
+
+// SanitizedConfig returns a copy of the Config with sensitive information removed or obfuscated.
+func (c Config) SanitizedConfig() Config {
+	sanitized := c
+	sanitized.RelayConfig.AuthenticationKeyCacheSize = 0 // Obfuscate sensitive information
+	return sanitized
+}
