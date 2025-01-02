@@ -19,6 +19,8 @@ on:
       - 'api/**'
       - '.github/codeql/**'
       - '.github/workflows/codeql-analysis.yml'
+   paths-ignore:
+      - 'contracts/bindings/**'
   schedule:
     - cron: '0 9 * * *'
 
