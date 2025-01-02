@@ -586,11 +586,17 @@ func generateDisperserKeypair() (string, gethcommon.Address, error) {
 		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
 	})
 
+	log.Printf("Generating disperser keypair")
+
 	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
 		KeySpec:  types.KeySpecEccSecgP256k1,
 		KeyUsage: types.KeyUsageTypeSignVerify,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "connect: connection refused") {
+			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
+			err = nil
+		}
 		return "", gethcommon.Address{}, err
 	}
 
@@ -602,6 +608,8 @@ func generateDisperserKeypair() (string, gethcommon.Address, error) {
 	}
 
 	publicAddress := crypto.PubkeyToAddress(*key)
+
+	log.Printf("Generated disperser keypair: key ID: %s, address: %s", keyID, publicAddress.Hex())
 
 	return keyID, publicAddress, nil
 }
