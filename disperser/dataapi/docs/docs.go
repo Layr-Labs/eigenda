@@ -21,7 +21,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Feed"
+                    "Batch"
                 ],
                 "summary": "Fetch batch by the batch header hash",
                 "parameters": [
@@ -29,6 +29,52 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Batch header hash in hex string",
                         "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob metadata by blob key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
                         "in": "path",
                         "required": true
                     }
@@ -61,15 +107,15 @@ const docTemplate = `{
                 }
             }
         },
-        "/blobs/{blob_key}": {
+        "/blobs/{blob_key}/certificate": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Feed"
+                    "Blob"
                 ],
-                "summary": "Fetch blob metadata by blob key",
+                "summary": "Fetch blob certificate by blob key",
                 "parameters": [
                     {
                         "type": "string",
@@ -83,7 +129,60 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/dataapi.BlobResponse"
+                            "$ref": "#/definitions/dataapi.BlobCertificateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}/verification-info": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob verification info by blob key and batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.BlobVerificationInfoResponse"
                         }
                     },
                     "400": {
@@ -529,7 +628,112 @@ const docTemplate = `{
                 }
             }
         },
+        "/metrics/summary": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch metrics summary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.Metric"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/throughput": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch throughput time series",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dataapi.Throughput"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/dataapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/timeseries/throughput": {
             "get": {
                 "produces": [
                     "application/json"
@@ -957,6 +1161,25 @@ const docTemplate = `{
         "big.Int": {
             "type": "object"
         },
+        "core.G1Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "core.G2Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
         "core.PaymentMetadata": {
             "type": "object",
             "properties": {
@@ -999,6 +1222,42 @@ const docTemplate = `{
                 "quorumRate": {
                     "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
                     "type": "integer"
+                }
+            }
+        },
+        "core.Signature": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "dataapi.BatchResponse": {
+            "type": "object",
+            "properties": {
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_verification_infos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                    }
+                },
+                "signed_batch": {
+                    "$ref": "#/definitions/dataapi.SignedBatch"
+                }
+            }
+        },
+        "dataapi.BlobCertificateResponse": {
+            "type": "object",
+            "properties": {
+                "blob_certificate": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
                 }
             }
         },
@@ -1069,6 +1328,14 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "dataapi.BlobVerificationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "blob_verification_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
                 }
             }
         },
@@ -1339,6 +1606,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dataapi.SignedBatch": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                }
+            }
+        },
         "dataapi.Throughput": {
             "type": "object",
             "properties": {
@@ -1394,6 +1672,101 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_core_v2.Attestation": {
+            "type": "object",
+            "properties": {
+                "apkg2": {
+                    "description": "APKG2 is the aggregate public key of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.G2Point"
+                        }
+                    ]
+                },
+                "attestedAt": {
+                    "description": "AttestedAt is the time the attestation was made",
+                    "type": "integer"
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "nonSignerPubKeys": {
+                    "description": "NonSignerPubKeys are the public keys of the operators that did not sign the blob",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumAPKs": {
+                    "description": "QuorumAPKs is the aggregate public keys of all operators in each quorum",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumNumbers": {
+                    "description": "QuorumNumbers contains the quorums relevant for the attestation",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorumResults": {
+                    "description": "QuorumResults contains the results of the quorum verification",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                },
+                "sigma": {
+                    "description": "Sigma is the aggregate signature of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.Signature"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BatchHeader": {
+            "type": "object",
+            "properties": {
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobCertificate": {
+            "type": "object",
+            "properties": {
+                "blobHeader": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "relayKeys": {
+                    "description": "RelayKeys",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_core_v2.BlobHeader": {
             "type": "object",
             "properties": {
@@ -1424,6 +1797,37 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
+            "type": "object",
+            "properties": {
+                "BlobKey": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "blobIndex": {
+                    "type": "integer"
+                },
+                "inclusionProof": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
                 }
             }
         },
