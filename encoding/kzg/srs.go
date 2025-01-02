@@ -37,7 +37,7 @@ type SRS struct {
 	G1 []bn254.G1Affine
 	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(WIDTH+1)],
 	G2 []bn254.G2Affine
-	// TODO: is there a nice way to represent this field mathematically, as above?
+	// [b.multiply(b.G2, pow(s, i, MODULUS)) for i in range(SRS_ORDER - WIDTH -1, SRS_ORDER)],
 	G2Trailing []bn254.G2Affine
 }
 
