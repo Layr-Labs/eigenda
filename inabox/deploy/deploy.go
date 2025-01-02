@@ -9,7 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"runtime/debug"
+	"runtime"
 	"strconv"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -157,8 +157,10 @@ func (env *Config) DeployExperiment() {
 	}
 
 	// TODO remove
-	debug.PrintStack()
-	log.Print(debug.Stack())
+	b := make([]byte, 2048) // adjust buffer size to be larger than expected stack
+	n := runtime.Stack(b, false)
+	s := string(b[:n])
+	log.Printf("Stack trace:\n %s", s)
 
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
