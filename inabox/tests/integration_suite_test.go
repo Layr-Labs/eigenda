@@ -132,6 +132,9 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
+		fmt.Println("Updating disperser address")
+		updateDisperserAddress()
+
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 
@@ -141,6 +144,18 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 	}
 })
+
+// updateDisperserAddress updates the disperser address in the retriever contract
+func updateDisperserAddress() {
+	tx, err := eth.NewWriter(
+		logger,
+		ethClient,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	Expect(err).To(BeNil())
+	err = tx.SetDisperserAddress(context.Background(), testConfig.DisperserAddress)
+	Expect(err).To(BeNil())
+}
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{

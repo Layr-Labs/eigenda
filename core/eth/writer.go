@@ -338,6 +338,7 @@ func (t *Writer) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader
 func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Address) error {
 	registry := t.bindings.DisperserRegistry
 	if registry == nil {
+		log.Printf("disperser registry not deployed")
 		return errors.New("disperser registry not deployed")
 	}
 
