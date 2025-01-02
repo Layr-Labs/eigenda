@@ -583,7 +583,7 @@ func (env *Config) getKey(name string) (key, address string) {
 func generateDisperserKeypair() (string, gethcommon.Address, error) {
 	keyManager := kms.New(kms.Options{
 		Region:       "us-east-1",
-		BaseEndpoint: aws.String("http://0.0.0.0:4570"), // TODO don't hard code this
+		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
 	})
 
 	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
