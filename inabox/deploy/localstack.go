@@ -135,30 +135,31 @@ func DeployResources(
 		return err
 	}
 
+	fmt.Println("Creating v2 tables")
 	if v2MetadataTableName != "" {
 		// Create v2 metadata table
 		_, err = test_utils.CreateTable(context.Background(), cfg, v2MetadataTableName, blobstorev2.GenerateTableSchema(v2MetadataTableName, 10, 10))
 		if err != nil {
 			return err
 		}
-	}
 
-	v2PaymentName := "e2e_v2_"
-	// create payment related tables
-	err = meterer.CreateReservationTable(cfg, v2PaymentName+"reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateOnDemandTable(cfg, v2PaymentName+"ondemand")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
-	}
-	err = meterer.CreateGlobalReservationTable(cfg, v2PaymentName+"global_reservation")
-	if err != nil {
-		fmt.Println("err", err)
-		return err
+		v2PaymentName := "e2e_v2_"
+		// create payment related tables
+		err = meterer.CreateReservationTable(cfg, v2PaymentName+"reservation")
+		if err != nil {
+			fmt.Println("err", err)
+			return err
+		}
+		err = meterer.CreateOnDemandTable(cfg, v2PaymentName+"ondemand")
+		if err != nil {
+			fmt.Println("err", err)
+			return err
+		}
+		err = meterer.CreateGlobalReservationTable(cfg, v2PaymentName+"global_reservation")
+		if err != nil {
+			fmt.Println("err", err)
+			return err
+		}
 	}
 
 	return err

@@ -988,6 +988,7 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
+- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -996,6 +997,7 @@ Terminal states are states that will not be updated to a different state:
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
 | FAILED | 4 | FAILED means that the blob has failed permanently |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation |
 
 
  

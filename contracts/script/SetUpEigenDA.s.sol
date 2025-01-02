@@ -10,6 +10,8 @@ import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
 import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
 
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {PaymentVault} from "../src/payments/PaymentVault.sol";
+import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
@@ -18,6 +20,21 @@ import "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+
+
+// Helper function to create single-element arrays
+function toArray(address element) pure returns (address[] memory) {
+    address[] memory arr = new address[](1);
+    arr[0] = element;
+    return arr;
+}
+
+function toArray(uint256 element) pure returns (uint256[] memory) {
+    uint256[] memory arr = new uint256[](1);
+    arr[0] = element;
+    return arr;
+}
+
 
 // # To load the variables in the .env file
 // source .env
@@ -112,8 +129,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         vm.startBroadcast();
-
-        // Allocate eth to stakers and operators
+        // Allocate eth to stakers, operators, dispserser clients
         _allocate(
             IERC20(address(0)),
             stakers,
@@ -155,6 +171,22 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             string memory metadataURI = string.concat("https://urmom.com/operator/", vm.toString(i));
             delegation.registerAsOperator(IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks), metadataURI);
         }
+
+
+        // Register Reservations for client as the eigenDACommunityMultisig
+        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
+            symbolsPerSecond: 452198,
+            startTimestamp: uint64(block.timestamp),
+            endTimestamp: uint64(block.timestamp + 1000000000),
+            quorumNumbers: hex"0001",
+            quorumSplits: hex"3232"
+        });
+        address clientAddress = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
+        vm.startBroadcast(msg.sender);
+        paymentVault.setReservation(clientAddress, reservation);
+        // Deposit OnDemand 
+        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
+        vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {

@@ -27,7 +27,7 @@ var (
 func TestRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 
 	err := mockState.RefreshOnchainPaymentState(ctx)
 	assert.NoError(t, err)
