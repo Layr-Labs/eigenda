@@ -116,6 +116,18 @@ func (t *MockWriter) StakeRegistry(ctx context.Context) (gethcommon.Address, err
 	return result.(gethcommon.Address), args.Error(1)
 }
 
+func (t *MockWriter) SocketRegistry(ctx context.Context) (gethcommon.Address, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(gethcommon.Address), args.Error(1)
+}
+
+func (t *MockWriter) RegistryCoordinator(ctx context.Context) (gethcommon.Address, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(gethcommon.Address), args.Error(1)
+}
+
 func (t *MockWriter) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)

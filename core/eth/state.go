@@ -22,8 +22,6 @@ type ChainState struct {
 	socketPrevBlockNumber uint32
 }
 
-var defaultQuorumIDs = []core.QuorumID{core.QuorumID(0), core.QuorumID(1)}
-
 func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 	return &ChainState{
 		Client: client,
