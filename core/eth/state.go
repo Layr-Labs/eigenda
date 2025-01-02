@@ -23,11 +23,16 @@ type ChainState struct {
 }
 
 func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
+	currentBlockNumber, err := client.BlockByNumber(context.Background(), nil)
+	// TODO: consider changing function signature to return error
+	if err != nil {
+		return nil
+	}
 	return &ChainState{
 		Client: client,
 		Tx:     tx,
 		// TODO: consider a more reasonable init value
-		socketPrevBlockNumber: 0,
+		socketPrevBlockNumber: uint32(currentBlockNumber.Number().Uint64()),
 		SocketMap:             make(map[core.OperatorID]*string),
 	}
 }
@@ -40,9 +45,14 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 		return nil, err
 	}
 
-	if err := cs.indexSocketMap(ctx); err != nil {
-		return nil, err
+	if _, ok := cs.SocketMap[operator]; !ok {
+		socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
+		if err != nil {
+			return nil, err
+		}
+		cs.SocketMap[operator] = &socket
 	}
+
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
 }
 
@@ -52,6 +62,18 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
+	// for all operators in operatorsByQuorum, check if the socket is in the map
+	missingOperatorIds := make([]core.OperatorID, 0)
+	for _, quorum := range operatorsByQuorum {
+		for _, operator := range quorum {
+			missingOperatorIds = append(missingOperatorIds, operator.OperatorID)
+		}
+	}
+
+	if err := cs.buildSocketMap(ctx, missingOperatorIds); err != nil {
+		return nil, err
+	}
+	// Index for recent socket updates
 	if err := cs.indexSocketMap(ctx); err != nil {
 		return nil, err
 	}
@@ -74,6 +96,30 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 		return "", err
 	}
 	return socket, nil
+}
+
+// buildSocketMap returns a map from operatorID to socket address for the operators in the operatorsByQuorum
+func (cs *ChainState) buildSocketMap(ctx context.Context, operatorIds []core.OperatorID) error {
+	socketMap := make(map[core.OperatorID]*string)
+	for _, operatorID := range operatorIds {
+		// if the socket is already in the map, skip
+		if _, ok := socketMap[operatorID]; ok {
+			continue
+		}
+		socket, err := cs.Tx.GetOperatorSocket(ctx, operatorID)
+		if err != nil {
+			return err
+		}
+		socketMap[operatorID] = &socket
+	}
+
+	cs.socketMu.Lock()
+	defer cs.socketMu.Unlock()
+	for operatorID, socket := range socketMap {
+		cs.SocketMap[operatorID] = socket
+	}
+
+	return nil
 }
 
 // indexSocketMap preloads the socket map for the default quorums at the current block.
