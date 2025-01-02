@@ -617,11 +617,6 @@ func (env *Config) GenerateAllVariables() {
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
 
-	// Gather keys
-	// keyData := readFile(gethPrivateKeys)
-	// keys := strings.Split(string(keyData), "\n")
-	// id := 1
-
 	disperserKeyID, disperserAddress, err := generateDisperserKeypair()
 	if err != nil {
 		log.Fatalf("Error generating disperser keypair: %v", err)
