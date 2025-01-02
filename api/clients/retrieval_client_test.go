@@ -127,7 +127,7 @@ func setup(t *testing.T) {
 		},
 		Data: codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes),
 	}
-	operatorState, err := chainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
+	operatorState, err = chainState.GetOperatorState(context.Background(), (0), []core.QuorumID{quorumID})
 	if err != nil {
 		t.Fatalf("failed to get operator state: %s", err)
 	}
