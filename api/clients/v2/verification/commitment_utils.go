@@ -6,13 +6,12 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
 
 // GenerateBlobCommitment computes a kzg-bn254 commitment of blob data using SRS
 func GenerateBlobCommitment(
-	kzgVerifier *verifier.Verifier,
+	g1Srs []bn254.G1Affine,
 	blob []byte) (*encoding.G1Commitment, error) {
 
 	inputFr, err := rs.ToFrArray(blob)
@@ -20,15 +19,15 @@ func GenerateBlobCommitment(
 		return nil, fmt.Errorf("convert bytes to field elements, %w", err)
 	}
 
-	if len(kzgVerifier.Srs.G1) < len(inputFr) {
+	if len(g1Srs) < len(inputFr) {
 		return nil, fmt.Errorf(
 			"insufficient SRS in memory: have %v, need %v",
-			len(kzgVerifier.Srs.G1),
+			len(g1Srs),
 			len(inputFr))
 	}
 
 	var commitment bn254.G1Affine
-	_, err = commitment.MultiExp(kzgVerifier.Srs.G1[:len(inputFr)], inputFr, ecc.MultiExpConfig{})
+	_, err = commitment.MultiExp(g1Srs[:len(inputFr)], inputFr, ecc.MultiExpConfig{})
 	if err != nil {
 		return nil, fmt.Errorf("MultiExp: %w", err)
 	}
@@ -39,11 +38,11 @@ func GenerateBlobCommitment(
 // GenerateAndCompareBlobCommitment generates the kzg-bn254 commitment of the blob, and compares it with a claimed
 // commitment. An error is returned if there is a problem generating the commitment, or if the comparison fails.
 func GenerateAndCompareBlobCommitment(
-	kzgVerifier *verifier.Verifier,
+	g1Srs []bn254.G1Affine,
 	claimedCommitment *encoding.G1Commitment,
 	blobBytes []byte) error {
 
-	computedCommitment, err := GenerateBlobCommitment(kzgVerifier, blobBytes)
+	computedCommitment, err := GenerateBlobCommitment(g1Srs, blobBytes)
 	if err != nil {
 		return fmt.Errorf("compute commitment: %w", err)
 	}

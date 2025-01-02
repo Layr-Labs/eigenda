@@ -3,24 +3,18 @@ package verification
 import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
+	"math"
 	"runtime"
 	"testing"
 )
 
-func getKzgConfig() *kzg.KzgConfig {
-	return &kzg.KzgConfig{
-		G1Path:          "../../../../inabox/resources/kzg/g1.point",
-		G2Path:          "../../../../inabox/resources/kzg/g2.point",
-		G2PowerOf2Path:  "../../../../inabox/resources/kzg/g2.point.powerOf2",
-		CacheDir:        "../../../../inabox/resources/kzg/SRSTables",
-		SRSOrder:        3000,
-		SRSNumberToLoad: 2900,
-		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		LoadG2Points:    false,
-	}
+const g1Path = "../../../../inabox/resources/kzg/g1.point"
+
+// computeSrsNumber computes the number of SRS elements that need to be loaded for a message of given byte count
+func computeSrsNumber(byteCount int) uint64 {
+	return uint64(math.Ceil(float64(byteCount) / 32))
 }
 
 // randomlyModifyBytes picks a random byte from the input array, and increments it
@@ -35,19 +29,21 @@ func getRandomPaddedBytes(testRandom *random.TestRandom, count int) []byte {
 
 func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
-	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
-	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	require.NotNil(t, kzgVerifier)
+	srsNumberToLoad := computeSrsNumber(len(randomBytes))
+
+	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, s1)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
+	commitment, err := GenerateBlobCommitment(s1, randomBytes)
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
 	// make sure the commitment verifies correctly
 	err = GenerateAndCompareBlobCommitment(
-		kzgVerifier,
+		s1,
 		commitment,
 		randomBytes)
 	require.NoError(t, err)
@@ -55,20 +51,22 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 
 func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
-	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
-	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	require.NotNil(t, kzgVerifier)
+	srsNumberToLoad := computeSrsNumber(len(randomBytes))
+
+	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, s1)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
+	commitment, err := GenerateBlobCommitment(s1, randomBytes)
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
 	err = GenerateAndCompareBlobCommitment(
-		kzgVerifier,
+		s1,
 		commitment,
 		randomBytes)
 	require.NotNil(t, err)
@@ -76,17 +74,19 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 
 func TestGenerateBlobCommitmentEquality(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
-	randomBytes := getRandomPaddedBytes(testRandom, 1000)
+	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
-	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	require.NotNil(t, kzgVerifier)
+	srsNumberToLoad := computeSrsNumber(len(randomBytes))
+
+	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, s1)
 	require.NoError(t, err)
 
 	// generate two identical commitments
-	commitment1, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
+	commitment1, err := GenerateBlobCommitment(s1, randomBytes)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
-	commitment2, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
+	commitment2, err := GenerateBlobCommitment(s1, randomBytes)
 	require.NotNil(t, commitment2)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 
 	// randomly modify a byte
 	randomlyModifyBytes(testRandom, randomBytes)
-	commitmentA, err := GenerateBlobCommitment(kzgVerifier, randomBytes)
+	commitmentA, err := GenerateBlobCommitment(s1, randomBytes)
 	require.NotNil(t, commitmentA)
 	require.NoError(t, err)
 
@@ -104,22 +104,24 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 }
 
 func TestGenerateBlobCommitmentTooLong(t *testing.T) {
-	kzgVerifier, err := verifier.NewVerifier(getKzgConfig(), nil)
-	require.NotNil(t, kzgVerifier)
+	srsNumberToLoad := uint64(500)
+
+	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, s1)
 	require.NoError(t, err)
 
 	// this is the absolute maximum number of bytes we can handle, given how the verifier was configured
-	almostTooLongByteCount := 2900 * 32
+	almostTooLongByteCount := srsNumberToLoad * 32
 
 	// an array of exactly this size should be fine
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
-	commitment1, err := GenerateBlobCommitment(kzgVerifier, almostTooLongBytes)
+	commitment1, err := GenerateBlobCommitment(s1, almostTooLongBytes)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
-	commitment2, err := GenerateBlobCommitment(kzgVerifier, tooLongBytes)
+	commitment2, err := GenerateBlobCommitment(s1, tooLongBytes)
 	require.Nil(t, commitment2)
 	require.NotNil(t, err)
 }
