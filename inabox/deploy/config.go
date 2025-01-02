@@ -444,7 +444,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_NUM_CONFIRMATIONS:                "0",
 		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
 		NODE_ENABLE_V2:                        "true",
-		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "true",
+		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)

@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -154,6 +155,10 @@ func (env *Config) DeployExperiment() {
 		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
 		env.deploySubgraphs(startBlock)
 	}
+
+	// TODO remove
+	debug.PrintStack()
+	log.Print(debug.Stack())
 
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
