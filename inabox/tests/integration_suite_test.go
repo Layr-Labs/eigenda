@@ -167,6 +167,11 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
+	err = tx.SetDisperserAddress(context.Background(), testConfig.DisperserAddress)
+	if err != nil {
+		return fmt.Errorf("could not set disperser address: %w", err)
+	}
+
 	cs := eth.NewChainState(tx, ethClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)

@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"os"
 	"path/filepath"
@@ -181,6 +182,9 @@ type Config struct {
 	Retriever  RetrieverVars
 	Controller ControllerVars
 	Relays     []RelayVars
+
+	// DisperserAddress is the address of disperser 0 (aka the only disperser at the current time)
+	DisperserAddress common.Address
 }
 
 func (c Config) IsEigenDADeployed() bool {

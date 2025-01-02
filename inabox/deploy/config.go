@@ -629,8 +629,7 @@ func (env *Config) GenerateAllVariables() {
 	if err != nil {
 		log.Fatalf("Error generating disperser keypair: %v", err)
 	}
-	// TODO do something more with the key ID
-	log.Printf("Disperser key ID: %s, address: %s", disperserKeyID, disperserAddress.Hex())
+	env.DisperserAddress = disperserAddress
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
