@@ -2,41 +2,6 @@ basePath: /api/v1
 definitions:
   big.Int:
     type: object
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  core.G1Point:
-    properties:
-      x:
-        items:
-          type: integer
-        type: array
-    type: object
-  core.G2Point:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  core.PaymentMetadata:
-    properties:
-      account_id:
-        description: AccountID is the ETH account address for the payer
-        type: string
-      cumulative_payment:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
-      reservation_period:
-        description: ReservationPeriod represents the range of time at which the dispersal
-          is made
-        type: integer
-      salt:
-        description: Allow same blob to be dispersed multiple times within the same
-          reservation period
-        type: integer
-    type: object
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
   core.SecurityParam:
     properties:
       adversaryThreshold:
@@ -58,9 +23,6 @@ definitions:
           data was posted to the DA node.
         type: integer
     type: object
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  core.Signature:
-=======
   dataapi.Meta:
     properties:
       next_token:
@@ -97,32 +59,11 @@ definitions:
         $ref: '#/definitions/encoding.LengthProof'
     type: object
   encoding.G1Commitment:
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
     properties:
       x:
         items:
           type: integer
         type: array
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-    type: object
-  dataapi.BatchResponse:
-    properties:
-      batch_header_hash:
-        type: string
-      blob_verification_infos:
-        items:
-          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
-        type: array
-      signed_batch:
-        $ref: '#/definitions/dataapi.SignedBatch'
-    type: object
-  dataapi.BlobCertificateResponse:
-    properties:
-      blob_certificate:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate'
-    type: object
-  dataapi.BlobMetadataResponse:
-=======
       "y":
         items:
           type: integer
@@ -185,7 +126,6 @@ definitions:
         type: object
     type: object
   v1.BlobMetadataResponse:
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
     properties:
       batch_header_hash:
         type: string
@@ -220,27 +160,7 @@ definitions:
       signatory_record_hash:
         type: string
     type: object
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  dataapi.BlobResponse:
-    properties:
-      blob_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      blob_size_bytes:
-        type: integer
-      dispersed_at:
-        type: integer
-      status:
-        type: string
-    type: object
-  dataapi.BlobVerificationInfoResponse:
-    properties:
-      blob_verification_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
-    type: object
-  dataapi.BlobsResponse:
-=======
   v1.BlobsResponse:
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
     properties:
       data:
         items:
@@ -388,341 +308,19 @@ definitions:
       meta:
         $ref: '#/definitions/dataapi.Meta'
     type: object
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  dataapi.SignedBatch:
-    properties:
-      attestation:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
-      batch_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
-    type: object
-  dataapi.Throughput:
-=======
   v1.Throughput:
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
     properties:
       throughput:
         type: number
       timestamp:
         type: integer
     type: object
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  encoding.BlobCommitments:
-    properties:
-      commitment:
-        $ref: '#/definitions/encoding.G1Commitment'
-      length:
-        type: integer
-      length_commitment:
-        $ref: '#/definitions/encoding.G2Commitment'
-      length_proof:
-        $ref: '#/definitions/encoding.LengthProof'
-    type: object
-  encoding.G1Commitment:
-    properties:
-      x:
-        items:
-          type: integer
-        type: array
-    type: object
-  encoding.G2Commitment:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  encoding.LengthProof:
-    properties:
-      x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.Attestation:
-    properties:
-      apkg2:
-        allOf:
-        - $ref: '#/definitions/core.G2Point'
-        description: APKG2 is the aggregate public key of all signers
-      attestedAt:
-        description: AttestedAt is the time the attestation was made
-        type: integer
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      nonSignerPubKeys:
-        description: NonSignerPubKeys are the public keys of the operators that did
-          not sign the blob
-        items:
-          $ref: '#/definitions/core.G1Point'
-        type: array
-      quorumAPKs:
-        additionalProperties:
-          $ref: '#/definitions/core.G1Point'
-        description: QuorumAPKs is the aggregate public keys of all operators in each
-          quorum
-        type: object
-      quorumNumbers:
-        description: QuorumNumbers contains the quorums relevant for the attestation
-        items:
-          type: integer
-        type: array
-      quorumResults:
-        additionalProperties:
-          type: integer
-        description: QuorumResults contains the results of the quorum verification
-        type: object
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
-        type: integer
-      sigma:
-        allOf:
-        - $ref: '#/definitions/core.Signature'
-        description: Sigma is the aggregate signature of all signers
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BatchHeader:
-    properties:
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
-        type: integer
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobCertificate:
-    properties:
-      blobHeader:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      relayKeys:
-        description: RelayKeys
-        items:
-          type: integer
-        type: array
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
-    properties:
-      blobCommitments:
-        $ref: '#/definitions/encoding.BlobCommitments'
-      blobVersion:
-        type: integer
-      paymentMetadata:
-        allOf:
-        - $ref: '#/definitions/core.PaymentMetadata'
-        description: PaymentMetadata contains the payment information for the blob
-      quorumNumbers:
-        description: QuorumNumbers contains the quorums the blob is dispersed to
-        items:
-          type: integer
-        type: array
-      signature:
-        description: Signature is the signature of the blob header by the account
-          ID
-        items:
-          type: integer
-        type: array
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo:
-    properties:
-      BlobKey:
-        items:
-          type: integer
-        type: array
-      batchRoot:
-        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
-          of the blobs in the batch
-        items:
-          type: integer
-        type: array
-      blobIndex:
-        type: integer
-      inclusionProof:
-        items:
-          type: integer
-        type: array
-      referenceBlockNumber:
-        description: ReferenceBlockNumber is the block number at which all operator
-          information (stakes, indexes, etc.) is taken from
-        type: integer
-    type: object
-  github_com_Layr-Labs_eigenda_disperser.BlobStatus:
-    enum:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    type: integer
-    x-enum-varnames:
-    - Processing
-    - Confirmed
-    - Failed
-    - Finalized
-    - InsufficientSignatures
-    - Dispersing
-  github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
-    properties:
-      a0:
-        items:
-          type: integer
-        type: array
-    type: object
-  semver.SemverMetrics:
-    properties:
-      count:
-        type: integer
-      operators:
-        items:
-          type: string
-        type: array
-      semver:
-        type: string
-      stake_percentage:
-        additionalProperties:
-          type: number
-        type: object
-    type: object
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
 info:
   contact: {}
   description: This is the EigenDA Data Access API V2 server.
   title: EigenDA Data Access API V1
   version: "1.0"
 paths:
-<<<<<<< HEAD:disperser/dataapi/docs/swagger.yaml
-  /batches/{batch_header_hash}:
-    get:
-      parameters:
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BatchResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch batch by the batch header hash
-      tags:
-      - Batch
-  /blobs/{blob_key}:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob metadata by blob key
-      tags:
-      - Blob
-  /blobs/{blob_key}/certificate:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobCertificateResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob certificate by blob key
-      tags:
-      - Blob
-  /blobs/{blob_key}/verification-info:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobVerificationInfoResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob verification info by blob key and batch header hash
-      tags:
-      - Blob
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_swagger.yaml
   /feed/batches/{batch_header_hash}/blobs:
     get:
       parameters:

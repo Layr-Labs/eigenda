@@ -144,6 +144,10 @@ type (
 	ErrorResponse struct {
 		Error string `json:"error"`
 	}
+
+	MetricSummary struct {
+		AvgThroughput float64 `json:"avg_throughput"`
+	}
 )
 
 type ServerInterface interface {
@@ -372,7 +376,7 @@ func (s *ServerV2) FetchBlobVerificationInfoHandler(c *gin.Context) {
 		return
 	}
 	batchHeaderHashHex := c.Query("batch_header_hash")
-	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
 		errorResponse(c, err)
@@ -569,7 +573,7 @@ func (s *ServerV2) FetchMetricsSummaryHandler(c *gin.Context) {
 		return
 	}
 
-	metricSummary := &dataapi.MetricSummary{
+	metricSummary := &MetricSummary{
 		AvgThroughput: avgThroughput,
 	}
 

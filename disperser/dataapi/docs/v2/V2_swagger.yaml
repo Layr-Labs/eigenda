@@ -2,6 +2,24 @@ basePath: /api/v2
 definitions:
   big.Int:
     type: object
+  core.G1Point:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+      "y":
+        items:
+          type: integer
+        type: array
+    type: object
+  core.G2Point:
+    properties:
+      x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+    type: object
   core.PaymentMetadata:
     properties:
       account_id:
@@ -21,6 +39,17 @@ definitions:
         description: Allow same blob to be dispersed multiple times within the same
           reservation period
         type: integer
+    type: object
+  core.Signature:
+    properties:
+      x:
+        items:
+          type: integer
+        type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -58,6 +87,75 @@ definitions:
       "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
+  github_com_Layr-Labs_eigenda_core_v2.Attestation:
+    properties:
+      apkg2:
+        allOf:
+        - $ref: '#/definitions/core.G2Point'
+        description: APKG2 is the aggregate public key of all signers
+      attestedAt:
+        description: AttestedAt is the time the attestation was made
+        type: integer
+      batchRoot:
+        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
+          of the blobs in the batch
+        items:
+          type: integer
+        type: array
+      nonSignerPubKeys:
+        description: NonSignerPubKeys are the public keys of the operators that did
+          not sign the blob
+        items:
+          $ref: '#/definitions/core.G1Point'
+        type: array
+      quorumAPKs:
+        additionalProperties:
+          $ref: '#/definitions/core.G1Point'
+        description: QuorumAPKs is the aggregate public keys of all operators in each
+          quorum
+        type: object
+      quorumNumbers:
+        description: QuorumNumbers contains the quorums relevant for the attestation
+        items:
+          type: integer
+        type: array
+      quorumResults:
+        additionalProperties:
+          type: integer
+        description: QuorumResults contains the results of the quorum verification
+        type: object
+      referenceBlockNumber:
+        description: ReferenceBlockNumber is the block number at which all operator
+          information (stakes, indexes, etc.) is taken from
+        type: integer
+      sigma:
+        allOf:
+        - $ref: '#/definitions/core.Signature'
+        description: Sigma is the aggregate signature of all signers
+    type: object
+  github_com_Layr-Labs_eigenda_core_v2.BatchHeader:
+    properties:
+      batchRoot:
+        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
+          of the blobs in the batch
+        items:
+          type: integer
+        type: array
+      referenceBlockNumber:
+        description: ReferenceBlockNumber is the block number at which all operator
+          information (stakes, indexes, etc.) is taken from
+        type: integer
+    type: object
+  github_com_Layr-Labs_eigenda_core_v2.BlobCertificate:
+    properties:
+      blobHeader:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
+      relayKeys:
+        description: RelayKeys
+        items:
+          type: integer
+        type: array
+    type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
     properties:
       blobCommitments:
@@ -79,6 +177,36 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo:
+    properties:
+      BlobKey:
+        items:
+          type: integer
+        type: array
+      batchRoot:
+        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
+          of the blobs in the batch
+        items:
+          type: integer
+        type: array
+      blobIndex:
+        type: integer
+      inclusionProof:
+        items:
+          type: integer
+        type: array
+      referenceBlockNumber:
+        description: ReferenceBlockNumber is the block number at which all operator
+          information (stakes, indexes, etc.) is taken from
+        type: integer
+    type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
+    properties:
+      attestation:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
     type: object
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
@@ -106,6 +234,22 @@ definitions:
           type: number
         type: object
     type: object
+  v2.BatchResponse:
+    properties:
+      batch_header_hash:
+        type: string
+      blob_verification_infos:
+        items:
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
+        type: array
+      signed_batch:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
+    type: object
+  v2.BlobCertificateResponse:
+    properties:
+      blob_certificate:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate'
+    type: object
   v2.BlobResponse:
     properties:
       blob_header:
@@ -116,6 +260,11 @@ definitions:
         type: integer
       status:
         type: string
+    type: object
+  v2.BlobVerificationInfoResponse:
+    properties:
+      blob_verification_info:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
     type: object
   v2.ErrorResponse:
     properties:
@@ -205,7 +354,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.BlobResponse'
+            $ref: '#/definitions/v2.BatchResponse'
         "400":
           description: 'error: Bad request'
           schema:
@@ -220,7 +369,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch batch by the batch header hash
       tags:
-      - Feed
+      - Batch
   /blobs/{blob_key}:
     get:
       parameters:
@@ -248,9 +397,74 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob metadata by blob key V2
+      summary: Fetch blob metadata by blob key
       tags:
-      - Feed
+      - Blob
+  /blobs/{blob_key}/certificate:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobCertificateResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob certificate by blob key
+      tags:
+      - Blob
+  /blobs/{blob_key}/verification-info:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      - description: Batch header hash in hex string
+        in: path
+        name: batch_header_hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobVerificationInfoResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob verification info by blob key and batch header hash
+      tags:
+      - Blob
   /metrics/summary:
     get:
       parameters:

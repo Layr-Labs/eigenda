@@ -15,200 +15,6 @@ const docTemplateV1 = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        "/batches/{batch_header_hash}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Batch"
-                ],
-                "summary": "Fetch batch by the batch header hash",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BatchResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/blobs/{blob_key}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Blob"
-                ],
-                "summary": "Fetch blob metadata by blob key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Blob key in hex string",
-                        "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BlobResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/blobs/{blob_key}/certificate": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Blob"
-                ],
-                "summary": "Fetch blob certificate by blob key",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Blob key in hex string",
-                        "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BlobCertificateResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/blobs/{blob_key}/verification-info": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Blob"
-                ],
-                "summary": "Fetch blob verification info by blob key and batch header hash",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Blob key in hex string",
-                        "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.BlobVerificationInfoResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/dataapi.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
         "/feed/batches/{batch_header_hash}/blobs": {
             "get": {
                 "produces": [
@@ -944,53 +750,6 @@ const docTemplateV1 = `{
         "big.Int": {
             "type": "object"
         },
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        "core.G1Point": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "core.G2Point": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                }
-            }
-        },
-        "core.PaymentMetadata": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "description": "AccountID is the ETH account address for the payer",
-                    "type": "string"
-                },
-                "cumulative_payment": {
-                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/big.Int"
-                        }
-                    ]
-                },
-                "reservation_period": {
-                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
-                    "type": "integer"
-                },
-                "salt": {
-                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
-                    "type": "integer"
-                }
-            }
-        },
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
         "core.SecurityParam": {
             "type": "object",
             "properties": {
@@ -1011,9 +770,6 @@ const docTemplateV1 = `{
                 }
             }
         },
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        "core.Signature": {
-=======
         "dataapi.Meta": {
             "type": "object",
             "properties": {
@@ -1069,7 +825,6 @@ const docTemplateV1 = `{
             }
         },
         "encoding.G1Commitment": {
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
             "type": "object",
             "properties": {
                 "x": {
@@ -1077,37 +832,6 @@ const docTemplateV1 = `{
                     "items": {
                         "type": "integer"
                     }
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-                }
-            }
-        },
-        "dataapi.BatchResponse": {
-            "type": "object",
-            "properties": {
-                "batch_header_hash": {
-                    "type": "string"
-                },
-                "blob_verification_infos": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
-                    }
-                },
-                "signed_batch": {
-                    "$ref": "#/definitions/dataapi.SignedBatch"
-                }
-            }
-        },
-        "dataapi.BlobCertificateResponse": {
-            "type": "object",
-            "properties": {
-                "blob_certificate": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
-                }
-            }
-        },
-        "dataapi.BlobMetadataResponse": {
-=======
                 },
                 "y": {
                     "type": "array",
@@ -1199,7 +923,6 @@ const docTemplateV1 = `{
             }
         },
         "v1.BlobMetadataResponse": {
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
             "type": "object",
             "properties": {
                 "batch_header_hash": {
@@ -1252,36 +975,7 @@ const docTemplateV1 = `{
                 }
             }
         },
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        "dataapi.BlobResponse": {
-            "type": "object",
-            "properties": {
-                "blob_header": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
-                },
-                "blob_size_bytes": {
-                    "type": "integer"
-                },
-                "dispersed_at": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "dataapi.BlobVerificationInfoResponse": {
-            "type": "object",
-            "properties": {
-                "blob_verification_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
-                }
-            }
-        },
-        "dataapi.BlobsResponse": {
-=======
         "v1.BlobsResponse": {
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
             "type": "object",
             "properties": {
                 "data": {
@@ -1511,22 +1205,7 @@ const docTemplateV1 = `{
                 }
             }
         },
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        "dataapi.SignedBatch": {
-            "type": "object",
-            "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
-                },
-                "batch_header": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
-                }
-            }
-        },
-        "dataapi.Throughput": {
-=======
         "v1.Throughput": {
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
             "type": "object",
             "properties": {
                 "throughput": {
@@ -1536,265 +1215,6 @@ const docTemplateV1 = `{
                     "type": "integer"
                 }
             }
-<<<<<<< HEAD:disperser/dataapi/docs/docs.go
-        },
-        "encoding.BlobCommitments": {
-            "type": "object",
-            "properties": {
-                "commitment": {
-                    "$ref": "#/definitions/encoding.G1Commitment"
-                },
-                "length": {
-                    "type": "integer"
-                },
-                "length_commitment": {
-                    "$ref": "#/definitions/encoding.G2Commitment"
-                },
-                "length_proof": {
-                    "$ref": "#/definitions/encoding.LengthProof"
-                }
-            }
-        },
-        "encoding.G1Commitment": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "encoding.G2Commitment": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                }
-            }
-        },
-        "encoding.LengthProof": {
-            "type": "object",
-            "properties": {
-                "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_core_v2.Attestation": {
-            "type": "object",
-            "properties": {
-                "apkg2": {
-                    "description": "APKG2 is the aggregate public key of all signers",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/core.G2Point"
-                        }
-                    ]
-                },
-                "attestedAt": {
-                    "description": "AttestedAt is the time the attestation was made",
-                    "type": "integer"
-                },
-                "batchRoot": {
-                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "nonSignerPubKeys": {
-                    "description": "NonSignerPubKeys are the public keys of the operators that did not sign the blob",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/core.G1Point"
-                    }
-                },
-                "quorumAPKs": {
-                    "description": "QuorumAPKs is the aggregate public keys of all operators in each quorum",
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/core.G1Point"
-                    }
-                },
-                "quorumNumbers": {
-                    "description": "QuorumNumbers contains the quorums relevant for the attestation",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "quorumResults": {
-                    "description": "QuorumResults contains the results of the quorum verification",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "referenceBlockNumber": {
-                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
-                    "type": "integer"
-                },
-                "sigma": {
-                    "description": "Sigma is the aggregate signature of all signers",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/core.Signature"
-                        }
-                    ]
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_core_v2.BatchHeader": {
-            "type": "object",
-            "properties": {
-                "batchRoot": {
-                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "referenceBlockNumber": {
-                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobCertificate": {
-            "type": "object",
-            "properties": {
-                "blobHeader": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
-                },
-                "relayKeys": {
-                    "description": "RelayKeys",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobHeader": {
-            "type": "object",
-            "properties": {
-                "blobCommitments": {
-                    "$ref": "#/definitions/encoding.BlobCommitments"
-                },
-                "blobVersion": {
-                    "type": "integer"
-                },
-                "paymentMetadata": {
-                    "description": "PaymentMetadata contains the payment information for the blob",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/core.PaymentMetadata"
-                        }
-                    ]
-                },
-                "quorumNumbers": {
-                    "description": "QuorumNumbers contains the quorums the blob is dispersed to",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "signature": {
-                    "description": "Signature is the signature of the blob header by the account ID",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
-            "type": "object",
-            "properties": {
-                "BlobKey": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "batchRoot": {
-                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "blobIndex": {
-                    "type": "integer"
-                },
-                "inclusionProof": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "referenceBlockNumber": {
-                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_Layr-Labs_eigenda_disperser.BlobStatus": {
-            "type": "integer",
-            "enum": [
-                0,
-                1,
-                2,
-                3,
-                4,
-                5
-            ],
-            "x-enum-varnames": [
-                "Processing",
-                "Confirmed",
-                "Failed",
-                "Finalized",
-                "InsufficientSignatures",
-                "Dispersing"
-            ]
-        },
-        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
-            "type": "object",
-            "properties": {
-                "a0": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "semver.SemverMetrics": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "operators": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "semver": {
-                    "type": "string"
-                },
-                "stake_percentage": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "number"
-                    }
-                }
-            }
-=======
->>>>>>> 2cb1dde7 (Move server_v2 into its own package):disperser/dataapi/docs/v1/V1_docs.go
         }
     }
 }`

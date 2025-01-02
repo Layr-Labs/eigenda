@@ -18,7 +18,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Feed"
+                    "Batch"
                 ],
                 "summary": "Fetch batch by the batch header hash",
                 "parameters": [
@@ -26,6 +26,52 @@
                         "type": "string",
                         "description": "Batch header hash in hex string",
                         "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob metadata by blob key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
                         "in": "path",
                         "required": true
                     }
@@ -58,15 +104,15 @@
                 }
             }
         },
-        "/blobs/{blob_key}": {
+        "/blobs/{blob_key}/certificate": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Feed"
+                    "Blob"
                 ],
-                "summary": "Fetch blob metadata by blob key V2",
+                "summary": "Fetch blob certificate by blob key",
                 "parameters": [
                     {
                         "type": "string",
@@ -80,7 +126,60 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobResponse"
+                            "$ref": "#/definitions/v2.BlobCertificateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}/verification-info": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob verification info by blob key and batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobVerificationInfoResponse"
                         }
                     },
                     "400": {
@@ -329,6 +428,34 @@
         "big.Int": {
             "type": "object"
         },
+        "core.G1Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "core.G2Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
         "core.PaymentMetadata": {
             "type": "object",
             "properties": {
@@ -351,6 +478,23 @@
                 "salt": {
                     "description": "Allow same blob to be dispersed multiple times within the same reservation period",
                     "type": "integer"
+                }
+            }
+        },
+        "core.Signature": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -410,6 +554,101 @@
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_core_v2.Attestation": {
+            "type": "object",
+            "properties": {
+                "apkg2": {
+                    "description": "APKG2 is the aggregate public key of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.G2Point"
+                        }
+                    ]
+                },
+                "attestedAt": {
+                    "description": "AttestedAt is the time the attestation was made",
+                    "type": "integer"
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "nonSignerPubKeys": {
+                    "description": "NonSignerPubKeys are the public keys of the operators that did not sign the blob",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumAPKs": {
+                    "description": "QuorumAPKs is the aggregate public keys of all operators in each quorum",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumNumbers": {
+                    "description": "QuorumNumbers contains the quorums relevant for the attestation",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorumResults": {
+                    "description": "QuorumResults contains the results of the quorum verification",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                },
+                "sigma": {
+                    "description": "Sigma is the aggregate signature of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.Signature"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BatchHeader": {
+            "type": "object",
+            "properties": {
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobCertificate": {
+            "type": "object",
+            "properties": {
+                "blobHeader": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "relayKeys": {
+                    "description": "RelayKeys",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_core_v2.BlobHeader": {
             "type": "object",
             "properties": {
@@ -440,6 +679,48 @@
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
+            "type": "object",
+            "properties": {
+                "BlobKey": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "blobIndex": {
+                    "type": "integer"
+                },
+                "inclusionProof": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
                 }
             }
         },
@@ -483,6 +764,31 @@
                 }
             }
         },
+        "v2.BatchResponse": {
+            "type": "object",
+            "properties": {
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_verification_infos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                    }
+                },
+                "signed_batch": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch"
+                }
+            }
+        },
+        "v2.BlobCertificateResponse": {
+            "type": "object",
+            "properties": {
+                "blob_certificate": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                }
+            }
+        },
         "v2.BlobResponse": {
             "type": "object",
             "properties": {
@@ -497,6 +803,14 @@
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "v2.BlobVerificationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "blob_verification_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
                 }
             }
         },
