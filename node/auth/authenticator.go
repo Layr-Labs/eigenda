@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -91,7 +92,7 @@ func NewRequestAuthenticator(
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
 	// this will need to be updated for decentralized dispersers
-	_, err := a.getDisperserKey(ctx, now, EigenLabsDisperserID)
+	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
 	}
@@ -120,7 +121,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 		return fmt.Errorf("failed to verify request: %w", err)
 	}
 
-	a.saveAuthenticationResult(now, origin)
+	a.cacheAuthenticationResult(now, origin)
 	return nil
 }
 
@@ -150,8 +151,8 @@ func (a *requestAuthenticator) getDisperserKey(
 	return &address, nil
 }
 
-// saveAuthenticationResult saves the result of an auth.
-func (a *requestAuthenticator) saveAuthenticationResult(now time.Time, origin string) {
+// cacheAuthenticationResult saves the result of an auth.
+func (a *requestAuthenticator) cacheAuthenticationResult(now time.Time, origin string) {
 	if a.authenticationTimeoutDuration == 0 {
 		// Authentication saving is disabled.
 		return

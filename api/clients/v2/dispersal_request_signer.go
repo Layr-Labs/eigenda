@@ -5,8 +5,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
@@ -51,7 +51,7 @@ func NewDispersalRequestSigner(
 }
 
 func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
-	hash := auth.HashStoreChunksRequest(request)
+	hash := hashing.HashStoreChunksRequest(request)
 
 	signature, err := common.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
 	if err != nil {

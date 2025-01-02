@@ -3,7 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/node/auth"
+	"github.com/Layr-Labs/eigenda/api"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -71,7 +71,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			},
 			BlobCertificates: blobCerts,
 		},
-		DisperserID: auth.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
+		DisperserID: api.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
 	}
 
 	if c.requestSigner != nil {
