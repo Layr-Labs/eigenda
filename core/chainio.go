@@ -53,6 +53,12 @@ type Reader interface {
 	// StakeRegistry returns the address of the stake registry contract.
 	StakeRegistry(ctx context.Context) (gethcommon.Address, error)
 
+	// SocketRegistry returns the address of the socket registry contract.
+	SocketRegistry(ctx context.Context) (gethcommon.Address, error)
+
+	// RegistryCoordinator returns the address of the  registry coordinator contract.
+	RegistryCoordinator(ctx context.Context) (gethcommon.Address, error)
+
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
 

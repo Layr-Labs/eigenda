@@ -1,22 +1,36 @@
 package eth
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"math/big"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type ChainState struct {
-	Client common.EthClient
-	Tx     core.Reader
+	Client                common.EthClient
+	Tx                    core.Reader
+	SocketMap             map[core.OperatorID]*string
+	socketMu              sync.Mutex
+	socketPrevBlockNumber uint32
 }
+
+var defaultQuorumIDs = []core.QuorumID{core.QuorumID(0), core.QuorumID(1)}
 
 func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 	return &ChainState{
 		Client: client,
 		Tx:     tx,
+		// TODO: consider a more reasonable init value
+		socketPrevBlockNumber: 0,
+		SocketMap:             make(map[core.OperatorID]*string),
 	}
 }
 
@@ -28,15 +42,10 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 		return nil, err
 	}
 
-	socketMap := make(map[core.OperatorID]string)
-	socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
-	if err != nil {
+	if err := cs.indexSocketMap(ctx); err != nil {
 		return nil, err
 	}
-	socketMap[operator] = socket
-
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber), socketMap)
-
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
 }
 
 func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
@@ -45,12 +54,10 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
-	socketMap, err := cs.buildSocketMap(ctx, operatorsByQuorum)
-	if err != nil {
+	if err := cs.indexSocketMap(ctx); err != nil {
 		return nil, err
 	}
-
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber), socketMap)
+	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
 }
 
 func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
@@ -71,26 +78,75 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 	return socket, nil
 }
 
-// buildSocketMap returns a map from operatorID to socket address for the operators in the operatorsByQuorum
-func (cs *ChainState) buildSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) (map[core.OperatorID]string, error) {
-	socketMap := make(map[core.OperatorID]string)
-	for _, quorum := range operatorsByQuorum {
-		for _, op := range quorum {
-			// if the socket is already in the map, skip
-			if _, ok := socketMap[op.OperatorID]; ok {
-				continue
-			}
-			socket, err := cs.Tx.GetOperatorSocket(ctx, op.OperatorID)
-			if err != nil {
-				return nil, err
-			}
-			socketMap[op.OperatorID] = socket
-		}
+// indexSocketMap preloads the socket map for the default quorums at the current block.
+func (cs *ChainState) indexSocketMap(ctx context.Context) error {
+	currentBlockNumber, err := cs.GetCurrentBlockNumber()
+	if err != nil {
+		return err
 	}
-	return socketMap, nil
+	registryCoordinator, err := cs.Tx.RegistryCoordinator(ctx)
+	if err != nil {
+		return err
+	}
+
+	logs, err := cs.Client.FilterLogs(ctx, ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(cs.socketPrevBlockNumber)),
+		ToBlock:   big.NewInt(int64(currentBlockNumber)),
+		Addresses: []gcommon.Address{registryCoordinator},
+		Topics: [][]gcommon.Hash{
+			{common.OperatorSocketUpdateEventSigHash},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if len(logs) == 0 {
+		return nil
+	}
+
+	var socketUpdates []*socketUpdateInput
+
+	// logs are in order of block number, so we can just iterate through them
+	for _, log := range logs {
+		tx, isPending, err := cs.Client.TransactionByHash(ctx, log.TxHash)
+		if err != nil {
+			return err
+		}
+		if isPending {
+			return fmt.Errorf("transaction pending for operator socket update event")
+		}
+
+		calldata := tx.Data()
+		rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
+		if err != nil {
+			return err
+		}
+		methodSig := calldata[:4]
+		method, err := rcAbi.MethodById(methodSig)
+		if err != nil {
+			return err
+		}
+		inputs, err := method.Inputs.Unpack(calldata[4:])
+		if err != nil {
+			return err
+		}
+		input := inputs[0].(socketUpdateInput)
+
+		socketUpdates = append(socketUpdates, &input)
+	}
+
+	cs.socketMu.Lock()
+	defer cs.socketMu.Unlock()
+	for _, socketUpdate := range socketUpdates {
+		cs.SocketMap[core.OperatorID(socketUpdate.OperatorID.Bytes())] = &socketUpdate.Socket
+	}
+
+	cs.socketPrevBlockNumber = uint32(currentBlockNumber)
+
+	return nil
 }
 
-func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32, socketMap map[core.OperatorID]string) (*core.OperatorState, error) {
+func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32, socketMap map[core.OperatorID]*string) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
 
@@ -102,7 +158,7 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32,
 			operators[quorumID][op.OperatorID] = &core.OperatorInfo{
 				Stake:  op.Stake,
 				Index:  core.OperatorIndex(ind),
-				Socket: socketMap[op.OperatorID],
+				Socket: *socketMap[op.OperatorID],
 			}
 			totalStake.Add(totalStake, op.Stake)
 		}
@@ -122,4 +178,9 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32,
 	}
 
 	return state, nil
+}
+
+type socketUpdateInput struct {
+	OperatorID gcommon.Address "json:\"operatorId\""
+	Socket     string          "json:\"socket\""
 }
