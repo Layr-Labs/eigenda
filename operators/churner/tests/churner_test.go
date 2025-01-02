@@ -66,6 +66,13 @@ func setup(m *testing.M) {
 		}
 	}
 
+	// TODO this probably doesn't belong here
+	localStackPort := "4570"
+	_, _, err := deploy.StartDockertestWithLocalstackContainer(localStackPort)
+	if err != nil {
+		log.Panicf("Failed to start dockertest with localstack container: %v", err)
+	}
+
 	testConfig = deploy.NewTestConfig(testName, rootPath)
 	testConfig.Deployers[0].DeploySubgraphs = false
 
