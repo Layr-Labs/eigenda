@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/relay/auth"
 	"sync"
 
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
@@ -115,7 +115,7 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 		return errors.New("no message signer provided in config, cannot sign get chunks request")
 	}
 
-	hash := auth.HashGetChunksRequest(request)
+	hash := hashing.HashGetChunksRequest(request)
 	hashArray := [32]byte{}
 	copy(hashArray[:], hash)
 	signature, err := c.config.MessageSigner(ctx, hashArray)
