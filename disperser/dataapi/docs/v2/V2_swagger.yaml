@@ -427,7 +427,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob certificate by blob key
+      summary: Fetch blob certificate by blob key v2
       tags:
       - Blob
   /blobs/{blob_key}/verification-info:

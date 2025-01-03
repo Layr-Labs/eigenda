@@ -34,7 +34,7 @@ var (
 	gitDate   string
 )
 
-// @title			EigenDA Data Access API
+// @title			EigenDA Data Access API V1
 // @description	This is the EigenDA Data Access API server.
 // @version		1
 // @Schemes		https http

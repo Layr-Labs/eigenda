@@ -334,7 +334,7 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 
 // FetchBlobCertificateHandler godoc
 //
-//	@Summary	Fetch blob certificate by blob key
+//	@Summary	Fetch blob certificate by blob key v2
 //	@Tags		Blob
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"

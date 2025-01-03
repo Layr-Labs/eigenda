@@ -115,7 +115,7 @@ const docTemplateV2 = `{
                 "tags": [
                     "Blob"
                 ],
-                "summary": "Fetch blob certificate by blob key",
+                "summary": "Fetch blob certificate by blob key v2",
                 "parameters": [
                     {
                         "type": "string",

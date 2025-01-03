@@ -23,7 +23,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	docsv1 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v1"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
@@ -273,8 +273,8 @@ func (s *server) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v1"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv1.SwaggerInfoV1.BasePath = basePath
+	docsv1.SwaggerInfoV1.Host = os.Getenv("SWAGGER_HOST")
 	v1 := router.Group(basePath)
 	{
 		feed := v1.Group("/feed")
@@ -304,7 +304,7 @@ func (s *server) Start() error {
 		}
 		swagger := v1.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V1"), ginswagger.URL("/api/v1/swagger/doc.json")))
 		}
 	}
 
