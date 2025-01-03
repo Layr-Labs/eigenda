@@ -14,8 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	v2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/tools/ejections"
 	"github.com/Layr-Labs/eigenda/tools/ejections/flags"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -78,7 +78,7 @@ func RunScan(ctx *cli.Context) error {
 		return errors.New("failed to create chain state")
 	}
 	subgraphApi := subgraph.NewApi(config.SubgraphEndpoint, config.SubgraphEndpoint)
-	subgraphClient := dataapi.NewSubgraphClient(subgraphApi, logger)
+	subgraphClient := v2.NewSubgraphClient(subgraphApi, logger)
 
 	ejections, err := subgraphClient.QueryOperatorEjectionsForTimeWindow(context.Background(), int32(config.Days), config.OperatorId, config.First, config.Skip)
 	if err != nil {
