@@ -33,18 +33,18 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
 
-	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
-	require.NotNil(t, s1)
+	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(s1, randomBytes)
+	commitment, err := GenerateBlobCommitment(g1Srs, randomBytes)
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
 	// make sure the commitment verifies correctly
 	err = GenerateAndCompareBlobCommitment(
-		s1,
 		commitment,
+		g1Srs,
 		randomBytes)
 	require.NoError(t, err)
 }
@@ -55,19 +55,19 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
 
-	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
-	require.NotNil(t, s1)
+	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	commitment, err := GenerateBlobCommitment(s1, randomBytes)
+	commitment, err := GenerateBlobCommitment(g1Srs, randomBytes)
 	require.NotNil(t, commitment)
 	require.NoError(t, err)
 
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
 	err = GenerateAndCompareBlobCommitment(
-		s1,
 		commitment,
+		g1Srs,
 		randomBytes)
 	require.NotNil(t, err)
 }
@@ -78,15 +78,15 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
 
-	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
-	require.NotNil(t, s1)
+	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
 	// generate two identical commitments
-	commitment1, err := GenerateBlobCommitment(s1, randomBytes)
+	commitment1, err := GenerateBlobCommitment(g1Srs, randomBytes)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
-	commitment2, err := GenerateBlobCommitment(s1, randomBytes)
+	commitment2, err := GenerateBlobCommitment(g1Srs, randomBytes)
 	require.NotNil(t, commitment2)
 	require.NoError(t, err)
 
@@ -95,7 +95,7 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 
 	// randomly modify a byte
 	randomlyModifyBytes(testRandom, randomBytes)
-	commitmentA, err := GenerateBlobCommitment(s1, randomBytes)
+	commitmentA, err := GenerateBlobCommitment(g1Srs, randomBytes)
 	require.NotNil(t, commitmentA)
 	require.NoError(t, err)
 
@@ -106,8 +106,8 @@ func TestGenerateBlobCommitmentEquality(t *testing.T) {
 func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 	srsNumberToLoad := uint64(500)
 
-	s1, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
-	require.NotNil(t, s1)
+	g1Srs, err := kzg.ReadG1Points(g1Path, srsNumberToLoad, uint64(runtime.GOMAXPROCS(0)))
+	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
 	// this is the absolute maximum number of bytes we can handle, given how the verifier was configured
@@ -115,13 +115,13 @@ func TestGenerateBlobCommitmentTooLong(t *testing.T) {
 
 	// an array of exactly this size should be fine
 	almostTooLongBytes := make([]byte, almostTooLongByteCount)
-	commitment1, err := GenerateBlobCommitment(s1, almostTooLongBytes)
+	commitment1, err := GenerateBlobCommitment(g1Srs, almostTooLongBytes)
 	require.NotNil(t, commitment1)
 	require.NoError(t, err)
 
 	// but 1 more byte is more than we can handle
 	tooLongBytes := make([]byte, almostTooLongByteCount+1)
-	commitment2, err := GenerateBlobCommitment(s1, tooLongBytes)
+	commitment2, err := GenerateBlobCommitment(g1Srs, tooLongBytes)
 	require.Nil(t, commitment2)
 	require.NotNil(t, err)
 }
