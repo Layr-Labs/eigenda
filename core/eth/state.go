@@ -148,7 +148,7 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 		return nil
 	}
 
-	var socketUpdates []*socketUpdateInput
+	var socketUpdates []*socketUpdateParams
 
 	// logs are in order of block number, so we can just iterate through them
 	for _, log := range logs {
@@ -174,15 +174,36 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		input := inputs[0].(socketUpdateInput)
 
-		socketUpdates = append(socketUpdates, &input)
+		var socket string
+		if method.Name == "registerOperator" {
+			socket = inputs[1].(string)
+		} else if method.Name == "updateOperatorSocket" {
+			socket = inputs[0].(string)
+		} else {
+			return fmt.Errorf("unknown method filtered for socket update event: %s", method.Name)
+		}
+		// operatorAddr := gcommon.BytesToAddress(log.Topics[1].Bytes())
+		operatorID := core.OperatorID(log.Topics[1].Bytes())
+		// fmt.Println("operator id", operatorID)
+		// fmt.Println("operator addr", operatorAddr)
+		// fmt.Println("operator addr hex", operatorAddr.Hex())
+		// operatorId, err := core.OperatorIDFromHex(operatorAddr.Hex())
+		// if err != nil {
+		// 	fmt.Println(err)
+		// 	return err
+		// }
+
+		socketUpdates = append(socketUpdates, &socketUpdateParams{
+			Socket:     socket,
+			OperatorID: operatorID,
+		})
 	}
 
 	cs.socketMu.Lock()
 	defer cs.socketMu.Unlock()
 	for _, socketUpdate := range socketUpdates {
-		cs.SocketMap[core.OperatorID(socketUpdate.OperatorID.Bytes())] = &socketUpdate.Socket
+		cs.SocketMap[core.OperatorID(socketUpdate.OperatorID)] = &socketUpdate.Socket
 	}
 
 	cs.socketPrevBlockNumber = uint32(currentBlockNumber)
@@ -224,7 +245,7 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32,
 	return state, nil
 }
 
-type socketUpdateInput struct {
-	OperatorID gcommon.Address "json:\"operatorId\""
-	Socket     string          "json:\"socket\""
+type socketUpdateParams struct {
+	OperatorID core.OperatorID
+	Socket     string
 }
