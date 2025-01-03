@@ -213,6 +213,11 @@ type (
 	}
 )
 
+type ServerInterface interface {
+	Start() error
+	Shutdown() error
+}
+
 func NewServer(
 	config Config,
 	blobstore disperser.BlobStore,

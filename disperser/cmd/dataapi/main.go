@@ -156,7 +156,7 @@ func RunDataApi(ctx *cli.Context) error {
 	return runServer(server, logger)
 }
 
-func runServer[T serverv2.ServerInterface](server T, logger logging.Logger) error {
+func runServer[T dataapi.ServerInterface](server T, logger logging.Logger) error {
 	// Setup channel to listen for termination signals
 	quit := make(chan os.Signal, 1)
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)

@@ -111,11 +111,6 @@ type (
 	}
 )
 
-type ServerInterface interface {
-	Start() error
-	Shutdown() error
-}
-
 type ServerV2 struct {
 	serverMode   string
 	socketAddr   string
