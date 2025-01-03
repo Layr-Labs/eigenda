@@ -351,10 +351,6 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.BinRecord"><span class="badge">M</span>BinRecord</a>
-                </li>
-              
-                <li>
                   <a href="#disperser.v2.BlobCommitmentReply"><span class="badge">M</span>BlobCommitmentReply</a>
                 </li>
               
@@ -396,6 +392,10 @@
               
                 <li>
                   <a href="#disperser.v2.Reservation"><span class="badge">M</span>Reservation</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.ReservationPeriodRecord"><span class="badge">M</span>ReservationPeriodRecord</a>
                 </li>
               
                 <li>
@@ -1992,37 +1992,6 @@ The order of the quorum_signed_percentages should match the order of the quorum_
 
         
       
-        <h3 id="disperser.v2.BinRecord">BinRecord</h3>
-        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>usage</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
         <p></p>
 
@@ -2256,8 +2225,8 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
                 </tr>
               
                 <tr>
-                  <td>bin_records</td>
-                  <td><a href="#disperser.v2.BinRecord">BinRecord</a></td>
+                  <td>reservation_period_records</td>
+                  <td><a href="#disperser.v2.ReservationPeriodRecord">ReservationPeriodRecord</a></td>
                   <td>repeated</td>
                   <td><p>off-chain account reservation usage records </p></td>
                 </tr>
@@ -2416,6 +2385,37 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.ReservationPeriodRecord">ReservationPeriodRecord</h3>
+        <p>ReservationPeriodRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>usage</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               

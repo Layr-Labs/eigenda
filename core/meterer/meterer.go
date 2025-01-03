@@ -18,8 +18,10 @@ type Config struct {
 	// ChainReadTimeout is the timeout for reading payment state from chain
 	ChainReadTimeout time.Duration
 
-	// UpdateInterval is the interval for refreshing the on-chain state
-	UpdateInterval time.Duration
+	// OnchainUpdateInterval is the interval for refreshing the on-chain state
+	OnchainUpdateInterval time.Duration
+	// OffchainPruneInterval is the interval for pruning the off-chain state
+	OffchainPruneInterval time.Duration
 }
 
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
@@ -51,10 +53,10 @@ func NewMeterer(
 	}
 }
 
-// Start starts to periodically refreshing the on-chain state
+// Start starts to periodically refreshing the on-chain state and pruning the off-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(m.UpdateInterval)
+		ticker := time.NewTicker(m.OnchainUpdateInterval)
 		defer ticker.Stop()
 
 		for {
@@ -62,6 +64,23 @@ func (m *Meterer) Start(ctx context.Context) {
 			case <-ticker.C:
 				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		ticker := time.NewTicker(m.OffchainPruneInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				now := uint64(time.Now().Unix())
+				reservationWindow := m.ChainPaymentState.GetReservationWindow()
+				if err := m.OffchainStore.DeleteOldPeriods(ctx, GetReservationPeriod(now, reservationWindow)-uint32(MinNumPeriods)); err != nil {
+					m.logger.Error("Failed to prune off-chain state", "error", err)
 				}
 			case <-ctx.Done():
 				return
@@ -108,9 +127,9 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		return fmt.Errorf("invalid reservation period for reservation")
 	}
 
-	// Update bin usage atomically and check against reservation's data rate as the bin limit
-	if err := m.IncrementBinUsage(ctx, header, reservation, numSymbols); err != nil {
-		return fmt.Errorf("bin overflows: %w", err)
+	// Update reservation period usage atomically and check against reservation's data rate as the period limit
+	if err := m.IncrementReservatiionPeriodUsage(ctx, header, reservation, numSymbols); err != nil {
+		return fmt.Errorf("period overflows: %w", err)
 	}
 
 	return nil
@@ -140,46 +159,46 @@ func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reserva
 	now := uint64(time.Now().Unix())
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
-	// Valid reservation periodes are either the current bin or the previous bin
+	// Valid reservation periods are either the current period or the previous period
 	if (header.ReservationPeriod != currentReservationPeriod && header.ReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(reservation.StartTimestamp, reservationWindow) > header.ReservationPeriod || header.ReservationPeriod > GetReservationPeriod(reservation.EndTimestamp, reservationWindow)) {
 		return false
 	}
 	return true
 }
 
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint) error {
+// IncrementReservatiionPeriodUsage increments the reservation period usage atomically and checks for overflow
+func (m *Meterer) IncrementReservatiionPeriodUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint) error {
 	symbolsCharged := m.SymbolsCharged(numSymbols)
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
+	newUsage, err := m.OffchainStore.UpdateReservationPeriod(ctx, header.AccountID, uint64(header.ReservationPeriod), uint64(symbolsCharged))
 	if err != nil {
-		return fmt.Errorf("failed to increment bin usage: %w", err)
+		return fmt.Errorf("failed to increment reservation period usage: %w", err)
 	}
 
-	// metered usage stays within the bin limit
-	usageLimit := m.GetReservationBinLimit(reservation)
+	// metered usage stays within the period limit
+	usageLimit := m.GetReservationPeriodLimit(reservation)
 	if newUsage <= usageLimit {
 		return nil
 	} else if newUsage-uint64(symbolsCharged) >= usageLimit {
 		// metered usage before updating the size already exceeded the limit
-		return fmt.Errorf("bin has already been filled")
+		return fmt.Errorf("period has already been filled")
 	}
 	if newUsage <= 2*usageLimit && header.ReservationPeriod+2 <= GetReservationPeriod(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
-		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(header.ReservationPeriod+2), newUsage-usageLimit)
+		_, err := m.OffchainStore.UpdateReservationPeriod(ctx, header.AccountID, uint64(header.ReservationPeriod+2), newUsage-usageLimit)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
-	return fmt.Errorf("overflow usage exceeds bin limit")
+	return fmt.Errorf("overflow usage exceeds period limit")
 }
 
-// GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
+// GetReservationPeriod returns the current reservation period by chunking time by the period interval;
 // bin interval used by the disperser should be public information
-func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
-	if binInterval == 0 {
+func GetReservationPeriod(timestamp uint64, periodInterval uint32) uint32 {
+	if periodInterval == 0 {
 		return 0
 	}
-	return uint32(timestamp) / binInterval
+	return uint32(timestamp) / periodInterval
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
@@ -207,8 +226,8 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
+	// Update reservation period usage atomically and check against period capacity
+	if err := m.IncrementGlobalPeriodUsage(ctx, uint64(symbolsCharged)); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		dbErr := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
 		if dbErr != nil {
@@ -265,21 +284,21 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(m.ChainPaymentState.GetMinNumSymbols()))) * m.ChainPaymentState.GetMinNumSymbols()
 }
 
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
+// IncrementGlobalPeriodUsage increments the period usage atomically and checks for overflow
+func (m *Meterer) IncrementGlobalPeriodUsage(ctx context.Context, symbolsCharged uint64) error {
 	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
+	newUsage, err := m.OffchainStore.UpdateGlobalPeriod(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
-		return fmt.Errorf("failed to increment global bin usage: %w", err)
+		return fmt.Errorf("failed to increment global reservation period usage: %w", err)
 	}
 	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
-		return fmt.Errorf("global bin usage overflows")
+		return fmt.Errorf("global reservation period usage overflows")
 	}
 	return nil
 }
 
-// GetReservationBinLimit returns the bin limit for a given reservation
-func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment) uint64 {
+// GetReservationPeriodLimit returns the period limit for a given reservation
+func (m *Meterer) GetReservationPeriodLimit(reservation *core.ReservedPayment) uint64 {
 	return reservation.SymbolsPerSecond * uint64(m.ChainPaymentState.GetReservationWindow())
 }

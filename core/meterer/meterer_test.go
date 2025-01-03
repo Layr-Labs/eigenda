@@ -110,8 +110,9 @@ func setup(_ *testing.M) {
 
 	logger = logging.NewNoopLogger()
 	config := meterer.Config{
-		ChainReadTimeout: 3 * time.Second,
-		UpdateInterval:   1 * time.Second,
+		ChainReadTimeout:      1 * time.Second,
+		OnchainUpdateInterval: 1 * time.Second,
+		OffchainPruneInterval: 1 * time.Second,
 	}
 
 	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
@@ -145,6 +146,7 @@ func setup(_ *testing.M) {
 		reservationTableName,
 		ondemandTableName,
 		globalReservationTableName,
+		uint64(100),
 		logger,
 	)
 
@@ -202,14 +204,14 @@ func TestMetererReservations(t *testing.T) {
 	err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
-	// overwhelming bin overflow for empty bins
+	// overwhelming period overflow for empty periods
 	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
-	// overwhelming bin overflow for empty bins
+	// overwhelming period overflow for empty periods
 	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
-	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
+	assert.ErrorContains(t, err, "overflow usage exceeds period limit")
 
 	// test non-existent account
 	unregisteredUser, err := crypto.GenerateKey()
@@ -231,7 +233,7 @@ func TestMetererReservations(t *testing.T) {
 	err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
-	// test bin usage metering
+	// test period usage metering
 	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
@@ -245,7 +247,7 @@ func TestMetererReservations(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["PeriodUsage"].(*types.AttributeValueMemberN).Value)
 
 	}
 	// first over flow is allowed
@@ -262,13 +264,13 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
-	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, strconv.Itoa(int(16)), item["PeriodUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
 	header = createPaymentHeader(reservationPeriod, big.NewInt(0), accountID2)
 	assert.NoError(t, err)
 	err = mt.MeterRequest(ctx, *header, 1, quoromNumbers)
-	assert.ErrorContains(t, err, "bin has already been filled")
+	assert.ErrorContains(t, err, "period has already been filled")
 }
 
 func TestMetererOnDemand(t *testing.T) {
