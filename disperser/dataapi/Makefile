@@ -2,7 +2,7 @@ build:
 	cd .. && go build -o ./bin/dataapi ./cmd/dataapi
 
 test:
-	go test -v .
+	go test -v ./...
 
 generate-swagger-v1:
 	@echo "  >  Generating v1 swagger..."

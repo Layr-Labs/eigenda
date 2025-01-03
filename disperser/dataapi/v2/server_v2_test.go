@@ -1,8 +1,9 @@
-package dataapi_test
+package v2_test
 
 import (
 	"context"
 	"crypto/rand"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,24 +19,40 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/prometheus/common/model"
+	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 var (
+	//go:embed testdata/prometheus-response-sample.json
+	mockPrometheusResponse string
+
+	//go:embed testdata/prometheus-resp-avg-throughput.json
+	mockPrometheusRespAvgThroughput string
+
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
@@ -46,7 +63,99 @@ var (
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
+
+	expectedBlobCommitment *encoding.BlobCommitments
+	mockLogger             = logging.NewNoopLogger()
+	blobstore              = inmem.NewBlobStore()
+	mockPrometheusApi      = &prommock.MockPrometheusApi{}
+	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
+	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
+	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
+
+	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
+
+	mockTx            = &coremock.MockWriter{}
+	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
+	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
+	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
+	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
+		0: {
+			opId0: 1,
+			opId1: 1,
+		},
+		1: {
+			opId0: 1,
+			opId1: 3,
+		},
+	})
+	mockIndexedChainState, _ = coremock.MakeChainDataMock(map[uint8]int{
+		0: 10,
+		1: 10,
+		2: 10,
+	})
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	expectedRequestedAt             = uint64(5567830000000000000)
+	expectedDataLength              = 32
+	expectedBatchId                 = uint32(99)
+	expectedBatchRoot               = []byte("hello")
+	expectedReferenceBlockNumber    = uint32(132)
+	expectedConfirmationBlockNumber = uint32(150)
+	expectedSignatoryRecordHash     = [32]byte{0}
+	expectedFee                     = []byte{0}
+	expectedInclusionProof          = []byte{1, 2, 3, 4, 5}
+	gettysburgAddressBytes          = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+
+	operatorInfo = &subgraph.IndexedOperatorInfo{
+		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
+		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
+		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
+		PubkeyG2_X: []graphql.String{
+			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
+			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
+		},
+		PubkeyG2_Y: []graphql.String{
+			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
+			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
+		},
+		SocketUpdates: []subgraph.SocketUpdates{
+			{
+				Socket: "23.93.76.1:32005;32006",
+			},
+		},
+	}
 )
+
+type MockSubgraphClient struct {
+	mock.Mock
+}
+
+type MockGRPCConnection struct{}
+
+type MockHttpClient struct {
+	ShouldSucceed bool
+}
+
+func (mc *MockGRPCConnection) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	// Here, return a mock connection. How you implement this depends on your testing framework
+	// and what aspects of the gRPC connection you wish to mock.
+	// For a simple approach, you might not even need to return a real *grpc.ClientConn
+	// but rather a mock or stub that satisfies the interface.
+	return &grpc.ClientConn{}, nil // Simplified, consider using a more sophisticated mock.
+}
+
+type MockGRPNilConnection struct{}
+
+func (mc *MockGRPNilConnection) Dial(serviceName string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	// Here, return a mock connection. How you implement this depends on your testing framework
+	// and what aspects of the gRPC connection you wish to mock.
+	// For a simple approach, you might not even need to return a real *grpc.ClientConn
+	// but rather a mock or stub that satisfies the interface.
+	return nil, nil // Simplified, consider using a more sophisticated mock.
+}
+
+type MockHealthCheckService struct {
+	ResponseMap map[string]*grpc_health_v1.HealthCheckResponse
+}
 
 func TestMain(m *testing.M) {
 	setup(m)
@@ -155,6 +264,10 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		},
 		Signature: sig,
 	}
+}
+
+func setUpRouter() *gin.Engine {
+	return gin.Default()
 }
 
 func TestFetchBlobHandlerV2(t *testing.T) {
