@@ -317,7 +317,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsNodeInfo"
+                    "Operators"
                 ],
                 "summary": "Active operator semver",
                 "responses": {
@@ -342,7 +342,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsReachability"
+                    "Operators"
                 ],
                 "summary": "Operator node reachability check",
                 "parameters": [
@@ -387,7 +387,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "OperatorsStake"
+                    "Operators"
                 ],
                 "summary": "Operator stake distribution query",
                 "parameters": [

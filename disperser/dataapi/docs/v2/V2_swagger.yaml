@@ -548,7 +548,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Active operator semver
       tags:
-      - OperatorsNodeInfo
+      - Operators
   /operators/reachability:
     get:
       parameters:
@@ -577,7 +577,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Operator node reachability check
       tags:
-      - OperatorsReachability
+      - Operators
   /operators/stake:
     get:
       parameters:
@@ -606,7 +606,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Operator stake distribution query
       tags:
-      - OperatorsStake
+      - Operators
 schemes:
 - https
 - http

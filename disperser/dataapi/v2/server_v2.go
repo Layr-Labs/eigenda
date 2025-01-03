@@ -451,7 +451,7 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 // FetchOperatorsStake godoc
 //
 //	@Summary	Operator stake distribution query
-//	@Tags		OperatorsStake
+//	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorsStakeResponse
@@ -483,7 +483,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 // FetchOperatorsNodeInfo godoc
 //
 //	@Summary	Active operator semver
-//	@Tags		OperatorsNodeInfo
+//	@Tags		Operators
 //	@Produce	json
 //	@Success	200	{object}	SemverReportResponse
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
@@ -507,7 +507,7 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 // CheckOperatorsReachability godoc
 //
 //	@Summary	Operator node reachability check
-//	@Tags		OperatorsReachability
+//	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorPortCheckResponse
