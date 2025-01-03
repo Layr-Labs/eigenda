@@ -45,25 +45,11 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 		return nil, err
 	}
 
-	// for _, state := range operatorsByQuorum {
-	// 	for _, op := range state {
-	// 		if _, ok := cs.SocketMap[op.OperatorID]; !ok {
-	// 			socket, err := cs.Tx.GetOperatorSocket(ctx, op.OperatorID)
-	// 			if err != nil {
-	// 				return nil, err
-	// 			}
-	// 			cs.socketMu.Lock()
-	// 			cs.SocketMap[op.OperatorID] = &socket
-	// 			cs.socketMu.Unlock()
-	// 		}
-
-	// 	}
-	// }
-
 	err = cs.refreshSocketMap(ctx, operatorsByQuorum)
 	if err != nil {
 		return nil, err
 	}
+
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
 }
 
@@ -73,21 +59,6 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, err
 	}
 
-	// // for all operators in operatorsByQuorum, check if the socket is in the map
-	// missingOperatorIds := make([]core.OperatorID, 0)
-	// for _, quorum := range operatorsByQuorum {
-	// 	for _, operator := range quorum {
-	// 		missingOperatorIds = append(missingOperatorIds, operator.OperatorID)
-	// 	}
-	// }
-
-	// if err := cs.buildSocketMap(ctx, missingOperatorIds); err != nil {
-	// 	return nil, err
-	// }
-	// // Index for recent socket updates
-	// if err := cs.indexSocketMap(ctx); err != nil {
-	// 	return nil, err
-	// }
 	err = cs.refreshSocketMap(ctx, operatorsByQuorum)
 	if err != nil {
 		return nil, err
