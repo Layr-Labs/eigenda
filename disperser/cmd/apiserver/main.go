@@ -99,8 +99,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
 		mtConfig := mt.Config{
-			ChainReadTimeout: time.Duration(config.ChainReadTimeout) * time.Second,
-			UpdateInterval:   time.Duration(config.UpdateInterval) * time.Second,
+			ChainReadTimeout:      time.Duration(config.ChainReadTimeout) * time.Second,
+			OnchainUpdateInterval: time.Duration(config.OnchainUpdateInterval) * time.Second,
+			OffchainPruneInterval: time.Duration(config.OffchainPruneInterval) * time.Second,
 		}
 
 		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
@@ -116,6 +117,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.ReservationsTableName,
 			config.OnDemandTableName,
 			config.GlobalRateTableName,
+			uint64(config.OffchainMaxOnDemandStorage),
 			logger,
 		)
 		if err != nil {
@@ -180,6 +182,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,
+			config.OffchainPruneInterval,
 			logger,
 			reg,
 		)

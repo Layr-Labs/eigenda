@@ -488,7 +488,7 @@ type GetPaymentStateReply struct {
 	// global payment vault parameters
 	PaymentGlobalParams *PaymentGlobalParams `protobuf:"bytes,1,opt,name=payment_global_params,json=paymentGlobalParams,proto3" json:"payment_global_params,omitempty"`
 	// off-chain account reservation usage records
-	BinRecords []*BinRecord `protobuf:"bytes,2,rep,name=bin_records,json=binRecords,proto3" json:"bin_records,omitempty"`
+	ReservationPeriodRecords []*ReservationPeriodRecord `protobuf:"bytes,2,rep,name=reservation_period_records,json=reservationPeriodRecords,proto3" json:"reservation_period_records,omitempty"`
 	// on-chain account reservation setting
 	Reservation *Reservation `protobuf:"bytes,3,opt,name=reservation,proto3" json:"reservation,omitempty"`
 	// off-chain on-demand payment usage
@@ -536,9 +536,9 @@ func (x *GetPaymentStateReply) GetPaymentGlobalParams() *PaymentGlobalParams {
 	return nil
 }
 
-func (x *GetPaymentStateReply) GetBinRecords() []*BinRecord {
+func (x *GetPaymentStateReply) GetReservationPeriodRecords() []*ReservationPeriodRecord {
 	if x != nil {
-		return x.BinRecords
+		return x.ReservationPeriodRecords
 	}
 	return nil
 }
@@ -941,9 +941,9 @@ func (x *Reservation) GetQuorumSplits() []uint32 {
 	return nil
 }
 
-// BinRecord is the usage record of an account in a bin. The API should return the active bin
+// ReservationPeriodRecord is the usage record of an account in a bin. The API should return the active bin
 // record and the subsequent two records that contains potential overflows.
-type BinRecord struct {
+type ReservationPeriodRecord struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -952,8 +952,8 @@ type BinRecord struct {
 	Usage uint64 `protobuf:"varint,2,opt,name=usage,proto3" json:"usage,omitempty"`
 }
 
-func (x *BinRecord) Reset() {
-	*x = BinRecord{}
+func (x *ReservationPeriodRecord) Reset() {
+	*x = ReservationPeriodRecord{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_disperser_v2_disperser_v2_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -961,13 +961,13 @@ func (x *BinRecord) Reset() {
 	}
 }
 
-func (x *BinRecord) String() string {
+func (x *ReservationPeriodRecord) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*BinRecord) ProtoMessage() {}
+func (*ReservationPeriodRecord) ProtoMessage() {}
 
-func (x *BinRecord) ProtoReflect() protoreflect.Message {
+func (x *ReservationPeriodRecord) ProtoReflect() protoreflect.Message {
 	mi := &file_disperser_v2_disperser_v2_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -979,19 +979,19 @@ func (x *BinRecord) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use BinRecord.ProtoReflect.Descriptor instead.
-func (*BinRecord) Descriptor() ([]byte, []int) {
+// Deprecated: Use ReservationPeriodRecord.ProtoReflect.Descriptor instead.
+func (*ReservationPeriodRecord) Descriptor() ([]byte, []int) {
 	return file_disperser_v2_disperser_v2_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *BinRecord) GetIndex() uint32 {
+func (x *ReservationPeriodRecord) GetIndex() uint32 {
 	if x != nil {
 		return x.Index
 	}
 	return 0
 }
 
-func (x *BinRecord) GetUsage() uint64 {
+func (x *ReservationPeriodRecord) GetUsage() uint64 {
 	if x != nil {
 		return x.Usage
 	}
@@ -1049,7 +1049,7 @@ var file_disperser_v2_disperser_v2_proto_rawDesc = []byte{
 	0x0a, 0x0a, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
 	0x28, 0x09, 0x52, 0x09, 0x61, 0x63, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x49, 0x64, 0x12, 0x1c, 0x0a,
 	0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0xd1, 0x02, 0x0a, 0x14,
+	0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0xfc, 0x02, 0x0a, 0x14,
 	0x47, 0x65, 0x74, 0x50, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x53, 0x74, 0x61, 0x74, 0x65, 0x52,
 	0x65, 0x70, 0x6c, 0x79, 0x12, 0x55, 0x0a, 0x15, 0x70, 0x61, 0x79, 0x6d, 0x65, 0x6e, 0x74, 0x5f,
 	0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x5f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x18, 0x01, 0x20,
@@ -1189,25 +1189,25 @@ func file_disperser_v2_disperser_v2_proto_rawDescGZIP() []byte {
 var file_disperser_v2_disperser_v2_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_disperser_v2_disperser_v2_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_disperser_v2_disperser_v2_proto_goTypes = []interface{}{
-	(BlobStatus)(0),                // 0: disperser.v2.BlobStatus
-	(*DisperseBlobRequest)(nil),    // 1: disperser.v2.DisperseBlobRequest
-	(*DisperseBlobReply)(nil),      // 2: disperser.v2.DisperseBlobReply
-	(*BlobStatusRequest)(nil),      // 3: disperser.v2.BlobStatusRequest
-	(*BlobStatusReply)(nil),        // 4: disperser.v2.BlobStatusReply
-	(*BlobCommitmentRequest)(nil),  // 5: disperser.v2.BlobCommitmentRequest
-	(*BlobCommitmentReply)(nil),    // 6: disperser.v2.BlobCommitmentReply
-	(*GetPaymentStateRequest)(nil), // 7: disperser.v2.GetPaymentStateRequest
-	(*GetPaymentStateReply)(nil),   // 8: disperser.v2.GetPaymentStateReply
-	(*SignedBatch)(nil),            // 9: disperser.v2.SignedBatch
-	(*BlobVerificationInfo)(nil),   // 10: disperser.v2.BlobVerificationInfo
-	(*Attestation)(nil),            // 11: disperser.v2.Attestation
-	(*PaymentGlobalParams)(nil),    // 12: disperser.v2.PaymentGlobalParams
-	(*Reservation)(nil),            // 13: disperser.v2.Reservation
-	(*BinRecord)(nil),              // 14: disperser.v2.BinRecord
-	(*v2.BlobHeader)(nil),          // 15: common.v2.BlobHeader
-	(*common.BlobCommitment)(nil),  // 16: common.BlobCommitment
-	(*v2.BatchHeader)(nil),         // 17: common.v2.BatchHeader
-	(*v2.BlobCertificate)(nil),     // 18: common.v2.BlobCertificate
+	(BlobStatus)(0),                 // 0: disperser.v2.BlobStatus
+	(*DisperseBlobRequest)(nil),     // 1: disperser.v2.DisperseBlobRequest
+	(*DisperseBlobReply)(nil),       // 2: disperser.v2.DisperseBlobReply
+	(*BlobStatusRequest)(nil),       // 3: disperser.v2.BlobStatusRequest
+	(*BlobStatusReply)(nil),         // 4: disperser.v2.BlobStatusReply
+	(*BlobCommitmentRequest)(nil),   // 5: disperser.v2.BlobCommitmentRequest
+	(*BlobCommitmentReply)(nil),     // 6: disperser.v2.BlobCommitmentReply
+	(*GetPaymentStateRequest)(nil),  // 7: disperser.v2.GetPaymentStateRequest
+	(*GetPaymentStateReply)(nil),    // 8: disperser.v2.GetPaymentStateReply
+	(*SignedBatch)(nil),             // 9: disperser.v2.SignedBatch
+	(*BlobVerificationInfo)(nil),    // 10: disperser.v2.BlobVerificationInfo
+	(*Attestation)(nil),             // 11: disperser.v2.Attestation
+	(*PaymentGlobalParams)(nil),     // 12: disperser.v2.PaymentGlobalParams
+	(*Reservation)(nil),             // 13: disperser.v2.Reservation
+	(*ReservationPeriodRecord)(nil), // 14: disperser.v2.ReservationPeriodRecord
+	(*v2.BlobHeader)(nil),           // 15: common.v2.BlobHeader
+	(*common.BlobCommitment)(nil),   // 16: common.BlobCommitment
+	(*v2.BatchHeader)(nil),          // 17: common.v2.BatchHeader
+	(*v2.BlobCertificate)(nil),      // 18: common.v2.BlobCertificate
 }
 var file_disperser_v2_disperser_v2_proto_depIdxs = []int32{
 	15, // 0: disperser.v2.DisperseBlobRequest.blob_header:type_name -> common.v2.BlobHeader
@@ -1217,7 +1217,7 @@ var file_disperser_v2_disperser_v2_proto_depIdxs = []int32{
 	10, // 4: disperser.v2.BlobStatusReply.blob_verification_info:type_name -> disperser.v2.BlobVerificationInfo
 	16, // 5: disperser.v2.BlobCommitmentReply.blob_commitment:type_name -> common.BlobCommitment
 	12, // 6: disperser.v2.GetPaymentStateReply.payment_global_params:type_name -> disperser.v2.PaymentGlobalParams
-	14, // 7: disperser.v2.GetPaymentStateReply.bin_records:type_name -> disperser.v2.BinRecord
+	14, // 7: disperser.v2.GetPaymentStateReply.reservation_period_records:type_name -> disperser.v2.ReservationPeriodRecord
 	13, // 8: disperser.v2.GetPaymentStateReply.reservation:type_name -> disperser.v2.Reservation
 	17, // 9: disperser.v2.SignedBatch.header:type_name -> common.v2.BatchHeader
 	11, // 10: disperser.v2.SignedBatch.attestation:type_name -> disperser.v2.Attestation
@@ -1400,7 +1400,7 @@ func file_disperser_v2_disperser_v2_proto_init() {
 			}
 		}
 		file_disperser_v2_disperser_v2_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BinRecord); i {
+			switch v := v.(*ReservationPeriodRecord); i {
 			case 0:
 				return &v.state
 			case 1:
