@@ -22,6 +22,7 @@ import (
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -36,7 +37,7 @@ import (
 
 var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
-	testDataApiServerV2 *dataapi.ServerV2
+	testDataApiServerV2 *serverv2.ServerV2
 
 	logger = logging.NewNoopLogger()
 
@@ -95,7 +96,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = dataapi.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
@@ -184,7 +185,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobResponse
+	var response serverv2.BlobResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -225,7 +226,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobCertificateResponse
+	var response serverv2.BlobCertificateResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -275,7 +276,7 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobVerificationInfoResponse
+	var response serverv2.BlobVerificationInfoResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -328,7 +329,7 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BatchResponse
+	var response serverv2.BatchResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -448,7 +449,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.MetricSummary
+	var response serverv2.MetricSummary
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

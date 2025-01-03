@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -131,7 +132,7 @@ func RunDataApi(ctx *cli.Context) error {
 
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		serverv2 := dataapi.NewServerV2(
+		serverv2 := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,
@@ -155,7 +156,7 @@ func RunDataApi(ctx *cli.Context) error {
 	return runServer(server, logger)
 }
 
-func runServer[T dataapi.ServerInterface](server T, logger logging.Logger) error {
+func runServer[T serverv2.ServerInterface](server T, logger logging.Logger) error {
 	// Setup channel to listen for termination signals
 	quit := make(chan os.Signal, 1)
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
