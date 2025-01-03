@@ -1,36 +1,36 @@
-package dataapi_test
+package v1_test
 
 import (
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	v1 "github.com/Layr-Labs/eigenda/disperser/dataapi/v1"
 	"github.com/stretchr/testify/assert"
 )
 
-func assertEntry(t *testing.T, quorumIntervals dataapi.OperatorQuorumIntervals, operator string, expected map[uint8][]dataapi.BlockInterval) {
+func assertEntry(t *testing.T, quorumIntervals v1.OperatorQuorumIntervals, operator string, expected map[uint8][]v1.BlockInterval) {
 	op, ok := quorumIntervals[operator]
 	assert.True(t, ok)
 	assert.True(t, reflect.DeepEqual(op, expected))
 }
 
 func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
-	addedQuorums := map[string][]*dataapi.OperatorQuorum{}
-	removedQuorums := map[string][]*dataapi.OperatorQuorum{}
+	addedQuorums := map[string][]*v1.OperatorQuorum{}
+	removedQuorums := map[string][]*v1.OperatorQuorum{}
 
 	// StartBlock > EndBlock
 	operatorInitialQuorum := map[string][]uint8{
 		"operator-1": {0x00},
 		"operator-2": {0x00},
 	}
-	_, err := dataapi.CreateOperatorQuorumIntervals(100, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	_, err := v1.CreateOperatorQuorumIntervals(100, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "endBlock must be no less than startBlock"))
 
 	// Equal block number
-	addedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x01},
@@ -38,8 +38,8 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	removedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	removedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x00},
@@ -47,13 +47,13 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	_, err = v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "adding and removing quorums at the same block"))
 
 	// Adding existing quorum again
-	addedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x00},
@@ -61,13 +61,13 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	_, err = v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "operator is already in the quorum"))
 
 	// addedQuurums not in ascending order of block number
-	addedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x01},
@@ -80,13 +80,13 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	_, err = v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "must be in ascending order by block number"))
 
 	// Removing nonexisting quorum
-	addedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x02},
@@ -94,8 +94,8 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	removedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	removedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x01},
@@ -103,23 +103,23 @@ func TestCreateOperatorQuorumIntervalsWithInvalidArgs(t *testing.T) {
 			},
 		},
 	}
-	_, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	_, err = v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "cannot remove a quorum"))
 }
 
 func TestCreateOperatorQuorumIntervalsWithNoQuorumChanges(t *testing.T) {
-	addedQuorums := map[string][]*dataapi.OperatorQuorum{}
-	removedQuorums := map[string][]*dataapi.OperatorQuorum{}
+	addedQuorums := map[string][]*v1.OperatorQuorum{}
+	removedQuorums := map[string][]*v1.OperatorQuorum{}
 	operatorInitialQuorum := map[string][]uint8{
 		"operator-1": {0x00},
 		"operator-2": {0x01},
 	}
-	quorumIntervals, err := dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	quorumIntervals, err := v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(quorumIntervals))
-	expectedOp1 := map[uint8][]dataapi.BlockInterval{0: []dataapi.BlockInterval{
+	expectedOp1 := map[uint8][]v1.BlockInterval{0: []v1.BlockInterval{
 		{
 			StartBlock: 10,
 			EndBlock:   25,
@@ -127,8 +127,8 @@ func TestCreateOperatorQuorumIntervalsWithNoQuorumChanges(t *testing.T) {
 	},
 	}
 	assertEntry(t, quorumIntervals, "operator-1", expectedOp1)
-	expectedOp2 := map[uint8][]dataapi.BlockInterval{
-		1: []dataapi.BlockInterval{
+	expectedOp2 := map[uint8][]v1.BlockInterval{
+		1: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   25,
@@ -139,8 +139,8 @@ func TestCreateOperatorQuorumIntervalsWithNoQuorumChanges(t *testing.T) {
 }
 
 func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
-	addedQuorums := map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums := map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x01},
@@ -152,7 +152,7 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 				BlockNumber:   20,
 			},
 		},
-		"operator-2": []*dataapi.OperatorQuorum{
+		"operator-2": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-2",
 				QuorumNumbers: []byte{0x01, 0x02},
@@ -160,36 +160,36 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 			},
 		},
 	}
-	removedQuorums := map[string][]*dataapi.OperatorQuorum{}
+	removedQuorums := map[string][]*v1.OperatorQuorum{}
 	operatorInitialQuorum := map[string][]uint8{
 		"operator-1": {0x00},
 		"operator-2": {0x00},
 	}
 
-	quorumIntervals, err := dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	quorumIntervals, err := v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(quorumIntervals))
-	expectedOp1 := map[uint8][]dataapi.BlockInterval{
-		0: []dataapi.BlockInterval{
+	expectedOp1 := map[uint8][]v1.BlockInterval{
+		0: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   25,
 			},
 		},
-		1: []dataapi.BlockInterval{
+		1: []v1.BlockInterval{
 			{
 				StartBlock: 11,
 				EndBlock:   25,
 			},
 		},
-		2: []dataapi.BlockInterval{
+		2: []v1.BlockInterval{
 			{
 				StartBlock: 20,
 				EndBlock:   25,
 			},
 		},
-		3: []dataapi.BlockInterval{
+		3: []v1.BlockInterval{
 			{
 				StartBlock: 20,
 				EndBlock:   25,
@@ -198,20 +198,20 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 	}
 	assertEntry(t, quorumIntervals, "operator-1", expectedOp1)
 
-	expectedOp2 := map[uint8][]dataapi.BlockInterval{
-		0: []dataapi.BlockInterval{
+	expectedOp2 := map[uint8][]v1.BlockInterval{
+		0: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   25,
 			},
 		},
-		1: []dataapi.BlockInterval{
+		1: []v1.BlockInterval{
 			{
 				StartBlock: 25,
 				EndBlock:   25,
 			},
 		},
-		2: []dataapi.BlockInterval{
+		2: []v1.BlockInterval{
 			{
 				StartBlock: 25,
 				EndBlock:   25,
@@ -220,9 +220,9 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 	}
 	assertEntry(t, quorumIntervals, "operator-2", expectedOp2)
 
-	addedQuorums = map[string][]*dataapi.OperatorQuorum{}
-	removedQuorums = map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums = map[string][]*v1.OperatorQuorum{}
+	removedQuorums = map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x00},
@@ -230,10 +230,10 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 			},
 		},
 	}
-	quorumIntervals, err = dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	quorumIntervals, err = v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.NoError(t, err)
-	expectedOp3 := map[uint8][]dataapi.BlockInterval{
-		0: []dataapi.BlockInterval{
+	expectedOp3 := map[uint8][]v1.BlockInterval{
+		0: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   14,
@@ -244,8 +244,8 @@ func TestCreateOperatorQuorumIntervalsWithOnlyAddOrRemove(t *testing.T) {
 }
 
 func TestCreateOperatorQuorumIntervals(t *testing.T) {
-	addedQuorums := map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	addedQuorums := map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x01},
@@ -262,7 +262,7 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 				BlockNumber:   20,
 			},
 		},
-		"operator-2": []*dataapi.OperatorQuorum{
+		"operator-2": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-2",
 				QuorumNumbers: []byte{0x02},
@@ -275,8 +275,8 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 			},
 		},
 	}
-	removedQuorums := map[string][]*dataapi.OperatorQuorum{
-		"operator-1": []*dataapi.OperatorQuorum{
+	removedQuorums := map[string][]*v1.OperatorQuorum{
+		"operator-1": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-1",
 				QuorumNumbers: []uint8{0x00},
@@ -293,7 +293,7 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 				BlockNumber:   23,
 			},
 		},
-		"operator-2": []*dataapi.OperatorQuorum{
+		"operator-2": []*v1.OperatorQuorum{
 			{
 				Operator:      "operator-2",
 				QuorumNumbers: []byte{0x01, 0x02},
@@ -306,12 +306,12 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 		"operator-2": {0x00, 0x01},
 	}
 
-	quorumIntervals, err := dataapi.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
+	quorumIntervals, err := v1.CreateOperatorQuorumIntervals(10, 25, operatorInitialQuorum, addedQuorums, removedQuorums)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, len(quorumIntervals))
-	expectedOp1 := map[uint8][]dataapi.BlockInterval{
-		0: []dataapi.BlockInterval{
+	expectedOp1 := map[uint8][]v1.BlockInterval{
+		0: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   14,
@@ -321,19 +321,19 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 				EndBlock:   22,
 			},
 		},
-		1: []dataapi.BlockInterval{
+		1: []v1.BlockInterval{
 			{
 				StartBlock: 11,
 				EndBlock:   25,
 			},
 		},
-		2: []dataapi.BlockInterval{
+		2: []v1.BlockInterval{
 			{
 				StartBlock: 20,
 				EndBlock:   20,
 			},
 		},
-		3: []dataapi.BlockInterval{
+		3: []v1.BlockInterval{
 			{
 				StartBlock: 20,
 				EndBlock:   25,
@@ -349,20 +349,20 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 	assert.ElementsMatch(t, []uint8{0x01, 0x03}, quorumIntervals.GetQuorums("operator-1", 23))
 	assert.ElementsMatch(t, []uint8{0x01, 0x03}, quorumIntervals.GetQuorums("operator-1", 25))
 
-	expectedOp2 := map[uint8][]dataapi.BlockInterval{
-		0: []dataapi.BlockInterval{
+	expectedOp2 := map[uint8][]v1.BlockInterval{
+		0: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   25,
 			},
 		},
-		1: []dataapi.BlockInterval{
+		1: []v1.BlockInterval{
 			{
 				StartBlock: 10,
 				EndBlock:   19,
 			},
 		},
-		2: []dataapi.BlockInterval{
+		2: []v1.BlockInterval{
 			{
 				StartBlock: 15,
 				EndBlock:   19,
@@ -382,28 +382,28 @@ func TestCreateOperatorQuorumIntervals(t *testing.T) {
 }
 
 func TestComputeNumBatches(t *testing.T) {
-	quorumBatches := &dataapi.QuorumBatches{
-		NumBatches:  []*dataapi.NumBatchesAtBlock{},
+	quorumBatches := &v1.QuorumBatches{
+		NumBatches:  []*v1.NumBatchesAtBlock{},
 		AccuBatches: []int{},
 	}
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(quorumBatches, 1, 4))
+	assert.Equal(t, 0, v1.ComputeNumBatches(quorumBatches, 1, 4))
 
-	numBatches := []*dataapi.NumBatchesAtBlock{
+	numBatches := []*v1.NumBatchesAtBlock{
 		{
 			BlockNumber: 5,
 			NumBatches:  2,
 		},
 	}
-	quorumBatches = &dataapi.QuorumBatches{
+	quorumBatches = &v1.QuorumBatches{
 		NumBatches:  numBatches,
 		AccuBatches: []int{2},
 	}
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(quorumBatches, 1, 4))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 1, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 5, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 5, 6))
+	assert.Equal(t, 0, v1.ComputeNumBatches(quorumBatches, 1, 4))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 1, 5))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 5, 5))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 5, 6))
 
-	numBatches = []*dataapi.NumBatchesAtBlock{
+	numBatches = []*v1.NumBatchesAtBlock{
 		{
 			BlockNumber: 5,
 			NumBatches:  2,
@@ -421,32 +421,32 @@ func TestComputeNumBatches(t *testing.T) {
 			NumBatches:  2,
 		},
 	}
-	quorumBatches = &dataapi.QuorumBatches{
+	quorumBatches = &v1.QuorumBatches{
 		NumBatches:  numBatches,
 		AccuBatches: []int{2, 4, 6, 8},
 	}
 
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(quorumBatches, 1, 4))
-	assert.Equal(t, 0, dataapi.ComputeNumBatches(quorumBatches, 21, 22))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 1, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 5, 5))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 5, 9))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(quorumBatches, 5, 10))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 6, 10))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(quorumBatches, 5, 14))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 6, 14))
-	assert.Equal(t, 6, dataapi.ComputeNumBatches(quorumBatches, 5, 15))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(quorumBatches, 5, 20))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(quorumBatches, 5, 22))
-	assert.Equal(t, 8, dataapi.ComputeNumBatches(quorumBatches, 1, 22))
-	assert.Equal(t, 6, dataapi.ComputeNumBatches(quorumBatches, 6, 22))
-	assert.Equal(t, 4, dataapi.ComputeNumBatches(quorumBatches, 11, 22))
-	assert.Equal(t, 2, dataapi.ComputeNumBatches(quorumBatches, 16, 22))
+	assert.Equal(t, 0, v1.ComputeNumBatches(quorumBatches, 1, 4))
+	assert.Equal(t, 0, v1.ComputeNumBatches(quorumBatches, 21, 22))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 1, 5))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 5, 5))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 5, 9))
+	assert.Equal(t, 4, v1.ComputeNumBatches(quorumBatches, 5, 10))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 6, 10))
+	assert.Equal(t, 4, v1.ComputeNumBatches(quorumBatches, 5, 14))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 6, 14))
+	assert.Equal(t, 6, v1.ComputeNumBatches(quorumBatches, 5, 15))
+	assert.Equal(t, 8, v1.ComputeNumBatches(quorumBatches, 5, 20))
+	assert.Equal(t, 8, v1.ComputeNumBatches(quorumBatches, 5, 22))
+	assert.Equal(t, 8, v1.ComputeNumBatches(quorumBatches, 1, 22))
+	assert.Equal(t, 6, v1.ComputeNumBatches(quorumBatches, 6, 22))
+	assert.Equal(t, 4, v1.ComputeNumBatches(quorumBatches, 11, 22))
+	assert.Equal(t, 2, v1.ComputeNumBatches(quorumBatches, 16, 22))
 }
 
 func TestCreatQuorumBatches(t *testing.T) {
 	// The nonsigning info for a list of batches.
-	batchNonSigningInfo := []*dataapi.BatchNonSigningInfo{
+	batchNonSigningInfo := []*v1.BatchNonSigningInfo{
 		{
 			QuorumNumbers:        []uint8{0, 1},
 			ReferenceBlockNumber: 2,
@@ -461,7 +461,7 @@ func TestCreatQuorumBatches(t *testing.T) {
 		},
 	}
 
-	quorumBatches := dataapi.CreatQuorumBatches(batchNonSigningInfo)
+	quorumBatches := v1.CreatQuorumBatches(batchNonSigningInfo)
 
 	assert.Equal(t, 3, len(quorumBatches))
 

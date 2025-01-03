@@ -97,7 +97,7 @@ func RunDataApi(ctx *cli.Context) error {
 		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
 		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
-		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
+		subgraphClient    = serverv1.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
@@ -133,6 +133,7 @@ func RunDataApi(ctx *cli.Context) error {
 
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		subgraphClientV2 := serverv2.NewSubgraphClient(subgraphApi, logger)
 		serverv2 := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -144,7 +145,7 @@ func RunDataApi(ctx *cli.Context) error {
 			},
 			blobMetadataStorev2,
 			promClient,
-			subgraphClient,
+			subgraphClientV2,
 			tx,
 			chainState,
 			indexedChainState,

@@ -87,7 +87,7 @@ type (
 	}
 
 	BlobsResponse struct {
-		Meta dataapi.Meta            `json:"meta"`
+		Meta Meta                    `json:"meta"`
 		Data []*BlobMetadataResponse `json:"data"`
 	}
 
@@ -102,7 +102,7 @@ type (
 	}
 
 	OperatorsNonsigningPercentage struct {
-		Meta dataapi.Meta                           `json:"meta"`
+		Meta Meta                                   `json:"meta"`
 		Data []*OperatorNonsigningPercentageMetrics `json:"data"`
 	}
 
@@ -115,12 +115,12 @@ type (
 	}
 
 	QueriedStateOperatorsResponse struct {
-		Meta dataapi.Meta                    `json:"meta"`
+		Meta Meta                            `json:"meta"`
 		Data []*QueriedStateOperatorMetadata `json:"data"`
 	}
 
 	QueriedOperatorEjectionsResponse struct {
-		Ejections []*dataapi.QueriedOperatorEjections `json:"ejections"`
+		Ejections []*QueriedOperatorEjections `json:"ejections"`
 	}
 
 	ServiceAvailability struct {
@@ -129,7 +129,7 @@ type (
 	}
 
 	ServiceAvailabilityResponse struct {
-		Meta dataapi.Meta           `json:"meta"`
+		Meta Meta                   `json:"meta"`
 		Data []*ServiceAvailability `json:"data"`
 	}
 
@@ -196,10 +196,6 @@ type (
 		NextToken string `json:"next_token,omitempty"`
 	}
 
-	NonSigner struct {
-		OperatorId string
-		Count      int
-	}
 	server struct {
 		serverMode        string
 		socketAddr        string
@@ -207,7 +203,7 @@ type (
 		logger            logging.Logger
 		blobstore         disperser.BlobStore
 		promClient        dataapi.PrometheusClient
-		subgraphClient    dataapi.SubgraphClient
+		subgraphClient    SubgraphClient
 		transactor        core.Reader
 		chainState        core.ChainState
 		indexedChainState core.IndexedChainState
@@ -228,7 +224,7 @@ func NewServer(
 	config dataapi.Config,
 	blobstore disperser.BlobStore,
 	promClient dataapi.PrometheusClient,
-	subgraphClient dataapi.SubgraphClient,
+	subgraphClient SubgraphClient,
 	transactor core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
@@ -466,7 +462,7 @@ func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobsFromBatchHeaderHash")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size:      len(metadatas),
 			NextToken: nextPageToken,
 		},
@@ -543,7 +539,7 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobs")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobsAge))
 	c.JSON(http.StatusOK, BlobsResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(metadatas),
 		},
 		Data: metadatas,
@@ -799,7 +795,7 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchDeregisteredOperators")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
@@ -848,7 +844,7 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchRegisteredOperators")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDeregisteredOperatorAge))
 	c.JSON(http.StatusOK, QueriedStateOperatorsResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(operatorMetadatas),
 		},
 		Data: operatorMetadatas,
@@ -1024,7 +1020,7 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDisperserAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,
@@ -1078,7 +1074,7 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxChurnerAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,
@@ -1132,7 +1128,7 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatcherAvailabilityAge))
 	c.JSON(availabilityStatus, ServiceAvailabilityResponse{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(availabilityStatuses),
 		},
 		Data: availabilityStatuses,

@@ -1,4 +1,4 @@
-package dataapi
+package v2
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -145,7 +146,7 @@ func (sc *subgraphClient) QueryOperatorInfoByOperatorId(ctx context.Context, ope
 		return nil, err
 	}
 
-	indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
+	indexedOperatorInfo, err := dataapi.ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
 	if err != nil {
 		errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info for operator %s", operatorId)
 		sc.logger.Error(errorMessage)
@@ -381,7 +382,7 @@ func getOperatorInfoForQueriedOperators(sc *subgraphClient, ctx context.Context,
 			sc.logger.Warn(errorMessage)
 			continue
 		}
-		indexedOperatorInfo, err := ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
+		indexedOperatorInfo, err := dataapi.ConvertOperatorInfoGqlToIndexedOperatorInfo(operatorInfo)
 		if err != nil {
 			operatorIdString := "0x" + hex.EncodeToString(operatorId[:])
 			errorMessage := fmt.Sprintf("failed to convert operator info gql to indexed operator info at blocknumber: %d for operator %s", uint32(operator.BlockNumber), operatorIdString)

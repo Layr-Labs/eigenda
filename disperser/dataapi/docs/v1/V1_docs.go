@@ -770,43 +770,6 @@ const docTemplateV1 = `{
                 }
             }
         },
-        "dataapi.Meta": {
-            "type": "object",
-            "properties": {
-                "next_token": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "dataapi.QueriedOperatorEjections": {
-            "type": "object",
-            "properties": {
-                "block_number": {
-                    "type": "integer"
-                },
-                "block_timestamp": {
-                    "type": "string"
-                },
-                "operator_address": {
-                    "type": "string"
-                },
-                "operator_id": {
-                    "type": "string"
-                },
-                "quorum": {
-                    "type": "integer"
-                },
-                "stake_percentage": {
-                    "type": "number"
-                },
-                "transaction_hash": {
-                    "type": "string"
-                }
-            }
-        },
         "encoding.BlobCommitments": {
             "type": "object",
             "properties": {
@@ -985,7 +948,7 @@ const docTemplateV1 = `{
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/dataapi.Meta"
+                    "$ref": "#/definitions/v1.Meta"
                 }
             }
         },
@@ -994,6 +957,17 @@ const docTemplateV1 = `{
             "properties": {
                 "error": {
                     "type": "string"
+                }
+            }
+        },
+        "v1.Meta": {
+            "type": "object",
+            "properties": {
+                "next_token": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
                 }
             }
         },
@@ -1106,7 +1080,7 @@ const docTemplateV1 = `{
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/dataapi.Meta"
+                    "$ref": "#/definitions/v1.Meta"
                 }
             }
         },
@@ -1124,13 +1098,39 @@ const docTemplateV1 = `{
                 }
             }
         },
+        "v1.QueriedOperatorEjections": {
+            "type": "object",
+            "properties": {
+                "block_number": {
+                    "type": "integer"
+                },
+                "block_timestamp": {
+                    "type": "string"
+                },
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum": {
+                    "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                },
+                "transaction_hash": {
+                    "type": "string"
+                }
+            }
+        },
         "v1.QueriedOperatorEjectionsResponse": {
             "type": "object",
             "properties": {
                 "ejections": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/dataapi.QueriedOperatorEjections"
+                        "$ref": "#/definitions/v1.QueriedOperatorEjections"
                     }
                 }
             }
@@ -1165,7 +1165,7 @@ const docTemplateV1 = `{
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/dataapi.Meta"
+                    "$ref": "#/definitions/v1.Meta"
                 }
             }
         },
@@ -1201,7 +1201,7 @@ const docTemplateV1 = `{
                     }
                 },
                 "meta": {
-                    "$ref": "#/definitions/dataapi.Meta"
+                    "$ref": "#/definitions/v1.Meta"
                 }
             }
         },

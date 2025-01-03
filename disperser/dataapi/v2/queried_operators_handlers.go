@@ -9,13 +9,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 )
 
 type OperatorOnlineStatus struct {
-	OperatorInfo         *dataapi.Operator
+	OperatorInfo         *Operator
 	IndexedOperatorInfo  *core.IndexedOperatorInfo
 	OperatorProcessError string
 }
@@ -35,7 +34,7 @@ func (s *ServerV2) getDeregisteredOperatorForDays(ctx context.Context, days int3
 	// Track time taken to get deregistered operators
 	startTime := time.Now()
 
-	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, dataapi.Deregistered)
+	indexedDeregisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Deregistered)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +69,7 @@ func (s *ServerV2) getRegisteredOperatorForDays(ctx context.Context, days int32)
 	// Track time taken to get registered operators
 	startTime := time.Now()
 
-	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, dataapi.Registered)
+	indexedRegisteredOperatorState, err := s.subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(ctx, days, Registered)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +98,7 @@ func (s *ServerV2) getRegisteredOperatorForDays(ctx context.Context, days int32)
 
 // Function to get operator ejection over last N days
 // Returns list of Ejections with operatorId, quorum, block number, txn and timestemp if ejection
-func (s *ServerV2) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*dataapi.QueriedOperatorEjections, error) {
+func (s *ServerV2) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
 	startTime := time.Now()
 
 	operatorEjections, err := s.subgraphClient.QueryOperatorEjectionsForTimeWindow(ctx, days, operatorId, first, skip)
@@ -175,7 +174,7 @@ func (s *ServerV2) getOperatorEjections(ctx context.Context, days int32, operato
 	return operatorEjections, nil
 }
 
-func processOperatorOnlineCheck(queriedOperatorsInfo *dataapi.IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
+func processOperatorOnlineCheck(queriedOperatorsInfo *IndexedQueriedOperatorInfo, operatorOnlineStatusresultsChan chan<- *QueriedStateOperatorMetadata, logger logging.Logger) {
 	operators := queriedOperatorsInfo.Operators
 	wp := workerpool.New(poolSize)
 

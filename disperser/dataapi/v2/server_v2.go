@@ -90,12 +90,22 @@ type (
 	}
 
 	QueriedStateOperatorsResponse struct {
-		Meta dataapi.Meta                    `json:"meta"`
+		Meta Meta                            `json:"meta"`
 		Data []*QueriedStateOperatorMetadata `json:"data"`
 	}
 
 	QueriedOperatorEjectionsResponse struct {
-		Ejections []*dataapi.QueriedOperatorEjections `json:"ejections"`
+		Ejections []*QueriedOperatorEjections `json:"ejections"`
+	}
+
+	QueriedOperatorEjections struct {
+		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
+		Quorum          uint8   `json:"quorum"`
+		BlockNumber     uint64  `json:"block_number"`
+		BlockTimestamp  string  `json:"block_timestamp"`
+		TransactionHash string  `json:"transaction_hash"`
+		StakePercentage float64 `json:"stake_percentage"`
 	}
 
 	OperatorPortCheckRequest struct {
@@ -162,7 +172,7 @@ type ServerV2 struct {
 	logger       logging.Logger
 
 	blobMetadataStore *blobstore.BlobMetadataStore
-	subgraphClient    dataapi.SubgraphClient
+	subgraphClient    SubgraphClient
 	chainReader       core.Reader
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
@@ -177,7 +187,7 @@ func NewServerV2(
 	config dataapi.Config,
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	promClient dataapi.PrometheusClient,
-	subgraphClient dataapi.SubgraphClient,
+	subgraphClient SubgraphClient,
 	chainReader core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
@@ -632,7 +642,7 @@ func errorResponse(c *gin.Context, err error) {
 	default:
 		code = http.StatusInternalServerError
 	}
-	c.JSON(code, dataapi.ErrorResponse{
+	c.JSON(code, ErrorResponse{
 		Error: err.Error(),
 	})
 }

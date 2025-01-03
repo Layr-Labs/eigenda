@@ -38,7 +38,7 @@ func (mh *metricsHandler) GetAvgThroughput(ctx context.Context, startTime int64,
 	return totalBytes / timeDuration, nil
 }
 
-func (mh *metricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*dataapi.Throughput, error) {
+func (mh *metricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {
 	throughputRateSecs := uint16(defaultThroughputRateSecs)
 	if endTime-startTime >= 7*24*60*60 {
 		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
@@ -49,13 +49,13 @@ func (mh *metricsHandler) GetThroughputTimeseries(ctx context.Context, startTime
 	}
 
 	if len(result.Values) <= 1 {
-		return []*dataapi.Throughput{}, nil
+		return []*Throughput{}, nil
 	}
 
-	throughputs := make([]*dataapi.Throughput, 0)
+	throughputs := make([]*Throughput, 0)
 	for i := throughputRateSecs; i < uint16(len(result.Values)); i++ {
 		v := result.Values[i]
-		throughputs = append(throughputs, &dataapi.Throughput{
+		throughputs = append(throughputs, &Throughput{
 			Timestamp:  uint64(v.Timestamp.Unix()),
 			Throughput: v.Value,
 		})

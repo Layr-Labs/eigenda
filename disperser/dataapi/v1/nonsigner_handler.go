@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 )
 
 func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTime int64, liveOnly bool) (*OperatorsNonsigningPercentage, error) {
@@ -134,14 +133,14 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 	})
 
 	return &OperatorsNonsigningPercentage{
-		Meta: dataapi.Meta{
+		Meta: Meta{
 			Size: len(nonsignerMetrics),
 		},
 		Data: nonsignerMetrics,
 	}, nil
 }
 
-func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (dataapi.OperatorQuorumIntervals, []uint8, error) {
+func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, []uint8, error) {
 	// Get operators' initial quorums (at startBlock).
 	quorumSeen := make(map[uint8]struct{}, 0)
 
@@ -171,7 +170,7 @@ func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners [
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, err := dataapi.CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
+	operatorQuorumIntervals, err := CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -179,9 +178,9 @@ func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners [
 	return operatorQuorumIntervals, allQuorums, nil
 }
 
-func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*dataapi.OperatorQuorum, map[string][]*dataapi.OperatorQuorum, error) {
-	addedToQuorum := make(map[string][]*dataapi.OperatorQuorum)
-	removedFromQuorum := make(map[string][]*dataapi.OperatorQuorum)
+func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
+	addedToQuorum := make(map[string][]*OperatorQuorum)
+	removedFromQuorum := make(map[string][]*OperatorQuorum)
 	if startBlock == endBlock {
 		return addedToQuorum, removedFromQuorum, nil
 	}
@@ -204,7 +203,7 @@ func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlo
 	return addedToQuorum, removedFromQuorum, nil
 }
 
-func getNonSigners(batches []*dataapi.BatchNonSigningInfo) ([]core.OperatorID, error) {
+func getNonSigners(batches []*BatchNonSigningInfo) ([]core.OperatorID, error) {
 	nonsignerSet := map[string]struct{}{}
 	for _, b := range batches {
 		for _, op := range b.NonSigners {
@@ -230,7 +229,7 @@ func getNonSigners(batches []*dataapi.BatchNonSigningInfo) ([]core.OperatorID, e
 	return nonsigners, nil
 }
 
-func computeNumFailed(batches []*dataapi.BatchNonSigningInfo, operatorQuorumIntervals dataapi.OperatorQuorumIntervals) map[string]map[uint8]int {
+func computeNumFailed(batches []*BatchNonSigningInfo, operatorQuorumIntervals OperatorQuorumIntervals) map[string]map[uint8]int {
 	numFailed := make(map[string]map[uint8]int)
 	for _, b := range batches {
 		for _, op := range b.NonSigners {
@@ -253,10 +252,10 @@ func computeNumFailed(batches []*dataapi.BatchNonSigningInfo, operatorQuorumInte
 	return numFailed
 }
 
-func computeNumResponsible(batches []*dataapi.BatchNonSigningInfo, operatorQuorumIntervals dataapi.OperatorQuorumIntervals) map[string]map[uint8]int {
+func computeNumResponsible(batches []*BatchNonSigningInfo, operatorQuorumIntervals OperatorQuorumIntervals) map[string]map[uint8]int {
 	// Create quorumBatches, where quorumBatches[q].AccuBatches is the total number of
 	// batches in block interval [startBlock, b] for quorum "q".
-	quorumBatches := dataapi.CreatQuorumBatches(batches)
+	quorumBatches := CreatQuorumBatches(batches)
 
 	numResponsible := make(map[string]map[uint8]int)
 	for op, val := range operatorQuorumIntervals {
@@ -264,7 +263,7 @@ func computeNumResponsible(batches []*dataapi.BatchNonSigningInfo, operatorQuoru
 			numBatches := 0
 			if _, ok := quorumBatches[q]; ok {
 				for _, interval := range intervals {
-					numBatches = numBatches + dataapi.ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+					numBatches = numBatches + ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
 				}
 			}
 			if _, ok := numResponsible[op]; !ok {

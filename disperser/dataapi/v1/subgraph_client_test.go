@@ -1,4 +1,4 @@
-package dataapi_test
+package v1_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
+	v1 "github.com/Layr-Labs/eigenda/disperser/dataapi/v1"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
@@ -436,7 +437,7 @@ var (
 
 func TestQueryBatchesWithLimit(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	batches, err := subgraphClient.QueryBatchesWithLimit(context.Background(), 2, 0)
 	assert.NoError(t, err)
@@ -463,7 +464,7 @@ func TestQueryBatchesWithLimit(t *testing.T) {
 func TestQueryOperators(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryOperators").Return(subgraphOperatorRegistereds, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	operators, err := subgraphClient.QueryOperatorsWithLimit(context.Background(), 2)
 	assert.NoError(t, err)
 
@@ -490,8 +491,8 @@ func TestQueryIndexedDeregisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryDeregisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorDeregistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
-	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, dataapi.Deregistered)
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	indexedDeregisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, v1.Deregistered)
 	assert.NoError(t, err)
 
 	operators := indexedDeregisteredOperatorState.Operators
@@ -519,8 +520,8 @@ func TestQueryIndexedRegisteredOperatorsForTimeWindow(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryRegisteredOperatorsGreaterThanBlockTimestamp").Return(subgraphOperatorRegistered, nil)
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(subgraphIndexedOperatorInfo1, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
-	indexedRegisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, dataapi.Registered)
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	indexedRegisteredOperatorState, err := subgraphClient.QueryIndexedOperatorsWithStateForTimeWindow(context.Background(), 1, v1.Registered)
 	assert.NoError(t, err)
 
 	operators := indexedRegisteredOperatorState.Operators
@@ -547,7 +548,7 @@ func TestQueryIndexedRegisteredOperatorsForTimeWindow(t *testing.T) {
 func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryBatchNonSigningInfo", int64(0), int64(1)).Return(batchNonSigningInfo, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	result, err := subgraphClient.QueryBatchNonSigningInfoInInterval(context.Background(), 0, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(result))
@@ -570,7 +571,7 @@ func TestQueryBatchNonSigningInfoInInterval(t *testing.T) {
 	assert.Equal(t, "0xe22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311", result[1].NonSigners[0])
 }
 
-func assertGasFees(t *testing.T, gasFees *dataapi.GasFees) {
+func assertGasFees(t *testing.T, gasFees *v1.GasFees) {
 	assert.NotNil(t, gasFees)
 	assert.Equal(t, []byte("0x0006afd9ce41ba0f3414ba2650a9cd2f47c0e22af21651f7fd902f71df678c5d9942"), gasFees.Id)
 	assert.Equal(t, uint64(249815), gasFees.GasUsed)
@@ -582,7 +583,7 @@ func TestQueryOperatorQuorumEvent(t *testing.T) {
 	mockSubgraphApi := &subgraphmock.MockSubgraphApi{}
 	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
-	subgraphClient := dataapi.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
+	subgraphClient := v1.NewSubgraphClient(mockSubgraphApi, logging.NewNoopLogger())
 	result, err := subgraphClient.QueryOperatorQuorumEvent(context.Background(), uint32(78), uint32(88))
 	assert.NoError(t, err)
 

@@ -23,10 +23,10 @@ type operatorHandler struct {
 	chainReader       core.Reader
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
-	subgraphClient    dataapi.SubgraphClient
+	subgraphClient    SubgraphClient
 }
 
-func newOperatorHandler(logger logging.Logger, metrics *dataapi.Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient dataapi.SubgraphClient) *operatorHandler {
+func newOperatorHandler(logger logging.Logger, metrics *dataapi.Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *operatorHandler {
 	return &operatorHandler{
 		logger:            logger,
 		metrics:           metrics,
@@ -67,7 +67,7 @@ func (oh *operatorHandler) probeOperatorHosts(ctx context.Context, operatorId st
 	return portCheckResponse, nil
 }
 
-func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId string) (*dataapi.OperatorsStakeResponse, error) {
+func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
 	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
@@ -80,13 +80,13 @@ func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId str
 	tqs, quorumsStake := operators.GetRankedOperators(state)
 	oh.metrics.UpdateOperatorsStake(tqs, quorumsStake)
 
-	stakeRanked := make(map[string][]*dataapi.OperatorStake)
+	stakeRanked := make(map[string][]*OperatorStake)
 	for q, operators := range quorumsStake {
 		quorum := fmt.Sprintf("%d", q)
-		stakeRanked[quorum] = make([]*dataapi.OperatorStake, 0)
+		stakeRanked[quorum] = make([]*OperatorStake, 0)
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
-				stakeRanked[quorum] = append(stakeRanked[quorum], &dataapi.OperatorStake{
+				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
 					StakePercentage: op.StakeShare / 100.0,
@@ -95,10 +95,10 @@ func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId str
 			}
 		}
 	}
-	stakeRanked["total"] = make([]*dataapi.OperatorStake, 0)
+	stakeRanked["total"] = make([]*OperatorStake, 0)
 	for i, op := range tqs {
 		if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
-			stakeRanked["total"] = append(stakeRanked["total"], &dataapi.OperatorStake{
+			stakeRanked["total"] = append(stakeRanked["total"], &OperatorStake{
 				QuorumId:        "total",
 				OperatorId:      op.OperatorId.Hex(),
 				StakePercentage: op.StakeShare / 100.0,
@@ -106,7 +106,7 @@ func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId str
 			})
 		}
 	}
-	return &dataapi.OperatorsStakeResponse{
+	return &OperatorsStakeResponse{
 		StakeRankedOperators: stakeRanked,
 	}, nil
 }

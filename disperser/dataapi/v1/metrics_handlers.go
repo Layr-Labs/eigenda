@@ -10,7 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 )
 
-func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) (*dataapi.Metric, error) {
+func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) (*Metric, error) {
 	blockNumber, err := s.transactor.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -53,7 +53,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		return nil, err
 	}
 
-	return &dataapi.Metric{
+	return &Metric{
 		Throughput:          throughput,
 		CostInGas:           costInGas,
 		TotalStake:          totalStakePerQuorum[0],
@@ -103,16 +103,16 @@ func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error)
 	return totalGasUsed, nil
 }
 
-func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]dataapi.NonSigner, error) {
+func (s *server) getNonSigners(ctx context.Context, intervalSeconds int64) (*[]NonSigner, error) {
 	nonSigners, err := s.subgraphClient.QueryBatchNonSigningOperatorIdsInInterval(ctx, intervalSeconds)
 	if err != nil {
 		return nil, err
 	}
 
-	nonSignersObj := make([]dataapi.NonSigner, 0)
+	nonSignersObj := make([]NonSigner, 0)
 	for nonSigner, nonSigningAmount := range nonSigners {
 		s.logger.Info("NonSigner", "nonSigner", nonSigner, "nonSigningAmount", nonSigningAmount)
-		nonSignersObj = append(nonSignersObj, dataapi.NonSigner{
+		nonSignersObj = append(nonSignersObj, NonSigner{
 			OperatorId: nonSigner,
 			Count:      nonSigningAmount,
 		})

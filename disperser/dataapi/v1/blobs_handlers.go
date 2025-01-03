@@ -115,10 +115,10 @@ func convertMetadataToBlobMetadataResponse(metadata *disperser.BlobMetadata) (*B
 	}, nil
 }
 
-func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*dataapi.Batch, []*disperser.BlobMetadata, error) {
+func (s *server) getBlobMetadataByBatchesWithLimit(ctx context.Context, limit int) ([]*Batch, []*disperser.BlobMetadata, error) {
 	var (
 		blobMetadatas   = make([]*disperser.BlobMetadata, 0)
-		batches         = make([]*dataapi.Batch, 0)
+		batches         = make([]*Batch, 0)
 		blobKeyPresence = make(map[string]struct{})
 		batchPresence   = make(map[string]struct{})
 	)

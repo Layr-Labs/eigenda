@@ -3,6 +3,7 @@ package v2_test
 import (
 	"context"
 	"crypto/rand"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/gin-gonic/gin"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -47,6 +49,12 @@ var (
 	logger     = logging.NewNoopLogger()
 	mockLogger = logging.NewNoopLogger()
 
+	//go:embed testdata/prometheus-response-sample.json
+	mockPrometheusResponse string
+
+	//go:embed testdata/prometheus-resp-avg-throughput.json
+	mockPrometheusRespAvgThroughput string
+
 	// Local stack
 	localStackPort     = "4566"
 	dockertestPool     *dockertest.Pool
@@ -56,7 +64,7 @@ var (
 
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
-	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
+	subgraphClient    = v2.NewSubgraphClient(mockSubgraphApi, mockLogger)
 	mockTx            = &coremock.MockWriter{}
 	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
@@ -262,7 +270,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobCertificateResponse
+	var response serverv2.BlobCertificateResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -312,7 +320,7 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.BlobVerificationInfoResponse
+	var response serverv2.BlobVerificationInfoResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -404,7 +412,7 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.OperatorPortCheckResponse
+	var response v2.OperatorPortCheckResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -433,7 +441,7 @@ func TestFetchOperatorsStake(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response dataapi.OperatorsStakeResponse
+	var response v2.OperatorsStakeResponse
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -505,7 +513,7 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v2/metrics/timeseries/throughput", testDataApiServer.FetchMetricsThroughputHandler)
+	r.GET("/v2/metrics/timeseries/throughput", testDataApiServerV2.FetchMetricsThroughputTimeseriesHandler)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v2/metrics/timeseries/throughput", nil)
@@ -517,7 +525,7 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response []*dataapi.Throughput
+	var response []*v2.Throughput
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)

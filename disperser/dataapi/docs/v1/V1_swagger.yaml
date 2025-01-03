@@ -23,30 +23,6 @@ definitions:
           data was posted to the DA node.
         type: integer
     type: object
-  dataapi.Meta:
-    properties:
-      next_token:
-        type: string
-      size:
-        type: integer
-    type: object
-  dataapi.QueriedOperatorEjections:
-    properties:
-      block_number:
-        type: integer
-      block_timestamp:
-        type: string
-      operator_address:
-        type: string
-      operator_id:
-        type: string
-      quorum:
-        type: integer
-      stake_percentage:
-        type: number
-      transaction_hash:
-        type: string
-    type: object
   encoding.BlobCommitments:
     properties:
       commitment:
@@ -167,12 +143,19 @@ definitions:
           $ref: '#/definitions/v1.BlobMetadataResponse'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
   v1.ErrorResponse:
     properties:
       error:
         type: string
+    type: object
+  v1.Meta:
+    properties:
+      next_token:
+        type: string
+      size:
+        type: integer
     type: object
   v1.Metric:
     properties:
@@ -245,7 +228,7 @@ definitions:
           $ref: '#/definitions/v1.OperatorNonsigningPercentageMetrics'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
   v1.OperatorsStakeResponse:
     properties:
@@ -256,11 +239,28 @@ definitions:
           type: array
         type: object
     type: object
+  v1.QueriedOperatorEjections:
+    properties:
+      block_number:
+        type: integer
+      block_timestamp:
+        type: string
+      operator_address:
+        type: string
+      operator_id:
+        type: string
+      quorum:
+        type: integer
+      stake_percentage:
+        type: number
+      transaction_hash:
+        type: string
+    type: object
   v1.QueriedOperatorEjectionsResponse:
     properties:
       ejections:
         items:
-          $ref: '#/definitions/dataapi.QueriedOperatorEjections'
+          $ref: '#/definitions/v1.QueriedOperatorEjections'
         type: array
     type: object
   v1.QueriedStateOperatorMetadata:
@@ -283,7 +283,7 @@ definitions:
           $ref: '#/definitions/v1.QueriedStateOperatorMetadata'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
   v1.SemverReportResponse:
     properties:
@@ -306,7 +306,7 @@ definitions:
           $ref: '#/definitions/v1.ServiceAvailability'
         type: array
       meta:
-        $ref: '#/definitions/dataapi.Meta'
+        $ref: '#/definitions/v1.Meta'
     type: object
   v1.Throughput:
     properties:
