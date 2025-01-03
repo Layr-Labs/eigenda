@@ -38,9 +38,9 @@ func GenerateBlobCommitment(
 // GenerateAndCompareBlobCommitment generates the kzg-bn254 commitment of the blob, and compares it with a claimed
 // commitment. An error is returned if there is a problem generating the commitment, or if the comparison fails.
 func GenerateAndCompareBlobCommitment(
-	claimedCommitment *encoding.G1Commitment,
 	g1Srs []bn254.G1Affine,
-	blobBytes []byte) error {
+	blobBytes []byte,
+	claimedCommitment *encoding.G1Commitment) error {
 
 	computedCommitment, err := GenerateBlobCommitment(g1Srs, blobBytes)
 	if err != nil {

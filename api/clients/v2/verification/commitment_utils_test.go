@@ -43,9 +43,9 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 
 	// make sure the commitment verifies correctly
 	err = GenerateAndCompareBlobCommitment(
-		commitment,
 		g1Srs,
-		randomBytes)
+		randomBytes,
+		commitment)
 	require.NoError(t, err)
 }
 
@@ -66,9 +66,9 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
 	err = GenerateAndCompareBlobCommitment(
-		commitment,
 		g1Srs,
-		randomBytes)
+		randomBytes,
+		commitment)
 	require.NotNil(t, err)
 }
 
