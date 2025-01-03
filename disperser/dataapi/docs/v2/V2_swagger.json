@@ -1,0 +1,924 @@
+{
+    "schemes": [
+        "https",
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "This is the EigenDA Data Access API V2 server.",
+        "title": "EigenDA Data Access API V2",
+        "contact": {},
+        "version": "2.0"
+    },
+    "basePath": "/api/v2",
+    "paths": {
+        "/batches/{batch_header_hash}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batch"
+                ],
+                "summary": "Fetch batch by the batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob metadata by blob key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}/certificate": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob certificate by blob key v2",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobCertificateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/{blob_key}/verification-info": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob verification info by blob key and batch header hash",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Blob key in hex string",
+                        "name": "blob_key",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobVerificationInfoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/summary": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch metrics summary",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.Metric"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/timeseries/throughput": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch throughput time series",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start unix timestamp [default: 1 hour ago]",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End unix timestamp [default: unix time now]",
+                        "name": "end",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/v2.Throughput"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/nodeinfo": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Active operator semver",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.SemverReportResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/reachability": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Operator node reachability check",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorPortCheckResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/stake": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Operator stake distribution query",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorsStakeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "big.Int": {
+            "type": "object"
+        },
+        "core.G1Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "core.G2Point": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "core.PaymentMetadata": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "description": "AccountID is the ETH account address for the payer",
+                    "type": "string"
+                },
+                "cumulative_payment": {
+                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/big.Int"
+                        }
+                    ]
+                },
+                "reservation_period": {
+                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                    "type": "integer"
+                },
+                "salt": {
+                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
+                    "type": "integer"
+                }
+            }
+        },
+        "core.Signature": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "encoding.BlobCommitments": {
+            "type": "object",
+            "properties": {
+                "commitment": {
+                    "$ref": "#/definitions/encoding.G1Commitment"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "length_commitment": {
+                    "$ref": "#/definitions/encoding.G2Commitment"
+                },
+                "length_proof": {
+                    "$ref": "#/definitions/encoding.LengthProof"
+                }
+            }
+        },
+        "encoding.G1Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "encoding.G2Commitment": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "encoding.LengthProof": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.Attestation": {
+            "type": "object",
+            "properties": {
+                "apkg2": {
+                    "description": "APKG2 is the aggregate public key of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.G2Point"
+                        }
+                    ]
+                },
+                "attestedAt": {
+                    "description": "AttestedAt is the time the attestation was made",
+                    "type": "integer"
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "nonSignerPubKeys": {
+                    "description": "NonSignerPubKeys are the public keys of the operators that did not sign the blob",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumAPKs": {
+                    "description": "QuorumAPKs is the aggregate public keys of all operators in each quorum",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/core.G1Point"
+                    }
+                },
+                "quorumNumbers": {
+                    "description": "QuorumNumbers contains the quorums relevant for the attestation",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorumResults": {
+                    "description": "QuorumResults contains the results of the quorum verification",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                },
+                "sigma": {
+                    "description": "Sigma is the aggregate signature of all signers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.Signature"
+                        }
+                    ]
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BatchHeader": {
+            "type": "object",
+            "properties": {
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobCertificate": {
+            "type": "object",
+            "properties": {
+                "blobHeader": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "relayKeys": {
+                    "description": "RelayKeys",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobHeader": {
+            "type": "object",
+            "properties": {
+                "blobCommitments": {
+                    "$ref": "#/definitions/encoding.BlobCommitments"
+                },
+                "blobVersion": {
+                    "type": "integer"
+                },
+                "paymentMetadata": {
+                    "description": "PaymentMetadata contains the payment information for the blob",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core.PaymentMetadata"
+                        }
+                    ]
+                },
+                "quorumNumbers": {
+                    "description": "QuorumNumbers contains the quorums the blob is dispersed to",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "signature": {
+                    "description": "Signature is the signature of the blob header by the account ID",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
+            "type": "object",
+            "properties": {
+                "BlobKey": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "blobIndex": {
+                    "type": "integer"
+                },
+                "inclusionProof": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                }
+            }
+        },
+        "github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2": {
+            "type": "object",
+            "properties": {
+                "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "a1": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "semver.SemverMetrics": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "semver": {
+                    "type": "string"
+                },
+                "stake_percentage": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "v2.BatchResponse": {
+            "type": "object",
+            "properties": {
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_verification_infos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                    }
+                },
+                "signed_batch": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch"
+                }
+            }
+        },
+        "v2.BlobCertificateResponse": {
+            "type": "object",
+            "properties": {
+                "blob_certificate": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                }
+            }
+        },
+        "v2.BlobResponse": {
+            "type": "object",
+            "properties": {
+                "blob_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "blob_size_bytes": {
+                    "type": "integer"
+                },
+                "dispersed_at": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.BlobVerificationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "blob_verification_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                }
+            }
+        },
+        "v2.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.Metric": {
+            "type": "object",
+            "properties": {
+                "cost_in_gas": {
+                    "type": "number"
+                },
+                "throughput": {
+                    "type": "number"
+                },
+                "total_stake": {
+                    "description": "deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/big.Int"
+                        }
+                    ]
+                },
+                "total_stake_per_quorum": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/big.Int"
+                    }
+                }
+            }
+        },
+        "v2.OperatorPortCheckResponse": {
+            "type": "object",
+            "properties": {
+                "dispersal_online": {
+                    "type": "boolean"
+                },
+                "dispersal_socket": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "retrieval_online": {
+                    "type": "boolean"
+                },
+                "retrieval_socket": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.OperatorStake": {
+            "type": "object",
+            "properties": {
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum_id": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                }
+            }
+        },
+        "v2.OperatorsStakeResponse": {
+            "type": "object",
+            "properties": {
+                "stake_ranked_operators": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/v2.OperatorStake"
+                        }
+                    }
+                }
+            }
+        },
+        "v2.SemverReportResponse": {
+            "type": "object",
+            "properties": {
+                "semver": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/semver.SemverMetrics"
+                    }
+                }
+            }
+        },
+        "v2.Throughput": {
+            "type": "object",
+            "properties": {
+                "throughput": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

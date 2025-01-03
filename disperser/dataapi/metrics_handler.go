@@ -11,18 +11,18 @@ const (
 )
 
 // metricHandler handles operations to collect metrics about the Disperser.
-type metricsHandler struct {
+type MetricsHandler struct {
 	// For accessing metrics info
 	promClient PrometheusClient
 }
 
-func newMetricsHandler(promClient PrometheusClient) *metricsHandler {
-	return &metricsHandler{
+func NewMetricsHandler(promClient PrometheusClient) *MetricsHandler {
+	return &MetricsHandler{
 		promClient: promClient,
 	}
 }
 
-func (mh *metricsHandler) getAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
+func (mh *MetricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
 	result, err := mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
 	if err != nil {
 		return 0, err
@@ -36,7 +36,7 @@ func (mh *metricsHandler) getAvgThroughput(ctx context.Context, startTime int64,
 	return totalBytes / timeDuration, nil
 }
 
-func (mh *metricsHandler) getThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {
+func (mh *MetricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {
 	throughputRateSecs := uint16(defaultThroughputRateSecs)
 	if endTime-startTime >= 7*24*60*60 {
 		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
