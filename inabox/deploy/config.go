@@ -1,9 +1,16 @@
 package deploy
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"log"
 	"math/big"
 	"path/filepath"
@@ -321,28 +328,34 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	return v
 }
 
-func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
+func (env *Config) generateControllerVars(
+	ind int,
+	graphUrl string,
+	disperserKeyID string) ControllerVars {
+
 	v := ControllerVars{
-		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
-		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		CONTROLLER_USE_GRAPH:                   "true",
-		CONTROLLER_GRAPH_URL:                   graphUrl,
-		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
-		CONTROLLER_AVAILABLE_RELAYS:            "0,1,2,3",
-		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "3s",
-		CONTROLLER_NODE_REQUEST_TIMEOUT:        "5s",
-		CONTROLLER_NUM_CONNECTIONS_TO_NODES:    "10",
-		CONTROLLER_CHAIN_RPC:                   "",
-		CONTROLLER_PRIVATE_KEY:                 "123",
-		CONTROLLER_NUM_CONFIRMATIONS:           "0",
-		CONTROLLER_INDEXER_PULL_INTERVAL:       "1s",
-		CONTROLLER_AWS_REGION:                  "",
-		CONTROLLER_AWS_ACCESS_KEY_ID:           "",
-		CONTROLLER_AWS_SECRET_ACCESS_KEY:       "",
-		CONTROLLER_AWS_ENDPOINT_URL:            "",
-		CONTROLLER_ENCODER_ADDRESS:             "0.0.0.0:34001",
-		CONTROLLER_FINALIZATION_BLOCK_DELAY:    "0",
+		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
+		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:             env.EigenDA.OperatorStateRetreiver,
+		CONTROLLER_EIGENDA_SERVICE_MANAGER:                 env.EigenDA.ServiceManager,
+		CONTROLLER_USE_GRAPH:                               "true",
+		CONTROLLER_GRAPH_URL:                               graphUrl,
+		CONTROLLER_ENCODING_PULL_INTERVAL:                  "1s",
+		CONTROLLER_AVAILABLE_RELAYS:                        "0,1,2,3",
+		CONTROLLER_DISPATCHER_PULL_INTERVAL:                "3s",
+		CONTROLLER_NODE_REQUEST_TIMEOUT:                    "5s",
+		CONTROLLER_NUM_CONNECTIONS_TO_NODES:                "10",
+		CONTROLLER_CHAIN_RPC:                               "",
+		CONTROLLER_PRIVATE_KEY:                             "123",
+		CONTROLLER_NUM_CONFIRMATIONS:                       "0",
+		CONTROLLER_INDEXER_PULL_INTERVAL:                   "1s",
+		CONTROLLER_AWS_REGION:                              "",
+		CONTROLLER_AWS_ACCESS_KEY_ID:                       "",
+		CONTROLLER_AWS_SECRET_ACCESS_KEY:                   "",
+		CONTROLLER_AWS_ENDPOINT_URL:                        "",
+		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
+		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "true",
+		CONTROLLER_DISPERSER_KMS_KEY_ID:                    disperserKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -391,46 +404,47 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	ecdsaPassword := env.Pks.EcdsaMap[name].Password
 
 	v := OperatorVars{
-		NODE_HOSTNAME:                    "",
-		NODE_DISPERSAL_PORT:              dispersalPort,
-		NODE_RETRIEVAL_PORT:              retrievalPort,
-		NODE_INTERNAL_DISPERSAL_PORT:     dispersalPort,
-		NODE_INTERNAL_RETRIEVAL_PORT:     retrievalPort,
-		NODE_ENABLE_METRICS:              "true",
-		NODE_METRICS_PORT:                metricsPort,
-		NODE_ENABLE_NODE_API:             "true",
-		NODE_API_PORT:                    nodeApiPort,
-		NODE_TIMEOUT:                     "10s",
-		NODE_QUORUM_ID_LIST:              "0,1",
-		NODE_DB_PATH:                     dbPath,
-		NODE_ENABLE_TEST_MODE:            "false", // using encrypted key in inabox
-		NODE_TEST_PRIVATE_BLS:            blsKey,
-		NODE_BLS_KEY_FILE:                blsKeyFile,
-		NODE_ECDSA_KEY_FILE:              ecdsaKeyFile,
-		NODE_BLS_KEY_PASSWORD:            blsPassword,
-		NODE_ECDSA_KEY_PASSWORD:          ecdsaPassword,
-		NODE_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		NODE_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		NODE_REGISTER_AT_NODE_START:      "true",
-		NODE_CHURNER_URL:                 churnerUrl,
-		NODE_CHURNER_USE_SECURE_GRPC:     "false",
-		NODE_EXPIRATION_POLL_INTERVAL:    "10",
-		NODE_G1_PATH:                     "",
-		NODE_G2_PATH:                     "",
-		NODE_G2_POWER_OF_2_PATH:          "",
-		NODE_CACHE_PATH:                  "",
-		NODE_SRS_ORDER:                   "",
-		NODE_SRS_LOAD:                    "",
-		NODE_NUM_WORKERS:                 fmt.Sprint(runtime.GOMAXPROCS(0)),
-		NODE_VERBOSE:                     "true",
-		NODE_CHAIN_RPC:                   "",
-		NODE_PRIVATE_KEY:                 key[2:],
-		NODE_NUM_BATCH_VALIDATORS:        "128",
-		NODE_PUBLIC_IP_PROVIDER:          "mockip",
-		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
-		NODE_NUM_CONFIRMATIONS:           "0",
-		NODE_ONCHAIN_METRICS_INTERVAL:    "-1",
-		NODE_ENABLE_V2:                   "true",
+		NODE_HOSTNAME:                         "",
+		NODE_DISPERSAL_PORT:                   dispersalPort,
+		NODE_RETRIEVAL_PORT:                   retrievalPort,
+		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
+		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
+		NODE_ENABLE_METRICS:                   "true",
+		NODE_METRICS_PORT:                     metricsPort,
+		NODE_ENABLE_NODE_API:                  "true",
+		NODE_API_PORT:                         nodeApiPort,
+		NODE_TIMEOUT:                          "10s",
+		NODE_QUORUM_ID_LIST:                   "0,1",
+		NODE_DB_PATH:                          dbPath,
+		NODE_ENABLE_TEST_MODE:                 "false", // using encrypted key in inabox
+		NODE_TEST_PRIVATE_BLS:                 blsKey,
+		NODE_BLS_KEY_FILE:                     blsKeyFile,
+		NODE_ECDSA_KEY_FILE:                   ecdsaKeyFile,
+		NODE_BLS_KEY_PASSWORD:                 blsPassword,
+		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
+		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetreiver,
+		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
+		NODE_REGISTER_AT_NODE_START:           "true",
+		NODE_CHURNER_URL:                      churnerUrl,
+		NODE_CHURNER_USE_SECURE_GRPC:          "false",
+		NODE_EXPIRATION_POLL_INTERVAL:         "10",
+		NODE_G1_PATH:                          "",
+		NODE_G2_PATH:                          "",
+		NODE_G2_POWER_OF_2_PATH:               "",
+		NODE_CACHE_PATH:                       "",
+		NODE_SRS_ORDER:                        "",
+		NODE_SRS_LOAD:                         "",
+		NODE_NUM_WORKERS:                      fmt.Sprint(runtime.GOMAXPROCS(0)),
+		NODE_VERBOSE:                          "true",
+		NODE_CHAIN_RPC:                        "",
+		NODE_PRIVATE_KEY:                      key[2:],
+		NODE_NUM_BATCH_VALIDATORS:             "128",
+		NODE_PUBLIC_IP_PROVIDER:               "mockip",
+		NODE_PUBLIC_IP_CHECK_INTERVAL:         "10s",
+		NODE_NUM_CONFIRMATIONS:                "0",
+		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
+		NODE_ENABLE_V2:                        "true",
+		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
@@ -565,6 +579,41 @@ func (env *Config) getKey(name string) (key, address string) {
 	return
 }
 
+// GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
+func generateDisperserKeypair() (string, gethcommon.Address, error) {
+	keyManager := kms.New(kms.Options{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
+	})
+
+	log.Printf("Generating disperser keypair")
+
+	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
+		KeySpec:  types.KeySpecEccSecgP256k1,
+		KeyUsage: types.KeyUsageTypeSignVerify,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "connect: connection refused") {
+			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
+			err = nil
+		}
+		return "", gethcommon.Address{}, err
+	}
+
+	keyID := *createKeyOutput.KeyMetadata.KeyId
+
+	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
+	if err != nil {
+		return "", gethcommon.Address{}, err
+	}
+
+	publicAddress := crypto.PubkeyToAddress(*key)
+
+	log.Printf("Generated disperser keypair: key ID: %s, address: %s", keyID, publicAddress.Hex())
+
+	return keyID, publicAddress, nil
+}
+
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
@@ -576,10 +625,11 @@ func (env *Config) GenerateAllVariables() {
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
 
-	// Gather keys
-	// keyData := readFile(gethPrivateKeys)
-	// keys := strings.Split(string(keyData), "\n")
-	// id := 1
+	disperserKeyID, disperserAddress, err := generateDisperserKeypair()
+	if err != nil {
+		log.Fatalf("Error generating disperser keypair: %v", err)
+	}
+	env.DisperserAddress = disperserAddress
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
@@ -726,7 +776,7 @@ func (env *Config) GenerateAllVariables() {
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl)
+	controllerConfig := env.generateControllerVars(0, graphUrl, disperserKeyID)
 	writeEnv(controllerConfig.getEnvMap(), envFile)
 	env.Controller = controllerConfig
 

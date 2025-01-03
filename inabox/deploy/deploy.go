@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -154,6 +155,12 @@ func (env *Config) DeployExperiment() {
 		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
 		env.deploySubgraphs(startBlock)
 	}
+
+	// TODO remove
+	b := make([]byte, 2048) // adjust buffer size to be larger than expected stack
+	n := runtime.Stack(b, false)
+	s := string(b[:n])
+	log.Printf("Stack trace:\n %s", s)
 
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
