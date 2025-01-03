@@ -223,7 +223,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 0,
-			CumulativePayment: big.NewInt(100).Bytes(),
+			CumulativePayment: big.NewInt(0).Bytes(),
 		},
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(invalidReqProto)
