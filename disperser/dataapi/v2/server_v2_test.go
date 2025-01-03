@@ -48,12 +48,6 @@ var (
 	logger     = logging.NewNoopLogger()
 	mockLogger = logging.NewNoopLogger()
 
-	//go:embed testdata/prometheus-response-sample.json
-	mockPrometheusResponse string
-
-	//go:embed testdata/prometheus-resp-avg-throughput.json
-	mockPrometheusRespAvgThroughput string
-
 	// Local stack
 	localStackPort     = "4566"
 	dockertestPool     *dockertest.Pool
@@ -65,7 +59,6 @@ var (
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
 	subgraphClient    = v2.NewSubgraphClient(mockSubgraphApi, mockLogger)
 	mockTx            = &coremock.MockWriter{}
-	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
@@ -99,7 +92,7 @@ func teardown() {
 	}
 }
 
-func setup(m *testing.M) {
+func setup(_ *testing.M) {
 	// Start localstack
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 	if !deployLocalStack {

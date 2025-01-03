@@ -30,9 +30,6 @@ import (
 )
 
 const (
-	maxWorkerPoolLimit   = 10
-	maxQueryBatchesLimit = 2
-
 	cacheControlParam = "Cache-Control"
 
 	// Cache control for responses.
