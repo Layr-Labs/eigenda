@@ -116,16 +116,7 @@ var _ = BeforeSuite(func() {
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
 
-		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-		pk = strings.TrimPrefix(pk, "0x")
-		pk = strings.TrimPrefix(pk, "0X")
-		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
-			RPCURLs:          []string{testConfig.Deployers[0].RPC},
-			PrivateKeyString: pk,
-			NumConfirmations: numConfirmations,
-			NumRetries:       numRetries,
-		}, gcommon.Address{}, logger)
-		Expect(err).To(BeNil())
+		ethClient = buildEthClient(numConfirmations)
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
@@ -145,11 +136,30 @@ var _ = BeforeSuite(func() {
 	}
 })
 
+// buildEthClient builds an Ethereum client with the given number of required confirmations
+func buildEthClient(confirmations int) common.EthClient {
+	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+	pk = strings.TrimPrefix(pk, "0x")
+	pk = strings.TrimPrefix(pk, "0X")
+
+	ec, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{testConfig.Deployers[0].RPC},
+		PrivateKeyString: pk,
+		NumConfirmations: confirmations,
+		NumRetries:       numRetries,
+	}, gcommon.Address{}, logger)
+
+	Expect(err).To(BeNil())
+	return ec
+}
+
 // updateDisperserAddress updates the disperser address in the retriever contract
 func updateDisperserAddress() {
+	nonConfirmingClient := buildEthClient(0)
+
 	writer, err := eth.NewWriter(
 		logger,
-		ethClient,
+		nonConfirmingClient,
 		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
 		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	Expect(err).To(BeNil())
