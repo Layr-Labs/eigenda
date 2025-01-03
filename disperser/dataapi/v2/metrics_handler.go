@@ -18,12 +18,6 @@ type metricsHandler struct {
 	promClient dataapi.PrometheusClient
 }
 
-func newMetricsHandler(promClient dataapi.PrometheusClient) *metricsHandler {
-	return &metricsHandler{
-		promClient: promClient,
-	}
-}
-
 func (mh *metricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
 	result, err := mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
 	if err != nil {

@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -155,4 +156,43 @@ func (s *operatorHandler) scanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	s.logger.Info("Semver scan completed", "semverReport", semverReport)
 	return semverReport, nil
 
+}
+
+// Check that the socketString is not private/unspecified
+func ValidOperatorIP(address string, logger logging.Logger) bool {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		logger.Error("Failed to split host port", "address", address, "error", err)
+		return false
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		logger.Error("Error resolving operator host IP", "host", host, "error", err)
+		return false
+	}
+	ipAddr := ips[0]
+	if ipAddr == nil {
+		logger.Error("IP address is nil", "host", host, "ips", ips)
+		return false
+	}
+	isValid := !ipAddr.IsPrivate() && !ipAddr.IsUnspecified()
+	logger.Debug("Operator IP validation", "address", address, "host", host, "ips", ips, "ipAddr", ipAddr, "isValid", isValid)
+
+	return isValid
+}
+
+// method to check if operator is online via socket dial
+func checkIsOperatorOnline(socket string, timeoutSecs int, logger logging.Logger) bool {
+	if !ValidOperatorIP(socket, logger) {
+		logger.Error("port check blocked invalid operator IP", "socket", socket)
+		return false
+	}
+	timeout := time.Second * time.Duration(timeoutSecs)
+	conn, err := net.DialTimeout("tcp", socket, timeout)
+	if err != nil {
+		logger.Warn("port check timeout", "socket", socket, "timeout", timeoutSecs, "error", err)
+		return false
+	}
+	defer conn.Close() // Close the connection after checking
+	return true
 }
