@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,9 +15,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -70,6 +72,42 @@ type (
 
 	MetricSummary struct {
 		AvgThroughput float64 `json:"avg_throughput"`
+	}
+
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
+
+	SemverReportResponse struct {
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
+	}
+
+	Metric struct {
+		Throughput float64 `json:"throughput"`
+		CostInGas  float64 `json:"cost_in_gas"`
+		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
+		TotalStake          *big.Int                   `json:"total_stake"`
+		TotalStakePerQuorum map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
+	}
+
+	Throughput struct {
+		Throughput float64 `json:"throughput"`
+		Timestamp  uint64  `json:"timestamp"`
 	}
 )
 
@@ -133,8 +171,9 @@ func (s *ServerV2) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v2"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv2.SwaggerInfoV2.BasePath = basePath
+	docsv2.SwaggerInfoV2.Host = os.Getenv("SWAGGER_HOST")
+
 	v2 := router.Group(basePath)
 	{
 		blob := v2.Group("/blob")
@@ -163,7 +202,8 @@ func (s *ServerV2) Start() error {
 		}
 		swagger := v2.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V2"), ginswagger.URL("/api/v2/swagger/doc.json")))
+
 		}
 	}
 
