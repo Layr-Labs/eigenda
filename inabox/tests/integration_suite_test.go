@@ -116,15 +116,15 @@ var _ = BeforeSuite(func() {
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
 
+		fmt.Println("Updating disperser address")
+		updateDisperserAddress()
+
 		ethClient = buildEthClient(numConfirmations)
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
-
-		fmt.Println("Updating disperser address")
-		updateDisperserAddress()
 
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
