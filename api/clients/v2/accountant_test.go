@@ -68,7 +68,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	symbolLength := uint32(500)
+	symbolLength := uint64(500)
 	quorums := []uint8{0, 1}
 
 	header, err := accountant.AccountBlob(ctx, symbolLength, quorums, salt)
@@ -78,7 +78,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.reservationPeriodRecords)), true)
 
-	symbolLength = uint32(700)
+	symbolLength = uint64(700)
 
 	header, err = accountant.AccountBlob(ctx, symbolLength, quorums, salt)
 
@@ -116,13 +116,13 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	numSymbols := uint32(1500)
+	numSymbols := uint64(1500)
 	quorums := []uint8{0, 1}
 
 	header, err := accountant.AccountBlob(ctx, numSymbols, quorums, salt)
 	assert.NoError(t, err)
 
-	expectedPayment := big.NewInt(int64(numSymbols * pricePerSymbol))
+	expectedPayment := big.NewInt(int64(numSymbols * uint64(pricePerSymbol)))
 	assert.Equal(t, uint32(0), header.ReservationPeriod)
 	assert.Equal(t, expectedPayment, header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{0, 0, 0}, mapRecordUsage(accountant.reservationPeriodRecords)), true)
@@ -144,7 +144,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	numSymbols := uint32(2000)
+	numSymbols := uint64(2000)
 	quorums := []uint8{0, 1}
 
 	_, err = accountant.AccountBlob(ctx, numSymbols, quorums, salt)
