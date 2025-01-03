@@ -14,6 +14,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -37,7 +38,7 @@ var (
 	testConfig                     *deploy.Config
 	templateName                   string
 	testName                       string
-	logger                         = logging.NewNoopLogger()
+	logger                         = testutils.GetLogger()
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}

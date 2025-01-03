@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,7 +26,7 @@ const loopInterval = 6 * time.Minute
 
 func TestFinalizedBlob(t *testing.T) {
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -125,7 +125,7 @@ func TestFinalizedBlob(t *testing.T) {
 func TestUnfinalizedBlob(t *testing.T) {
 	ctx := context.Background()
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -198,7 +198,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 func TestNoReceipt(t *testing.T) {
 	ctx := context.Background()
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 

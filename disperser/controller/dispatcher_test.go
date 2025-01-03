@@ -461,7 +461,7 @@ func deleteBlobs(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, k
 }
 
 func newDispatcherComponents(t *testing.T) *dispatcherComponents {
-	// logger := logging.NewNoopLogger()
+	// logger := testutils.GetLogger()
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 	pool := workerpool.New(5)

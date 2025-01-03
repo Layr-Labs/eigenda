@@ -30,6 +30,7 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
@@ -476,7 +477,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	assert.NoError(t, err)
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)
