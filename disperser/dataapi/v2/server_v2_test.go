@@ -64,18 +64,16 @@ var (
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
 
-	expectedBlobCommitment *encoding.BlobCommitments
-	mockLogger             = logging.NewNoopLogger()
-	blobstore              = inmem.NewBlobStore()
-	mockPrometheusApi      = &prommock.MockPrometheusApi{}
-	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
-	mockSubgraphApi        = &subgraphmock.MockSubgraphApi{}
-	subgraphClient         = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
+	mockLogger        = logging.NewNoopLogger()
+	blobstore         = inmem.NewBlobStore()
+	mockPrometheusApi = &prommock.MockPrometheusApi{}
+	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
+	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
+	subgraphClient    = dataapi.NewSubgraphClient(mockSubgraphApi, mockLogger)
 
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
 	mockTx            = &coremock.MockWriter{}
-	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
@@ -93,17 +91,9 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
-	expectedRequestedAt             = uint64(5567830000000000000)
-	expectedDataLength              = 32
-	expectedBatchId                 = uint32(99)
-	expectedBatchRoot               = []byte("hello")
-	expectedReferenceBlockNumber    = uint32(132)
-	expectedConfirmationBlockNumber = uint32(150)
-	expectedSignatoryRecordHash     = [32]byte{0}
-	expectedFee                     = []byte{0}
-	expectedInclusionProof          = []byte{1, 2, 3, 4, 5}
-	gettysburgAddressBytes          = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
+	testDataApiServer      = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	expectedInclusionProof = []byte{1, 2, 3, 4, 5}
+	gettysburgAddressBytes = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 
 	operatorInfo = &subgraph.IndexedOperatorInfo{
 		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
