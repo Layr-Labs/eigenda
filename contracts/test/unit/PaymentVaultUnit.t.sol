@@ -229,7 +229,7 @@ contract PaymentVaultUnit is MockEigenDADeployer {
     function test_withdrawERC20() public {
         deal(address(mockToken), address(paymentVault), 100 ether);
         vm.prank(registryCoordinatorOwner);
-        paymentVault.withdrawERC20(address(mockToken), 100 ether);
+        paymentVault.withdrawERC20(mockToken, 100 ether);
         assertEq(mockToken.balanceOf(address(registryCoordinatorOwner)), 100 ether);
     }
 
@@ -247,7 +247,7 @@ contract PaymentVaultUnit is MockEigenDADeployer {
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.withdraw(100 ether);
         vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.withdrawERC20(address(mockToken), 100 ether);
+        paymentVault.withdrawERC20(mockToken, 100 ether);
         vm.expectRevert("Ownable: caller is not the owner");
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
         vm.expectRevert("Ownable: caller is not the owner");
