@@ -351,12 +351,17 @@ func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Add
 	}
 	options.Context = ctx
 
-	_, err = registry.SetDisperserInfo(
+	transaction, err := registry.SetDisperserInfo(
 		options,
 		api.EigenLabsDisperserID,
 		contractEigenDADisperserRegistry.DisperserInfo{
 			DisperserAddress: address,
 		})
+	if err != nil {
+		return fmt.Errorf("failed to create transaction for setting disperser address: %w", err)
+	}
+
+	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, transaction, "SetDisperserAddress", nil)
 	if err != nil {
 		return fmt.Errorf("failed to set disperser address: %w", err)
 	}
