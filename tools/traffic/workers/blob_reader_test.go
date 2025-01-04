@@ -21,7 +21,7 @@ import (
 	"golang.org/x/exp/rand"
 )
 
-// TestBlobReaderNoOptionalReads tests the BlobReader's basic functionality'
+// TestBlobReader tests the BlobReader's basic functionality'
 func TestBlobReader(t *testing.T) {
 	tu.InitializeRandom()
 
