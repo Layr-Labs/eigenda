@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/relay/auth"
-	"sync"
 
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -122,7 +123,8 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 	if err != nil {
 		return fmt.Errorf("failed to sign get chunks request: %v", err)
 	}
-	request.OperatorSignature = signature.Serialize()
+	sig := signature.SerializeCompressed()
+	request.OperatorSignature = sig[:]
 	return nil
 }
 
