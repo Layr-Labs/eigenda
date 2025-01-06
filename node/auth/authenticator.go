@@ -39,8 +39,10 @@ type requestAuthenticator struct {
 	// chainReader is used to read the chain state.
 	chainReader core.Reader
 
-	// keyCache is used to cache the public keys of dispersers.
-	keyCache *lru.Cache[uint32, *keyWithTimeout]
+	// keyCache is used to cache the public keys of dispersers. The uint32 map keys are disperser IDs. Disperser
+	// IDs are serial numbers, with the original EigenDA disperser assigned ID 0. The map values contain
+	// the public key of the disperser and the time when the local cache of the key will expire.
+	keyCache *lru.Cache[uint32 /* disperser ID */, *keyWithTimeout]
 
 	// keyTimeoutDuration is the duration for which a key is cached. After this duration, the key should be
 	// reloaded from the chain state in case the key has been changed.
