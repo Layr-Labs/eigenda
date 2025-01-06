@@ -20,13 +20,13 @@ import (
 const MinNumPeriods int32 = 3
 
 type OffchainStore struct {
-	dynamoClient         commondynamodb.Client
-	reservationTableName string
-	onDemandTableName    string
-	globalBinTableName   string
-	logger               logging.Logger
-	// TODO: add maximum storage for both tables
-	MaxOnDemandStorage uint64
+	dynamoClient          commondynamodb.Client
+	reservationTableName  string
+	onDemandTableName     string
+	globalBinTableName    string
+	logger                logging.Logger
+	MaxOnDemandStorage    uint64
+	MaxReservationPeriods uint64
 }
 
 func NewOffchainStore(
@@ -35,6 +35,7 @@ func NewOffchainStore(
 	onDemandTableName string,
 	globalBinTableName string,
 	maxOnDemandStorage uint64,
+	maxReservationPeriods uint64,
 	logger logging.Logger,
 ) (OffchainStore, error) {
 
@@ -47,23 +48,27 @@ func NewOffchainStore(
 	if err != nil {
 		return OffchainStore{}, err
 	}
+
 	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
+
 	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
 	if err != nil {
 		return OffchainStore{}, err
 	}
+
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation periods (<i-1) and old on-demand payments (retain max N payments)
 	return OffchainStore{
-		dynamoClient:         dynamoClient,
-		reservationTableName: reservationTableName,
-		onDemandTableName:    onDemandTableName,
-		globalBinTableName:   globalBinTableName,
-		logger:               logger,
-		MaxOnDemandStorage:   maxOnDemandStorage,
+		dynamoClient:          dynamoClient,
+		reservationTableName:  reservationTableName,
+		onDemandTableName:     onDemandTableName,
+		globalBinTableName:    globalBinTableName,
+		logger:                logger,
+		MaxOnDemandStorage:    maxOnDemandStorage,
+		MaxReservationPeriods: maxReservationPeriods,
 	}, nil
 }
 
@@ -93,6 +98,11 @@ func (s *OffchainStore) UpdateReservationPeriod(ctx context.Context, accountID s
 		return 0, fmt.Errorf("failed to parse PeriodUsage: %w", err)
 	}
 
+	if err := s.PruneReservationPeriods(ctx, accountID); err != nil {
+		// Don't fail the request if pruning fails, just log a warning
+		s.logger.Warn("failed to prune reservation periods", "accountID", accountID, "error", err)
+	}
+
 	return periodUsageValue, nil
 }
 
@@ -119,6 +129,11 @@ func (s *OffchainStore) UpdateGlobalPeriod(ctx context.Context, reservationPerio
 	periodUsageValue, err := strconv.ParseUint(periodUsageAttr.Value, 10, 32)
 	if err != nil {
 		return 0, err
+	}
+
+	if err := s.PruneGlobalPeriods(ctx); err != nil {
+		// Don't fail the request if pruning fails, just log a warning
+		s.logger.Warn("failed to prune global periods", "error", err)
 	}
 
 	return periodUsageValue, nil
@@ -354,33 +369,75 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	return payment, nil
 }
 
-// DeleteOldPeriods removes all reservation bin entries with indices strictly less than the provided reservationPeriod
-func (s *OffchainStore) DeleteOldPeriods(ctx context.Context, reservationPeriod uint32) error {
-	// get all keys that need to be deleted
+func (s *OffchainStore) PruneReservationPeriods(ctx context.Context, accountID string) error {
 	queryInput := &dynamodb.QueryInput{
-		TableName:        aws.String(s.reservationTableName),
-		FilterExpression: aws.String("ReservationPeriod < :reservationPeriod"),
+		TableName:              aws.String(s.reservationTableName),
+		KeyConditionExpression: aws.String("AccountID = :account"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(reservationPeriod), 10)},
+			":account": &types.AttributeValueMemberS{Value: accountID},
 		},
+		ScanIndexForward: aws.Bool(true), // ascending order
 	}
 
-	items, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	periods, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return fmt.Errorf("failed to query old periods: %w", err)
+		return fmt.Errorf("failed to query existing reservation periods: %w", err)
 	}
 
-	keys := make([]commondynamodb.Key, len(items))
-	for i, item := range items {
+	if len(periods) >= int(s.MaxReservationPeriods) {
+		numToDelete := len(periods) - int(s.MaxReservationPeriods) + 1
+		// Create keys for all reservation periods to delete (taking the smallest reservation periods)
+		keysToDelete := make([]commondynamodb.Key, numToDelete)
+		for i := 0; i < numToDelete; i++ {
+			keysToDelete[i] = commondynamodb.Key{
+				"AccountID":         periods[i]["AccountID"],
+				"ReservationPeriod": periods[i]["ReservationPeriod"],
+			}
+		}
+
+		// Delete the items in batches
+		failedKeys, err := s.dynamoClient.DeleteItems(ctx, s.onDemandTableName, keysToDelete)
+		if err != nil {
+			return fmt.Errorf("failed to delete oldest reservation periods: %w", err)
+		}
+		if len(failedKeys) > 0 {
+			return fmt.Errorf("failed to delete %d reservation periods", len(failedKeys))
+		}
+	}
+
+	return nil
+}
+
+// DeleteOldPeriods removes all reservation bin entries with indices strictly less than the provided reservationPeriod
+func (s *OffchainStore) PruneGlobalPeriods(ctx context.Context) error {
+	// First, get total count of entries
+	queryInput := &dynamodb.QueryInput{
+		TableName:        aws.String(s.globalBinTableName),
+		ScanIndexForward: aws.Bool(true),
+	}
+
+	allItems, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return fmt.Errorf("failed to query periods: %w", err)
+	}
+
+	totalCount := len(allItems)
+	if totalCount <= int(s.MaxReservationPeriods) {
+		return nil
+	}
+
+	numToDelete := totalCount - int(s.MaxReservationPeriods)
+
+	keys := make([]commondynamodb.Key, numToDelete)
+	for i := 0; i < numToDelete; i++ {
 		keys[i] = commondynamodb.Key{
-			"AccountID":         item["AccountID"],
-			"ReservationPeriod": item["ReservationPeriod"],
+			"ReservationPeriod": allItems[i]["ReservationPeriod"],
 		}
 	}
 
 	// Delete the items in batches
 	if len(keys) > 0 {
-		failedKeys, err := s.dynamoClient.DeleteItems(ctx, s.reservationTableName, keys)
+		failedKeys, err := s.dynamoClient.DeleteItems(ctx, s.globalBinTableName, keys)
 		if err != nil {
 			return fmt.Errorf("failed to delete old periods: %w", err)
 		}

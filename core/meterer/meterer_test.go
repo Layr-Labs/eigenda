@@ -112,7 +112,6 @@ func setup(_ *testing.M) {
 	config := meterer.Config{
 		ChainReadTimeout:      1 * time.Second,
 		OnchainUpdateInterval: 1 * time.Second,
-		OffchainPruneInterval: 1 * time.Second,
 	}
 
 	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
@@ -146,6 +145,7 @@ func setup(_ *testing.M) {
 		reservationTableName,
 		ondemandTableName,
 		globalReservationTableName,
+		uint64(100),
 		uint64(100),
 		logger,
 	)

@@ -792,6 +792,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		table_names[1],
 		table_names[2],
 		uint64(100),
+		uint64(100),
 		logger,
 	)
 	if err != nil {
@@ -801,7 +802,6 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	mt := meterer.NewMeterer(meterer.Config{
 		ChainReadTimeout:      1 * time.Second,
 		OnchainUpdateInterval: 1 * time.Second,
-		OffchainPruneInterval: 1 * time.Second,
 	}, mockState, store, logger)
 	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
 	if err != nil {

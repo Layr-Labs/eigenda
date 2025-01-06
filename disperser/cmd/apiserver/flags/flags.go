@@ -148,18 +148,18 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
 		Value:    2 * time.Minute,
 	}
-	OffchainPruneInterval = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "offchain-state-pruning-interval"),
-		Usage:    "The interval at which to prune the outdated offchain state. This flag is only relevant in v2",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_STATE_PRUNING_INTERVAL"),
-		Value:    2 * time.Minute,
-	}
 	OffchainMaxOnDemandStorage = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "offchain-max-on-demand-storage"),
 		Usage:    "max number of on-demand payments to store in the off-chain state",
 		Value:    100,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_MAX_ON_DEMAND_STORAGE"),
+		Required: false,
+	}
+	OffchainMaxReservedPeriods = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "offchain-max-reserved-periods"),
+		Usage:    "max number of reserved periods to store in the off-chain state for all account and global reserved periods",
+		Value:    100,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "OFFCHAIN_MAX_RESERVED_PERIODS"),
 		Required: false,
 	}
 	MaxNumSymbolsPerBlob = cli.UintFlag{
@@ -273,8 +273,8 @@ var optionalFlags = []cli.Flag{
 	OnDemandTableName,
 	GlobalRateTableName,
 	OnchainStateRefreshInterval,
-	OffchainPruneInterval,
 	OffchainMaxOnDemandStorage,
+	OffchainMaxReservedPeriods,
 	MaxNumSymbolsPerBlob,
 	PprofHttpPort,
 	EnablePprof,

@@ -57,7 +57,6 @@ type DispersalServerV2 struct {
 	onchainState                atomic.Pointer[OnchainState]
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
-	OffchainPruneInterval       time.Duration
 
 	metrics *metricsV2
 }
@@ -73,7 +72,6 @@ func NewDispersalServerV2(
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
-	OffchainPruneInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 ) (*DispersalServerV2, error) {
@@ -117,7 +115,6 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
-		OffchainPruneInterval:       OffchainPruneInterval,
 
 		metrics: newAPIServerV2Metrics(registry),
 	}, nil

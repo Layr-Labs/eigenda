@@ -37,6 +37,7 @@ type Config struct {
 	EnablePaymentMeterer        bool
 	OnchainUpdateInterval       int
 	OffchainMaxOnDemandStorage  int
+	OffchainMaxReservedPeriods  int
 	ChainReadTimeout            int
 	ReservationsTableName       string
 	OnDemandTableName           string
@@ -47,7 +48,6 @@ type Config struct {
 	MaxBlobSize                 int
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
-	OffchainPruneInterval       time.Duration
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
@@ -127,8 +127,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
-		OffchainPruneInterval:       ctx.GlobalDuration(flags.OffchainPruneInterval.Name),
 		OffchainMaxOnDemandStorage:  ctx.GlobalInt(flags.OffchainMaxOnDemandStorage.Name),
+		OffchainMaxReservedPeriods:  ctx.GlobalInt(flags.OffchainMaxReservedPeriods.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),

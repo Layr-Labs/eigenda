@@ -284,6 +284,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		table_names[1],
 		table_names[2],
 		uint64(100),
+		uint64(100),
 		logger,
 	)
 	if err != nil {
@@ -298,7 +299,6 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mt := meterer.NewMeterer(meterer.Config{
 		ChainReadTimeout:      1 * time.Second,
 		OnchainUpdateInterval: 1 * time.Second,
-		OffchainPruneInterval: 1 * time.Second,
 	}, mockState, offchainStore, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
 

@@ -483,6 +483,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		table_names[1],
 		table_names[2],
 		uint64(100),
+		uint64(100),
 		logger,
 	)
 	if err != nil {
@@ -492,7 +493,6 @@ func newTestServerV2(t *testing.T) *testComponents {
 	meterer := meterer.NewMeterer(meterer.Config{
 		ChainReadTimeout:      1 * time.Second,
 		OnchainUpdateInterval: 1 * time.Second,
-		OffchainPruneInterval: 1 * time.Second,
 	}, mockState, store, logger)
 
 	chainReader.On("GetCurrentBlockNumber").Return(uint32(100), nil)
@@ -520,7 +520,6 @@ func newTestServerV2(t *testing.T) *testComponents {
 		auth.NewAuthenticator(),
 		prover,
 		10,
-		time.Hour,
 		time.Hour,
 		logger,
 		prometheus.NewRegistry())
