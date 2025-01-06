@@ -8,7 +8,6 @@ import (
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -63,9 +62,8 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 
 func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
 
-	publicKeyBytes := crypto.FromECDSAPub(&s.PrivateKey.PublicKey)
-	return hexutil.Encode(publicKeyBytes), nil
-
+	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey).Hex()
+	return accountId, nil
 }
 
 type LocalNoopSigner struct{}
