@@ -441,7 +441,7 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 		n := runtime.Stack(b, false)
 		s := string(b[:n])
 
-		t.logger.Error("Failed to fetch operator state", "err", err, "stackTrace", s)
+		t.logger.Errorf("Failed to fetch operator state: %s Stack trace:\n%s", err, s)
 		return nil, err
 	}
 
