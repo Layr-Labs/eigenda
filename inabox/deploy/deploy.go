@@ -19,7 +19,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -157,22 +156,17 @@ func (env *Config) DeployExperiment() {
 		env.deployEigenDAContracts()
 	}
 
-	log.Print("Generating disperser keypair")
-	err = env.generateDisperserKeypair()
-	if err != nil {
-		log.Panicf("could not generate disperser keypair: %v", err)
-	}
-
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
 		env.deploySubgraphs(startBlock)
 	}
 
-	// TODO remove
-	b := make([]byte, 2048) // adjust buffer size to be larger than expected stack
-	n := runtime.Stack(b, false)
-	s := string(b[:n])
-	log.Printf("Stack trace:\n %s", s)
+	// TODO does this need to go before start block?
+	log.Print("Generating disperser keypair")
+	err = env.generateDisperserKeypair()
+	if err != nil {
+		log.Panicf("could not generate disperser keypair: %v", err)
+	}
 
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
