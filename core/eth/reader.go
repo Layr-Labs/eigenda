@@ -437,11 +437,16 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 	if err != nil {
 
 		// TODO don't merge this
-		b := make([]byte, 1024*32) // adjust buffer size to be larger than expected stack
+		b := make([]byte, 1024*64) // adjust buffer size to be larger than expected stack
 		n := runtime.Stack(b, false)
 		s := string(b[:n])
 
-		t.logger.Errorf("Failed to fetch operator state: %s Stack trace:\n%s", err, s)
+		elements := strings.Split(s, "\n")
+		for _, element := range elements {
+			t.logger.Error(element)
+		}
+
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
 		return nil, err
 	}
 
