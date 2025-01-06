@@ -73,11 +73,6 @@ func setup() {
 	}
 	_ = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-	err = testConfig.GenerateDisperserKeypair()
-	if err != nil {
-		panic(err)
-	}
-
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()
 }

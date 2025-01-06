@@ -123,6 +123,12 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
+		fmt.Println("Generating disperser keypair") // TODO possibly follow exemple of RegisterBlobVersionAndRelays
+		err = testConfig.GenerateDisperserKeypair()
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 
