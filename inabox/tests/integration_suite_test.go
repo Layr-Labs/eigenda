@@ -124,7 +124,7 @@ var _ = BeforeSuite(func() {
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 		fmt.Println("Generating disperser keypair") // TODO possibly follow exemple of RegisterBlobVersionAndRelays
-		err = testConfig.GenerateDisperserKeypair()
+		err = testConfig.GenerateDisperserKeypair(ethClient)
 		if err != nil {
 			panic(err)
 		}

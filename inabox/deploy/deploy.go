@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -175,7 +174,7 @@ func (env *Config) DeployExperiment() {
 }
 
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
-func (env *Config) GenerateDisperserKeypair() error {
+func (env *Config) GenerateDisperserKeypair(ethClient common.EthClient) error {
 
 	// Generate a keypair in AWS KMS
 
@@ -221,15 +220,15 @@ func (env *Config) GenerateDisperserKeypair() error {
 		return fmt.Errorf("could not create logger: %v", err)
 	}
 
-	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{env.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: 0,
-		NumRetries:       0,
-	}, gcommon.Address{}, logger)
-	if err != nil {
-		return fmt.Errorf("could not create eth client: %v", err)
-	}
+	//ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+	//	RPCURLs:          []string{env.Deployers[0].RPC},
+	//	PrivateKeyString: pk,
+	//	NumConfirmations: 0,
+	//	NumRetries:       0,
+	//}, gcommon.Address{}, logger)
+	//if err != nil {
+	//	return fmt.Errorf("could not create eth client: %v", err)
+	//}
 
 	writer, err := eth.NewWriter(
 		logger,
