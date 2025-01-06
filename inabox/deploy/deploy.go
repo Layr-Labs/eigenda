@@ -161,15 +161,15 @@ func (env *Config) DeployExperiment() {
 		env.deploySubgraphs(startBlock)
 	}
 
-	// TODO does this need to go before start block?
+	fmt.Println("Generating variables")
+	env.GenerateAllVariables()
+
+	// TODO this is causing problems
 	log.Print("Generating disperser keypair")
 	err = env.generateDisperserKeypair()
 	if err != nil {
 		log.Panicf("could not generate disperser keypair: %v", err)
 	}
-
-	fmt.Println("Generating variables")
-	env.GenerateAllVariables()
 
 	fmt.Println("Test environment has successfully deployed!")
 }
