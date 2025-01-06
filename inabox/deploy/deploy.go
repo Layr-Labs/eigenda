@@ -158,17 +158,9 @@ func (env *Config) DeployExperiment() {
 	}
 
 	log.Print("Generating disperser keypair")
-	keyID, disperserAddress, err := generateDisperserKeypair()
+	err = env.generateDisperserKeypair()
 	if err != nil {
 		log.Panicf("could not generate disperser keypair: %v", err)
-	}
-	env.DisperserAddress = disperserAddress
-	env.DisperserKMSKeyID = keyID
-
-	log.Print("Updating disperser address")
-	err = env.updateDisperserAddress()
-	if err != nil {
-		log.Panicf("could not update disperser address: %v", err)
 	}
 
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
@@ -189,7 +181,10 @@ func (env *Config) DeployExperiment() {
 }
 
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
-func generateDisperserKeypair() (string, gcommon.Address, error) {
+func (env *Config) generateDisperserKeypair() error {
+
+	// Generate a keypair in AWS KMS
+
 	keyManager := kms.New(kms.Options{
 		Region:       "us-east-1",
 		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
@@ -204,25 +199,24 @@ func generateDisperserKeypair() (string, gcommon.Address, error) {
 			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
 			err = nil
 		}
-		return "", gcommon.Address{}, err
+		return err
 	}
 
-	keyID := *createKeyOutput.KeyMetadata.KeyId
+	env.DisperserKMSKeyID = *createKeyOutput.KeyMetadata.KeyId
 
-	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
+	// Load the public key and convert it to an Ethereum address
+
+	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, env.DisperserKMSKeyID)
 	if err != nil {
-		return "", gcommon.Address{}, err
+		return fmt.Errorf("could not load public key: %v", err)
 	}
 
-	publicAddress := crypto.PubkeyToAddress(*key)
+	env.DisperserAddress = crypto.PubkeyToAddress(*key)
+	log.Printf("Generated disperser keypair: key ID: %s, address: %s",
+		env.DisperserKMSKeyID, env.DisperserAddress.Hex())
 
-	log.Printf("Generated disperser keypair: key ID: %s, address: %s", keyID, publicAddress.Hex())
+	// Write the disperser's public key to on-chain storage
 
-	return keyID, publicAddress, nil
-}
-
-// updateDisperserAddress updates the disperser address in the retriever contract
-func (env *Config) updateDisperserAddress() error {
 	pk := env.Pks.EcdsaMap["default"].PrivateKey
 	pk = strings.TrimPrefix(pk, "0x")
 	pk = strings.TrimPrefix(pk, "0X")
@@ -256,6 +250,8 @@ func (env *Config) updateDisperserAddress() error {
 	if err != nil {
 		return fmt.Errorf("could not set disperser address: %v", err)
 	}
+
+	// Read the disperser's public key from on-chain storage to verify it was written correctly
 
 	address, err := writer.GetDisperserAddress(context.Background(), 0)
 	if err != nil {
