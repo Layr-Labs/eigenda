@@ -109,15 +109,15 @@ var _ = BeforeSuite(func() {
 			testConfig.StartGraphNode()
 		}
 
+		loggerConfig := common.DefaultLoggerConfig()
+		logger, err = common.NewLogger(loggerConfig)
+		Expect(err).To(BeNil())
+
 		fmt.Println("Updating disperser address")
 		updateDisperserAddress()
 
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment() ////////////////////////////////////////// TODO
-
-		loggerConfig := common.DefaultLoggerConfig()
-		logger, err = common.NewLogger(loggerConfig)
-		Expect(err).To(BeNil())
 
 		ethClient = buildEthClient(numConfirmations)
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
