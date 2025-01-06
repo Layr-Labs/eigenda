@@ -56,11 +56,10 @@ func BytesToBN254G2Point(bytes []byte) (*verifierBindings.BN254G2Point, error) {
 		return nil, fmt.Errorf("deserialize g2 point: %s", err)
 	}
 
-	var x [2]*big.Int
+	var x, y [2]*big.Int
 	x[0] = g2Point.X.A0.BigInt(new(big.Int))
 	x[1] = g2Point.X.A1.BigInt(new(big.Int))
 
-	var y [2]*big.Int
 	y[0] = g2Point.Y.A0.BigInt(new(big.Int))
 	y[1] = g2Point.Y.A1.BigInt(new(big.Int))
 

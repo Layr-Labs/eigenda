@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -22,9 +23,9 @@ type BlobVerifier struct {
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-// the eth RPC URL that will be connected to in this constructor
+	// the eth RPC URL that will be connected to
 	ethRpcUrl string,
-// the hex address of the verifyBlobV2FromSignedBatch contract
+	// the hex address of the verifyBlobV2FromSignedBatch contract
 	verifyBlobV2FromSignedBatchAddress string) (*BlobVerifier, error) {
 
 	ethClient, err := ethclient.Dial(ethRpcUrl)
@@ -55,10 +56,10 @@ func NewBlobVerifier(
 // This method is not threadsafe.
 func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	ctx context.Context,
-// The signed batch that contains the blob being verified. This is obtained from the disperser, and is used
-// to verify that the described blob actually exists in a valid batch.
+	// The signed batch that contains the blob being verified. This is obtained from the disperser, and is used
+	// to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
-// Contains all necessary information about the blob, so that it can be verified.
+	// Contains all necessary information about the blob, so that it can be verified.
 	blobVerificationProof *disperser.BlobVerificationInfo,
 ) error {
 	convertedSignedBatch, err := signedBatch.ToBinding()
