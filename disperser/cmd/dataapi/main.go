@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -33,7 +34,7 @@ var (
 	gitDate   string
 )
 
-// @title			EigenDA Data Access API
+// @title			EigenDA Data Access API V1
 // @description	This is the EigenDA Data Access API server.
 // @version		1
 // @Schemes		https http
@@ -131,7 +132,7 @@ func RunDataApi(ctx *cli.Context) error {
 
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		serverv2 := dataapi.NewServerV2(
+		serverv2 := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,

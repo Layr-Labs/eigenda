@@ -11,8 +11,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// operatorHandler handles operations to collect and process operators info.
-type operatorHandler struct {
+// OperatorHandler handles operations to collect and process operators info.
+type OperatorHandler struct {
 	// For visibility
 	logger  logging.Logger
 	metrics *Metrics
@@ -24,8 +24,8 @@ type operatorHandler struct {
 	subgraphClient    SubgraphClient
 }
 
-func newOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *operatorHandler {
-	return &operatorHandler{
+func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *OperatorHandler {
+	return &OperatorHandler{
 		logger:            logger,
 		metrics:           metrics,
 		chainReader:       chainReader,
@@ -35,7 +35,7 @@ func newOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 	}
 }
 
-func (oh *operatorHandler) probeOperatorHosts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
+func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
 	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
 	if err != nil {
 		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
@@ -65,7 +65,7 @@ func (oh *operatorHandler) probeOperatorHosts(ctx context.Context, operatorId st
 	return portCheckResponse, nil
 }
 
-func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
+func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
 	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
@@ -109,7 +109,7 @@ func (oh *operatorHandler) getOperatorsStake(ctx context.Context, operatorId str
 	}, nil
 }
 
-func (s *operatorHandler) scanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
+func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
 	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
