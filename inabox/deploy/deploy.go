@@ -165,17 +165,17 @@ func (env *Config) DeployExperiment() {
 	env.GenerateAllVariables()
 
 	// TODO this is causing problems
-	log.Print("Generating disperser keypair")
-	err = env.generateDisperserKeypair()
-	if err != nil {
-		log.Panicf("could not generate disperser keypair: %v", err)
-	}
+	//log.Print("Generating disperser keypair")
+	//err = env.generateDisperserKeypair()
+	//if err != nil {
+	//	log.Panicf("could not generate disperser keypair: %v", err)
+	//}
 
 	fmt.Println("Test environment has successfully deployed!")
 }
 
 // GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
-func (env *Config) generateDisperserKeypair() error {
+func (env *Config) GenerateDisperserKeypair() error {
 
 	// Generate a keypair in AWS KMS
 
