@@ -361,7 +361,7 @@ func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Add
 		return fmt.Errorf("failed to create transaction for setting disperser address: %w", err)
 	}
 
-	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(ctx, transaction, "SetDisperserAddress", nil)
+	err = t.ethClient.SendTransaction(ctx, transaction)
 	if err != nil {
 		return fmt.Errorf("failed to set disperser address: %w", err)
 	}
