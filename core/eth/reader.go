@@ -437,7 +437,7 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 	if err != nil {
 
 		// TODO don't merge this
-		b := make([]byte, 2048) // adjust buffer size to be larger than expected stack
+		b := make([]byte, 1024*32) // adjust buffer size to be larger than expected stack
 		n := runtime.Stack(b, false)
 		s := string(b[:n])
 
