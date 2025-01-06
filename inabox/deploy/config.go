@@ -1,16 +1,9 @@
 package deploy
 
 import (
-	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/kms"
-	"github.com/aws/aws-sdk-go-v2/service/kms/types"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"log"
 	"math/big"
 	"path/filepath"
@@ -579,41 +572,6 @@ func (env *Config) getKey(name string) (key, address string) {
 	return
 }
 
-// GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
-func generateDisperserKeypair() (string, gethcommon.Address, error) {
-	keyManager := kms.New(kms.Options{
-		Region:       "us-east-1",
-		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
-	})
-
-	log.Printf("Generating disperser keypair")
-
-	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
-		KeySpec:  types.KeySpecEccSecgP256k1,
-		KeyUsage: types.KeyUsageTypeSignVerify,
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), "connect: connection refused") {
-			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
-			err = nil
-		}
-		return "", gethcommon.Address{}, err
-	}
-
-	keyID := *createKeyOutput.KeyMetadata.KeyId
-
-	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
-	if err != nil {
-		return "", gethcommon.Address{}, err
-	}
-
-	publicAddress := crypto.PubkeyToAddress(*key)
-
-	log.Printf("Generated disperser keypair: key ID: %s, address: %s", keyID, publicAddress.Hex())
-
-	return keyID, publicAddress, nil
-}
-
 // GenerateAllVariables all of the config for the test environment.
 // Returns an object that corresponds to the participants of the
 // current experiment.
@@ -624,12 +582,6 @@ func (env *Config) GenerateAllVariables() {
 	// Create envs directory
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
-
-	disperserKeyID, disperserAddress, err := generateDisperserKeypair()
-	if err != nil {
-		log.Fatalf("Error generating disperser keypair: %v", err)
-	}
-	env.DisperserAddress = disperserAddress
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"
@@ -776,7 +728,7 @@ func (env *Config) GenerateAllVariables() {
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl, disperserKeyID)
+	controllerConfig := env.generateControllerVars(0, graphUrl, env.DisperserKMSKeyID)
 	writeEnv(controllerConfig.getEnvMap(), envFile)
 	env.Controller = controllerConfig
 

@@ -185,10 +185,13 @@ type Config struct {
 
 	// DisperserAddress is the address of disperser 0 (aka the only disperser at the current time)
 	DisperserAddress common.Address
+
+	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
+	DisperserKMSKeyID string
 }
 
-func (c Config) IsEigenDADeployed() bool {
-	return c.EigenDA.ServiceManager != ""
+func (env *Config) IsEigenDADeployed() bool {
+	return env.EigenDA.ServiceManager != ""
 }
 
 func NewTestConfig(testName, rootPath string) (testEnv *Config) {

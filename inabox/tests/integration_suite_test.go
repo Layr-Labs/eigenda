@@ -113,9 +113,6 @@ var _ = BeforeSuite(func() {
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
 
-		fmt.Println("Updating disperser address")
-		updateDisperserAddress()
-
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment() ////////////////////////////////////////// TODO
 
@@ -136,6 +133,7 @@ var _ = BeforeSuite(func() {
 	}
 })
 
+// TODO revert this change
 // buildEthClient builds an Ethereum client with the given number of required confirmations
 func buildEthClient(confirmations int) common.EthClient {
 	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
@@ -151,36 +149,6 @@ func buildEthClient(confirmations int) common.EthClient {
 
 	Expect(err).To(BeNil())
 	return ec
-}
-
-// updateDisperserAddress updates the disperser address in the retriever contract
-func updateDisperserAddress() {
-	nonConfirmingClient := buildEthClient(0)
-
-	writer, err := eth.NewWriter(
-		logger,
-		nonConfirmingClient,
-		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
-		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
-	Expect(err).To(BeNil())
-	err = writer.SetDisperserAddress(context.Background(), testConfig.DisperserAddress)
-	Expect(err).To(BeNil())
-
-	maxWaitTime := time.Minute
-	start := time.Now()
-	ticker := time.NewTicker(time.Second)
-	for time.Since(start) < maxWaitTime {
-		address, err := writer.GetDisperserAddress(context.Background(), 0)
-		if err == nil {
-			Expect(address).To(Equal(testConfig.DisperserAddress))
-			return
-		}
-
-		fmt.Printf("Error reading disperser address. Will keep retrying for %v. %s\n",
-			maxWaitTime-time.Since(start), err)
-		<-ticker.C
-	}
-	Fail("Failed to get disperser address")
 }
 
 func setupRetrievalClient(testConfig *deploy.Config) error {

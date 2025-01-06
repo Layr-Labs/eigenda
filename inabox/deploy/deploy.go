@@ -4,6 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
+	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
+	"github.com/aws/aws-sdk-go-v2/service/kms/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"io"
 	"log"
 	"math/big"
@@ -11,11 +21,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-
-	"github.com/Layr-Labs/eigenda/common"
-	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
-	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -151,6 +157,20 @@ func (env *Config) DeployExperiment() {
 		env.deployEigenDAContracts()
 	}
 
+	log.Print("Generating disperser keypair")
+	keyID, disperserAddress, err := generateDisperserKeypair()
+	if err != nil {
+		log.Panicf("could not generate disperser keypair: %v", err)
+	}
+	env.DisperserAddress = disperserAddress
+	env.DisperserKMSKeyID = keyID
+
+	log.Print("Updating disperser address")
+	err = env.updateDisperserAddress()
+	if err != nil {
+		log.Panicf("could not update disperser address: %v", err)
+	}
+
 	if deployer, ok := env.GetDeployer(env.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
 		startBlock := GetLatestBlockNumber(env.Deployers[0].RPC)
 		env.deploySubgraphs(startBlock)
@@ -166,6 +186,87 @@ func (env *Config) DeployExperiment() {
 	env.GenerateAllVariables()
 
 	fmt.Println("Test environment has successfully deployed!")
+}
+
+// GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
+func generateDisperserKeypair() (string, gcommon.Address, error) {
+	keyManager := kms.New(kms.Options{
+		Region:       "us-east-1",
+		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
+	})
+
+	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{
+		KeySpec:  types.KeySpecEccSecgP256k1,
+		KeyUsage: types.KeyUsageTypeSignVerify,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "connect: connection refused") {
+			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
+			err = nil
+		}
+		return "", gcommon.Address{}, err
+	}
+
+	keyID := *createKeyOutput.KeyMetadata.KeyId
+
+	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, keyID)
+	if err != nil {
+		return "", gcommon.Address{}, err
+	}
+
+	publicAddress := crypto.PubkeyToAddress(*key)
+
+	log.Printf("Generated disperser keypair: key ID: %s, address: %s", keyID, publicAddress.Hex())
+
+	return keyID, publicAddress, nil
+}
+
+// updateDisperserAddress updates the disperser address in the retriever contract
+func (env *Config) updateDisperserAddress() error {
+	pk := env.Pks.EcdsaMap["default"].PrivateKey
+	pk = strings.TrimPrefix(pk, "0x")
+	pk = strings.TrimPrefix(pk, "0X")
+
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return fmt.Errorf("could not create logger: %v", err)
+	}
+
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{env.Deployers[0].RPC},
+		PrivateKeyString: pk,
+		NumConfirmations: 0,
+		NumRetries:       0,
+	}, gcommon.Address{}, logger)
+	if err != nil {
+		return fmt.Errorf("could not create eth client: %v", err)
+	}
+
+	writer, err := eth.NewWriter(
+		logger,
+		ethClient,
+		env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		env.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	if err != nil {
+		return fmt.Errorf("could not create writer: %v", err)
+	}
+
+	err = writer.SetDisperserAddress(context.Background(), env.DisperserAddress)
+	if err != nil {
+		return fmt.Errorf("could not set disperser address: %v", err)
+	}
+
+	address, err := writer.GetDisperserAddress(context.Background(), 0)
+	if err != nil {
+		return fmt.Errorf("could not get disperser address: %v", err)
+	}
+
+	if address != env.DisperserAddress {
+		return fmt.Errorf("expected disperser address %s, got %s", env.DisperserAddress, address)
+	}
+
+	return nil
 }
 
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint32]string {
