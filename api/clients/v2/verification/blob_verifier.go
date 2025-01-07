@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common"
+
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // BlobVerifier is responsible for making eth calls to verify blobs that have been received by the client
@@ -16,30 +17,22 @@ import (
 // Blob verification is not threadsafe.
 type BlobVerifier struct {
 	// the eth client that calls will be made to
-	ethClient *ethclient.Client
+	ethClient *common.EthClient
 	// go binding around the verifyBlobV2FromSignedBatch ethereum contract
 	blobVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
 }
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-	// the eth RPC URL that will be connected to
-	ethRpcUrl string,
-	// the hex address of the verifyBlobV2FromSignedBatch contract
-	verifyBlobV2FromSignedBatchAddress string) (*BlobVerifier, error) {
-
-	ethClient, err := ethclient.Dial(ethRpcUrl)
-	if err != nil {
-		return nil, fmt.Errorf("dial ETH RPC node: %s", err)
-	}
+	ethClient *common.EthClient,               // the eth client, which should already be set up
+	verifyBlobV2FromSignedBatchAddress string, // the hex address of the verifyBlobV2FromSignedBatch contract
+) (*BlobVerifier, error) {
 
 	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
-		ethcommon.HexToAddress(verifyBlobV2FromSignedBatchAddress),
-		ethClient)
+		gethcommon.HexToAddress(verifyBlobV2FromSignedBatchAddress),
+		*ethClient)
 
 	if err != nil {
-		ethClient.Close()
-
 		return nil, fmt.Errorf("bind to verifier contract at %s: %s", verifyBlobV2FromSignedBatchAddress, err)
 	}
 
@@ -82,9 +75,4 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	}
 
 	return nil
-}
-
-// Close closes the eth client. This method is threadsafe.
-func (v *BlobVerifier) Close() {
-	v.ethClient.Close()
 }
