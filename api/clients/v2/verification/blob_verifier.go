@@ -40,8 +40,6 @@ func NewBlobVerifier(
 // VerifyBlobV2FromSignedBatch makes a call to the verifyBlobV2FromSignedBatch contract
 //
 // This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
-//
-// This method is not threadsafe.
 func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	ctx context.Context,
 	// The signed batch that contains the blob being verified. This is obtained from the disperser, and is used
