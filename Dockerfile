@@ -15,6 +15,7 @@ FROM base-builder AS common-builder
 WORKDIR /app
 COPY . .
 RUN go mod download
+COPY ~/go/pkg/mod ~/go/pkg/mod
 
 # Churner build stage
 FROM common-builder AS churner-builder
