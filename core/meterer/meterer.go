@@ -99,7 +99,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint, quorumNumbers []uint8) error {
-	m.logger.Info("Recording and validating reservation usage", "reservation", reservation)
+	m.logger.Info("Recording and validating reservation usage", "header", header, "reservation", reservation)
 	if !reservation.IsActive(uint64(time.Now().Unix())) {
 		return fmt.Errorf("reservation not active")
 	}
@@ -188,7 +188,7 @@ func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, numSymbols uint, headerQuorums []uint8) error {
-	m.logger.Info("Recording and validating on-demand usage", "onDemandPayment", onDemandPayment)
+	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
