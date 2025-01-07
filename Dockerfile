@@ -17,7 +17,6 @@ COPY . .
 
 # Churner build stage
 FROM common-builder AS churner-builder
-COPY operators ./operators
 WORKDIR /app/operators
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -39,7 +38,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # DataAPI build stage
 FROM common-builder AS dataapi-builder
-COPY operators ./operators
 WORKDIR /app/disperser
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -54,9 +52,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Retriever build stage
 FROM common-builder AS retriever-builder
-COPY retriever /app/retriever
-COPY node /app/node
-COPY operators ./operators
 WORKDIR /app/retriever
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -67,8 +62,6 @@ FROM common-builder AS node-builder
 ARG SEMVER
 ARG GITCOMMIT
 ARG GITDATE
-COPY node /app/node
-COPY operators ./operators
 WORKDIR /app/node
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -76,8 +69,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Nodeplugin build stage
 FROM common-builder AS node-plugin-builder
-COPY ./node /app/node
-COPY operators ./operators
 WORKDIR /app/node
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
