@@ -41,6 +41,8 @@ func NewBlobVerifier(
 // VerifyBlobV2FromSignedBatch calls the verifyBlobV2FromSignedBatch view function on the EigenDABlobVerifier contract
 //
 // This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
+//
+// It is the responsibility of the caller to configure a timeout on the ctx, if a timeout is required.
 func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	ctx context.Context,
 	// The signed batch that contains the blob being verified. This is obtained from the disperser, and is used
