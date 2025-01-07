@@ -13,8 +13,8 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 # Common build stage
 FROM base-builder AS common-builder
 WORKDIR /app
-RUN go mod tidy
 COPY . .
+RUN go mod tidy
 
 # Churner build stage
 FROM common-builder AS churner-builder
