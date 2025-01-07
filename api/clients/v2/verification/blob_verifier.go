@@ -13,8 +13,6 @@ import (
 )
 
 // BlobVerifier is responsible for making eth calls to verify blobs that have been received by the client
-//
-// Blob verification is not threadsafe.
 type BlobVerifier struct {
 	// go binding around the verifyBlobV2FromSignedBatch ethereum contract
 	blobVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
