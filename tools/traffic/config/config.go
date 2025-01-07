@@ -3,10 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/retriever"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli"
@@ -55,7 +56,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		customQuorumsUint8[i] = uint8(q)
 	}
 
-	retrieverConfig := retriever.ReadRetrieverConfig(ctx)
+	retrieverConfig, err := retriever.NewConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	config := &Config{
 		DisperserClientConfig: &clients.Config{
