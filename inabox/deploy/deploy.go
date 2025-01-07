@@ -210,9 +210,9 @@ func (env *Config) GenerateDisperserKeypair(ethClient common.EthClient) error {
 
 	// Write the disperser's public key to on-chain storage
 
-	pk := env.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
+	//pk := env.Pks.EcdsaMap["default"].PrivateKey
+	//pk = strings.TrimPrefix(pk, "0x")
+	//pk = strings.TrimPrefix(pk, "0X")
 
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
