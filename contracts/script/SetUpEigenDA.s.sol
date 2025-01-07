@@ -182,7 +182,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumSplits: hex"3232"
         });
         vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(address(0x641691973c98dFe68b07Ee3613E270406285DFE8), reservation1);
+        paymentVault.setReservation(address(0x1aa8226f6d354380dDE75eE6B634875c4203e522), reservation1);
 
         // small reservation
         IPaymentVault.Reservation memory reservation2 = IPaymentVault.Reservation({
@@ -192,11 +192,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        paymentVault.setReservation(address(0x56242c5e4C968669FE04331AC89967a7F5A06B24), reservation2);
+        paymentVault.setReservation(address(0x1113cAAD341fa57b14bBCfFa69b591f7032588C0), reservation2);
 
         // Deposit OnDemand 
-        paymentVault.depositOnDemand{value: 0.1 ether}(address(0x641691973c98dFe68b07Ee3613E270406285DFE8));
-        paymentVault.depositOnDemand{value: 2000 gwei}(address(0x55c781dd60F8418Fc8a65D14907aFF47C903a559));
+        paymentVault.depositOnDemand{value: 0.1 ether}(address(0x1aa8226f6d354380dDE75eE6B634875c4203e522));
+        paymentVault.depositOnDemand{value: 2000 gwei}(address(0xFCAd0B19bB29D4674531d6f115237E16AfCE377c));
 
         vm.stopBroadcast();
         // Deposit stakers into EigenLayer and delegate to operators
