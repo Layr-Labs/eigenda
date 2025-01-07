@@ -181,12 +181,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address clientAddress = address(0x641691973c98dFe68b07Ee3613E270406285DFE8);
         vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand 
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
-        vm.stopBroadcast();
+        paymentVault.setReservation(address(0x641691973c98dFe68b07Ee3613E270406285DFE8), reservation1);
 
         // small reservation
         IPaymentVault.Reservation memory reservation2 = IPaymentVault.Reservation({
