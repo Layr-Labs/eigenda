@@ -1,4 +1,4 @@
-package common
+package aws
 
 import (
 	"bytes"

@@ -55,6 +55,9 @@ type requestAuthenticator struct {
 	// authenticationTimeoutDuration is the duration for which an auth is valid.
 	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
 	authenticationTimeoutDuration time.Duration
+
+	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
+	disperserIDFilter func(uint32) bool
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
@@ -64,6 +67,7 @@ func NewRequestAuthenticator(
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
 	authenticationTimeoutDuration time.Duration,
+	disperserIDFilter func(uint32) bool,
 	now time.Time) (RequestAuthenticator, error) {
 
 	keyCache, err := lru.New[uint32, *keyWithTimeout](keyCacheSize)
@@ -82,6 +86,7 @@ func NewRequestAuthenticator(
 		keyTimeoutDuration:            keyTimeoutDuration,
 		authenticatedDispersers:       authenticatedDispersers,
 		authenticationTimeoutDuration: authenticationTimeoutDuration,
+		disperserIDFilter:             disperserIDFilter,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
@@ -132,6 +137,11 @@ func (a *requestAuthenticator) getDisperserKey(
 	ctx context.Context,
 	now time.Time,
 	disperserID uint32) (*gethcommon.Address, error) {
+
+	if !a.disperserIDFilter(disperserID) {
+		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
+	}
+
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {
 		expirationTime := key.expiration

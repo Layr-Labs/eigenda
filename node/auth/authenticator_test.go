@@ -9,6 +9,7 @@ import (
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -30,6 +31,7 @@ func TestValidRequest(t *testing.T) {
 		10,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -60,6 +62,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		10,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -93,6 +96,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		10,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -113,33 +117,59 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 
 	start := rand.Time()
 
-	publicKey, _ := rand.ECDSA()
-	disperserAddress := crypto.PubkeyToAddress(*publicKey)
+	publicKey0, privateKey0 := rand.ECDSA()
+	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
+
+	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
+	publicKey1, privateKey1 := rand.ECDSA()
+	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
 
 	chainReader := wmock.MockWriter{}
-	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+	chainReader.Mock.On("GetDisperserAddress", uint32(0)).Return(disperserAddress0, nil)
+	chainReader.Mock.On("GetDisperserAddress", uint32(1)).Return(disperserAddress1, nil)
 	chainReader.Mock.On("GetDisperserAddress", uint32(1234)).Return(
 		nil, errors.New("disperser not found"))
+
+	filterCallCount := atomic.Uint32{}
 
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
 		&chainReader,
 		10,
 		time.Minute,
-		time.Minute,
+		0, /* disable auth caching */
+		func(id uint32) bool {
+			filterCallCount.Add(1)
+			return id != uint32(1)
+		},
 		start)
 	require.NoError(t, err)
+	require.Equal(t, uint32(1), filterCallCount.Load())
 
 	request := RandomStoreChunksRequest(rand)
-	request.DisperserID = 1234
-
-	_, differentPrivateKey := rand.ECDSA()
-	signature, err := SignStoreChunksRequest(differentPrivateKey, request)
+	request.DisperserID = 0
+	signature, err := SignStoreChunksRequest(privateKey0, request)
 	require.NoError(t, err)
 	request.Signature = signature
+	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), "localhost", request, start)
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), filterCallCount.Load())
 
+	request.DisperserID = 1
+	signature, err = SignStoreChunksRequest(privateKey1, request)
+	require.NoError(t, err)
+	request.Signature = signature
 	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), "localhost", request, start)
 	require.Error(t, err)
+	require.Equal(t, uint32(3), filterCallCount.Load())
+
+	request.DisperserID = 1234
+	signature, err = SignStoreChunksRequest(privateKey1, request)
+	require.NoError(t, err)
+	request.Signature = signature
+	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), "localhost", request, start)
+	require.Error(t, err)
+	require.Equal(t, uint32(4), filterCallCount.Load())
 }
 
 func TestAuthCaching(t *testing.T) {
@@ -159,6 +189,7 @@ func TestAuthCaching(t *testing.T) {
 		10,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -224,6 +255,7 @@ func TestAuthCachingDisabled(t *testing.T) {
 		10,
 		time.Minute,
 		0, // This disables auth caching
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -267,6 +299,7 @@ func TestKeyExpiry(t *testing.T) {
 		10,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -321,6 +354,7 @@ func TestAuthCacheSize(t *testing.T) {
 		cacheSize,
 		time.Minute,
 		time.Minute,
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -411,6 +445,7 @@ func TestKeyCacheSize(t *testing.T) {
 		cacheSize,
 		time.Minute,
 		0, // disable auth caching
+		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
