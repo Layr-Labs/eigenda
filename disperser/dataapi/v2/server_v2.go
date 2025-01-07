@@ -34,6 +34,7 @@ const (
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
 	maxOperatorsStakeAge    = 300 // not expect the stake change to happen frequently
+	maxOperatorResponseAge  = 300 // this is completely static
 	maxOperatorPortCheckAge = 60
 	maxMetricAge            = 10
 	maxThroughputAge        = 10
@@ -83,6 +84,10 @@ type (
 
 	OperatorsStakeResponse struct {
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+
+	OperatorDispersalResponse struct {
+		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
 	}
 
 	OperatorPortCheckResponse struct {
@@ -189,6 +194,7 @@ func (s *ServerV2) Start() error {
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
 			operators.GET("/reachability", s.CheckOperatorsReachability)
+			operators.GET("/response/:batch_header_hash", s.FetchOperatorResponse)
 		}
 		metrics := v2.Group("/metrics")
 		{
@@ -502,6 +508,53 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, report)
+}
+
+// FetchOperatorResponse godoc
+//
+//	@Summary	Fetch operator attestation response for a batch
+//	@Tags		Operators
+//	@Produce	json
+//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
+//	@Param		operator_id			query		string	false	"Operator ID in hex string"
+//	@Success	200					{object}	OperatorDispersalResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/{batch_header_hash} [get]
+func (s *ServerV2) FetchOperatorResponse(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorResponse", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	batchHeaderHashHex := c.Param("batch_header_hash")
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorResponse")
+		errorResponse(c, errors.New("invalid batch header hash"))
+		return
+	}
+	operatorIdStr := c.DefaultQuery("operator_id", "")
+	operatorId, err := core.OperatorIDFromHex(operatorIdStr)
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorResponse")
+		errorResponse(c, errors.New("invalid operatorId"))
+		return
+	}
+
+	operatorResponse, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorResponse")
+		errorResponse(c, err)
+		return
+	}
+	response := &OperatorDispersalResponse{
+		Response: operatorResponse,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorResponse")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
+	c.JSON(http.StatusOK, response)
 }
 
 // CheckOperatorsReachability godoc
