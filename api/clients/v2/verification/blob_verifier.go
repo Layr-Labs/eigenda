@@ -12,24 +12,25 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// BlobVerifier is responsible for making eth calls to verify blobs that have been received by the client
+// BlobVerifier is responsible for making eth calls against the BlobVerifier contract to ensure cryptographic and
+// structural integrity of V2 certificates
 type BlobVerifier struct {
-	// go binding around the verifyBlobV2FromSignedBatch ethereum contract
+	// go binding around the EigenDABlobVerifier ethereum contract
 	blobVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
 }
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-	ethClient *common.EthClient,               // the eth client, which should already be set up
-	verifyBlobV2FromSignedBatchAddress string, // the hex address of the verifyBlobV2FromSignedBatch contract
+	ethClient *common.EthClient, // the eth client, which should already be set up
+	blobVerifierAddress string, // the hex address of the EigenDABlobVerifier contract
 ) (*BlobVerifier, error) {
 
 	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
-		gethcommon.HexToAddress(verifyBlobV2FromSignedBatchAddress),
+		gethcommon.HexToAddress(blobVerifierAddress),
 		*ethClient)
 
 	if err != nil {
-		return nil, fmt.Errorf("bind to verifier contract at %s: %s", verifyBlobV2FromSignedBatchAddress, err)
+		return nil, fmt.Errorf("bind to verifier contract at %s: %s", blobVerifierAddress, err)
 	}
 
 	return &BlobVerifier{
@@ -37,7 +38,7 @@ func NewBlobVerifier(
 	}, nil
 }
 
-// VerifyBlobV2FromSignedBatch makes a call to the verifyBlobV2FromSignedBatch contract
+// VerifyBlobV2FromSignedBatch calls the verifyBlobV2FromSignedBatch view function on the EigenDABlobVerifier contract
 //
 // This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
 func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
