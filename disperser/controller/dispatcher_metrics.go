@@ -1,10 +1,11 @@
 package controller
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"time"
 )
 
 const dispatcherNamespace = "eigenda_dispatcher"
@@ -140,9 +141,10 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	putDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace: dispatcherNamespace,
-			Name:      "put_dispersal_latency_ms",
-			Help:      "The time required to put the dispersal request (part of HandleBatch()).",
+			Namespace:  dispatcherNamespace,
+			Name:       "put_dispersal_latency_ms",
+			Help:       "The time required to put the dispersal request (part of HandleBatch()).",
+			Objectives: objectives,
 		},
 		[]string{},
 	)
@@ -168,9 +170,10 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	putDispersalResponseLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace: dispatcherNamespace,
-			Name:      "put_dispersal_response_latency_ms",
-			Help:      "The time required to put the dispersal response (part of HandleBatch()).",
+			Namespace:  dispatcherNamespace,
+			Name:       "put_dispersal_response_latency_ms",
+			Help:       "The time required to put the dispersal response (part of HandleBatch()).",
+			Objectives: objectives,
 		},
 		[]string{},
 	)
