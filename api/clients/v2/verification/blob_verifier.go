@@ -16,8 +16,6 @@ import (
 //
 // Blob verification is not threadsafe.
 type BlobVerifier struct {
-	// the eth client that calls will be made to
-	ethClient *common.EthClient
 	// go binding around the verifyBlobV2FromSignedBatch ethereum contract
 	blobVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
 }
@@ -37,7 +35,6 @@ func NewBlobVerifier(
 	}
 
 	return &BlobVerifier{
-		ethClient:          ethClient,
 		blobVerifierCaller: verifierCaller,
 	}, nil
 }
