@@ -281,7 +281,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
+	reservationPeriodRecords, err := s.meterer.OffchainStore.GetReservationPeriodRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
@@ -335,7 +335,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
-		BinRecords:               binRecords[:],
+		ReservationPeriodRecords: reservationPeriodRecords[:],
 		Reservation:              pbReservation,
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,

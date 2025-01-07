@@ -35,7 +35,9 @@ type Config struct {
 	EncodingConfig              kzg.KzgConfig
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
-	UpdateInterval              int
+	OnchainUpdateInterval       int
+	OffchainMaxOnDemandStorage  int
+	OffchainMaxReservedPeriods  int
 	ChainReadTimeout            int
 	ReservationsTableName       string
 	OnDemandTableName           string
@@ -119,12 +121,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
 		BucketTableName:             ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:             ctx.GlobalInt(flags.BucketStoreSize.Name),
-		UpdateInterval:              ctx.GlobalInt(flags.UpdateInterval.Name),
+		OnchainUpdateInterval:       ctx.GlobalInt(flags.OnchainUpdateInterval.Name),
 		ChainReadTimeout:            ctx.GlobalInt(flags.ChainReadTimeout.Name),
 		EthClientConfig:             geth.ReadEthClientConfigRPCOnly(ctx),
 		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
+		OffchainMaxOnDemandStorage:  ctx.GlobalInt(flags.OffchainMaxOnDemandStorage.Name),
+		OffchainMaxReservedPeriods:  ctx.GlobalInt(flags.OffchainMaxReservedPeriods.Name),
 
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
