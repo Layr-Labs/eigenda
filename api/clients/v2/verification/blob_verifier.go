@@ -48,12 +48,12 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	// Contains all necessary information about the blob, so that it can be verified.
 	blobVerificationProof *disperser.BlobVerificationInfo,
 ) error {
-	convertedSignedBatch, err := signedBatch.ToBinding()
+	convertedSignedBatch, err := verifierBindings.ConvertSignedBatch(signedBatch)
 	if err != nil {
 		return fmt.Errorf("convert signed batch: %s", err)
 	}
 
-	convertedBlobVerificationProof, err := blobVerificationProof.ToBinding()
+	convertedBlobVerificationProof, err := verifierBindings.ConvertVerificationProof(blobVerificationProof)
 	if err != nil {
 		return fmt.Errorf("convert blob verification proof: %s", err)
 	}
