@@ -13,16 +13,7 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 # Common build stage
 FROM base-builder AS common-builder
 WORKDIR /app
-COPY go.mod go.sum ./
-COPY disperser /app/disperser
-COPY common /app/common
-COPY core /app/core
-COPY api /app/api
-COPY contracts /app/contracts
-COPY indexer /app/indexer
-COPY encoding /app/encoding
-COPY relay /app/relay
-COPY inabox /app/inabox
+COPY . .
 
 # Churner build stage
 FROM common-builder AS churner-builder
