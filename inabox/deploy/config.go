@@ -323,8 +323,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateControllerVars(
 	ind int,
-	graphUrl string,
-	disperserKeyID string) ControllerVars {
+	graphUrl string) ControllerVars {
 
 	v := ControllerVars{
 		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
@@ -348,7 +347,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
-		CONTROLLER_DISPERSER_KMS_KEY_ID:                    disperserKeyID,
+		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -728,7 +727,7 @@ func (env *Config) GenerateAllVariables() {
 	// Controller
 	name = "controller0"
 	_, _, _, envFile = env.getPaths(name)
-	controllerConfig := env.generateControllerVars(0, graphUrl, env.DisperserKMSKeyID)
+	controllerConfig := env.generateControllerVars(0, graphUrl)
 	writeEnv(controllerConfig.getEnvMap(), envFile)
 	env.Controller = controllerConfig
 

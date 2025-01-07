@@ -160,21 +160,20 @@ func (env *Config) DeployExperiment() {
 		env.deploySubgraphs(startBlock)
 	}
 
+	fmt.Println("Generating disperser keypair")
+	err = env.GenerateDisperserKeypair()
+	if err != nil {
+		log.Panicf("could not generate disperser keypair: %v", err)
+	}
+
 	fmt.Println("Generating variables")
 	env.GenerateAllVariables()
-
-	// TODO this is causing problems
-	//log.Print("Generating disperser keypair")
-	//err = env.generateDisperserKeypair()
-	//if err != nil {
-	//	log.Panicf("could not generate disperser keypair: %v", err)
-	//}
 
 	fmt.Println("Test environment has successfully deployed!")
 }
 
-// GenerateDisperserKeypair generates a disperser keypair using AWS KMS. Returns the key ID and the public address.
-func (env *Config) GenerateDisperserKeypair(ethClient common.EthClient) error {
+// GenerateDisperserKeypair generates a disperser keypair using AWS KMS.
+func (env *Config) GenerateDisperserKeypair() error {
 
 	// Generate a keypair in AWS KMS
 
@@ -208,27 +207,19 @@ func (env *Config) GenerateDisperserKeypair(ethClient common.EthClient) error {
 	log.Printf("Generated disperser keypair: key ID: %s, address: %s",
 		env.DisperserKMSKeyID, env.DisperserAddress.Hex())
 
-	// Write the disperser's public key to on-chain storage
+	return nil
+}
 
-	//pk := env.Pks.EcdsaMap["default"].PrivateKey
-	//pk = strings.TrimPrefix(pk, "0x")
-	//pk = strings.TrimPrefix(pk, "0X")
+// RegisterDisperserKeypair registers the disperser's public key on-chain.
+func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
+
+	// Write the disperser's public key to on-chain storage
 
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		return fmt.Errorf("could not create logger: %v", err)
 	}
-
-	//ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-	//	RPCURLs:          []string{env.Deployers[0].RPC},
-	//	PrivateKeyString: pk,
-	//	NumConfirmations: 0,
-	//	NumRetries:       0,
-	//}, gcommon.Address{}, logger)
-	//if err != nil {
-	//	return fmt.Errorf("could not create eth client: %v", err)
-	//}
 
 	writer, err := eth.NewWriter(
 		logger,

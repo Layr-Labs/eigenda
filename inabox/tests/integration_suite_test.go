@@ -114,7 +114,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 
 		fmt.Println("Deploying experiment")
-		testConfig.DeployExperiment() ////////////////////////////////////////// TODO
+		testConfig.DeployExperiment()
 
 		ethClient = buildEthClient(numConfirmations)
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
@@ -123,8 +123,8 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
-		fmt.Println("Generating disperser keypair") // TODO possibly follow exemple of RegisterBlobVersionAndRelays
-		err = testConfig.GenerateDisperserKeypair(ethClient)
+		fmt.Println("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient)
 		if err != nil {
 			panic(err)
 		}
