@@ -347,7 +347,7 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AWS_ENDPOINT_URL:                        "",
 		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
-		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "true",
+		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    disperserKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
