@@ -14,9 +14,6 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 FROM base-builder AS common-builder
 WORKDIR /app
 COPY . .
-RUN go mod download
-RUN echo $GOPATH
-#COPY ~/go/pkg/mod ~/go/pkg/mod
 
 # Churner build stage
 FROM common-builder AS churner-builder
