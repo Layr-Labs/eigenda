@@ -2,9 +2,10 @@ package v2
 
 import (
 	"fmt"
+	"math"
+
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/Layr-Labs/eigenda/core"
-	"math"
 )
 
 // ToBinding converts a BatchHeader into a contractEigenDABlobVerifier.BatchHeaderV2

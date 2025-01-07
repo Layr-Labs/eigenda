@@ -2,9 +2,10 @@ package common
 
 import (
 	"fmt"
+	"math/big"
+
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	"math/big"
 )
 
 // ToBinding converts a BlobCommitment into a contractEigenDABlobVerifier.BlobCommitment

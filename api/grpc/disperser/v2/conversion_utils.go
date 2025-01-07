@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 )
