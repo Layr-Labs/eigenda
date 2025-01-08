@@ -69,7 +69,11 @@ func (s *EncoderServerV2) Start() error {
 		log.Fatalf("Could not start tcp listener: %v", err)
 	}
 
-	gs := grpc.NewServer()
+	gs := grpc.NewServer(
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		),
+	)
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
 	s.grpcMetrics.InitializeMetrics(gs)
