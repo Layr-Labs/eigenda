@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -31,21 +32,30 @@ type EncoderServerV2 struct {
 	logger      logging.Logger
 	prover      encoding.Prover
 	metrics     *Metrics
+	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
 
 	runningRequests chan struct{}
 	requestPool     chan struct{}
 }
 
-func NewEncoderServerV2(config ServerConfig, blobStore *blobstore.BlobStore, chunkWriter chunkstore.ChunkWriter, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServerV2 {
+func NewEncoderServerV2(
+	config ServerConfig,
+	blobStore *blobstore.BlobStore,
+	chunkWriter chunkstore.ChunkWriter,
+	logger logging.Logger,
+	prover encoding.Prover,
+	metrics *Metrics,
+	grpcMetrics *grpcprom.ServerMetrics,
+) *EncoderServerV2 {
 	return &EncoderServerV2{
-		config:      config,
-		blobStore:   blobStore,
-		chunkWriter: chunkWriter,
-		logger:      logger.With("component", "EncoderServer"),
-		prover:      prover,
-		metrics:     metrics,
-
+		config:          config,
+		blobStore:       blobStore,
+		chunkWriter:     chunkWriter,
+		logger:          logger.With("component", "EncoderServerV2"),
+		prover:          prover,
+		metrics:         metrics,
+		grpcMetrics:     grpcMetrics,
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
 		requestPool:     make(chan struct{}, config.RequestPoolSize),
 	}
@@ -62,6 +72,7 @@ func (s *EncoderServerV2) Start() error {
 	gs := grpc.NewServer()
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Encoder_ServiceDesc.ServiceName
