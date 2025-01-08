@@ -517,7 +517,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 		10,
 		time.Hour,
 		logger,
-		prometheus.NewRegistry())
+		prometheus.NewRegistry(),
+		disperser.MetricsConfig{
+			HTTPPort:      "9094",
+			EnableMetrics: false,
+		},
+	)
 	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())

@@ -1,12 +1,20 @@
 package apiserver
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
-	"time"
 )
 
 const namespace = "eigenda_disperser_api"
@@ -22,12 +30,18 @@ type metricsV2 struct {
 	validateDispersalRequestLatency *prometheus.SummaryVec
 	storeBlobLatency                *prometheus.SummaryVec
 	getBlobStatusLatency            *prometheus.SummaryVec
+
+	registry *prometheus.Registry
+	httpPort string
+	logger   logging.Logger
 }
 
 // newAPIServerV2Metrics creates a new metricsV2 instance.
-func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
+func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperser.MetricsConfig, logger logging.Logger) *metricsV2 {
 	grpcMetrics := grpcprom.NewServerMetrics()
 	registry.MustRegister(grpcMetrics)
+	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	registry.MustRegister(collectors.NewGoCollector())
 
 	grpcServerOption := grpc.UnaryInterceptor(
 		grpcMetrics.UnaryServerInterceptor(),
@@ -113,7 +127,27 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 		validateDispersalRequestLatency: validateDispersalRequestLatency,
 		storeBlobLatency:                storeBlobLatency,
 		getBlobStatusLatency:            getBlobStatusLatency,
+		registry:                        registry,
+		httpPort:                        metricsConfig.HTTPPort,
+		logger:                          logger.With("component", "DisperserV2Metrics"),
 	}
+}
+
+// Start starts the metrics server
+func (m *metricsV2) Start(ctx context.Context) {
+	m.logger.Info("Starting metrics server at ", "port", m.httpPort)
+	addr := fmt.Sprintf(":%s", m.httpPort)
+	go func() {
+		log := m.logger
+		mux := http.NewServeMux()
+		m.logger.Info("metrics registry", "registry", m.registry)
+		mux.Handle("/metrics", promhttp.HandlerFor(
+			m.registry,
+			promhttp.HandlerOpts{},
+		))
+		err := http.ListenAndServe(addr, mux)
+		log.Error("Prometheus server failed", "err", err)
+	}()
 }
 
 func (m *metricsV2) reportGetBlobCommitmentLatency(duration time.Duration) {
