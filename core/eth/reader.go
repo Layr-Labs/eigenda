@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"runtime"
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -435,19 +434,8 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 		Context: ctx,
 	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
-
-		// TODO don't merge this
-		b := make([]byte, 1024*64) // adjust buffer size to be larger than expected stack
-		n := runtime.Stack(b, false)
-		s := string(b[:n])
-
-		elements := strings.Split(s, "\n")
-		for _, element := range elements {
-			t.logger.Error(element)
-		}
-
 		t.logger.Errorf("Failed to fetch operator state: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
 
 	state := make(core.OperatorStakes, len(state_))

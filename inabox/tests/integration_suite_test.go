@@ -116,7 +116,17 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
 
-		ethClient = buildEthClient(numConfirmations)
+		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+		pk = strings.TrimPrefix(pk, "0x")
+		pk = strings.TrimPrefix(pk, "0X")
+		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+			RPCURLs:          []string{testConfig.Deployers[0].RPC},
+			PrivateKeyString: pk,
+			NumConfirmations: numConfirmations,
+			NumRetries:       numRetries,
+		}, gcommon.Address{}, logger)
+		Expect(err).To(BeNil())
+
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
@@ -138,24 +148,6 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 	}
 })
-
-// TODO revert this change
-// buildEthClient builds an Ethereum client with the given number of required confirmations
-func buildEthClient(confirmations int) common.EthClient {
-	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
-
-	ec, err := geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: confirmations,
-		NumRetries:       numRetries,
-	}, gcommon.Address{}, logger)
-
-	Expect(err).To(BeNil())
-	return ec
-}
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
