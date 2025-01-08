@@ -31,15 +31,19 @@ disperse-test-blob:
 clean:
 	rm bin/eigenda-proxy
 
+# Unit tests
 test:
 	go test ./... -parallel 4 
 
+# E2E tests, leveraging op-e2e
 e2e-test:
 	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4
 
+# E2E test which fuzzes the proxy client server integration and op client keccak256 with malformed inputs
 e2e-fuzz-test:
 	$(E2EFUZZTEST)
 
+# E2E tests against holesky testnet
 holesky-test:
 	TESTNET=true go test -timeout 50m ./e2e  -parallel 4
 

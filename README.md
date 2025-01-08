@@ -213,15 +213,18 @@ The `raw commitment` is an RLP-encoded [EigenDA certificate](https://github.com/
 Unit tests can be ran via invoking `make test`.
 
 ### Integration
-End-to-end (E2E) tests can be ran via `make e2e-test`.
+
+End-to-end (E2E) tests can be ran via `make e2e-test`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
+
+These tests also assert E2E client <-> server interactions using simple/op clients.
+
+### E2E Fuzz
+
+This E2E test will fuzz the proxy client server integration and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA. Run with `make e2e-fuzz-test`.
 
 ### Holesky
 
 A holesky integration test can be ran using `make holesky-test` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
-
-### Optimism
-
-An E2E test exists which spins up a local OP sequencer instance using the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation. These tests can be ran via `make optimism-test`.
 
 ## Metrics
 
