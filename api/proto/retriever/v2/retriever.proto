@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+import "common/v2/common.proto";
+option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2";
+package retriever.v2;
+
+// The Retriever is a service for retrieving chunks corresponding to a blob from
+// the EigenDA operator nodes and reconstructing the original blob from the chunks.
+// This is a client-side library that the users are supposed to operationalize.
+//
+// Note: Users generally have two ways to retrieve a blob from EigenDA V2:
+//   1) Retrieve from the relay that the blob is assigned to: the API
+//      is Relay.GetBlob() as defined in api/proto/relay/relay.proto
+//   2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+//
+// The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the
+// relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+// (the 2nd approach here) removes the need to trust the relay, with the downside of
+// worse cost and performance.
+service Retriever {
+	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
+	// reconstructed original blob in response.
+	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
+}
+
+message BlobRequest {
+	// header of the blob to be retrieved
+	common.v2.BlobHeader blob_header = 1;
+	// The Ethereum block number at which the batch for this blob was constructed.
+	uint32 reference_block_number = 2;
+	// Which quorum of the blob this is requesting for (note a blob can participate in
+	// multiple quorums).
+	uint32 quorum_id = 3;
+}
+
+message BlobReply {
+	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
+	bytes data = 1;
+}

@@ -23,7 +23,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	docsv1 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v1"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
@@ -208,10 +208,15 @@ type (
 		eigenDAGRPCServiceChecker EigenDAGRPCServiceChecker
 		eigenDAHttpServiceChecker EigenDAHttpServiceChecker
 
-		operatorHandler *operatorHandler
-		metricsHandler  *metricsHandler
+		operatorHandler *OperatorHandler
+		metricsHandler  *MetricsHandler
 	}
 )
+
+type ServerInterface interface {
+	Start() error
+	Shutdown() error
+}
 
 func NewServer(
 	config Config,
@@ -260,8 +265,8 @@ func NewServer(
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
-		operatorHandler:           newOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
-		metricsHandler:            newMetricsHandler(promClient),
+		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
+		metricsHandler:            NewMetricsHandler(promClient),
 	}
 }
 
@@ -273,8 +278,8 @@ func (s *server) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v1"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv1.SwaggerInfoV1.BasePath = basePath
+	docsv1.SwaggerInfoV1.Host = os.Getenv("SWAGGER_HOST")
 	v1 := router.Group(basePath)
 	{
 		feed := v1.Group("/feed")
@@ -304,7 +309,7 @@ func (s *server) Start() error {
 		}
 		swagger := v1.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V1"), ginswagger.URL("/api/v1/swagger/doc.json")))
 		}
 	}
 
@@ -609,7 +614,7 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+	ths, err := s.metricsHandler.GetThroughputTimeseries(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsTroughput")
 		errorResponse(c, err)
@@ -732,7 +737,7 @@ func (s *server) OperatorsStake(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
 
-	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
+	operatorsStakeResponse, err := s.operatorHandler.GetOperatorsStake(c.Request.Context(), operatorId)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("OperatorsStake")
 		errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
@@ -923,7 +928,7 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.ProbeOperatorHosts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -955,7 +960,7 @@ func (s *server) SemverScan(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
+	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("SemverScan")

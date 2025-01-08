@@ -144,7 +144,7 @@ func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 
 	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), "not-hex-encoded")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to decode public key")
+	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
 
 func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
