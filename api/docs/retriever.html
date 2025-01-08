@@ -175,22 +175,22 @@
         
           
           <li>
-            <a href="#retriever%2fretriever.proto">retriever/retriever.proto</a>
+            <a href="#retriever%2fv2%2fretriever.proto">retriever/v2/retriever.proto</a>
             <ul>
               
                 <li>
-                  <a href="#retriever.BlobReply"><span class="badge">M</span>BlobReply</a>
+                  <a href="#retriever.v2.BlobReply"><span class="badge">M</span>BlobReply</a>
                 </li>
               
                 <li>
-                  <a href="#retriever.BlobRequest"><span class="badge">M</span>BlobRequest</a>
+                  <a href="#retriever.v2.BlobRequest"><span class="badge">M</span>BlobRequest</a>
                 </li>
               
               
               
               
                 <li>
-                  <a href="#retriever.Retriever"><span class="badge">S</span>Retriever</a>
+                  <a href="#retriever.v2.Retriever"><span class="badge">S</span>Retriever</a>
                 </li>
               
             </ul>
@@ -203,12 +203,12 @@
     
       
       <div class="file-heading">
-        <h2 id="retriever/retriever.proto">retriever/retriever.proto</h2><a href="#title">Top</a>
+        <h2 id="retriever/v2/retriever.proto">retriever/v2/retriever.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
       
-        <h3 id="retriever.BlobReply">BlobReply</h3>
+        <h3 id="retriever.v2.BlobReply">BlobReply</h3>
         <p></p>
 
         
@@ -232,7 +232,7 @@
 
         
       
-        <h3 id="retriever.BlobRequest">BlobRequest</h3>
+        <h3 id="retriever.v2.BlobRequest">BlobRequest</h3>
         <p></p>
 
         
@@ -243,20 +243,10 @@
             <tbody>
               
                 <tr>
-                  <td>batch_header_hash</td>
-                  <td><a href="#bytes">bytes</a></td>
+                  <td>blob_header</td>
+                  <td><a href="#common.v2.BlobHeader">common.v2.BlobHeader</a></td>
                   <td></td>
-                  <td><p>The hash of the ReducedBatchHeader defined onchain, see:
-https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
-This identifies the batch that this blob belongs to. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>blob_index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>Which blob in the batch this is requesting for (note: a batch is logically an
-ordered list of blobs). </p></td>
+                  <td><p>header of the blob to be retrieved </p></td>
                 </tr>
               
                 <tr>
@@ -287,8 +277,8 @@ multiple quorums). </p></td>
       
 
       
-        <h3 id="retriever.Retriever">Retriever</h3>
-        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA:</p><p>1) Retrieve from the Disperser that the user initially used for dispersal: the API</p><p>is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the</p><p>Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the Disperser, with the downside of</p><p>worse cost and performance.</p>
+        <h3 id="retriever.v2.Retriever">Retriever</h3>
+        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA V2:</p><p>1) Retrieve from the relay that the blob is assigned to: the API</p><p>is Relay.GetBlob() as defined in api/proto/relay/relay.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the</p><p>relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the relay, with the downside of</p><p>worse cost and performance.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -297,8 +287,8 @@ multiple quorums). </p></td>
             
               <tr>
                 <td>RetrieveBlob</td>
-                <td><a href="#retriever.BlobRequest">BlobRequest</a></td>
-                <td><a href="#retriever.BlobReply">BlobReply</a></td>
+                <td><a href="#retriever.v2.BlobRequest">BlobRequest</a></td>
+                <td><a href="#retriever.v2.BlobReply">BlobReply</a></td>
                 <td><p>This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 reconstructed original blob in response.</p></td>
               </tr>

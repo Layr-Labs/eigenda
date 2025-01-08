@@ -298,10 +298,21 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 		return big.NewInt(0), nil
 	}
 
-	var payment *big.Int
-	_, success := payment.SetString(payments[0]["CumulativePayments"].(*types.AttributeValueMemberN).Value, 10)
-	if !success {
-		return nil, fmt.Errorf("failed to parse payment: %w", err)
+	// Safely extract CumulativePayments
+	cumulativePaymentsAttr, ok := payments[0]["CumulativePayments"]
+	if !ok {
+		return nil, fmt.Errorf("CumulativePayments field not found in result")
+	}
+
+	// Type assertion with check
+	cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
+	if !ok {
+		return nil, fmt.Errorf("CumulativePayments has invalid type: %T", cumulativePaymentsAttr)
+	}
+
+	payment := new(big.Int)
+	if _, success := payment.SetString(cumulativePaymentsNum.Value, 10); !success {
+		return nil, fmt.Errorf("failed to parse payment value: %s", cumulativePaymentsNum.Value)
 	}
 
 	return payment, nil

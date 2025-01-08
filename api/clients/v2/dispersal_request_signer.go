@@ -6,7 +6,7 @@ import (
 	"fmt"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common"
+	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
@@ -38,7 +38,7 @@ func NewDispersalRequestSigner(
 		BaseEndpoint: aws.String(endpoint),
 	})
 
-	key, err := common.LoadPublicKeyKMS(ctx, keyManager, keyID)
+	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)
 	}
@@ -53,7 +53,7 @@ func NewDispersalRequestSigner(
 func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
 	hash := hashing.HashStoreChunksRequest(request)
 
-	signature, err := common.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
+	signature, err := aws2.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign request: %w", err)
 	}
