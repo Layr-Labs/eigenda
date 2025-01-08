@@ -79,7 +79,7 @@ message GetPaymentStateReply {
   // global payment vault parameters
   PaymentGlobalParams payment_global_params = 1;
   // off-chain account reservation usage records
-  repeated PeriodRecord bin_records = 2;
+  repeated PeriodRecord period_records = 2;
   // on-chain account reservation setting
   Reservation reservation = 3;
   // off-chain on-demand payment usage

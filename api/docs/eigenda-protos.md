@@ -883,7 +883,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
+| period_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
