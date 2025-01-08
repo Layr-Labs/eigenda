@@ -8,6 +8,7 @@ type ServerConfig struct {
 	GrpcPort                 string
 	MaxConcurrentRequests    int
 	RequestPoolSize          int
+	RequestQueueSize         int
 	EnableGnarkChunkEncoding bool
 	PreventReencoding        bool
 	Backend                  string

@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"sync"
-	"time"
 )
 
 type chunkProvider struct {
@@ -110,7 +111,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 		go func() {
 			frames, err := s.frameCache.Get(ctx, *boundKey)
 			if err != nil {
-				s.logger.Errorf("Failed to get frames for blob %v: %v", boundKey.blobKey, err)
+				s.logger.Errorf("Failed to get frames for blob %v: %v", boundKey.blobKey.Hex(), err)
 				completionChannel <- &framesResult{
 					key: boundKey.blobKey,
 					err: err,
@@ -129,7 +130,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 	for len(fMap) < len(keys) {
 		result := <-completionChannel
 		if result.err != nil {
-			return nil, fmt.Errorf("error fetching frames for blob %v: %w", result.key, result.err)
+			return nil, fmt.Errorf("error fetching frames for blob %v: %w", result.key.Hex(), result.err)
 		}
 		fMap[result.key] = result.data
 	}
