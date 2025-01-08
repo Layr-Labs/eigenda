@@ -124,6 +124,11 @@ func NewDispersalServerV2(
 }
 
 func (s *DispersalServerV2) Start(ctx context.Context) error {
+	// Start the metrics server
+	if s.metricsConfig.EnableMetrics {
+		s.metrics.Start(context.Background())
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
@@ -168,11 +173,6 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 
 	if err := gs.Serve(listener); err != nil {
 		return errors.New("could not start GRPC server")
-	}
-
-	// Start the metrics server
-	if s.metricsConfig.EnableMetrics {
-		s.metrics.Start(context.Background())
 	}
 
 	return nil

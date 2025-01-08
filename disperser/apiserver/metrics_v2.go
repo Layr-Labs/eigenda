@@ -133,14 +133,13 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 	}
 }
 
-// Start starts the metrics server
+// Start the metrics server
 func (m *metricsV2) Start(ctx context.Context) {
 	m.logger.Info("Starting metrics server at ", "port", m.httpPort)
 	addr := fmt.Sprintf(":%s", m.httpPort)
 	go func() {
 		log := m.logger
 		mux := http.NewServeMux()
-		m.logger.Info("metrics registry", "registry", m.registry)
 		mux.Handle("/metrics", promhttp.HandlerFor(
 			m.registry,
 			promhttp.HandlerOpts{},
