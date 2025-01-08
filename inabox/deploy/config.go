@@ -362,8 +362,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_ONCHAIN_STATE_REFRESH_INTERVAL:        "1s",
 		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
-		// TODO(ian-shim): set this to false once there is request signing at the relay client
-		RELAY_AUTHENTICATION_DISABLED: "true",
+		RELAY_AUTHENTICATION_DISABLED:               "false",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 

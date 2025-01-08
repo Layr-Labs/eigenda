@@ -8,16 +8,10 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   core.G2Point:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -46,10 +40,6 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -68,23 +58,15 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -214,10 +196,6 @@ definitions:
         items:
           type: integer
         type: array
-      a1:
-        items:
-          type: integer
-        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -266,6 +244,41 @@ definitions:
       blob_verification_info:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
     type: object
+  v2.DispersalResponse:
+    properties:
+      batchRoot:
+        description: BatchRoot is the root of a Merkle tree whose leaves are the keys
+          of the blobs in the batch
+        items:
+          type: integer
+        type: array
+      core.OperatorID:
+        items:
+          type: integer
+        type: array
+      dispersedAt:
+        type: integer
+      error:
+        description: Error is the error message if the dispersal failed
+        type: string
+      operatorAddress:
+        items:
+          type: integer
+        type: array
+      referenceBlockNumber:
+        description: ReferenceBlockNumber is the block number at which all operator
+          information (stakes, indexes, etc.) is taken from
+        type: integer
+      respondedAt:
+        type: integer
+      signature:
+        description: Signature is the signature of the response by the operator
+        items:
+          type: integer
+        type: array
+      socket:
+        type: string
+    type: object
   v2.ErrorResponse:
     properties:
       error:
@@ -286,6 +299,11 @@ definitions:
         additionalProperties:
           $ref: '#/definitions/big.Int'
         type: object
+    type: object
+  v2.OperatorDispersalResponse:
+    properties:
+      operator_dispersal_response:
+        $ref: '#/definitions/v2.DispersalResponse'
     type: object
   v2.OperatorPortCheckResponse:
     properties:
@@ -533,6 +551,40 @@ paths:
       summary: Fetch throughput time series
       tags:
       - Metrics
+  /operators/{batch_header_hash}:
+    get:
+      parameters:
+      - description: Batch header hash in hex string
+        in: path
+        name: batch_header_hash
+        required: true
+        type: string
+      - description: Operator ID in hex string
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorDispersalResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch operator attestation response for a batch
+      tags:
+      - Operators
   /operators/nodeinfo:
     get:
       produces:

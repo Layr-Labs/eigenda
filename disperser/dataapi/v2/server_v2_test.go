@@ -34,6 +34,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
@@ -449,13 +450,13 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operator_id := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
+	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfo, nil)
 
 	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
 
 	w := httptest.NewRecorder()
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operator_id)
+	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
 	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
 	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
 	defer cancel()
@@ -481,6 +482,55 @@ func TestCheckOperatorsReachability(t *testing.T) {
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
+}
+
+func TestFetchOperatorResponse(t *testing.T) {
+	r := setUpRouter()
+
+	ctx := context.Background()
+	// Set up batch header in metadata store
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 0, 2, 4},
+		ReferenceBlockNumber: 1024,
+	}
+	batchHeaderHashBytes, err := batchHeader.Hash()
+	require.NoError(t, err)
+	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
+
+	// Set up dispersal response in metadata store
+	operatorId := core.OperatorID{0, 1}
+	dispersalRequest := &corev2.DispersalRequest{
+		OperatorID:      operatorId,
+		OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+		Socket:          "socket",
+		DispersedAt:     uint64(time.Now().UnixNano()),
+		BatchHeader:     *batchHeader,
+	}
+	dispersalResponse := &corev2.DispersalResponse{
+		DispersalRequest: dispersalRequest,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        [32]byte{1, 1, 1},
+		Error:            "error",
+	}
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
+	assert.NoError(t, err)
+
+	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorResponse)
+	w := httptest.NewRecorder()
+	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
+	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+	r.ServeHTTP(w, req)
+	assert.Equal(t, w.Code, http.StatusOK)
+	res := w.Result()
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	assert.NoError(t, err)
+
+	var response serverv2.OperatorDispersalResponse
+	err = json.Unmarshal(data, &response)
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, response.Response, dispersalResponse)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {

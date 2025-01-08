@@ -425,6 +425,58 @@ const docTemplateV2 = `{
                     }
                 }
             }
+        },
+        "/operators/{batch_header_hash}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Fetch operator attestation response for a batch",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorDispersalResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -439,12 +491,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -452,9 +498,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -492,12 +535,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -526,12 +563,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -540,9 +571,6 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -550,9 +578,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -735,12 +760,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "a1": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -817,6 +836,54 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.DispersalResponse": {
+            "type": "object",
+            "properties": {
+                "batchRoot": {
+                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "core.OperatorID": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dispersedAt": {
+                    "type": "integer"
+                },
+                "error": {
+                    "description": "Error is the error message if the dispersal failed",
+                    "type": "string"
+                },
+                "operatorAddress": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "referenceBlockNumber": {
+                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                    "type": "integer"
+                },
+                "respondedAt": {
+                    "type": "integer"
+                },
+                "signature": {
+                    "description": "Signature is the signature of the response by the operator",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "socket": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -847,6 +914,14 @@ const docTemplateV2 = `{
                     "additionalProperties": {
                         "$ref": "#/definitions/big.Int"
                     }
+                }
+            }
+        },
+        "v2.OperatorDispersalResponse": {
+            "type": "object",
+            "properties": {
+                "operator_dispersal_response": {
+                    "$ref": "#/definitions/v2.DispersalResponse"
                 }
             }
         },
