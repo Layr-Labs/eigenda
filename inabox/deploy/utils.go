@@ -99,7 +99,12 @@ func changeDirectory(path string) {
 
 // Execute yarn command
 func execYarnCmd(command string, args ...string) {
-	log.Printf("Executing yarn with command: %s", command)
+	currentWorkingDirectory, err := os.Getwd()
+	if err != nil {
+		log.Panicf("Failed to get working directory. Error: %s", err)
+	}
+
+	log.Printf("Executing yarn with command at %s: %s", currentWorkingDirectory, command)
 
 	args = append([]string{command}, args...)
 	cmd := exec.Command("yarn", args...)
@@ -109,7 +114,7 @@ func execYarnCmd(command string, args ...string) {
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		log.Print(fmt.Sprint(err) + ": " + stderr.String())
 		log.Panicf("Failed to execute yarn command (%s). Err: %s", command, err)

@@ -19,5 +19,8 @@ lightnode/docker/args.sh
 
 icicle/*
 
+# TODO make sure this is ok to do
+subgraphs/eigenda-operator-state/yarn.lock
+
 # OSX specific
 .DS_Store

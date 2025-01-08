@@ -136,6 +136,7 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 // Generates churner .env
 func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort string) ChurnerVars {
 	v := ChurnerVars{
+		CHURNER_LOG_FORMAT:                  "text",
 		CHURNER_HOSTNAME:                    "",
 		CHURNER_GRPC_PORT:                   grpcPort,
 		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
@@ -160,6 +161,7 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 // Generates disperser .env
 func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
 	v := DisperserVars{
+		DISPERSER_SERVER_LOG_FORMAT:             "text",
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata",
 		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
@@ -197,6 +199,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 
 func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
 	v := DisperserVars{
+		DISPERSER_SERVER_LOG_FORMAT:             "text",
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata-v2",
 		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
@@ -240,6 +243,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 // Generates batcher .env
 func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) BatcherVars {
 	v := BatcherVars{
+		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
 		BATCHER_ENABLE_METRICS:                "true",
@@ -273,6 +277,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		DISPERSER_ENCODER_LOG_FORMAT:              "text",
 		DISPERSER_ENCODER_AWS_REGION:              "",
 		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
 		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
@@ -297,6 +302,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		DISPERSER_ENCODER_LOG_FORMAT:              "text",
 		DISPERSER_ENCODER_AWS_REGION:              "",
 		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
 		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
@@ -323,6 +329,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
 	v := ControllerVars{
+		CONTROLLER_LOG_FORMAT:                              "text",
 		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
 		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:             env.EigenDA.OperatorStateRetreiver,
 		CONTROLLER_EIGENDA_SERVICE_MANAGER:                 env.EigenDA.ServiceManager,
@@ -352,6 +359,7 @@ func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVa
 
 func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVars {
 	v := RelayVars{
+		RELAY_LOG_FORMAT:                            "text",
 		RELAY_GRPC_PORT:                             grpcPort,
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
@@ -391,6 +399,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	ecdsaPassword := env.Pks.EcdsaMap[name].Password
 
 	v := OperatorVars{
+		NODE_LOG_FORMAT:                       "text",
 		NODE_HOSTNAME:                         "",
 		NODE_DISPERSAL_PORT:                   dispersalPort,
 		NODE_RETRIEVAL_PORT:                   retrievalPort,
@@ -443,6 +452,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 // Generates retriever .env
 func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath, grpcPort string) RetrieverVars {
 	v := RetrieverVars{
+		RETRIEVER_LOG_FORMAT:                  "text",
 		RETRIEVER_HOSTNAME:                    "",
 		RETRIEVER_GRPC_PORT:                   grpcPort,
 		RETRIEVER_TIMEOUT:                     "10s",
