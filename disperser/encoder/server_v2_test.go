@@ -224,7 +224,7 @@ func createTestComponents(t *testing.T) *testComponents {
 	encoderServer := encoder.NewEncoderServerV2(encoder.ServerConfig{
 		GrpcPort:              "8080",
 		MaxConcurrentRequests: 10,
-		RequestPoolSize:       5,
+		RequestQueueSize:      5,
 		PreventReencoding:     true,
 	}, blobStore, chunkStoreWriter, logger, prover, metrics, grpcMetrics)
 
