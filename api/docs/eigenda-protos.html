@@ -351,7 +351,7 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.BinRecord"><span class="badge">M</span>BinRecord</a>
+                  <a href="#disperser.v2.PeriodRecord"><span class="badge">M</span>PeriodRecord</a>
                 </li>
               
                 <li>
@@ -2015,8 +2015,8 @@ The order of the quorum_signed_percentages should match the order of the quorum_
 
         
       
-        <h3 id="disperser.v2.BinRecord">BinRecord</h3>
-        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+        <h3 id="disperser.v2.PeriodRecord">PeriodRecord</h3>
+        <p>PeriodRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
 
         
           <table class="field-table">
@@ -2280,7 +2280,7 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
               
                 <tr>
                   <td>bin_records</td>
-                  <td><a href="#disperser.v2.BinRecord">BinRecord</a></td>
+                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
                   <td>repeated</td>
                   <td><p>off-chain account reservation usage records </p></td>
                 </tr>

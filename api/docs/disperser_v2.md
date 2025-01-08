@@ -5,7 +5,7 @@
 
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
-    - [BinRecord](#disperser-v2-BinRecord)
+    - [PeriodRecord](#disperser-v2-PeriodRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -54,10 +54,10 @@
 
 
 
-<a name="disperser-v2-BinRecord"></a>
+<a name="disperser-v2-PeriodRecord"></a>
 
-### BinRecord
-BinRecord is the usage record of an account in a bin. The API should return the active bin 
+### PeriodRecord
+PeriodRecord is the usage record of an account in a bin. The API should return the active bin 
 record and the subsequent two records that contains potential overflows.
 
 
@@ -192,7 +192,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| bin_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
