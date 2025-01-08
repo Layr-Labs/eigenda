@@ -241,3 +241,34 @@ func TestBadSignature(t *testing.T) {
 		now)
 	require.Error(t, err)
 }
+
+func TestMissingOperatorID(t *testing.T) {
+	tu.InitializeRandom()
+
+	ctx := context.Background()
+
+	operatorID := mock.MakeOperatorId(0)
+	stakes := map[core.QuorumID]map[core.OperatorID]int{
+		core.QuorumID(0): {
+			operatorID: 1,
+		},
+	}
+	ics, err := mock.NewChainDataMock(stakes)
+	require.NoError(t, err)
+	ics.Mock.On("GetCurrentBlockNumber").Return(uint(0), nil)
+
+	timeout := 10 * time.Second
+
+	authenticator, err := NewRequestAuthenticator(ctx, ics, 1024, timeout)
+	require.NoError(t, err)
+
+	request := randomGetChunksRequest()
+	request.OperatorId = nil
+
+	err = authenticator.AuthenticateGetChunksRequest(
+		ctx,
+		"foobar",
+		request,
+		time.Now())
+	require.Error(t, err)
+}

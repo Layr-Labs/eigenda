@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -244,20 +245,19 @@ func (m *RelayMetrics) GetGRPCServerOption() grpc.ServerOption {
 }
 
 func (m *RelayMetrics) ReportChunkLatency(duration time.Duration) {
-	m.getChunksLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportChunkAuthenticationLatency(duration time.Duration) {
-	m.getChunksAuthenticationLatency.WithLabelValues().Observe(
-		float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getChunksAuthenticationLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportChunkMetadataLatency(duration time.Duration) {
-	m.getChunksMetadataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getChunksMetadataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportChunkDataLatency(duration time.Duration) {
-	m.getChunksDataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getChunksDataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportChunkAuthFailure() {
@@ -277,15 +277,15 @@ func (m *RelayMetrics) ReportChunkDataSize(size int) {
 }
 
 func (m *RelayMetrics) ReportBlobLatency(duration time.Duration) {
-	m.getBlobLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getBlobLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportBlobMetadataLatency(duration time.Duration) {
-	m.getBlobMetadataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getBlobMetadataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportBlobDataLatency(duration time.Duration) {
-	m.getBlobDataLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getBlobDataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *RelayMetrics) ReportBlobRateLimited(reason string) {

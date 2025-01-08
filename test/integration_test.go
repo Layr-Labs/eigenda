@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -221,10 +223,10 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState := &coremock.MockOnchainPaymentState{}
 	reservationLimit := uint64(1024)
 	paymentLimit := big.NewInt(512)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	})).Return(&core.ActiveReservation{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
-	mockState.On("GetActiveReservationByAccount", mock.Anything, mock.Anything).Return(&core.ActiveReservation{}, errors.New("reservation not found"))
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
@@ -288,7 +290,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	}
 
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
@@ -418,7 +420,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		ratelimiter := &commonmock.NoopRatelimiter{}
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2 := nodegrpc.NewServerV2(config, n, logger, ratelimiter)
+		serverV2, err := nodegrpc.NewServerV2(config, n, logger, ratelimiter, prometheus.NewRegistry())
+		require.NoError(t, err)
 
 		ops[id] = TestOperator{
 			Node:     n,

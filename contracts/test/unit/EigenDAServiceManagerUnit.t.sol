@@ -14,7 +14,9 @@ import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMe
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
+import {IEigenDADisperserRegistry} from "../../src/interfaces/IEigenDADisperserRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 
 contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
@@ -75,7 +77,9 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             eigenDAThresholdRegistry,
-            eigenDARelayRegistry
+            eigenDARelayRegistry,
+            IPaymentVault(address(0)),
+            IEigenDADisperserRegistry(address(0))
         );
 
         address[] memory confirmers = new address[](1);
@@ -156,7 +160,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: header and nonsigner data must be in calldata"));
+        cheats.expectRevert(bytes("header and nonsigner data must be in calldata"));
         cheats.prank(confirmer, notConfirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -168,7 +172,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
-        cheats.expectRevert(bytes("onlyBatchConfirmer: not from batch confirmer"));
+        cheats.expectRevert();
         cheats.prank(notConfirmer, notConfirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -190,7 +194,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         bytes32 batchHeaderHash = batchHeader.hashBatchHeaderMemory();
         nonSignerStakesAndSignature.sigma = BN254.hashToG1(batchHeaderHash).scalar_mul(aggSignerPrivKey);
 
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is in future"));
+        cheats.expectRevert(bytes("specified referenceBlockNumber is in future"));
         cheats.prank(confirmer, confirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -203,7 +207,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
         cheats.roll(block.number + eigenDAServiceManager.BLOCK_STALE_MEASURE());
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: specified referenceBlockNumber is too far in past"));
+        cheats.expectRevert(bytes("specified referenceBlockNumber is too far in past"));
         cheats.prank(confirmer, confirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -215,7 +219,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
         (BatchHeader memory batchHeader, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) 
             = _getHeaderandNonSigners(1, pseudoRandomNumber, 100);
 
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: signatories do not own at least threshold percentage of a quorum"));
+        cheats.expectRevert(bytes("signatories do not own threshold percentage of a quorum"));
         cheats.prank(confirmer, confirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,
@@ -249,7 +253,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
             = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
         batchHeader.signedStakeForQuorums = new bytes(0);
 
-        cheats.expectRevert(bytes("EigenDAServiceManager.confirmBatch: quorumNumbers and signedStakeForQuorums must be of the same length"));
+        cheats.expectRevert(bytes("quorumNumbers and signedStakeForQuorums must be same length"));
         cheats.prank(confirmer, confirmer);
         eigenDAServiceManager.confirmBatch(
             batchHeader,

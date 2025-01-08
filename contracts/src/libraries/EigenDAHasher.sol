@@ -130,4 +130,17 @@ library EigenDAHasher {
             )
         );
     }
+
+    /**
+     * @notice hashes the given V2 blob certificate
+     * @param blobCertificate the V2 blob certificate to hash
+     */
+    function hashBlobCertificate(BlobCertificate memory blobCertificate) internal pure returns(bytes32) {
+        return keccak256(
+            abi.encode(
+                hashBlobHeaderV2(blobCertificate.blobHeader),
+                blobCertificate.relayKeys
+            )
+        );
+    }
 }

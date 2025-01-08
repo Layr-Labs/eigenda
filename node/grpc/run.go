@@ -33,7 +33,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			}
 
 			opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
-			gs := grpc.NewServer(opt)
+			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -60,7 +60,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			}
 
 			opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-			gs := grpc.NewServer(opt)
+			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work

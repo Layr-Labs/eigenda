@@ -2,7 +2,6 @@ package controller_test
 
 import (
 	"context"
-	"github.com/prometheus/client_golang/prometheus"
 	"testing"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -97,7 +97,7 @@ func TestGetRelayKeys(t *testing.T) {
 
 func TestEncodingManagerHandleBatch(t *testing.T) {
 	ctx := context.Background()
-	blobKey1, blobHeader1 := newBlob(t)
+	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -143,7 +143,7 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	headers := make([]*corev2.BlobHeader, numBlobs)
 	metadata := make([]*commonv2.BlobMetadata, numBlobs)
 	for i := 0; i < numBlobs; i++ {
-		keys[i], headers[i] = newBlob(t)
+		keys[i], headers[i] = newBlob(t, []core.QuorumID{0, 1})
 		now := time.Now()
 		metadata[i] = &commonv2.BlobMetadata{
 			BlobHeader: headers[i],
@@ -176,7 +176,7 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	require.ErrorContains(t, err, "no blobs to encode")
 
 	// new record
-	key, header := newBlob(t)
+	key, header := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	meta := &commonv2.BlobMetadata{
 		BlobHeader: header,
@@ -205,7 +205,7 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	ctx := context.Background()
-	blobKey1, blobHeader1 := newBlob(t)
+	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,
@@ -248,7 +248,7 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 
 func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	ctx := context.Background()
-	blobKey1, blobHeader1 := newBlob(t)
+	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
 		BlobHeader: blobHeader1,

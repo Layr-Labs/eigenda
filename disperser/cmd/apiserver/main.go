@@ -107,7 +107,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
-		if err := paymentChainState.RefreshOnchainPaymentState(context.Background(), nil); err != nil {
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
@@ -170,7 +170,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
-		server := apiserver.NewDispersalServerV2(
+		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
 			blobMetadataStore,
@@ -183,6 +183,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			reg,
 		)
+		if err != nil {
+			return err
+		}
 		return server.Start(context.Background())
 	}
 

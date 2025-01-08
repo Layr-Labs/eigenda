@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ import (
 )
 
 var (
-	dummyActiveReservation = &core.ActiveReservation{
+	dummyReservedPayment = &core.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
@@ -28,9 +27,9 @@ var (
 func TestRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("RefreshOnchainPaymentState", testifymock.Anything, testifymock.Anything).Return(nil)
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 
-	err := mockState.RefreshOnchainPaymentState(ctx, &eth.Reader{})
+	err := mockState.RefreshOnchainPaymentState(ctx)
 	assert.NoError(t, err)
 }
 
@@ -43,14 +42,14 @@ func TestGetCurrentBlockNumber(t *testing.T) {
 	assert.Equal(t, uint32(1000), blockNumber)
 }
 
-func TestGetActiveReservationByAccount(t *testing.T) {
+func TestGetReservedPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetActiveReservationByAccount", testifymock.Anything, testifymock.Anything).Return(dummyActiveReservation, nil)
+	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(dummyReservedPayment, nil)
 
-	reservation, err := mockState.GetActiveReservationByAccount(ctx, gethcommon.Address{})
+	reservation, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
 	assert.NoError(t, err)
-	assert.Equal(t, dummyActiveReservation, reservation)
+	assert.Equal(t, dummyReservedPayment, reservation)
 }
 
 func TestGetOnDemandPaymentByAccount(t *testing.T) {

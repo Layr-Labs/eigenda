@@ -3,23 +3,23 @@ package mock
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/stretchr/testify/mock"
 )
 
-type MockNodeClientV2 struct {
+type MockNodeClient struct {
 	mock.Mock
 }
 
-var _ clients.NodeClientV2 = (*MockNodeClientV2)(nil)
+var _ clients.NodeClient = (*MockNodeClient)(nil)
 
-func NewNodeClientV2() *MockNodeClientV2 {
-	return &MockNodeClientV2{}
+func NewNodeClient() *MockNodeClient {
+	return &MockNodeClient{}
 }
 
-func (c *MockNodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
+func (c *MockNodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*core.Signature, error) {
 	args := c.Called()
 	var signature *core.Signature
 	if args.Get(0) != nil {
@@ -28,7 +28,7 @@ func (c *MockNodeClientV2) StoreChunks(ctx context.Context, batch *corev2.Batch)
 	return signature, args.Error(1)
 }
 
-func (c *MockNodeClientV2) Close() error {
+func (c *MockNodeClient) Close() error {
 	args := c.Called()
 	return args.Error(0)
 }

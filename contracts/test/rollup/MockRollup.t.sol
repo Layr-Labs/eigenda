@@ -17,8 +17,10 @@ import {IEigenDABatchMetadataStorage} from "../../src/interfaces/IEigenDABatchMe
 import {IEigenDASignatureVerifier} from "../../src/interfaces/IEigenDASignatureVerifier.sol";
 import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IEigenDARelayRegistry} from "../../src/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "../../src/interfaces/IPaymentVault.sol";
 import {EigenDARelayRegistry} from "../../src/core/EigenDARelayRegistry.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IEigenDADisperserRegistry} from "../../src/interfaces/IEigenDADisperserRegistry.sol";
 import "../../src/interfaces/IEigenDAStructs.sol";
 import "forge-std/StdStorage.sol";
 
@@ -94,7 +96,9 @@ contract MockRollupTest is BLSMockAVSDeployer {
             registryCoordinator,
             stakeRegistry,
             eigenDAThresholdRegistry,
-            eigenDARelayRegistry
+            eigenDARelayRegistry,
+            IPaymentVault(address(0)),
+            IEigenDADisperserRegistry(address(0))
         );
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();

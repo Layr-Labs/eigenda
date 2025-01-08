@@ -210,6 +210,20 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
+	var contractPaymentVault *paymentvault.ContractPaymentVault
+	paymentVaultAddr, err := contractEigenDAServiceManager.PaymentVault(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch PaymentVault address", "err", err)
+		//TODO(hopeyen): return err when the contract is deployed
+		// return err
+	} else {
+		contractPaymentVault, err = paymentvault.NewContractPaymentVault(paymentVaultAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch PaymentVault contract", "err", err)
+			return err
+		}
+	}
+
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
@@ -224,8 +238,8 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,
 		RelayRegistry:         contractRelayRegistry,
-		// PaymentVault:          contractPaymentVault,
-		ThresholdRegistry: contractThresholdRegistry,
+		PaymentVault:          contractPaymentVault,
+		ThresholdRegistry:     contractThresholdRegistry,
 	}
 	return nil
 }
@@ -647,7 +661,7 @@ func (t *Reader) GetNumBlobVersions(ctx context.Context) (uint16, error) {
 	})
 }
 
-func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) (*core.BlobVersionParameters, error) {
+func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint16) (*core.BlobVersionParameters, error) {
 	params, err := t.bindings.EigenDAServiceManager.GetBlobParams(&bind.CallOpts{
 		Context: ctx,
 	}, uint16(blobVersion))
@@ -661,7 +675,7 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint8) 
 	}, nil
 }
 
-func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core.BlobVersionParameters, error) {
+func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*core.BlobVersionParameters, error) {
 	if t.bindings.ThresholdRegistry == nil {
 		return nil, errors.New("threshold registry not deployed")
 	}
@@ -671,8 +685,8 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 		return nil, err
 	}
 
-	res := make(map[uint8]*core.BlobVersionParameters)
-	for version := uint8(0); version < uint8(numBlobVersions); version++ {
+	res := make(map[uint16]*core.BlobVersionParameters)
+	for version := uint16(0); version < uint16(numBlobVersions); version++ {
 		params, err := t.GetVersionedBlobParams(ctx, version)
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
 			break
@@ -690,11 +704,11 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint8]*core
 	return res, nil
 }
 
-func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ActiveReservation, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	reservationsMap := make(map[gethcommon.Address]*core.ActiveReservation)
+	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
 	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
 		Context: ctx,
 	}, accountIDs)
@@ -704,7 +718,7 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 
 	// since reservations are returned in the same order as the accountIDs, we can directly map them
 	for i, reservation := range reservations {
-		res, err := ConvertToActiveReservation(reservation)
+		res, err := ConvertToReservedPayment(reservation)
 		if err != nil {
 			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
 			continue
@@ -716,7 +730,7 @@ func (t *Reader) GetActiveReservations(ctx context.Context, accountIDs []gethcom
 	return reservationsMap, nil
 }
 
-func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ActiveReservation, error) {
+func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
@@ -726,7 +740,7 @@ func (t *Reader) GetActiveReservationByAccount(ctx context.Context, accountID ge
 	if err != nil {
 		return nil, err
 	}
-	return ConvertToActiveReservation(reservation)
+	return ConvertToReservedPayment(reservation)
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
@@ -734,9 +748,8 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 		return nil, errors.New("payment vault not deployed")
 	}
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
-	payments, err := t.bindings.PaymentVault.GetOnDemandAmounts(&bind.CallOpts{
-		Context: ctx,
-	}, accountIDs)
+	payments, err := t.bindings.PaymentVault.GetOnDemandTotalDeposits(&bind.CallOpts{
+		Context: ctx}, accountIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +772,7 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandAmount(&bind.CallOpts{
+	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
 		Context: ctx,
 	}, accountID)
 	if err != nil {
@@ -777,26 +790,26 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalSymbolsPerPeriod(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
 	}
-	return globalSymbolsPerSecond.Uint64(), nil
+	return globalSymbolsPerSecond, nil
 }
 
-func (t *Reader) GetGlobalRateBinInterval(ctx context.Context) (uint64, error) {
+func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRateBinInterval(&bind.CallOpts{
+	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRatePeriodInterval(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
 		return 0, err
 	}
-	return globalRateBinInterval.Uint64(), nil
+	return uint32(globalRateBinInterval), nil
 }
 
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
@@ -809,7 +822,7 @@ func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint32(minNumSymbols.Uint64()), nil
+	return uint32(minNumSymbols), nil
 }
 
 func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
@@ -822,20 +835,19 @@ func (t *Reader) GetPricePerSymbol(ctx context.Context) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint32(pricePerSymbol.Uint64()), nil
+	return uint32(pricePerSymbol), nil
 }
 
 func (t *Reader) GetReservationWindow(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	reservationWindow, err := t.bindings.PaymentVault.ReservationBinInterval(&bind.CallOpts{
-		Context: ctx,
-	})
+	reservationWindow, err := t.bindings.PaymentVault.ReservationPeriodInterval(&bind.CallOpts{
+		Context: ctx})
 	if err != nil {
 		return 0, err
 	}
-	return uint32(reservationWindow.Uint64()), nil
+	return uint32(reservationWindow), nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
@@ -843,8 +855,7 @@ func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.Operator
 		return "", errors.New("socket registry not enabled")
 	}
 	socket, err := t.bindings.SocketRegistry.GetOperatorSocket(&bind.CallOpts{
-		Context: ctx,
-	}, [32]byte(operatorId))
+		Context: ctx}, [32]byte(operatorId))
 	if err != nil {
 		return "", err
 	}

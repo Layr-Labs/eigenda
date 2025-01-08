@@ -103,21 +103,27 @@
     - [Retrieval](#node-v2-Retrieval)
   
 - [relay/relay.proto](#relay_relay-proto)
-    - [ChunkRequest](#node-ChunkRequest)
-    - [ChunkRequestByIndex](#node-ChunkRequestByIndex)
-    - [ChunkRequestByRange](#node-ChunkRequestByRange)
-    - [GetBlobReply](#node-GetBlobReply)
-    - [GetBlobRequest](#node-GetBlobRequest)
-    - [GetChunksReply](#node-GetChunksReply)
-    - [GetChunksRequest](#node-GetChunksRequest)
+    - [ChunkRequest](#relay-ChunkRequest)
+    - [ChunkRequestByIndex](#relay-ChunkRequestByIndex)
+    - [ChunkRequestByRange](#relay-ChunkRequestByRange)
+    - [GetBlobReply](#relay-GetBlobReply)
+    - [GetBlobRequest](#relay-GetBlobRequest)
+    - [GetChunksReply](#relay-GetChunksReply)
+    - [GetChunksRequest](#relay-GetChunksRequest)
   
-    - [Relay](#node-Relay)
+    - [Relay](#relay-Relay)
   
 - [retriever/retriever.proto](#retriever_retriever-proto)
     - [BlobReply](#retriever-BlobReply)
     - [BlobRequest](#retriever-BlobRequest)
   
     - [Retriever](#retriever-Retriever)
+  
+- [retriever/v2/retriever.proto](#retriever_v2_retriever-proto)
+    - [BlobReply](#retriever-v2-BlobReply)
+    - [BlobRequest](#retriever-v2-BlobRequest)
+  
+    - [Retriever](#retriever-v2-Retriever)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -721,7 +727,7 @@ Disperser defines the public APIs for dispersing blobs.
 | DisperseBlob | [DisperseBlobRequest](#disperser-DisperseBlobRequest) | [DisperseBlobReply](#disperser-DisperseBlobReply) | DisperseBlob accepts a single blob to be dispersed. This executes the dispersal async, i.e. it returns once the request is accepted. The client should use GetBlobStatus() API to poll the processing status of the blob.
 
 If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg. RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg. user should retry after the specified duration. INTERNAL (500): serious error, user should NOT retry. |
-| DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protoco is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message. |
+| DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protocol is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message. |
 | GetBlobStatus | [BlobStatusRequest](#disperser-BlobStatusRequest) | [BlobStatusReply](#disperser-BlobStatusReply) | This API is meant to be polled for the blob status. |
 | RetrieveBlob | [RetrieveBlobRequest](#disperser-RetrieveBlobRequest) | [RetrieveBlobReply](#disperser-RetrieveBlobReply) | This retrieves the requested blob from the Disperser&#39;s backend. This is a more efficient way to retrieve blobs than directly retrieving from the DA Nodes (see detail about this approach in api/proto/retriever/retriever.proto). The blob should have been initially dispersed via this Disperser service for this API to work. |
 
@@ -746,9 +752,10 @@ If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): reque
 | ----- | ---- | ----- | ----------- |
 | non_signer_pubkeys | [bytes](#bytes) | repeated | Serialized bytes of non signer public keys (G1 points) |
 | apk_g2 | [bytes](#bytes) |  | Serialized bytes of G2 point that represents aggregate public key of all signers |
-| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum |
+| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum The order of the quorum_apks should match the order of the quorum_numbers |
 | sigma | [bytes](#bytes) |  | Serialized bytes of aggregate signature |
 | quorum_numbers | [uint32](#uint32) | repeated | Relevant quorum numbers for the attestation |
+| quorum_signed_percentages | [bytes](#bytes) |  | The attestation rate for each quorum. The order of the quorum_signed_percentages should match the order of the quorum_numbers |
 
 
 
@@ -912,7 +919,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  |  |
-| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a bin index or a nonce to mitigate signature replay attacks |
+| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a reservation period or a nonce to mitigate signature replay attacks |
 
 
 
@@ -987,6 +994,7 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
+- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -995,6 +1003,7 @@ Terminal states are states that will not be updated to a different state:
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
 | FAILED | 4 | FAILED means that the blob has failed permanently |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation |
 
 
  
@@ -1525,7 +1534,7 @@ WARNING: the following RPCs are experimental and subject to change.
 
 
 
-<a name="node-ChunkRequest"></a>
+<a name="relay-ChunkRequest"></a>
 
 ### ChunkRequest
 A request for chunks within a specific blob. Requests are fulfilled in all-or-nothing fashion. If any of the
@@ -1534,15 +1543,15 @@ requested chunks are not found or are unable to be fetched, the entire request w
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| by_index | [ChunkRequestByIndex](#node-ChunkRequestByIndex) |  | Request chunks by their individual indices. |
-| by_range | [ChunkRequestByRange](#node-ChunkRequestByRange) |  | Request chunks by a range of indices. |
+| by_index | [ChunkRequestByIndex](#relay-ChunkRequestByIndex) |  | Request chunks by their individual indices. |
+| by_range | [ChunkRequestByRange](#relay-ChunkRequestByRange) |  | Request chunks by a range of indices. |
 
 
 
 
 
 
-<a name="node-ChunkRequestByIndex"></a>
+<a name="relay-ChunkRequestByIndex"></a>
 
 ### ChunkRequestByIndex
 A request for chunks within a specific blob. Each chunk is requested individually by its index.
@@ -1558,7 +1567,7 @@ A request for chunks within a specific blob. Each chunk is requested individuall
 
 
 
-<a name="node-ChunkRequestByRange"></a>
+<a name="relay-ChunkRequestByRange"></a>
 
 ### ChunkRequestByRange
 A request for chunks within a specific blob. Each chunk is requested a range of indices.
@@ -1575,7 +1584,7 @@ A request for chunks within a specific blob. Each chunk is requested a range of 
 
 
 
-<a name="node-GetBlobReply"></a>
+<a name="relay-GetBlobReply"></a>
 
 ### GetBlobReply
 The reply to a GetBlobs request.
@@ -1590,7 +1599,7 @@ The reply to a GetBlobs request.
 
 
 
-<a name="node-GetBlobRequest"></a>
+<a name="relay-GetBlobRequest"></a>
 
 ### GetBlobRequest
 A request to fetch one or more blobs.
@@ -1605,7 +1614,7 @@ A request to fetch one or more blobs.
 
 
 
-<a name="node-GetChunksReply"></a>
+<a name="relay-GetChunksReply"></a>
 
 ### GetChunksReply
 The reply to a GetChunks request.
@@ -1620,7 +1629,7 @@ The reply to a GetChunks request.
 
 
 
-<a name="node-GetChunksRequest"></a>
+<a name="relay-GetChunksRequest"></a>
 
 ### GetChunksRequest
 Request chunks from blobs stored by this relay.
@@ -1628,7 +1637,7 @@ Request chunks from blobs stored by this relay.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| chunk_requests | [ChunkRequest](#node-ChunkRequest) | repeated | The chunk requests. Chunks are returned in the same order as they are requested. |
+| chunk_requests | [ChunkRequest](#relay-ChunkRequest) | repeated | The chunk requests. Chunks are returned in the same order as they are requested. |
 | operator_id | [bytes](#bytes) |  | If this is an authenticated request, this should hold the ID of the operator. If this is an unauthenticated request, this field should be empty. Relays may choose to reject unauthenticated requests. |
 | operator_signature | [bytes](#bytes) |  | If this is an authenticated request, this field will hold a BLS signature by the requester on the hash of this request. Relays may choose to reject unauthenticated requests.
 
@@ -1649,15 +1658,15 @@ Perform a keccak256 hash on the following data in the following order: 1. the op
  
 
 
-<a name="node-Relay"></a>
+<a name="relay-Relay"></a>
 
 ### Relay
 Relay is a service that provides access to public relay functionality.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetBlob | [GetBlobRequest](#node-GetBlobRequest) | [GetBlobReply](#node-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
-| GetChunks | [GetChunksRequest](#node-GetChunksRequest) | [GetChunksReply](#node-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
+| GetBlob | [GetBlobRequest](#relay-GetBlobRequest) | [GetBlobReply](#relay-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
+| GetChunks | [GetChunksRequest](#relay-GetChunksRequest) | [GetChunksReply](#relay-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
 
  
 
@@ -1729,6 +1738,76 @@ worse cost and performance.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+
+ 
+
+
+
+<a name="retriever_v2_retriever-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## retriever/v2/retriever.proto
+
+
+
+<a name="retriever-v2-BlobReply"></a>
+
+### BlobReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
+
+
+
+
+
+
+<a name="retriever-v2-BlobRequest"></a>
+
+### BlobRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | header of the blob to be retrieved |
+| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="retriever-v2-Retriever"></a>
+
+### Retriever
+The Retriever is a service for retrieving chunks corresponding to a blob from
+the EigenDA operator nodes and reconstructing the original blob from the chunks.
+This is a client-side library that the users are supposed to operationalize.
+
+Note: Users generally have two ways to retrieve a blob from EigenDA V2:
+  1) Retrieve from the relay that the blob is assigned to: the API
+     is Relay.GetBlob() as defined in api/proto/relay/relay.proto
+  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+
+The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the
+relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+(the 2nd approach here) removes the need to trust the relay, with the downside of
+worse cost and performance.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
 
  
 

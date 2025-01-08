@@ -134,7 +134,7 @@ contract EigenDABlobVerifier is IEigenDABlobVerifier {
         return EigenDABlobVerificationUtils._getNonSignerStakesAndSignature(
             operatorStateRetriever, 
             registryCoordinator, 
-            signedBatch.attestation
+            signedBatch
         );
     }
 

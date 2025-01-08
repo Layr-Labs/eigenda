@@ -1,22 +1,6 @@
 definitions:
   big.Int:
     type: object
-  core.PaymentMetadata:
-    properties:
-      account_id:
-        description: AccountID is the ETH account address for the payer
-        type: string
-      bin_index:
-        description: BinIndex represents the range of time at which the dispersal
-          is made
-        type: integer
-      cumulative_payment:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
-    type: object
   core.SecurityParam:
     properties:
       adversaryThreshold:
@@ -71,17 +55,6 @@ definitions:
           $ref: '#/definitions/core.SecurityParam'
         type: array
       signatory_record_hash:
-        type: string
-    type: object
-  dataapi.BlobResponse:
-    properties:
-      blob_header:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
-      blob_size_bytes:
-        type: integer
-      dispersed_at:
-        type: integer
-      status:
         type: string
     type: object
   dataapi.BlobsResponse:
@@ -280,38 +253,24 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-    type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
-    properties:
-      blobCommitments:
-        $ref: '#/definitions/encoding.BlobCommitments'
-      blobVersion:
-        type: integer
-      paymentMetadata:
-        allOf:
-        - $ref: '#/definitions/core.PaymentMetadata'
-        description: PaymentMetadata contains the payment information for the blob
-      quorumNumbers:
-        description: QuorumNumbers contains the quorums the blob is dispersed to
-        items:
-          type: integer
-        type: array
-      signature:
-        description: Signature is the signature of the blob header by the account
-          ID
-        items:
-          type: integer
-        type: array
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_disperser.BlobStatus:
     enum:
@@ -335,6 +294,10 @@ definitions:
         items:
           type: integer
         type: array
+      a1:
+        items:
+          type: integer
+        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -354,69 +317,9 @@ definitions:
 info:
   contact: {}
   description: This is the EigenDA Data Access API server.
-  title: EigenDA Data Access API
+  title: EigenDA Data Access API V1
   version: "1"
 paths:
-  /batch/{batch_header_hash}:
-    get:
-      parameters:
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch batch by the batch header hash
-      tags:
-      - Feed
-  /blob/{blob_key}:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dataapi.BlobResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/dataapi.ErrorResponse'
-      summary: Fetch blob metadata by blob key
-      tags:
-      - Feed
   /feed/batches/{batch_header_hash}/blobs:
     get:
       parameters:

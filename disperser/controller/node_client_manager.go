@@ -3,25 +3,25 @@ package controller
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 type NodeClientManager interface {
-	GetClient(host, port string) (clients.NodeClientV2, error)
+	GetClient(host, port string) (clients.NodeClient, error)
 }
 
 type nodeClientManager struct {
 	// nodeClients is a cache of node clients keyed by socket address
-	nodeClients *lru.Cache[string, clients.NodeClientV2]
+	nodeClients *lru.Cache[string, clients.NodeClient]
 	logger      logging.Logger
 }
 
 var _ NodeClientManager = (*nodeClientManager)(nil)
 
 func NewNodeClientManager(cacheSize int, logger logging.Logger) (*nodeClientManager, error) {
-	closeClient := func(socket string, value clients.NodeClientV2) {
+	closeClient := func(socket string, value clients.NodeClient) {
 		if err := value.Close(); err != nil {
 			logger.Error("failed to close node client", "err", err)
 		}
@@ -37,12 +37,12 @@ func NewNodeClientManager(cacheSize int, logger logging.Logger) (*nodeClientMana
 	}, nil
 }
 
-func (m *nodeClientManager) GetClient(host, port string) (clients.NodeClientV2, error) {
+func (m *nodeClientManager) GetClient(host, port string) (clients.NodeClient, error) {
 	socket := fmt.Sprintf("%s:%s", host, port)
 	client, ok := m.nodeClients.Get(socket)
 	if !ok {
 		var err error
-		client, err = clients.NewNodeClientV2(&clients.NodeClientV2Config{
+		client, err = clients.NewNodeClient(&clients.NodeClientConfig{
 			Hostname: host,
 			Port:     port,
 		})

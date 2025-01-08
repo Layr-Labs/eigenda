@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"

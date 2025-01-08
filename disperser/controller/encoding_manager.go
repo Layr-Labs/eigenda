@@ -128,7 +128,7 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 				err := e.HandleBatch(ctx)
 				if err != nil {
 					if errors.Is(err, errNoBlobsToEncode) {
-						e.logger.Warn("no blobs to encode")
+						e.logger.Debug("no blobs to encode")
 					} else {
 						e.logger.Error("failed to process a batch", "err", err)
 					}
@@ -263,6 +263,8 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	if cursor != nil {
 		e.cursor = cursor
 	}
+
+	e.logger.Debug("successfully submitted encoding requests", "numBlobs", len(blobMetadatas))
 	return nil
 }
 

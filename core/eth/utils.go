@@ -137,14 +137,14 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 		len(reservation.QuorumSplits) == 0
 }
 
-// ConvertToActiveReservation converts a upstream binding data structure to local definition.
+// ConvertToReservedPayment converts a upstream binding data structure to local definition.
 // Returns an error if the input reservation is zero-valued.
-func ConvertToActiveReservation(reservation paymentvault.IPaymentVaultReservation) (*core.ActiveReservation, error) {
+func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation) (*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
 		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
 
-	return &core.ActiveReservation{
+	return &core.ReservedPayment{
 		SymbolsPerSecond: reservation.SymbolsPerSecond,
 		StartTimestamp:   reservation.StartTimestamp,
 		EndTimestamp:     reservation.EndTimestamp,

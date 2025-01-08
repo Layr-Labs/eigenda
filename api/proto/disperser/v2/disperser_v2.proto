@@ -70,7 +70,7 @@ message BlobCommitmentReply {
 message GetPaymentStateRequest {
   string account_id = 1;
   // Signature over the account ID
-  // TODO: sign over a bin index or a nonce to mitigate signature replay attacks
+  // TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
   bytes signature = 2;
 }
 
@@ -99,6 +99,7 @@ message GetPaymentStateReply {
 // Terminal states are states that will not be updated to a different state:
 // - CERTIFIED
 // - FAILED
+// - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
   UNKNOWN = 0;
 
@@ -113,6 +114,9 @@ enum BlobStatus {
 
   // FAILED means that the blob has failed permanently
   FAILED = 4;
+
+  // INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation
+  INSUFFICIENT_SIGNATURES = 5;
 }
 
 // SignedBatch is a batch of blobs with a signature.
@@ -138,11 +142,15 @@ message Attestation {
   // Serialized bytes of G2 point that represents aggregate public key of all signers
   bytes apk_g2 = 2;
   // Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum
+  // The order of the quorum_apks should match the order of the quorum_numbers
   repeated bytes quorum_apks = 3;
   // Serialized bytes of aggregate signature
   bytes sigma = 4;
   // Relevant quorum numbers for the attestation
   repeated uint32 quorum_numbers = 5;
+  // The attestation rate for each quorum.
+  // The order of the quorum_signed_percentages should match the order of the quorum_numbers
+  bytes quorum_signed_percentages = 6;
 }
 
 message PaymentGlobalParams {

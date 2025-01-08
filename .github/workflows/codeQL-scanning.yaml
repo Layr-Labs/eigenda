@@ -1,0 +1,63 @@
+name: "CodeQL scanning"
+
+on:
+  push:
+    branches:
+      - master
+      - 'release/*'
+  pull_request:
+    branches:
+      - master
+      - 'release/*'
+    paths:
+      - 'node/**'
+      - 'operators/**'
+      - 'retriever/**'
+      - 'disperser/**'
+      - 'core/**'
+      - 'common/**'
+      - 'api/**'
+      - '.github/codeql/**'
+      - '.github/workflows/codeql-analysis.yml'
+   paths-ignore:
+      - 'contracts/bindings/**'
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  CodeQL-Build:
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+
+    - name: Install golang
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.21.1'
+
+    - name: Custom build using make
+      run: |
+        go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+        make compile-el
+        
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: go
+        
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3

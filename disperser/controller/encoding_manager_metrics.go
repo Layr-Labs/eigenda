@@ -1,6 +1,7 @@
 package controller
 
 import (
+	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
@@ -123,23 +124,23 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 }
 
 func (m *encodingManagerMetrics) reportBatchSubmissionLatency(duration time.Duration) {
-	m.batchSubmissionLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.batchSubmissionLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportBlobHandleLatency(duration time.Duration) {
-	m.blobHandleLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.blobHandleLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportEncodingLatency(duration time.Duration) {
-	m.encodingLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.encodingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportPutBlobCertLatency(duration time.Duration) {
-	m.putBlobCertLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.putBlobCertLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportUpdateBlobStatusLatency(duration time.Duration) {
-	m.updateBlobStatusLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.updateBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportBatchSize(size int) {

@@ -225,6 +225,11 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
 		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
 		DISPERSER_SERVER_DISPERSER_VERSION:           "2",
+
+		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
+		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
+		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
+		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -357,6 +362,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_ONCHAIN_STATE_REFRESH_INTERVAL:        "1s",
 		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
+		RELAY_AUTHENTICATION_DISABLED:               "false",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 
@@ -455,6 +461,8 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
 		RETRIEVER_GRAPH_URL:           graphUrl,
+		RETRIEVER_GRAPH_BACKOFF:       "1s",
+		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
 
 		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 	}

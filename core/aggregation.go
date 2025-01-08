@@ -273,6 +273,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	// Aggregate the aggregated signatures. We reuse the first aggregated signature as the accumulator
 	var aggSig *Signature
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.AggSignature[quorumID] == nil {
+			a.Logger.Error("cannot aggregate signature for quorum because aggregated signature is nil", "quorumID", quorumID)
+			continue
+		}
 		sig := quorumAttestation.AggSignature[quorumID]
 		if aggSig == nil {
 			aggSig = &Signature{sig.G1Point.Clone()}
@@ -284,6 +288,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	// Aggregate the aggregated public keys. We reuse the first aggregated public key as the accumulator
 	var aggPubKey *G2Point
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.SignersAggPubKey[quorumID] == nil {
+			a.Logger.Error("cannot aggregate public key for quorum because signers aggregated public key is nil", "quorumID", quorumID)
+			continue
+		}
 		apk := quorumAttestation.SignersAggPubKey[quorumID]
 		if aggPubKey == nil {
 			aggPubKey = apk.Clone()
@@ -315,6 +323,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 
 	quorumAggKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.QuorumAggPubKey[quorumID] == nil {
+			a.Logger.Error("cannot aggregate public key for quorum because aggregated public key is nil", "quorumID", quorumID)
+			continue
+		}
 		quorumAggKeys[quorumID] = quorumAttestation.QuorumAggPubKey[quorumID]
 	}
 

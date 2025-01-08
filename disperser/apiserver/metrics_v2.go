@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"github.com/Layr-Labs/eigenda/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -116,15 +117,15 @@ func newAPIServerV2Metrics(registry *prometheus.Registry) *metricsV2 {
 }
 
 func (m *metricsV2) reportGetBlobCommitmentLatency(duration time.Duration) {
-	m.getBlobCommitmentLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getBlobCommitmentLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *metricsV2) reportGetPaymentStateLatency(duration time.Duration) {
-	m.getPaymentStateLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getPaymentStateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *metricsV2) reportDisperseBlobLatency(duration time.Duration) {
-	m.disperseBlobLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.disperseBlobLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *metricsV2) reportDisperseBlobSize(size int) {
@@ -133,13 +134,13 @@ func (m *metricsV2) reportDisperseBlobSize(size int) {
 
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {
 	m.validateDispersalRequestLatency.WithLabelValues().Observe(
-		float64(duration.Nanoseconds()) / float64(time.Millisecond))
+		common.ToMilliseconds(duration))
 }
 
 func (m *metricsV2) reportStoreBlobLatency(duration time.Duration) {
-	m.storeBlobLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.storeBlobLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *metricsV2) reportGetBlobStatusLatency(duration time.Duration) {
-	m.getBlobStatusLatency.WithLabelValues().Observe(float64(duration.Nanoseconds()) / float64(time.Millisecond))
+	m.getBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }

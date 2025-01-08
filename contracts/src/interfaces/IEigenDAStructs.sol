@@ -62,6 +62,10 @@ struct RelayInfo {
     string relayURL;
 }
 
+struct DisperserInfo {
+    address disperserAddress;
+}
+
 struct BlobVerificationProofV2 {
     BlobCertificate blobCertificate;
     uint32 blobIndex;
@@ -103,7 +107,6 @@ struct Attestation {
     BN254.G1Point sigma;
     BN254.G2Point apkG2;
     uint32[] quorumNumbers;
-    uint32 referenceBlockNumber;
 }
 
 ///////////////////////// SIGNATURE VERIFIER ///////////////////////////////

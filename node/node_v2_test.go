@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -181,8 +181,15 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	relayURLs := map[v2.RelayKey]string{
 		0: "http://localhost:8080",
 	}
+
+	messageSigner := func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+		return nil, nil
+	}
+
 	relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-		Sockets: relayURLs,
+		Sockets:       relayURLs,
+		OperatorID:    &c.node.Config.ID,
+		MessageSigner: messageSigner,
 	}, c.node.Logger)
 	require.NoError(t, err)
 	// set up non-mock client
