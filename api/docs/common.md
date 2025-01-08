@@ -60,8 +60,8 @@ BlobCertificate is what gets attested by the network
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  |  |
-| relays | [uint32](#uint32) | repeated |  |
+| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header is the header of the blob |
+| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob |
 
 
 
@@ -71,15 +71,15 @@ BlobCertificate is what gets attested by the network
 <a name="common-v2-BlobHeader"></a>
 
 ### BlobHeader
-
+BlobHeader is the header of a blob
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | version | [uint32](#uint32) |  | Blob version |
-| quorum_numbers | [uint32](#uint32) | repeated |  |
-| commitment | [common.BlobCommitment](#common-BlobCommitment) |  |  |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  |  |
+| quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of |
+| commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment of the blob |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
 
 

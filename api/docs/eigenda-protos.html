@@ -896,28 +896,28 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A commitment to the blob data. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A commitment to the degree of the polynomial used to generate the blob commitment. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_proof</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The degree of the polynomial used to generate the blob commitment. TODO: comment on power of 2 stuff </p></td>
                 </tr>
               
             </tbody>
@@ -928,7 +928,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p></p>
+        <p>G1Commitment represents a commitment to a field element in the G1 group of the BLS12-381 curve.</p>
 
         
           <table class="field-table">
@@ -1094,14 +1094,14 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>blob_header is the header of the blob </p></td>
                 </tr>
               
                 <tr>
                   <td>relays</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>relays is the list of relays that are in custody of the blob </p></td>
                 </tr>
               
             </tbody>
@@ -1112,7 +1112,7 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p></p>
+        <p>BlobHeader is the header of a blob</p>
 
         
           <table class="field-table">
@@ -1132,21 +1132,21 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of </p></td>
                 </tr>
               
                 <tr>
                   <td>commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>commitment is the KZG commitment of the blob </p></td>
                 </tr>
               
                 <tr>
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>payment_header contains payment information for the blob </p></td>
                 </tr>
               
                 <tr>
@@ -2016,7 +2016,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BinRecord">BinRecord</h3>
-        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+        <p>BinRecord is the usage record of an account in a bin. The API should return the active bin</p><p>record and the subsequent two records that contains potential overflows.</p>
 
         
           <table class="field-table">
@@ -2029,14 +2029,14 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>index</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Period index of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>usage</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>symbol usage recorded </p></td>
                 </tr>
               
             </tbody>
@@ -2047,7 +2047,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
-        <p></p>
+        <p>A reply to a BlobCommitmentRequest.</p>
 
         
           <table class="field-table">
@@ -2060,7 +2060,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The commitment of the blob. </p></td>
                 </tr>
               
             </tbody>
@@ -2071,7 +2071,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</h3>
-        <p>Utility method used to generate the commitment of blob given its data.</p><p>This can be used to construct BlobHeader.commitment</p>
+        <p>A request to generate the commitment of a blob via BlobCommitmentRequest().</p><p>This can be used to construct a BlobHeader.commitment.</p>
 
         
           <table class="field-table">
@@ -2084,7 +2084,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>TODO describe this </p></td>
                 </tr>
               
             </tbody>
@@ -2095,7 +2095,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobStatusReply">BlobStatusReply</h3>
-        <p></p>
+        <p>BlobStatusReply is the reply to a BlobStatusRequest.</p>
 
         
           <table class="field-table">
@@ -2122,7 +2122,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_verification_info</td>
                   <td><a href="#disperser.v2.BlobVerificationInfo">BlobVerificationInfo</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. </p></td>
                 </tr>
               
             </tbody>
@@ -2146,7 +2146,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob. </p></td>
                 </tr>
               
             </tbody>
@@ -2195,7 +2195,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.DisperseBlobReply">DisperseBlobReply</h3>
-        <p></p>
+        <p>A reply to a DisperseBlob request.</p>
 
         
           <table class="field-table">
@@ -2215,7 +2215,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob. Unique even if blob data is the identical. </p></td>
                 </tr>
               
             </tbody>
@@ -2226,7 +2226,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.DisperseBlobRequest">DisperseBlobRequest</h3>
-        <p></p>
+        <p>A request to disperse a blob.</p>
 
         
           <table class="field-table">
@@ -2240,10 +2240,14 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The data to be dispersed.
-The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-as a field element on the bn254 curve. The valid range is
-0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617
+
+Although the length commitment is required to be a power of 2, the length of this byte array is not required to
+be a power of 2 as long as the length does not exceed the length commitment. The maximum length of the data is
+16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+
+Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
+significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
+The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617.
 If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. </p></td>
                 </tr>
               
@@ -2251,7 +2255,7 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">common.v2.BlobHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The header contains metadata about the blob. </p></td>
                 </tr>
               
             </tbody>
@@ -2327,7 +2331,7 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The ID of the account being queried. </p></td>
                 </tr>
               
                 <tr>
@@ -2346,7 +2350,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
         
       
         <h3 id="disperser.v2.PaymentGlobalParams">PaymentGlobalParams</h3>
-        <p></p>
+        <p>Global constant parameters defined by the payment vault.</p>
 
         
           <table class="field-table">
@@ -2359,35 +2363,35 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>global_symbols_per_second</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Global ratelimit for on-demand dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>min_num_symbols</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Minimum number of symbols accounted for all dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>price_per_symbol</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Price charged per symbol for on-demand dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>reservation_window</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Reservation window for all reservations </p></td>
                 </tr>
               
                 <tr>
                   <td>on_demand_quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorums allowed to make on-demand dispersals </p></td>
                 </tr>
               
             </tbody>
@@ -2398,7 +2402,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
         
       
         <h3 id="disperser.v2.Reservation">Reservation</h3>
-        <p></p>
+        <p>Reservation parameters of an account, used to determine the rate limit for the account.</p>
 
         
           <table class="field-table">
@@ -2411,35 +2415,35 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>symbols_per_second</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>rate limit for the account </p></td>
                 </tr>
               
                 <tr>
                   <td>start_timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>start timestamp of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>end_timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>end timestamp of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorums allowed to make reserved dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorum splits between allowed quorums </p></td>
                 </tr>
               
             </tbody>
@@ -2493,37 +2497,37 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
               <tr>
                 <td>UNKNOWN</td>
                 <td>0</td>
-                <td><p></p></td>
+                <td><p>UNKNOWN means that the status of the blob is unknown.</p></td>
               </tr>
             
               <tr>
                 <td>QUEUED</td>
                 <td>1</td>
-                <td><p>QUEUED means that the blob has been queued by the disperser for processing</p></td>
+                <td><p>QUEUED means that the blob has been queued by the disperser for processing.</p></td>
               </tr>
             
               <tr>
                 <td>ENCODED</td>
                 <td>2</td>
-                <td><p>ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes</p></td>
+                <td><p>ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes.</p></td>
               </tr>
             
               <tr>
                 <td>CERTIFIED</td>
                 <td>3</td>
-                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes</p></td>
+                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes.</p></td>
               </tr>
             
               <tr>
                 <td>FAILED</td>
                 <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently</p></td>
+                <td><p>FAILED means that the blob has failed permanently.</p></td>
               </tr>
             
               <tr>
                 <td>INSUFFICIENT_SIGNATURES</td>
                 <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation</p></td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.</p></td>
               </tr>
             
           </tbody>
@@ -4026,7 +4030,7 @@ reconstructed original blob in response.</p></td>
 
       
         <h3 id="retriever.v2.BlobReply">BlobReply</h3>
-        <p></p>
+        <p>A reply to a RetrieveBlob() request.</p>
 
         
           <table class="field-table">
@@ -4050,7 +4054,7 @@ reconstructed original blob in response.</p></td>
         
       
         <h3 id="retriever.v2.BlobRequest">BlobRequest</h3>
-        <p></p>
+        <p>A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().</p>
 
         
           <table class="field-table">
