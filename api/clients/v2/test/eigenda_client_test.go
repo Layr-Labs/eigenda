@@ -1,27 +1,28 @@
-package v2
+package test
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	codecsmock "github.com/Layr-Labs/eigenda/api/clients/codecs/mock"
-	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"testing"
-	"time"
 )
 
 type ClientTester struct {
-	Random          *testrandom.TestRandom
-	Client          *EigenDAClient
+	Random    *testrandom.TestRandom
+	Client    *clients.EigenDAClient
 	MockRelayClient *clientsmock.MockRelayClient
-	MockCodec       *codecsmock.BlobCodec
+	MockCodec *codecsmock.BlobCodec
 }
 
 func (c *ClientTester) assertExpectations(t *testing.T) {
@@ -32,16 +33,16 @@ func (c *ClientTester) assertExpectations(t *testing.T) {
 // buildClientTester sets up a client with mocks necessary for testing
 func buildClientTester(t *testing.T) ClientTester {
 	logger := logging.NewNoopLogger()
-	clientConfig := &EigenDAClientConfig{
+	clientConfig := &clients.EigenDAClientConfig{
 		RelayTimeout: 50 * time.Millisecond,
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	mockCodec := codecsmock.BlobCodec{}
 
-	random := testrandom.NewTestRandom()
+	random := testrandom.NewTestRandom(t)
 
-	client, err := NewEigenDAClient(
+	client, err := clients.NewEigenDAClient(
 		logger,
 		random.Rand,
 		clientConfig,
@@ -63,8 +64,8 @@ func buildClientTester(t *testing.T) ClientTester {
 func TestGetBlobSuccess(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
-	blobBytes := tester.Random.RandomBytes(100)
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
+	blobBytes := tester.Random.Bytes(100)
 
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
@@ -73,7 +74,7 @@ func TestGetBlobSuccess(t *testing.T) {
 	}
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
-	tester.MockCodec.On("DecodeBlob", blobBytes).Return(tester.Random.RandomBytes(50), nil).Once()
+	tester.MockCodec.On("DecodeBlob", blobBytes).Return(tester.Random.Bytes(50), nil).Once()
 
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
 
@@ -87,7 +88,7 @@ func TestGetBlobSuccess(t *testing.T) {
 func TestRelayCallTimeout(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
 
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
@@ -139,8 +140,8 @@ func TestRelayCallTimeout(t *testing.T) {
 func TestRandomRelayRetries(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
-	blobBytes := tester.Random.RandomBytes(100)
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
+	blobBytes := tester.Random.Bytes(100)
 
 	relayCount := 100
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -162,7 +163,7 @@ func TestRandomRelayRetries(t *testing.T) {
 		failedCallCount++
 	})
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.MatchedBy(onlineKeyMatcher), blobKey).Return(blobBytes, nil)
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil)
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.Bytes(50), nil)
 
 	// keep track of how many tries various blob retrievals require
 	// this allows us to assert that there is variability, i.e. that relay call order is actually random
@@ -187,7 +188,7 @@ func TestRandomRelayRetries(t *testing.T) {
 func TestNoRelayResponse(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -211,7 +212,7 @@ func TestNoRelayResponse(t *testing.T) {
 func TestNoRelaysInCert(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
 
 	// cert has no listed relay keys
 	blobCert := core.BlobCertificate{
@@ -229,7 +230,7 @@ func TestNoRelaysInCert(t *testing.T) {
 func TestGetBlobReturns0Len(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -243,9 +244,11 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	// the first GetBlob will return a 0 len blob
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return([]byte{}, nil).Once()
 	// the second call will return random bytes
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tester.Random.RandomBytes(100), nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
+		tester.Random.Bytes(100),
+		nil).Once()
 
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil)
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.Bytes(50), nil)
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
@@ -259,7 +262,7 @@ func TestGetBlobReturns0Len(t *testing.T) {
 func TestFailedDecoding(t *testing.T) {
 	tester := buildClientTester(t)
 
-	blobKey := core.BlobKey(tester.Random.RandomBytes(32))
+	blobKey := core.BlobKey(tester.Random.Bytes(32))
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -270,10 +273,10 @@ func TestFailedDecoding(t *testing.T) {
 		RelayKeys: relayKeys,
 	}
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tester.Random.RandomBytes(100), nil)
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tester.Random.Bytes(100), nil)
 
 	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(nil, fmt.Errorf("decode failed")).Once()
-	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.RandomBytes(50), nil).Once()
+	tester.MockCodec.On("DecodeBlob", mock.Anything).Return(tester.Random.Bytes(50), nil).Once()
 
 	// decoding will fail the first time, but succeed the second time
 	blob, err := tester.Client.GetBlob(context.Background(), blobKey, blobCert)
@@ -318,9 +321,9 @@ func TestGetCodec(t *testing.T) {
 
 // TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
 func TestBuilder(t *testing.T) {
-	clientConfig := &EigenDAClientConfig{
+	clientConfig := &clients.EigenDAClientConfig{
 		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
-		PointVerificationMode: IFFT,
+		PointVerificationMode: clients.IFFT,
 		RelayTimeout:          500 * time.Millisecond,
 	}
 
@@ -332,7 +335,7 @@ func TestBuilder(t *testing.T) {
 		UseSecureGrpcFlag: true,
 	}
 
-	client, err := BuildEigenDAClient(
+	client, err := clients.BuildEigenDAClient(
 		logging.NewNoopLogger(),
 		clientConfig,
 		relayClientConfig)

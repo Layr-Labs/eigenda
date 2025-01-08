@@ -1,8 +1,9 @@
-package v2
+package clients
 
 import (
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 )
 
 // VerificationMode is an enum that represents the different ways that a blob may be encoded/decoded between

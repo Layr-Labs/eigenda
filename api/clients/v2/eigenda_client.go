@@ -1,14 +1,14 @@
-package v2
+package clients
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api/clients"
+	"math/rand"
+
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"math/rand"
 )
 
 // EigenDAClient provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
@@ -20,16 +20,16 @@ type EigenDAClient struct {
 	random      *rand.Rand
 	config      *EigenDAClientConfig
 	codec       codecs.BlobCodec
-	relayClient clients.RelayClient
+	relayClient RelayClient
 }
 
 // BuildEigenDAClient builds an EigenDAClient from config structs.
 func BuildEigenDAClient(
 	log logging.Logger,
 	config *EigenDAClientConfig,
-	relayClientConfig *clients.RelayClientConfig) (*EigenDAClient, error) {
+	relayClientConfig *RelayClientConfig) (*EigenDAClient, error) {
 
-	relayClient, err := clients.NewRelayClient(relayClientConfig, log)
+	relayClient, err := NewRelayClient(relayClientConfig, log)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
@@ -47,7 +47,7 @@ func NewEigenDAClient(
 	log logging.Logger,
 	random *rand.Rand,
 	config *EigenDAClientConfig,
-	relayClient clients.RelayClient,
+	relayClient RelayClient,
 	codec codecs.BlobCodec) (*EigenDAClient, error) {
 
 	return &EigenDAClient{
