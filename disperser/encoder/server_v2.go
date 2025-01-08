@@ -39,7 +39,7 @@ type EncoderServerV2 struct {
 	close       func()
 
 	runningRequests chan struct{}
-	requestPool     chan blobRequest
+	requestQueue    chan blobRequest
 
 	queueStats map[string]int
 	queueLock  sync.Mutex
@@ -54,7 +54,7 @@ func NewEncoderServerV2(
 	metrics *Metrics,
 	grpcMetrics *grpcprom.ServerMetrics,
 ) *EncoderServerV2 {
-	metrics.SetQueueCapacity(config.RequestPoolSize)
+	metrics.SetQueueCapacity(config.RequestQueueSize)
 
 	return &EncoderServerV2{
 		config:          config,
@@ -65,7 +65,7 @@ func NewEncoderServerV2(
 		metrics:         metrics,
 		grpcMetrics:     grpcMetrics,
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan blobRequest, config.RequestPoolSize),
+		requestQueue:    make(chan blobRequest, config.RequestQueueSize),
 		queueStats:      make(map[string]int),
 	}
 }
@@ -114,14 +114,14 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 
 	// Rate limit
 	select {
-	case s.requestPool <- blobRequest{blobSizeByte: int(blobSize)}:
+	case s.requestQueue <- blobRequest{blobSizeByte: int(blobSize)}:
 		s.queueLock.Lock()
 		s.queueStats[sizeBucket]++
 		s.metrics.ObserveQueue(s.queueStats)
 		s.queueLock.Unlock()
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(int(blobSize))
-		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		s.logger.Warn("rate limiting as request queue is full", "requestQueueSize", s.config.RequestQueueSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
 	}
 
@@ -193,7 +193,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 }
 
 func (s *EncoderServerV2) popRequest() {
-	blobRequest := <-s.requestPool
+	blobRequest := <-s.requestQueue
 	<-s.runningRequests
 	s.queueLock.Lock()
 	s.queueStats[common.BlobSizeBucket(blobRequest.blobSizeByte)]--
