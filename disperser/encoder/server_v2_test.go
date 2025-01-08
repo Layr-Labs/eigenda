@@ -18,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,7 +210,12 @@ func createTestComponents(t *testing.T) *testComponents {
 	t.Helper()
 	prover, err := makeTestProver(300000)
 	require.NoError(t, err, "Failed to create prover")
-	metrics := encoder.NewMetrics(prometheus.NewRegistry(), "9000", logger)
+
+	registry := prometheus.NewRegistry()
+	metrics := encoder.NewMetrics(registry, "9000", logger)
+	grpcMetrics := grpcprom.NewServerMetrics()
+	registry.MustRegister(grpcMetrics)
+
 	s3Client := mock.NewS3Client()
 	dynamoDBClient := &mock.MockDynamoDBClient{}
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
@@ -220,7 +226,7 @@ func createTestComponents(t *testing.T) *testComponents {
 		MaxConcurrentRequests: 10,
 		RequestPoolSize:       5,
 		PreventReencoding:     true,
-	}, blobStore, chunkStoreWriter, logger, prover, metrics)
+	}, blobStore, chunkStoreWriter, logger, prover, metrics, grpcMetrics)
 
 	return &testComponents{
 		encoderServer:    encoderServer,
