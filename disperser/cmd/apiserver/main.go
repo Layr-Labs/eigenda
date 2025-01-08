@@ -129,6 +129,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
+		meterer.Start(context.Background())
 	}
 
 	var ratelimiter common.RateLimiter
