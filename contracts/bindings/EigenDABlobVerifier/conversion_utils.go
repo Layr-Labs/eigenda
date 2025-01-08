@@ -193,6 +193,8 @@ func bytesToBN254G1Point(bytes []byte) (*BN254G1Point, error) {
 
 func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
 	var g2Point bn254.G2Affine
+
+	// SetBytes checks that the result is in the correct subgroup
 	_, err := g2Point.SetBytes(bytes)
 
 	if err != nil {
