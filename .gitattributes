@@ -1,2 +1,4 @@
-api/docs/*.md linguist-generated=true
+# Auto-generated files should not be rendered in diffs.
+api/docs/*.md   linguist-generated=true
 api/docs/*.html linguist-generated=true
+*.pb.go         linguist-generated=true
