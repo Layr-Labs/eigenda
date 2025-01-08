@@ -179,6 +179,12 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 	if err != nil {
 		log.Panicf("Error: %s", err)
 	}
+	fmt.Println("thresholds reigstry address", thresholdRegistryAddr.Hex())
+	defaultThes, err := contractThresholdRegistry.GetDefaultSecurityThresholdsV2(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	fmt.Println("thresholds", defaultThes.AdversaryThreshold, defaultThes.ConfirmationThreshold)
 	for _, blobVersionParam := range env.BlobVersionParams {
 		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.VersionedBlobParams{
 			MaxNumOperators: blobVersionParam.MaxNumOperators,
@@ -203,10 +209,11 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 		log.Panicf("Error: %s", err)
 	}
 	relays := map[uint32]string{}
+	ethAddr := ethClient.GetAccountAddress()
 	for i, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
-			RelayAddress: gcommon.Address{0},
+			RelayAddress: ethAddr,
 			RelayURL:     url,
 		})
 		if err != nil {
