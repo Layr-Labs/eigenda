@@ -28,7 +28,7 @@ func FuzzInaboxIntegration(f *testing.F) {
 		make([]byte, 1),                 // Minimal non-empty input
 		bytes.Repeat([]byte{0x00}, 100), // All zeros
 		bytes.Repeat([]byte{0xFF}, 100), // All 0xFF bytes
-		[]byte("Hello, 世界"),           // Unicode characters
+		[]byte("Hello, 世界"),             // Unicode characters
 		make([]byte, 1024),              // 1KB of zeros
 		func() []byte { // Random 4MB
 			data := make([]byte, 4*1024*1024) // 4MB
