@@ -99,8 +99,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
 		mtConfig := mt.Config{
-			ChainReadTimeout: time.Duration(config.ChainReadTimeout) * time.Second,
-			UpdateInterval:   time.Duration(config.UpdateInterval) * time.Second,
+			ChainReadTimeout: config.ChainReadTimeout,
+			UpdateInterval:   config.OnchainStateRefreshInterval,
 		}
 
 		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
@@ -129,6 +129,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
+		meterer.Start(context.Background())
 	}
 
 	var ratelimiter common.RateLimiter
