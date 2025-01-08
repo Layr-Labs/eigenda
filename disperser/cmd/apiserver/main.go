@@ -183,6 +183,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			config.OnchainStateRefreshInterval,
 			logger,
 			reg,
+			config.MetricsConfig,
 		)
 		if err != nil {
 			return err
@@ -213,7 +214,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
-		// TODO(cody-littley): once we deprecate v1, move all remaining metrics functionality to metrics_v2.go
 		metrics.Start(context.Background())
 		logger.Info("Enabled metrics for Disperser", "socket", httpSocket)
 	}
