@@ -86,8 +86,9 @@ type (
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
-	OperatorDispersalResponse struct {
-		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
+	// Operators' responses for a batch
+	OperatorDispersalResponses struct {
+		Responses []*corev2.DispersalResponse `json:"operator_dispersal_responses"`
 	}
 
 	OperatorPortCheckResponse struct {
@@ -194,7 +195,7 @@ func (s *ServerV2) Start() error {
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
 			operators.GET("/reachability", s.CheckOperatorsReachability)
-			operators.GET("/response/:batch_header_hash", s.FetchOperatorResponse)
+			operators.GET("/response/:batch_header_hash", s.FetchOperatorsResponses)
 		}
 		metrics := v2.Group("/metrics")
 		{
@@ -510,49 +511,62 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
-// FetchOperatorResponse godoc
+// FetchOperatorsResponses godoc
 //
 //	@Summary	Fetch operator attestation response for a batch
 //	@Tags		Operators
 //	@Produce	json
 //	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
-//	@Param		operator_id			query		string	false	"Operator ID in hex string"
-//	@Success	200					{object}	OperatorDispersalResponse
+//	@Param		operator_id			query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
+//	@Success	200					{object}	OperatorDispersalResponses
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/{batch_header_hash} [get]
-func (s *ServerV2) FetchOperatorResponse(c *gin.Context) {
+func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorResponse", f*1000) // make milliseconds
+		s.metrics.ObserveLatency("FetchOperatorsResponses", f*1000) // make milliseconds
 	}))
 	defer timer.ObserveDuration()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorResponse")
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
 	operatorIdStr := c.DefaultQuery("operator_id", "")
-	operatorId, err := core.OperatorIDFromHex(operatorIdStr)
-	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorResponse")
-		errorResponse(c, errors.New("invalid operatorId"))
-		return
-	}
 
-	operatorResponse, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchOperatorResponse")
-		errorResponse(c, err)
-		return
+	operatorResponses := make([]*corev2.DispersalResponse, 0)
+	if operatorIdStr == "" {
+		res, err := s.blobMetadataStore.GetDispersalResponses(c.Request.Context(), batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
+			errorResponse(c, err)
+			return
+		}
+		operatorResponses = append(operatorResponses, res...)
+	} else {
+		operatorId, err := core.OperatorIDFromHex(operatorIdStr)
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
+			errorResponse(c, errors.New("invalid operatorId"))
+			return
+		}
+
+		res, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
+			errorResponse(c, err)
+			return
+		}
+		operatorResponses = append(operatorResponses, res)
 	}
-	response := &OperatorDispersalResponse{
-		Response: operatorResponse,
+	response := &OperatorDispersalResponses{
+		Responses: operatorResponses,
 	}
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorResponse")
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsResponses")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
 	c.JSON(http.StatusOK, response)
 }

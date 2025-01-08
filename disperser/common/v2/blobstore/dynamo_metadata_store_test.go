@@ -336,6 +336,35 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
+	// the other operator's response for the same batch
+	opID2 := core.OperatorID{2, 3}
+	dispersalRequest2 := &corev2.DispersalRequest{
+		OperatorID:      opID2,
+		OperatorAddress: gethcommon.HexToAddress("0x2234567"),
+		Socket:          "socket",
+		DispersedAt:     uint64(time.Now().UnixNano()),
+		BatchHeader: corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, 3},
+			ReferenceBlockNumber: 100,
+		},
+	}
+	err = blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest2)
+	assert.NoError(t, err)
+	dispersalResponse2 := &corev2.DispersalResponse{
+		DispersalRequest: dispersalRequest2,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        [32]byte{1, 1, 1},
+		Error:            "",
+	}
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
+	assert.NoError(t, err)
+
+	responses, err := blobMetadataStore.GetDispersalResponses(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(responses))
+	assert.Equal(t, dispersalResponse, responses[0])
+	assert.Equal(t, dispersalResponse2, responses[1])
+
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
@@ -343,7 +372,15 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 		},
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID2.Hex()},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID2.Hex()},
 		},
 	})
 }

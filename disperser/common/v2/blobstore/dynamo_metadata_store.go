@@ -480,6 +480,35 @@ func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeade
 	return res, nil
 }
 
+func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHeaderHash [32]byte) ([]*corev2.DispersalResponse, error) {
+	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
+		":pk": &types.AttributeValueMemberS{
+			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		":prefix": &types.AttributeValueMemberS{
+			Value: dispersalResponseSKPrefix,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("%w: dispersal responses not found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	responses := make([]*corev2.DispersalResponse, len(items))
+	for i, item := range items {
+		responses[i], err = UnmarshalDispersalResponse(item)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return responses, nil
+}
+
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {
