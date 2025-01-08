@@ -70,7 +70,7 @@ message BlobStatusReply {
 // A request to generate the commitment of a blob via BlobCommitmentRequest().
 // This can be used to construct a BlobHeader.commitment.
 message BlobCommitmentRequest {
-  // TODO describe this
+  // The blob data.
   bytes data = 1;
 }
 
