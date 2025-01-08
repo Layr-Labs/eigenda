@@ -288,6 +288,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
 		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS: "16",
 		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
@@ -314,6 +315,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
 		DISPERSER_ENCODER_ENCODER_VERSION:         "2",
 		DISPERSER_ENCODER_S3_BUCKET_NAME:          "test-eigenda-blobstore",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
