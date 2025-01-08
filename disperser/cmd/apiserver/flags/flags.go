@@ -112,7 +112,7 @@ var (
 		Usage:    "update interval for refreshing the on-chain state",
 		Value:    1 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
-		Required: false,
+		Required: true,
 	}
 	ChainReadTimeout = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
