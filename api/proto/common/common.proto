@@ -22,7 +22,7 @@ message BlobCommitment {
   bytes length_commitment = 2;
   // A proof that the degree of the polynomial used to generate the blob commitment is valid.
   bytes length_proof = 3;
-  // The degree of the polynomial used to generate the blob commitment. TODO: comment on power of 2 stuff
+  // The degree of the polynomial used to generate the blob commitment. Must be a power of 2.
   uint32 length = 4;
 }
 

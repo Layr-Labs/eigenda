@@ -255,7 +255,7 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 | commitment | [bytes](#bytes) |  | A commitment to the blob data. |
 | length_commitment | [bytes](#bytes) |  | A commitment to the degree of the polynomial used to generate the blob commitment. |
 | length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. |
-| length | [uint32](#uint32) |  | The degree of the polynomial used to generate the blob commitment. TODO: comment on power of 2 stuff |
+| length | [uint32](#uint32) |  | The degree of the polynomial used to generate the blob commitment. Must be a power of 2. |
 
 
 
@@ -803,7 +803,7 @@ This can be used to construct a BlobHeader.commitment.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | TODO describe this |
+| data | [bytes](#bytes) |  | The blob data. |
 
 
 

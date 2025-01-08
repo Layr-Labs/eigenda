@@ -95,7 +95,7 @@ This can be used to construct a BlobHeader.commitment.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | TODO describe this |
+| data | [bytes](#bytes) |  | The blob data. |
 
 
 

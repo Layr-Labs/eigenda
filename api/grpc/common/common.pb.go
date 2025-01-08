@@ -91,7 +91,7 @@ type BlobCommitment struct {
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
 	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
 	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
-	// The degree of the polynomial used to generate the blob commitment. TODO: comment on power of 2 stuff
+	// The degree of the polynomial used to generate the blob commitment. Must be a power of 2.
 	Length uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
 }
 
