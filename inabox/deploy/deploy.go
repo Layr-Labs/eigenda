@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common"
+	caws "github.com/Layr-Labs/eigenda/common/aws"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -198,7 +199,7 @@ func (env *Config) GenerateDisperserKeypair() error {
 
 	// Load the public key and convert it to an Ethereum address
 
-	key, err := common.LoadPublicKeyKMS(context.Background(), keyManager, env.DisperserKMSKeyID)
+	key, err := caws.LoadPublicKeyKMS(context.Background(), keyManager, env.DisperserKMSKeyID)
 	if err != nil {
 		return fmt.Errorf("could not load public key: %v", err)
 	}
