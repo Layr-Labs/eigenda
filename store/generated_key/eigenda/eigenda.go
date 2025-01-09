@@ -59,7 +59,12 @@ func (e Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
 	}
 
-	decodedBlob, err := e.client.GetBlob(ctx, cert.BlobVerificationProof.BatchMetadata.BatchHeaderHash, cert.BlobVerificationProof.BlobIndex)
+	err = cert.NoNilFields()
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify DA cert: %w", err)
+	}
+
+	decodedBlob, err := e.client.GetBlob(ctx, cert.BlobVerificationProof.GetBatchMetadata().GetBatchHeaderHash(), cert.BlobVerificationProof.GetBlobIndex())
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to retrieve decoded blob: %w", err)
 	}
@@ -119,7 +124,12 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	}
 	cert := (*verify.Certificate)(blobInfo)
 
-	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
+	err = cert.NoNilFields()
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify DA cert: %w", err)
+	}
+
+	err = e.verifier.VerifyCommitment(cert.BlobHeader.GetCommitment(), encodedBlob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify commitment: %w", err)
 	}
@@ -158,7 +168,7 @@ func (e Store) Verify(ctx context.Context, key []byte, value []byte) error {
 	}
 
 	// verify kzg data commitment
-	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
+	err = e.verifier.VerifyCommitment(cert.BlobHeader.GetCommitment(), encodedBlob)
 	if err != nil {
 		return fmt.Errorf("failed to verify commitment: %w", err)
 	}
