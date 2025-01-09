@@ -59,6 +59,7 @@ func DefaultLoggerConfig() LoggerConfig {
 		HandlerOpts: logging.SLoggerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
+			NoColor:   true,
 		},
 	}
 }
