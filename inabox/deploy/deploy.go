@@ -179,12 +179,6 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 	if err != nil {
 		log.Panicf("Error: %s", err)
 	}
-	fmt.Println("thresholds reigstry address", thresholdRegistryAddr.Hex())
-	defaultThes, err := contractThresholdRegistry.GetDefaultSecurityThresholdsV2(&bind.CallOpts{})
-	if err != nil {
-		log.Panicf("Error: %s", err)
-	}
-	fmt.Println("thresholds", defaultThes.AdversaryThreshold, defaultThes.ConfirmationThreshold)
 	for _, blobVersionParam := range env.BlobVersionParams {
 		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.VersionedBlobParams{
 			MaxNumOperators: blobVersionParam.MaxNumOperators,

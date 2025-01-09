@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/core"
@@ -11,7 +13,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
-	"sync"
 )
 
 // MessageSigner is a function that signs a message with a private BLS key.
@@ -74,7 +75,7 @@ func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClie
 		return nil, fmt.Errorf("invalid config: %v", config)
 	}
 
-	logger.Info("creating relay client", "config", config)
+	logger.Info("creating relay client", "urls", config.Sockets)
 
 	initOnce := sync.Map{}
 	for key := range config.Sockets {
