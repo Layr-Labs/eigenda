@@ -265,7 +265,7 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-G1Commitment"></a>
 
 ### G1Commitment
-G1Commitment represents a commitment to a field element in the G1 group of the BLS12-381 curve.
+A KZG commitment to a G1 point.
 
 
 | Field | Type | Label | Description |
@@ -782,7 +782,7 @@ record and the subsequent two records that contains potential overflows.
 <a name="disperser-v2-BlobCommitmentReply"></a>
 
 ### BlobCommitmentReply
-A reply to a BlobCommitmentRequest.
+The result of a BlobCommitmentRequest().
 
 
 | Field | Type | Label | Description |
@@ -797,13 +797,13 @@ A reply to a BlobCommitmentRequest.
 <a name="disperser-v2-BlobCommitmentRequest"></a>
 
 ### BlobCommitmentRequest
-A request to generate the commitment of a blob via BlobCommitmentRequest().
+The input for a BlobCommitmentRequest().
 This can be used to construct a BlobHeader.commitment.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The blob data. |
+| data | [bytes](#bytes) |  | The blob data to compute the commitment for. |
 
 
 
@@ -819,8 +819,8 @@ BlobStatusReply is the reply to a BlobStatusRequest.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | status | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob. |
-| signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch |
-| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  | BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. |
+| signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch. Unset if the status is not CERTIFIED. |
+| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  | BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
 
 
 

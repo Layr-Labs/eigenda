@@ -278,9 +278,10 @@ type BlobStatusReply struct {
 
 	// The status of the blob.
 	Status BlobStatus `protobuf:"varint,1,opt,name=status,proto3,enum=disperser.v2.BlobStatus" json:"status,omitempty"`
-	// The signed batch
+	// The signed batch. Unset if the status is not CERTIFIED.
 	SignedBatch *SignedBatch `protobuf:"bytes,2,opt,name=signed_batch,json=signedBatch,proto3" json:"signed_batch,omitempty"`
 	// BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+	// Unset if the status is not CERTIFIED.
 	BlobVerificationInfo *BlobVerificationInfo `protobuf:"bytes,3,opt,name=blob_verification_info,json=blobVerificationInfo,proto3" json:"blob_verification_info,omitempty"`
 }
 
@@ -337,14 +338,14 @@ func (x *BlobStatusReply) GetBlobVerificationInfo() *BlobVerificationInfo {
 	return nil
 }
 
-// A request to generate the commitment of a blob via BlobCommitmentRequest().
+// The input for a BlobCommitmentRequest().
 // This can be used to construct a BlobHeader.commitment.
 type BlobCommitmentRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The blob data.
+	// The blob data to compute the commitment for.
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 }
 
@@ -387,7 +388,7 @@ func (x *BlobCommitmentRequest) GetData() []byte {
 	return nil
 }
 
-// A reply to a BlobCommitmentRequest.
+// The result of a BlobCommitmentRequest().
 type BlobCommitmentReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

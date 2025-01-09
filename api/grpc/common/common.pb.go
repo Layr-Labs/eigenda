@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// G1Commitment represents a commitment to a field element in the G1 group of the BLS12-381 curve.
+// A KZG commitment to a G1 point.
 type G1Commitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

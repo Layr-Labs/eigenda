@@ -61,20 +61,21 @@ message BlobStatusRequest {
 message BlobStatusReply {
   // The status of the blob.
   BlobStatus status = 1;
-  // The signed batch
+  // The signed batch. Unset if the status is not CERTIFIED.
   SignedBatch signed_batch = 2;
   // BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+  // Unset if the status is not CERTIFIED.
   BlobVerificationInfo blob_verification_info = 3;
 }
 
-// A request to generate the commitment of a blob via BlobCommitmentRequest().
+// The input for a BlobCommitmentRequest().
 // This can be used to construct a BlobHeader.commitment.
 message BlobCommitmentRequest {
-  // The blob data.
+  // The blob data to compute the commitment for.
   bytes data = 1;
 }
 
-// A reply to a BlobCommitmentRequest.
+// The result of a BlobCommitmentRequest().
 message BlobCommitmentReply {
   // The commitment of the blob.
   common.BlobCommitment blob_commitment = 1;

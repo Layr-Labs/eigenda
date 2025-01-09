@@ -928,7 +928,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p>G1Commitment represents a commitment to a field element in the G1 group of the BLS12-381 curve.</p>
+        <p>A KZG commitment to a G1 point.</p>
 
         
           <table class="field-table">
@@ -2047,7 +2047,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
-        <p>A reply to a BlobCommitmentRequest.</p>
+        <p>The result of a BlobCommitmentRequest().</p>
 
         
           <table class="field-table">
@@ -2071,7 +2071,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</h3>
-        <p>A request to generate the commitment of a blob via BlobCommitmentRequest().</p><p>This can be used to construct a BlobHeader.commitment.</p>
+        <p>The input for a BlobCommitmentRequest().</p><p>This can be used to construct a BlobHeader.commitment.</p>
 
         
           <table class="field-table">
@@ -2084,7 +2084,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The blob data. </p></td>
+                  <td><p>The blob data to compute the commitment for. </p></td>
                 </tr>
               
             </tbody>
@@ -2115,14 +2115,15 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>signed_batch</td>
                   <td><a href="#disperser.v2.SignedBatch">SignedBatch</a></td>
                   <td></td>
-                  <td><p>The signed batch </p></td>
+                  <td><p>The signed batch. Unset if the status is not CERTIFIED. </p></td>
                 </tr>
               
                 <tr>
                   <td>blob_verification_info</td>
                   <td><a href="#disperser.v2.BlobVerificationInfo">BlobVerificationInfo</a></td>
                   <td></td>
-                  <td><p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. </p></td>
+                  <td><p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+Unset if the status is not CERTIFIED. </p></td>
                 </tr>
               
             </tbody>
