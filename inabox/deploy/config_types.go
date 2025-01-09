@@ -183,6 +183,9 @@ type Config struct {
 	Controller ControllerVars
 	Relays     []RelayVars
 
+	localstackEndpoint string
+	localstackRegion   string
+
 	// DisperserAddress is the address of disperser 0 (aka the only disperser at the current time)
 	DisperserAddress common.Address
 

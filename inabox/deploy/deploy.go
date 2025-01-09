@@ -179,8 +179,8 @@ func (env *Config) GenerateDisperserKeypair() error {
 	// Generate a keypair in AWS KMS
 
 	keyManager := kms.New(kms.Options{
-		Region:       "us-east-1",
-		BaseEndpoint: aws.String("http://localhost:4570"), // TODO don't hard code this
+		Region:       env.localstackRegion,
+		BaseEndpoint: aws.String(env.localstackEndpoint),
 	})
 
 	createKeyOutput, err := keyManager.CreateKey(context.Background(), &kms.CreateKeyInput{

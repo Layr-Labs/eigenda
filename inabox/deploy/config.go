@@ -577,6 +577,9 @@ func (env *Config) GenerateAllVariables() {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
+	env.localstackEndpoint = "http://localhost:4570"
+	env.localstackRegion = "us-east-1"
+
 	// Create envs directory
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
