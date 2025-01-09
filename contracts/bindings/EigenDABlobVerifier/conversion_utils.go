@@ -202,11 +202,13 @@ func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
 	}
 
 	var x, y [2]*big.Int
-	x[0] = g2Point.X.A0.BigInt(new(big.Int))
-	x[1] = g2Point.X.A1.BigInt(new(big.Int))
+	// Order is intentionally reversed when constructing BN254G2Point
+	// (see https://github.com/Layr-Labs/eigenlayer-middleware/blob/512ce7326f35e8060b9d46e23f9c159c0000b546/src/libraries/BN254.sol#L43)
+	x[0] = g2Point.X.A1.BigInt(new(big.Int))
+	x[1] = g2Point.X.A0.BigInt(new(big.Int))
 
-	y[0] = g2Point.Y.A0.BigInt(new(big.Int))
-	y[1] = g2Point.Y.A1.BigInt(new(big.Int))
+	y[0] = g2Point.Y.A1.BigInt(new(big.Int))
+	y[1] = g2Point.Y.A0.BigInt(new(big.Int))
 
 	return &BN254G2Point{
 		X: x,
