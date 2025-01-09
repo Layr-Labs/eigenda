@@ -14,6 +14,8 @@ import (
 
 // BlobVerifier is responsible for making eth calls against the BlobVerifier contract to ensure cryptographic and
 // structural integrity of V2 certificates
+//
+// The blob verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDABlobVerifier.sol
 type BlobVerifier struct {
 	// go binding around the EigenDABlobVerifier ethereum contract
 	blobVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
