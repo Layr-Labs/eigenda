@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api"
-	contractEigenDADisperserRegistry "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
+	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	"log"
 	"math/big"
 
@@ -354,7 +354,7 @@ func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Add
 	transaction, err := registry.SetDisperserInfo(
 		options,
 		api.EigenLabsDisperserID,
-		contractEigenDADisperserRegistry.DisperserInfo{
+		dreg.DisperserInfo{
 			DisperserAddress: address,
 		})
 	if err != nil {

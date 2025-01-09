@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -188,7 +189,9 @@ func (env *Config) GenerateDisperserKeypair() error {
 		KeyUsage: types.KeyUsageTypeSignVerify,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "connect: connection refused") {
+		if strings.Contains(err.Error(), "connect: connection refused") ||
+			strings.Contains(err.Error(), "request send failed") {
+
 			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
 			err = nil
 		}
@@ -238,16 +241,24 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 
 	// Read the disperser's public key from on-chain storage to verify it was written correctly
 
-	address, err := writer.GetDisperserAddress(context.Background(), 0)
-	if err != nil {
-		return fmt.Errorf("could not get disperser address: %v", err)
+	retryTimeout := time.Now().Add(1 * time.Minute)
+	ticker := time.NewTicker(1 * time.Second)
+
+	for time.Now().Before(retryTimeout) {
+		address, err := writer.GetDisperserAddress(context.Background(), 0)
+		if err != nil {
+			logger.Warnf("could not get disperser address: %v", err)
+		} else {
+			if address != env.DisperserAddress {
+				return fmt.Errorf("expected disperser address %s, got %s", env.DisperserAddress, address)
+			}
+			return nil
+		}
+
+		<-ticker.C
 	}
 
-	if address != env.DisperserAddress {
-		return fmt.Errorf("expected disperser address %s, got %s", env.DisperserAddress, address)
-	}
-
-	return nil
+	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint32]string {
