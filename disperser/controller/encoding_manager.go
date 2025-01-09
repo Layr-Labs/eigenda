@@ -291,7 +291,8 @@ func GetRelayKeys(numAssignment uint16, availableRelays []corev2.RelayKey) ([]co
 	if int(numAssignment) > len(availableRelays) {
 		return nil, fmt.Errorf("numAssignment (%d) cannot be greater than numRelays (%d)", numAssignment, len(availableRelays))
 	}
-	relayKeys := availableRelays
+	relayKeys := make([]corev2.RelayKey, len(availableRelays))
+	copy(relayKeys, availableRelays)
 	// shuffle relay keys
 	for i := len(relayKeys) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
