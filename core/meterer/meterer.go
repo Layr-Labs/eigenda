@@ -54,7 +54,7 @@ func NewMeterer(
 // Start starts to periodically refreshing the on-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(m.UpdateInterval)
+		ticker := time.NewTicker(m.Config.UpdateInterval)
 		defer ticker.Stop()
 
 		for {
@@ -63,6 +63,7 @@ func (m *Meterer) Start(ctx context.Context) {
 				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
+				m.logger.Debug("Refreshed on-chain state")
 			case <-ctx.Done():
 				return
 			}

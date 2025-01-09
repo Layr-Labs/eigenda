@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/metadata"
 )
 
 var errNoBlobsToEncode = errors.New("no blobs to encode")
@@ -269,11 +270,18 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 }
 
 func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey, blob *v2.BlobMetadata, blobParams *core.BlobVersionParameters) (*encoding.FragmentInfo, error) {
+	// Add headers for routing
+	md := metadata.New(map[string]string{
+		"content-type": "application/grpc",
+		"x-blob-size":  fmt.Sprintf("%d", blob.BlobSize),
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
 	encodingParams, err := blob.BlobHeader.GetEncodingParams(blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get encoding params: %w", err)
 	}
-	return e.encodingClient.EncodeBlob(ctx, blobKey, encodingParams)
+	return e.encodingClient.EncodeBlob(ctx, blobKey, encodingParams, blob.BlobSize)
 }
 
 func (e *EncodingManager) refreshBlobVersionParams(ctx context.Context) error {

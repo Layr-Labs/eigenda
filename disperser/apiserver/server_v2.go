@@ -58,7 +58,8 @@ type DispersalServerV2 struct {
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
 
-	metrics *metricsV2
+	metricsConfig disperser.MetricsConfig
+	metrics       *metricsV2
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -74,6 +75,7 @@ func NewDispersalServerV2(
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
+	metricsConfig disperser.MetricsConfig,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -116,11 +118,17 @@ func NewDispersalServerV2(
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
-		metrics: newAPIServerV2Metrics(registry),
+		metricsConfig: metricsConfig,
+		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 	}, nil
 }
 
 func (s *DispersalServerV2) Start(ctx context.Context) error {
+	// Start the metrics server
+	if s.metricsConfig.EnableMetrics {
+		s.metrics.Start(context.Background())
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)

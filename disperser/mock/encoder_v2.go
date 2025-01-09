@@ -19,7 +19,7 @@ func NewMockEncoderClientV2() *MockEncoderClientV2 {
 	return &MockEncoderClientV2{}
 }
 
-func (m *MockEncoderClientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*encoding.FragmentInfo, error) {
+func (m *MockEncoderClientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams, blobSize uint64) (*encoding.FragmentInfo, error) {
 	args := m.Called()
 	var fragmentInfo *encoding.FragmentInfo
 	if args.Get(0) != nil {

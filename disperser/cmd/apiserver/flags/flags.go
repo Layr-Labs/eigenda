@@ -107,14 +107,7 @@ var (
 		Value:  "global_rate",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
 	}
-	UpdateInterval = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "update-interval"),
-		Usage:    "update interval for refreshing the on-chain state",
-		Value:    1 * time.Second,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "UPDATE_INTERVAL"),
-		Required: false,
-	}
-	ChainReadTimeout = cli.UintFlag{
+	ChainReadTimeout = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
 		Usage:    "timeout for reading from the chain",
 		Value:    10,
@@ -146,7 +139,7 @@ var (
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
-		Value:    1 * time.Hour,
+		Value:    1 * time.Minute,
 	}
 	MaxNumSymbolsPerBlob = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-num-symbols-per-blob"),

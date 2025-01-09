@@ -43,7 +43,7 @@ contract MockRollupTest is BLSMockAVSDeployer {
     bytes quorumAdversaryThresholdPercentages = hex"212121";
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
-    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(33, 55);
+    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(55, 33);
 
     uint8 defaultCodingRatioPercentage = 10;
     uint32 defaultReferenceBlockNumber = 100;

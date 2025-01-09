@@ -4,16 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/relay/auth"
-
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
+	"sync"
 )
 
 // MessageSigner is a function that signs a message with a private BLS key.
@@ -116,7 +114,7 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 		return errors.New("no message signer provided in config, cannot sign get chunks request")
 	}
 
-	hash := auth.HashGetChunksRequest(request)
+	hash := hashing.HashGetChunksRequest(request)
 	hashArray := [32]byte{}
 	copy(hashArray[:], hash)
 	signature, err := c.config.MessageSigner(ctx, hashArray)
