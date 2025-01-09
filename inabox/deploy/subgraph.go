@@ -118,23 +118,12 @@ func (env *Config) deploySubgraphs(startBlock int) {
 		return
 	}
 
-	// If subgraphs/yarn.lock exists, remove it. It will automatically be generated again.
-	yarnLockPath := "../subgraphs/eigenda-operator-state/yarn.lock"
-	if _, err := os.Stat(yarnLockPath); err == nil {
-		err = os.Remove(yarnLockPath)
-		if err != nil {
-			log.Panicf("Failed to remove yarn.lock. Err: %s", err)
-		}
-	}
-
 	fmt.Println("Deploying Subgraph")
 	env.deploySubgraph(eigenDAOperatorStateSubgraphUpdater{c: env}, "eigenda-operator-state", startBlock)
 	env.deploySubgraph(eigenDAUIMonitoringUpdater{c: env}, "eigenda-batch-metadata", startBlock)
 }
 
 func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlock int) {
-
-	fmt.Println("Deploying subgraph: ", path) // TODO
 
 	subgraphPath := filepath.Join(env.rootPath, "subgraphs", path)
 	changeDirectory(subgraphPath)
@@ -149,8 +138,6 @@ func (env *Config) deploySubgraph(updater subgraphUpdater, path string, startBlo
 	execYarnCmd("remove-local")
 	execYarnCmd("create-local")
 	execYarnCmd("deploy-local", "--version-label", "v0.0.1")
-
-	fmt.Println("Subgraph deployed successfully") // TODO
 }
 
 func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlock int) {
