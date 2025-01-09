@@ -123,7 +123,13 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 	c.cacheLock.Unlock()
 
 	if c.metrics != nil {
-		c.metrics.ReportCacheMiss()
+		if alreadyLoading {
+			// A lookup is currently in progress. Not a cache hit, but this call won't duplicate the work.
+			c.metrics.ReportCacheNearMiss()
+		} else {
+			// The data is not in the cache and no lookup is in progress. We must fetch the data from the source.
+			c.metrics.ReportCacheMiss()
+		}
 	}
 
 	if alreadyLoading {
