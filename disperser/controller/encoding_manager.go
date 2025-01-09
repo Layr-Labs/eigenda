@@ -246,6 +246,9 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				e.metrics.reportUpdateBlobStatusLatency(
 					finishedUpdateBlobStatusTime.Sub(finishedPutBlobCertificateTime))
 				e.metrics.reportBlobHandleLatency(time.Since(start))
+
+				requestedAt := time.Unix(0, int64(blob.RequestedAt))
+				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)

@@ -1,10 +1,11 @@
 package controller
 
 import (
+	"time"
+
 	common "github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"time"
 )
 
 const encodingManagerNamespace = "eigenda_encoding_manager"
@@ -16,6 +17,7 @@ type encodingManagerMetrics struct {
 	encodingLatency         *prometheus.SummaryVec
 	putBlobCertLatency      *prometheus.SummaryVec
 	updateBlobStatusLatency *prometheus.SummaryVec
+	blobE2EEncodingLatency  *prometheus.SummaryVec
 	batchSize               *prometheus.GaugeVec
 	batchDataSize           *prometheus.GaugeVec
 	batchRetryCount         *prometheus.GaugeVec
@@ -74,6 +76,16 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
+	blobE2EEncodingLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  encodingManagerNamespace,
+			Name:       "e2e_encoding_latency_ms",
+			Help:       "The time required to encode a blob end-to-end.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{},
+	)
+
 	batchSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: encodingManagerNamespace,
@@ -116,6 +128,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		encodingLatency:         encodingLatency,
 		putBlobCertLatency:      putBlobCertLatency,
 		updateBlobStatusLatency: updateBlobStatusLatency,
+		blobE2EEncodingLatency:  blobE2EEncodingLatency,
 		batchSize:               batchSize,
 		batchDataSize:           batchDataSize,
 		batchRetryCount:         batchRetryCount,
@@ -141,6 +154,10 @@ func (m *encodingManagerMetrics) reportPutBlobCertLatency(duration time.Duration
 
 func (m *encodingManagerMetrics) reportUpdateBlobStatusLatency(duration time.Duration) {
 	m.updateBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *encodingManagerMetrics) reportE2EEncodingLatency(duration time.Duration) {
+	m.blobE2EEncodingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *encodingManagerMetrics) reportBatchSize(size int) {
