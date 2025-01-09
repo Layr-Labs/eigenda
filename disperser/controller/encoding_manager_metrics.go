@@ -4,6 +4,7 @@ import (
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -22,6 +23,7 @@ type encodingManagerMetrics struct {
 	batchDataSize           *prometheus.GaugeVec
 	batchRetryCount         *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
+	completedBlobs          *prometheus.CounterVec
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
@@ -122,6 +124,15 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
+	completedBlobs := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: encodingManagerNamespace,
+			Name:      "completed_blobs_total",
+			Help:      "The number and size of completed blobs by status.",
+		},
+		[]string{"state", "data"},
+	)
+
 	return &encodingManagerMetrics{
 		batchSubmissionLatency:  batchSubmissionLatency,
 		blobHandleLatency:       blobHandleLatency,
@@ -133,6 +144,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		batchDataSize:           batchDataSize,
 		batchRetryCount:         batchRetryCount,
 		failedSubmissionCount:   failSubmissionCount,
+		completedBlobs:          completedBlobs,
 	}
 }
 
@@ -174,4 +186,20 @@ func (m *encodingManagerMetrics) reportBatchRetryCount(count int) {
 
 func (m *encodingManagerMetrics) reportFailedSubmission() {
 	m.failedSubmissionCount.WithLabelValues().Inc()
+}
+
+func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+	switch status {
+	case dispv2.Encoded:
+		m.completedBlobs.WithLabelValues("encoded", "number").Inc()
+		m.completedBlobs.WithLabelValues("encoded", "size").Add(float64(size))
+	case dispv2.Failed:
+		m.completedBlobs.WithLabelValues("failed", "number").Inc()
+		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+	default:
+		return
+	}
+
+	m.completedBlobs.WithLabelValues("total", "number").Inc()
+	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }

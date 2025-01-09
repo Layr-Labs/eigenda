@@ -230,6 +230,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
 					success = true
+					e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 					break
 				}
 
@@ -258,6 +259,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})
 	}
