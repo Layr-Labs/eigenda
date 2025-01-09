@@ -40,9 +40,6 @@ type PeriodRecord struct {
 }
 
 func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
-	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
-	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
-	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
 	periodRecords := make([]PeriodRecord, numBins)
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
