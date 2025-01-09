@@ -12,6 +12,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+const (
+	// limit requests to only 32 mib to mitigate potential DoS attacks
+	maxRequestBodySize int64 = 1024 * 1024 * 32
+)
+
 func (svr *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	w.WriteHeader(http.StatusOK)
 	return nil
@@ -164,7 +169,7 @@ func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.
 
 func (svr *Server) handlePostShared(w http.ResponseWriter, r *http.Request, comm []byte, meta commitments.CommitmentMeta) error {
 	svr.log.Info("Processing POST request", "commitment", hex.EncodeToString(comm), "commitmentMeta", meta)
-	input, err := io.ReadAll(r.Body)
+	input, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBodySize))
 	if err != nil {
 		err = MetaError{
 			Err:  fmt.Errorf("failed to read request body: %w", err),
