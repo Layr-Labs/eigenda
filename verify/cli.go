@@ -11,16 +11,12 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 )
 
-var (
+const (
 	BytesPerSymbol     = 31
 	MaxCodingRatio     = 8
-	MaxSRSPoints       = 1 << 28 // 2^28
-	MaxAllowedBlobSize = uint64(MaxSRSPoints * BytesPerSymbol / MaxCodingRatio)
+	SrsOrder           = 1 << 28 // 2^28
+	MaxAllowedBlobSize = uint64(SrsOrder * BytesPerSymbol / MaxCodingRatio)
 )
-
-// TODO: should this live in the resources pkg?
-// So that if we ever change the SRS files there we can change this value
-const srsOrder = 268435456 // 2 ^ 32
 
 var (
 	// cert verification flags
@@ -125,7 +121,7 @@ func ReadConfig(ctx *cli.Context, edaClientConfig clients.EigenDAClientConfig) C
 		G1Path:          ctx.String(G1PathFlagName),
 		G2PowerOf2Path:  ctx.String(G2PowerOf2PathFlagName),
 		CacheDir:        ctx.String(CachePathFlagName),
-		SRSOrder:        srsOrder,
+		SRSOrder:        SrsOrder,
 		SRSNumberToLoad: MaxBlobLengthBytes / 32,       // # of fr.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 	}
