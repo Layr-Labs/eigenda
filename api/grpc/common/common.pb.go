@@ -155,6 +155,7 @@ func (x *BlobCommitment) GetLength() uint32 {
 	return 0
 }
 
+// PaymentHeader contains payment information for a blob.
 type PaymentHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

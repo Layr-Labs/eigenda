@@ -26,6 +26,7 @@ message BlobCommitment {
   uint32 length = 4;
 }
 
+// PaymentHeader contains payment information for a blob.
 message PaymentHeader {
   // The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
   // corresponding to the key used by the client to sign the BlobHeader.

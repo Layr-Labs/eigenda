@@ -281,7 +281,7 @@ A KZG commitment to a G1 point.
 <a name="common-PaymentHeader"></a>
 
 ### PaymentHeader
-
+PaymentHeader contains payment information for a blob.
 
 
 | Field | Type | Label | Description |
@@ -868,7 +868,7 @@ A request to disperse a blob.
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed.
 
-Although the length commitment is required to be a power of 2, the length of this byte array is not required to be a power of 2 as long as the length does not exceed the length commitment. The maximum length of the data is 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 
 Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617. If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
 | blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob. |
@@ -992,7 +992,7 @@ SignedBatch is a batch of blobs with a signature.
 BlobStatus represents the status of a blob.
 The status of a blob is updated as the blob is processed by the disperser.
 The status of a blob can be queried by the client using the GetBlobStatus API.
-Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 - QUEUED
 - ENCODED
 Terminal states are states that will not be updated to a different state:
@@ -1413,7 +1413,7 @@ Used to facilitate the decoding of chunks.
 <a name="node-v2-GetChunksReply"></a>
 
 ### GetChunksReply
-
+The response to the GetChunks() RPC.
 
 
 | Field | Type | Label | Description |
@@ -1428,12 +1428,12 @@ Used to facilitate the decoding of chunks.
 <a name="node-v2-GetChunksRequest"></a>
 
 ### GetChunksRequest
-
+The parameter for the GetChunks() RPC.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  |  |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. |
 | quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
 
 
@@ -1449,11 +1449,11 @@ Node info reply
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| semver | [string](#string) |  |  |
-| arch | [string](#string) |  |  |
-| os | [string](#string) |  |  |
-| num_cpu | [uint32](#uint32) |  |  |
-| mem_bytes | [uint64](#uint64) |  |  |
+| semver | [string](#string) |  | The version of the node. |
+| arch | [string](#string) |  | The architecture of the node. |
+| os | [string](#string) |  | The operating system of the node. |
+| num_cpu | [uint32](#uint32) |  | The number of CPUs on the node. |
+| mem_bytes | [uint64](#uint64) |  | The amount of memory on the node in bytes. |
 
 
 
@@ -1463,7 +1463,7 @@ Node info reply
 <a name="node-v2-NodeInfoRequest"></a>
 
 ### NodeInfoRequest
-Node info request
+The parameter for the NodeInfo() RPC.
 
 
 
@@ -1473,12 +1473,12 @@ Node info request
 <a name="node-v2-StoreChunksReply"></a>
 
 ### StoreChunksReply
-
+StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  |  |
+| signature | [bytes](#bytes) |  | a custody signature of the received batch |
 
 
 
@@ -1517,22 +1517,22 @@ Note that this signature is not included in the hash for obvious reasons. |
 <a name="node-v2-Dispersal"></a>
 
 ### Dispersal
-WARNING: the following RPCs are experimental and subject to change.
+Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) |  |
-| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) |  |
+| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks stores a batch of chunks on the Node. |
+| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | NodeInfo fetches metadata about the node. |
 
 
 <a name="node-v2-Retrieval"></a>
 
 ### Retrieval
-
+Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. |
+| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
 | NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | Retrieve node info metadata |
 
  

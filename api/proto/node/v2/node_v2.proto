@@ -6,14 +6,18 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node/v2";
 // The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
 // for better security and separation of concerns.
 
-// WARNING: the following RPCs are experimental and subject to change.
+// Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.
 service Dispersal {
+  // StoreChunks stores a batch of chunks on the Node.
   rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+  // NodeInfo fetches metadata about the node.
   rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 }
 
+// Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
 service Retrieval {
-  // GetChunks retrieves the chunks for a blob custodied at the Node.
+  // GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+  // faster to retrieve chunks from the relay service if that service is available.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
   // Retrieve node info metadata
   rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
@@ -59,11 +63,15 @@ message StoreChunksRequest {
   bytes signature = 3;
 }
 
+// StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 message StoreChunksReply {
+  // a custody signature of the received batch
   bytes signature = 1;
 }
 
+// The parameter for the GetChunks() RPC.
 message GetChunksRequest {
+  // The unique identifier for the blob the chunks are being requested for.
   bytes blob_key = 1;
   // Which quorum of the blob to retrieve for (note: a blob can have multiple
   // quorums and the chunks for different quorums at a Node can be different).
@@ -71,20 +79,26 @@ message GetChunksRequest {
   uint32 quorum_id = 2;
 }
 
+// The response to the GetChunks() RPC.
 message GetChunksReply {
   // All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
   repeated bytes chunks = 1;
 }
 
-// Node info request
+// The parameter for the NodeInfo() RPC.
 message NodeInfoRequest {
 }
 
 // Node info reply
 message NodeInfoReply {
+  // The version of the node.
   string semver = 1;
+  // The architecture of the node.
   string arch = 2;
+  // The operating system of the node.
   string os = 3;
+  // The number of CPUs on the node.
   uint32 num_cpu = 4;
+  // The amount of memory on the node in bytes.
   uint64 mem_bytes = 5;
 }

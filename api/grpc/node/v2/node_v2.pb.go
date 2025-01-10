@@ -114,11 +114,13 @@ func (x *StoreChunksRequest) GetSignature() []byte {
 	return nil
 }
 
+// StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 type StoreChunksReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// a custody signature of the received batch
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
@@ -161,11 +163,13 @@ func (x *StoreChunksReply) GetSignature() []byte {
 	return nil
 }
 
+// The parameter for the GetChunks() RPC.
 type GetChunksRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The unique identifier for the blob the chunks are being requested for.
 	BlobKey []byte `protobuf:"bytes,1,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 	// Which quorum of the blob to retrieve for (note: a blob can have multiple
 	// quorums and the chunks for different quorums at a Node can be different).
@@ -219,6 +223,7 @@ func (x *GetChunksRequest) GetQuorumId() uint32 {
 	return 0
 }
 
+// The response to the GetChunks() RPC.
 type GetChunksReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -267,7 +272,7 @@ func (x *GetChunksReply) GetChunks() [][]byte {
 	return nil
 }
 
-// Node info request
+// The parameter for the NodeInfo() RPC.
 type NodeInfoRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -312,10 +317,15 @@ type NodeInfoReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Semver   string `protobuf:"bytes,1,opt,name=semver,proto3" json:"semver,omitempty"`
-	Arch     string `protobuf:"bytes,2,opt,name=arch,proto3" json:"arch,omitempty"`
-	Os       string `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
-	NumCpu   uint32 `protobuf:"varint,4,opt,name=num_cpu,json=numCpu,proto3" json:"num_cpu,omitempty"`
+	// The version of the node.
+	Semver string `protobuf:"bytes,1,opt,name=semver,proto3" json:"semver,omitempty"`
+	// The architecture of the node.
+	Arch string `protobuf:"bytes,2,opt,name=arch,proto3" json:"arch,omitempty"`
+	// The operating system of the node.
+	Os string `protobuf:"bytes,3,opt,name=os,proto3" json:"os,omitempty"`
+	// The number of CPUs on the node.
+	NumCpu uint32 `protobuf:"varint,4,opt,name=num_cpu,json=numCpu,proto3" json:"num_cpu,omitempty"`
+	// The amount of memory on the node in bytes.
 	MemBytes uint64 `protobuf:"varint,5,opt,name=mem_bytes,json=memBytes,proto3" json:"mem_bytes,omitempty"`
 }
 

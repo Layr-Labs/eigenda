@@ -517,9 +517,8 @@ Unset if the status is not CERTIFIED. </p></td>
                   <td></td>
                   <td><p>The data to be dispersed.
 
-Although the length commitment is required to be a power of 2, the length of this byte array is not required to
-be a power of 2 as long as the length does not exceed the length commitment. The maximum length of the data is
-16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
+(In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 
 Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
 significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
@@ -794,7 +793,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>

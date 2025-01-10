@@ -28,7 +28,7 @@
 <a name="node-v2-GetChunksReply"></a>
 
 ### GetChunksReply
-
+The response to the GetChunks() RPC.
 
 
 | Field | Type | Label | Description |
@@ -43,12 +43,12 @@
 <a name="node-v2-GetChunksRequest"></a>
 
 ### GetChunksRequest
-
+The parameter for the GetChunks() RPC.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  |  |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. |
 | quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
 
 
@@ -64,11 +64,11 @@ Node info reply
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| semver | [string](#string) |  |  |
-| arch | [string](#string) |  |  |
-| os | [string](#string) |  |  |
-| num_cpu | [uint32](#uint32) |  |  |
-| mem_bytes | [uint64](#uint64) |  |  |
+| semver | [string](#string) |  | The version of the node. |
+| arch | [string](#string) |  | The architecture of the node. |
+| os | [string](#string) |  | The operating system of the node. |
+| num_cpu | [uint32](#uint32) |  | The number of CPUs on the node. |
+| mem_bytes | [uint64](#uint64) |  | The amount of memory on the node in bytes. |
 
 
 
@@ -78,7 +78,7 @@ Node info reply
 <a name="node-v2-NodeInfoRequest"></a>
 
 ### NodeInfoRequest
-Node info request
+The parameter for the NodeInfo() RPC.
 
 
 
@@ -88,12 +88,12 @@ Node info request
 <a name="node-v2-StoreChunksReply"></a>
 
 ### StoreChunksReply
-
+StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  |  |
+| signature | [bytes](#bytes) |  | a custody signature of the received batch |
 
 
 
@@ -132,22 +132,22 @@ Note that this signature is not included in the hash for obvious reasons. |
 <a name="node-v2-Dispersal"></a>
 
 ### Dispersal
-WARNING: the following RPCs are experimental and subject to change.
+Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) |  |
-| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) |  |
+| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks stores a batch of chunks on the Node. |
+| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | NodeInfo fetches metadata about the node. |
 
 
 <a name="node-v2-Retrieval"></a>
 
 ### Retrieval
-
+Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. |
+| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
 | NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | Retrieve node info metadata |
 
  

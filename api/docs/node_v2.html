@@ -229,7 +229,7 @@
 
       
         <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
-        <p></p>
+        <p>The response to the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -253,7 +253,7 @@
         
       
         <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
-        <p></p>
+        <p>The parameter for the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -266,7 +266,7 @@
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob the chunks are being requested for. </p></td>
                 </tr>
               
                 <tr>
@@ -299,35 +299,35 @@ The ID must be in range [0, 254]. </p></td>
                   <td>semver</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The version of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>arch</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The architecture of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>os</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The operating system of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>num_cpu</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The number of CPUs on the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>mem_bytes</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The amount of memory on the node in bytes. </p></td>
                 </tr>
               
             </tbody>
@@ -338,14 +338,14 @@ The ID must be in range [0, 254]. </p></td>
         
       
         <h3 id="node.v2.NodeInfoRequest">NodeInfoRequest</h3>
-        <p>Node info request</p>
+        <p>The parameter for the NodeInfo() RPC.</p>
 
         
 
         
       
         <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
-        <p></p>
+        <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -358,7 +358,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>a custody signature of the received batch </p></td>
                 </tr>
               
             </tbody>
@@ -439,7 +439,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
       
         <h3 id="node.v2.Dispersal">Dispersal</h3>
-        <p>WARNING: the following RPCs are experimental and subject to change.</p>
+        <p>Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -450,14 +450,14 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>StoreChunks</td>
                 <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
                 <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
-                <td><p></p></td>
+                <td><p>StoreChunks stores a batch of chunks on the Node.</p></td>
               </tr>
             
               <tr>
                 <td>NodeInfo</td>
                 <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
                 <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
-                <td><p></p></td>
+                <td><p>NodeInfo fetches metadata about the node.</p></td>
               </tr>
             
           </tbody>
@@ -465,7 +465,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
         
         <h3 id="node.v2.Retrieval">Retrieval</h3>
-        <p></p>
+        <p>Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -476,7 +476,8 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>GetChunks</td>
                 <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
                 <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
-                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node.</p></td>
+                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+faster to retrieve chunks from the relay service if that service is available.</p></td>
               </tr>
             
               <tr>

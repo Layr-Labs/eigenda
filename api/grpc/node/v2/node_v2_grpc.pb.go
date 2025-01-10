@@ -27,7 +27,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DispersalClient interface {
+	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
+	// NodeInfo fetches metadata about the node.
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
@@ -61,7 +63,9 @@ func (c *dispersalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 // All implementations must embed UnimplementedDispersalServer
 // for forward compatibility
 type DispersalServer interface {
+	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
+	// NodeInfo fetches metadata about the node.
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
@@ -154,7 +158,8 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RetrievalClient interface {
-	// GetChunks retrieves the chunks for a blob custodied at the Node.
+	// GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+	// faster to retrieve chunks from the relay service if that service is available.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
@@ -190,7 +195,8 @@ func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 // All implementations must embed UnimplementedRetrievalServer
 // for forward compatibility
 type RetrievalServer interface {
-	// GetChunks retrieves the chunks for a blob custodied at the Node.
+	// GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+	// faster to retrieve chunks from the relay service if that service is available.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)

@@ -25,7 +25,7 @@ const (
 // BlobStatus represents the status of a blob.
 // The status of a blob is updated as the blob is processed by the disperser.
 // The status of a blob can be queried by the client using the GetBlobStatus API.
-// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 // - QUEUED
 // - ENCODED
 // Terminal states are states that will not be updated to a different state:
@@ -104,9 +104,8 @@ type DisperseBlobRequest struct {
 
 	// The data to be dispersed.
 	//
-	// Although the length commitment is required to be a power of 2, the length of this byte array is not required to
-	// be a power of 2 as long as the length does not exceed the length commitment. The maximum length of the data is
-	// 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+	// The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
+	// (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 	//
 	// Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
 	// significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
