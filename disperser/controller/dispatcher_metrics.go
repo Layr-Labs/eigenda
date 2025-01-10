@@ -3,7 +3,8 @@ package controller
 import (
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
+	common "github.com/Layr-Labs/eigenda/common"
+	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -26,19 +27,17 @@ type dispatcherMetrics struct {
 	sendChunksLatency           *prometheus.SummaryVec
 	sendChunksRetryCount        *prometheus.GaugeVec
 	putDispersalResponseLatency *prometheus.SummaryVec
-
-	handleSignaturesLatency    *prometheus.SummaryVec
-	receiveSignaturesLatency   *prometheus.SummaryVec
-	aggregateSignaturesLatency *prometheus.SummaryVec
-	putAttestationLatency      *prometheus.SummaryVec
-	updateBatchStatusLatency   *prometheus.SummaryVec
-
-	blobE2EDispersalLatency *prometheus.SummaryVec
+	handleSignaturesLatency     *prometheus.SummaryVec
+	receiveSignaturesLatency    *prometheus.SummaryVec
+	aggregateSignaturesLatency  *prometheus.SummaryVec
+	putAttestationLatency       *prometheus.SummaryVec
+	updateBatchStatusLatency    *prometheus.SummaryVec
+	blobE2EDispersalLatency     *prometheus.SummaryVec
+	completedBlobs              *prometheus.CounterVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
 func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
-
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
@@ -232,12 +231,21 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	blobE2EDispersalLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  encodingManagerNamespace,
+			Namespace:  dispatcherNamespace,
 			Name:       "e2e_dispersal_latency_ms",
 			Help:       "The time required to disperse a blob end-to-end.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		[]string{},
+	)
+
+	completedBlobs := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "completed_blobs_total",
+			Help:      "The number and size of completed blobs by status.",
+		},
+		[]string{"state", "data"},
 	)
 
 	return &dispatcherMetrics{
@@ -261,6 +269,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		putAttestationLatency:       putAttestationLatency,
 		updateBatchStatusLatency:    updateBatchStatusLatency,
 		blobE2EDispersalLatency:     blobE2EDispersalLatency,
+		completedBlobs:              completedBlobs,
 	}
 }
 
@@ -342,4 +351,23 @@ func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duratio
 
 func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
 	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+	switch status {
+	case dispv2.Certified:
+		m.completedBlobs.WithLabelValues("certified", "number").Inc()
+		m.completedBlobs.WithLabelValues("certified", "size").Add(float64(size))
+	case dispv2.Failed:
+		m.completedBlobs.WithLabelValues("failed", "number").Inc()
+		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+	case dispv2.InsufficientSignatures:
+		m.completedBlobs.WithLabelValues("insufficient_signature", "number").Inc()
+		m.completedBlobs.WithLabelValues("insufficient_signature", "size").Add(float64(size))
+	default:
+		return
+	}
+
+	m.completedBlobs.WithLabelValues("total", "number").Inc()
+	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }

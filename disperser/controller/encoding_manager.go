@@ -249,6 +249,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				requestedAt := time.Unix(0, int64(blob.RequestedAt))
 				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -258,6 +259,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})
 	}
