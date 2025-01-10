@@ -203,10 +203,11 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 		log.Panicf("Error: %s", err)
 	}
 	relays := map[uint32]string{}
+	ethAddr := ethClient.GetAccountAddress()
 	for i, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
-			RelayAddress: gcommon.Address{0},
+			RelayAddress: ethAddr,
 			RelayURL:     url,
 		})
 		if err != nil {

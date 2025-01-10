@@ -47,7 +47,6 @@
   
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
-    - [BinRecord](#disperser-v2-BinRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -58,6 +57,7 @@
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [PeriodRecord](#disperser-v2-PeriodRecord)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
@@ -762,23 +762,6 @@ If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): reque
 
 
 
-<a name="disperser-v2-BinRecord"></a>
-
-### BinRecord
-BinRecord is the usage record of an account in a bin. The API should return the active bin
-record and the subsequent two records that contains potential overflows.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| index | [uint32](#uint32) |  | Period index of the reservation |
-| usage | [uint64](#uint64) |  | symbol usage recorded |
-
-
-
-
-
-
 <a name="disperser-v2-BlobCommitmentReply"></a>
 
 ### BlobCommitmentReply
@@ -904,7 +887,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| period_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
@@ -943,6 +926,23 @@ Global constant parameters defined by the payment vault.
 | price_per_symbol | [uint32](#uint32) |  | Price charged per symbol for on-demand dispersals |
 | reservation_window | [uint32](#uint32) |  | Reservation window for all reservations |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make on-demand dispersals |
+
+
+
+
+
+
+<a name="disperser-v2-PeriodRecord"></a>
+
+### PeriodRecord
+PeriodRecord is the usage record of an account in a bin. The API should return the active bin
+record and the subsequent two records that contains potential overflows.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| index | [uint32](#uint32) |  | Period index of the reservation |
+| usage | [uint64](#uint64) |  | symbol usage recorded |
 
 
 

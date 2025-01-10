@@ -95,7 +95,7 @@ message GetPaymentStateReply {
   // global payment vault parameters
   PaymentGlobalParams payment_global_params = 1;
   // off-chain account reservation usage records
-  repeated BinRecord bin_records = 2;
+  repeated PeriodRecord period_records = 2;
   // on-chain account reservation setting
   Reservation reservation = 3;
   // off-chain on-demand payment usage
@@ -198,9 +198,9 @@ message Reservation {
   repeated uint32 quorum_splits = 5;
 }
 
-// BinRecord is the usage record of an account in a bin. The API should return the active bin
+// PeriodRecord is the usage record of an account in a bin. The API should return the active bin
 // record and the subsequent two records that contains potential overflows.
-message BinRecord {
+message PeriodRecord {
   // Period index of the reservation
   uint32 index = 1;
   // symbol usage recorded

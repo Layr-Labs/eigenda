@@ -817,6 +817,9 @@ const docTemplateV2 = `{
                 "blob_header": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
                 },
+                "blob_key": {
+                    "type": "string"
+                },
                 "blob_size_bytes": {
                     "type": "integer"
                 },

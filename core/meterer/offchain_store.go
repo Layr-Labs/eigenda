@@ -249,7 +249,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	return prevPayment, nextPayment, nextDataLength, nil
 }
 
-func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, reservationPeriod uint32) ([MinNumBins]*pb.BinRecord, error) {
+func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint32) ([MinNumBins]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -263,16 +263,16 @@ func (s *OffchainStore) GetBinRecords(ctx context.Context, accountID string, res
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	records := [MinNumBins]*pb.BinRecord{}
+	records := [MinNumBins]*pb.PeriodRecord{}
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
-		binRecord, err := parseBinRecord(bins[i])
+		periodRecord, err := parsePeriodRecord(bins[i])
 		if err != nil {
-			return [MinNumBins]*pb.BinRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
-		records[i] = binRecord
+		records[i] = periodRecord
 	}
 
 	return records, nil
@@ -318,7 +318,7 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	return payment, nil
 }
 
-func parseBinRecord(bin map[string]types.AttributeValue) (*pb.BinRecord, error) {
+func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, error) {
 	reservationPeriod, ok := bin["ReservationPeriod"]
 	if !ok {
 		return nil, errors.New("ReservationPeriod is not present in the response")
@@ -349,7 +349,7 @@ func parseBinRecord(bin map[string]types.AttributeValue) (*pb.BinRecord, error) 
 		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
 
-	return &pb.BinRecord{
+	return &pb.PeriodRecord{
 		Index: uint32(reservationPeriodValue),
 		Usage: uint64(binUsageValue),
 	}, nil

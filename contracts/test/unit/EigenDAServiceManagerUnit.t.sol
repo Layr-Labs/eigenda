@@ -40,7 +40,7 @@ contract EigenDAServiceManagerUnit is BLSMockAVSDeployer {
     bytes quorumAdversaryThresholdPercentages = hex"212121";
     bytes quorumConfirmationThresholdPercentages = hex"373737";
     bytes quorumNumbersRequired = hex"0001";
-    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(33, 55);
+    SecurityThresholds defaultSecurityThresholds = SecurityThresholds(55, 33);
 
     uint256 feePerBytePerTime = 0;
 

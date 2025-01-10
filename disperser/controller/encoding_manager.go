@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc/metadata"
 )
 
 var errNoBlobsToEncode = errors.New("no blobs to encode")
@@ -245,6 +246,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				e.metrics.reportUpdateBlobStatusLatency(
 					finishedUpdateBlobStatusTime.Sub(finishedPutBlobCertificateTime))
 				e.metrics.reportBlobHandleLatency(time.Since(start))
+
+				requestedAt := time.Unix(0, int64(blob.RequestedAt))
+				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -254,6 +259,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})
 	}
@@ -269,11 +275,18 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 }
 
 func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey, blob *v2.BlobMetadata, blobParams *core.BlobVersionParameters) (*encoding.FragmentInfo, error) {
+	// Add headers for routing
+	md := metadata.New(map[string]string{
+		"content-type": "application/grpc",
+		"x-blob-size":  fmt.Sprintf("%d", blob.BlobSize),
+	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
 	encodingParams, err := blob.BlobHeader.GetEncodingParams(blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get encoding params: %w", err)
 	}
-	return e.encodingClient.EncodeBlob(ctx, blobKey, encodingParams)
+	return e.encodingClient.EncodeBlob(ctx, blobKey, encodingParams, blob.BlobSize)
 }
 
 func (e *EncodingManager) refreshBlobVersionParams(ctx context.Context) error {
@@ -291,7 +304,8 @@ func GetRelayKeys(numAssignment uint16, availableRelays []corev2.RelayKey) ([]co
 	if int(numAssignment) > len(availableRelays) {
 		return nil, fmt.Errorf("numAssignment (%d) cannot be greater than numRelays (%d)", numAssignment, len(availableRelays))
 	}
-	relayKeys := availableRelays
+	relayKeys := make([]corev2.RelayKey, len(availableRelays))
+	copy(relayKeys, availableRelays)
 	// shuffle relay keys
 	for i := len(relayKeys) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)

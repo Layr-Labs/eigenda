@@ -115,6 +115,7 @@ func RunEncoderServer(ctx *cli.Context) error {
 			logger,
 			prover,
 			metrics,
+			grpcMetrics,
 		)
 
 		return server.Start()

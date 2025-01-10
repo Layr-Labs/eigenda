@@ -51,6 +51,7 @@ type (
 	}
 
 	BlobResponse struct {
+		BlobKey       string             `json:"blob_key"`
 		BlobHeader    *corev2.BlobHeader `json:"blob_header"`
 		Status        string             `json:"status"`
 		DispersedAt   uint64             `json:"dispersed_at"`
@@ -321,7 +322,14 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
+	bk, err := metadata.BlobHeader.BlobKey()
+	if err != nil || bk != blobKey {
+		s.metrics.IncrementFailedRequestNum("FetchBlob")
+		errorResponse(c, err)
+		return
+	}
 	response := &BlobResponse{
+		BlobKey:       bk.Hex(),
 		BlobHeader:    metadata.BlobHeader,
 		Status:        metadata.BlobStatus.String(),
 		DispersedAt:   metadata.RequestedAt,

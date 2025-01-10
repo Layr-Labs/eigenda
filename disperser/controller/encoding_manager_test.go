@@ -57,6 +57,12 @@ func TestGetRelayKeys(t *testing.T) {
 			err:             nil,
 		},
 		{
+			name:            "All relays",
+			numRelays:       2,
+			availableRelays: []corev2.RelayKey{0, 1},
+			err:             nil,
+		},
+		{
 			name:            "Choose 1 from multiple relays",
 			numRelays:       3,
 			availableRelays: []corev2.RelayKey{0, 1, 2, 3},
@@ -78,6 +84,10 @@ func TestGetRelayKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			availableRelaysCopy := make([]corev2.RelayKey, len(tt.availableRelays))
+			copy(availableRelaysCopy, tt.availableRelays)
+
 			got, err := controller.GetRelayKeys(tt.numRelays, tt.availableRelays)
 			if err != nil {
 				require.Error(t, err)
@@ -90,6 +100,8 @@ func TestGetRelayKeys(t *testing.T) {
 					seen[relay] = struct{}{}
 				}
 				require.Equal(t, len(seen), len(got))
+				// GetRelayKeys should not modify the original list of available relays.
+				require.Equal(t, availableRelaysCopy, tt.availableRelays)
 			}
 		})
 	}

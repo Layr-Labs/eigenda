@@ -1,10 +1,12 @@
 package controller
 
 import (
+	"time"
+
 	common "github.com/Layr-Labs/eigenda/common"
+	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"time"
 )
 
 const encodingManagerNamespace = "eigenda_encoding_manager"
@@ -16,10 +18,12 @@ type encodingManagerMetrics struct {
 	encodingLatency         *prometheus.SummaryVec
 	putBlobCertLatency      *prometheus.SummaryVec
 	updateBlobStatusLatency *prometheus.SummaryVec
+	blobE2EEncodingLatency  *prometheus.SummaryVec
 	batchSize               *prometheus.GaugeVec
 	batchDataSize           *prometheus.GaugeVec
 	batchRetryCount         *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
+	completedBlobs          *prometheus.CounterVec
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
@@ -74,6 +78,16 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
+	blobE2EEncodingLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  encodingManagerNamespace,
+			Name:       "e2e_encoding_latency_ms",
+			Help:       "The time required to encode a blob end-to-end.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{},
+	)
+
 	batchSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: encodingManagerNamespace,
@@ -110,16 +124,27 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{},
 	)
 
+	completedBlobs := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: encodingManagerNamespace,
+			Name:      "completed_blobs_total",
+			Help:      "The number and size of completed blobs by status.",
+		},
+		[]string{"state", "data"},
+	)
+
 	return &encodingManagerMetrics{
 		batchSubmissionLatency:  batchSubmissionLatency,
 		blobHandleLatency:       blobHandleLatency,
 		encodingLatency:         encodingLatency,
 		putBlobCertLatency:      putBlobCertLatency,
 		updateBlobStatusLatency: updateBlobStatusLatency,
+		blobE2EEncodingLatency:  blobE2EEncodingLatency,
 		batchSize:               batchSize,
 		batchDataSize:           batchDataSize,
 		batchRetryCount:         batchRetryCount,
 		failedSubmissionCount:   failSubmissionCount,
+		completedBlobs:          completedBlobs,
 	}
 }
 
@@ -143,6 +168,10 @@ func (m *encodingManagerMetrics) reportUpdateBlobStatusLatency(duration time.Dur
 	m.updateBlobStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
+func (m *encodingManagerMetrics) reportE2EEncodingLatency(duration time.Duration) {
+	m.blobE2EEncodingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
 func (m *encodingManagerMetrics) reportBatchSize(size int) {
 	m.batchSize.WithLabelValues().Set(float64(size))
 }
@@ -157,4 +186,20 @@ func (m *encodingManagerMetrics) reportBatchRetryCount(count int) {
 
 func (m *encodingManagerMetrics) reportFailedSubmission() {
 	m.failedSubmissionCount.WithLabelValues().Inc()
+}
+
+func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+	switch status {
+	case dispv2.Encoded:
+		m.completedBlobs.WithLabelValues("encoded", "number").Inc()
+		m.completedBlobs.WithLabelValues("encoded", "size").Add(float64(size))
+	case dispv2.Failed:
+		m.completedBlobs.WithLabelValues("failed", "number").Inc()
+		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+	default:
+		return
+	}
+
+	m.completedBlobs.WithLabelValues("total", "number").Inc()
+	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }

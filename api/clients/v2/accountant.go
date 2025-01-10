@@ -26,7 +26,7 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
-	binRecords        []BinRecord
+	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
@@ -34,18 +34,15 @@ type Accountant struct {
 	numBins uint32
 }
 
-type BinRecord struct {
+type PeriodRecord struct {
 	Index uint32
 	Usage uint64
 }
 
 func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
-	//TODO: client storage; currently every instance starts fresh but on-chain or a small store makes more sense
-	// Also client is currently responsible for supplying network params, we need to add RPC in order to be automatic
-	// There's a subsequent PR that handles populating the accountant with on-chain state from the disperser
-	binRecords := make([]BinRecord, numBins)
-	for i := range binRecords {
-		binRecords[i] = BinRecord{Index: uint32(i), Usage: 0}
+	periodRecords := make([]PeriodRecord, numBins)
+	for i := range periodRecords {
+		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
 	}
 	a := Accountant{
 		accountID:         accountID,
@@ -54,7 +51,7 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 		reservationWindow: reservationWindow,
 		pricePerSymbol:    pricePerSymbol,
 		minNumSymbols:     minNumSymbols,
-		binRecords:        binRecords,
+		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
 		numBins:           max(numBins, uint32(meterer.MinNumBins)),
 	}
@@ -74,22 +71,22 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativeBinRecord := a.GetRelativeBinRecord(currentReservationPeriod)
-	relativeBinRecord.Usage += symbolUsage
+	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
+	relativePeriodRecord.Usage += symbolUsage
 
 	// first attempt to use the active reservation
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
-	if relativeBinRecord.Usage <= binLimit {
+	if relativePeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
 		return currentReservationPeriod, big.NewInt(0), nil
 	}
 
-	overflowBinRecord := a.GetRelativeBinRecord(currentReservationPeriod + 2)
+	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if overflowBinRecord.Usage == 0 && relativeBinRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-		overflowBinRecord.Usage += relativeBinRecord.Usage - binLimit
+	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
+		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
@@ -98,7 +95,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 
 	// reservation not available, rollback reservation records, attempt on-demand
 	//todo: rollback on-demand if disperser respond with some type of rejection?
-	relativeBinRecord.Usage -= symbolUsage
+	relativePeriodRecord.Usage -= symbolUsage
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
@@ -143,16 +140,16 @@ func (a *Accountant) SymbolsCharged(numSymbols uint32) uint32 {
 	return uint32(core.RoundUpDivide(uint(numSymbols), uint(a.minNumSymbols))) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativeBinRecord(index uint32) *BinRecord {
+func (a *Accountant) GetRelativePeriodRecord(index uint32) *PeriodRecord {
 	relativeIndex := index % a.numBins
-	if a.binRecords[relativeIndex].Index != uint32(index) {
-		a.binRecords[relativeIndex] = BinRecord{
+	if a.periodRecords[relativeIndex].Index != uint32(index) {
+		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
 			Usage: 0,
 		}
 	}
 
-	return &a.binRecords[relativeIndex]
+	return &a.periodRecords[relativeIndex]
 }
 
 // SetPaymentState sets the accountant's state from the disperser's response
@@ -214,18 +211,18 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 
-	binRecords := make([]BinRecord, len(paymentState.GetBinRecords()))
-	for i, record := range paymentState.GetBinRecords() {
+	periodRecords := make([]PeriodRecord, len(paymentState.GetPeriodRecords()))
+	for i, record := range paymentState.GetPeriodRecords() {
 		if record == nil {
-			binRecords[i] = BinRecord{Index: 0, Usage: 0}
+			periodRecords[i] = PeriodRecord{Index: 0, Usage: 0}
 		} else {
-			binRecords[i] = BinRecord{
+			periodRecords[i] = PeriodRecord{
 				Index: record.Index,
 				Usage: record.Usage,
 			}
 		}
 	}
-	a.binRecords = binRecords
+	a.periodRecords = periodRecords
 	return nil
 }
 
