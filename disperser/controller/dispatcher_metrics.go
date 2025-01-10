@@ -32,6 +32,8 @@ type dispatcherMetrics struct {
 	aggregateSignaturesLatency *prometheus.SummaryVec
 	putAttestationLatency      *prometheus.SummaryVec
 	updateBatchStatusLatency   *prometheus.SummaryVec
+
+	blobE2EDispersalLatency *prometheus.SummaryVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -228,6 +230,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	blobE2EDispersalLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  encodingManagerNamespace,
+			Name:       "e2e_dispersal_latency_ms",
+			Help:       "The time required to disperse a blob end-to-end.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{},
+	)
+
 	return &dispatcherMetrics{
 		handleBatchLatency:          handleBatchLatency,
 		newBatchLatency:             newBatchLatency,
@@ -248,6 +260,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		aggregateSignaturesLatency:  aggregateSignaturesLatency,
 		putAttestationLatency:       putAttestationLatency,
 		updateBatchStatusLatency:    updateBatchStatusLatency,
+		blobE2EDispersalLatency:     blobE2EDispersalLatency,
 	}
 }
 
@@ -325,4 +338,8 @@ func (m *dispatcherMetrics) reportPutAttestationLatency(duration time.Duration) 
 
 func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {
 	m.updateBatchStatusLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
+	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
