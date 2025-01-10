@@ -162,6 +162,11 @@ func (env *Config) DeployExperiment() {
 		env.deploySubgraphs(startBlock)
 	}
 
+	// Ideally these should be set in GenerateAllVariables, but they need to be used in GenerateDisperserKeypair
+	// which is called before GenerateAllVariables
+	env.localstackEndpoint = "http://localhost:4570"
+	env.localstackRegion = "us-east-1"
+
 	fmt.Println("Generating disperser keypair")
 	err = env.GenerateDisperserKeypair()
 	if err != nil {
@@ -189,9 +194,7 @@ func (env *Config) GenerateDisperserKeypair() error {
 		KeyUsage: types.KeyUsageTypeSignVerify,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "connect: connection refused") ||
-			strings.Contains(err.Error(), "request send failed") {
-
+		if strings.Contains(err.Error(), "connect: connection refused") {
 			log.Printf("Unable to reach local stack, skipping disperser keypair generation. Error: %v", err)
 			err = nil
 		}
