@@ -16,7 +16,7 @@
     - [G1Commitment](#common-G1Commitment)
     - [PaymentHeader](#common-PaymentHeader)
   
-- [common/v2/common.proto](#common_v2_common-proto)
+- [common/v2/common_v2.proto](#common_v2_common_v2-proto)
     - [Batch](#common-v2-Batch)
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
@@ -119,7 +119,7 @@
   
     - [Retriever](#retriever-Retriever)
   
-- [retriever/v2/retriever.proto](#retriever_v2_retriever-proto)
+- [retriever/v2/retriever_v2.proto](#retriever_v2_retriever_v2-proto)
     - [BlobReply](#retriever-v2-BlobReply)
     - [BlobRequest](#retriever-v2-BlobRequest)
   
@@ -305,10 +305,10 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 
 
 
-<a name="common_v2_common-proto"></a>
+<a name="common_v2_common_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## common/v2/common.proto
+## common/v2/common_v2.proto
 
 
 
@@ -1751,10 +1751,10 @@ worse cost and performance.
 
 
 
-<a name="retriever_v2_retriever-proto"></a>
+<a name="retriever_v2_retriever_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## retriever/v2/retriever.proto
+## retriever/v2/retriever_v2.proto
 
 
 
