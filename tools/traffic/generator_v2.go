@@ -74,8 +74,6 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		config.WorkerConfig.MetricsBlacklist,
 		config.WorkerConfig.MetricsFuzzyBlacklist)
 
-	// uncertifiedKeyChannel := make(chan *workers.UncertifiedKey, 100)
-
 	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
 	if err != nil {
 		cancel()

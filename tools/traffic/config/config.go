@@ -7,13 +7,11 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/urfave/cli"
 )
 
 // Config configures a traffic generator.
 type Config struct {
-
 	// Logging configuration.
 	LoggingConfig common.LoggerConfig
 
@@ -31,8 +29,10 @@ type Config struct {
 
 	// The port at which the metrics server listens for HTTP requests.
 	MetricsHTTPPort string
+
 	// The timeout for the node client.
 	NodeClientTimeout time.Duration
+
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
 }
@@ -53,11 +53,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			return nil, errors.New("invalid custom quorum number")
 		}
 		customQuorumsUint8[i] = uint8(q)
-	}
-
-	retrieverConfig, err := retriever.NewConfig(ctx)
-	if err != nil {
-		return nil, err
 	}
 
 	config := &Config{
