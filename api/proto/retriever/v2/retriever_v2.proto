@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-import "common/v2/common.proto";
+import "common/v2/common_v2.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2";
 package retriever.v2;
 

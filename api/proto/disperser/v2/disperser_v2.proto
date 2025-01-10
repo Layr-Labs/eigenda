@@ -1,7 +1,7 @@
 syntax = "proto3";
 package disperser.v2;
 import "common/common.proto";
-import "common/v2/common.proto";
+import "common/v2/common_v2.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
 // Disperser defines the public APIs for dispersing blobs.

@@ -434,8 +434,8 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 		Context: ctx,
 	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
-		t.logger.Error("Failed to fetch operator state", "err", err)
-		return nil, err
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
 
 	state := make(core.OperatorStakes, len(state_))

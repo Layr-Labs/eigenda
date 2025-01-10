@@ -175,23 +175,27 @@
         
           
           <li>
-            <a href="#retriever%2fretriever.proto">retriever/retriever.proto</a>
+            <a href="#common%2fv2%2fcommon_v2.proto">common/v2/common_v2.proto</a>
             <ul>
               
                 <li>
-                  <a href="#retriever.BlobReply"><span class="badge">M</span>BlobReply</a>
+                  <a href="#common.v2.Batch"><span class="badge">M</span>Batch</a>
                 </li>
               
                 <li>
-                  <a href="#retriever.BlobRequest"><span class="badge">M</span>BlobRequest</a>
+                  <a href="#common.v2.BatchHeader"><span class="badge">M</span>BatchHeader</a>
                 </li>
-              
-              
-              
               
                 <li>
-                  <a href="#retriever.Retriever"><span class="badge">S</span>Retriever</a>
+                  <a href="#common.v2.BlobCertificate"><span class="badge">M</span>BlobCertificate</a>
                 </li>
+              
+                <li>
+                  <a href="#common.v2.BlobHeader"><span class="badge">M</span>BlobHeader</a>
+                </li>
+              
+              
+              
               
             </ul>
           </li>
@@ -203,13 +207,13 @@
     
       
       <div class="file-heading">
-        <h2 id="retriever/retriever.proto">retriever/retriever.proto</h2><a href="#title">Top</a>
+        <h2 id="common/v2/common_v2.proto">common/v2/common_v2.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
       
-        <h3 id="retriever.BlobReply">BlobReply</h3>
-        <p></p>
+        <h3 id="common.v2.Batch">Batch</h3>
+        <p>Batch is a batch of blob certificates</p>
 
         
           <table class="field-table">
@@ -219,10 +223,17 @@
             <tbody>
               
                 <tr>
-                  <td>data</td>
-                  <td><a href="#bytes">bytes</a></td>
+                  <td>header</td>
+                  <td><a href="#common.v2.BatchHeader">BatchHeader</a></td>
                   <td></td>
-                  <td><p>The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. </p></td>
+                  <td><p>header contains metadata about the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_certificates</td>
+                  <td><a href="#common.v2.BlobCertificate">BlobCertificate</a></td>
+                  <td>repeated</td>
+                  <td><p>blob_certificates is the list of blob certificates in the batch </p></td>
                 </tr>
               
             </tbody>
@@ -232,8 +243,8 @@
 
         
       
-        <h3 id="retriever.BlobRequest">BlobRequest</h3>
-        <p></p>
+        <h3 id="common.v2.BatchHeader">BatchHeader</h3>
+        <p>BatchHeader is the header of a batch of blobs</p>
 
         
           <table class="field-table">
@@ -243,35 +254,100 @@
             <tbody>
               
                 <tr>
-                  <td>batch_header_hash</td>
+                  <td>batch_root</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The hash of the ReducedBatchHeader defined onchain, see:
-https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
-This identifies the batch that this blob belongs to. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>blob_index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>Which blob in the batch this is requesting for (note: a batch is logically an
-ordered list of blobs). </p></td>
+                  <td><p>batch_root is the root of the merkle tree of the hashes of blob certificates in the batch </p></td>
                 </tr>
               
                 <tr>
                   <td>reference_block_number</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p>The Ethereum block number at which the batch for this blob was constructed. </p></td>
+                  <td><p>reference_block_number is the block number that the state of the batch is based on for attestation </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
+        <p>BlobCertificate is what gets attested by the network</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_header</td>
+                  <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
+                  <td></td>
+                  <td><p>blob_header is the header of the blob </p></td>
                 </tr>
               
                 <tr>
-                  <td>quorum_id</td>
+                  <td>relays</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>relays is the list of relays that are in custody of the blob </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.BlobHeader">BlobHeader</h3>
+        <p>BlobHeader is the header of a blob</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>version</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>Which quorum of the blob this is requesting for (note a blob can participate in
-multiple quorums). </p></td>
+                  <td><p>Blob version </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of </p></td>
+                </tr>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
+                  <td></td>
+                  <td><p>commitment is the KZG commitment of the blob </p></td>
+                </tr>
+              
+                <tr>
+                  <td>payment_header</td>
+                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
+                  <td></td>
+                  <td><p>payment_header contains payment information for the blob </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
                 </tr>
               
             </tbody>
@@ -287,26 +363,6 @@ multiple quorums). </p></td>
       
 
       
-        <h3 id="retriever.Retriever">Retriever</h3>
-        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA:</p><p>1) Retrieve from the Disperser that the user initially used for dispersal: the API</p><p>is Disperser.RetrieveBlob() as defined in api/proto/disperser/disperser.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Disperser.RetrieveBlob() (the 1st approach) is generally faster and cheaper as the</p><p>Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the Disperser, with the downside of</p><p>worse cost and performance.</p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>RetrieveBlob</td>
-                <td><a href="#retriever.BlobRequest">BlobRequest</a></td>
-                <td><a href="#retriever.BlobReply">BlobReply</a></td>
-                <td><p>This fans out request to EigenDA Nodes to retrieve the chunks and returns the
-reconstructed original blob in response.</p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-
-        
     
 
     <h2 id="scalar-value-types">Scalar Value Types</h2>
