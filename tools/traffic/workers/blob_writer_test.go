@@ -35,7 +35,7 @@ func TestBlobWriter(t *testing.T) {
 		customQuorum = []uint8{1, 2, 3}
 	}
 
-	config := &config.WorkerConfig{
+	config := &config.BlobWriterConfig{
 		DataSize:       dataSize,
 		RandomizeBlobs: randomizeBlobs,
 		CustomQuorums:  customQuorum,
@@ -46,9 +46,9 @@ func TestBlobWriter(t *testing.T) {
 
 	writer := NewBlobWriter(
 		&ctx,
+		config,
 		&waitGroup,
 		logger,
-		config,
 		disperserClient,
 		generatorMetrics)
 

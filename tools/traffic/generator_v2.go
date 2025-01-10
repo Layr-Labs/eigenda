@@ -71,8 +71,7 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 	generatorMetrics := metrics.NewMetrics(
 		config.MetricsHTTPPort,
 		logger,
-		config.WorkerConfig.MetricsBlacklist,
-		config.WorkerConfig.MetricsFuzzyBlacklist)
+	)
 
 	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
 	if err != nil {
@@ -81,12 +80,12 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 	}
 
 	writers := make([]*workers.BlobWriter, 0)
-	for i := 0; i < int(config.WorkerConfig.NumWriteInstances); i++ {
+	for i := 0; i < int(config.BlobWriterConfig.NumWriteInstances); i++ {
 		writer := workers.NewBlobWriter(
 			&ctx,
+			&config.BlobWriterConfig,
 			&waitGroup,
 			logger,
-			&config.WorkerConfig,
 			disperserClient,
 			generatorMetrics)
 		writers = append(writers, &writer)

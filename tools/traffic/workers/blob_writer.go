@@ -17,6 +17,9 @@ import (
 
 // BlobWriter sends blobs to a disperser at a configured rate.
 type BlobWriter struct {
+	// Config contains the configuration for the generator.
+	config *config.BlobWriterConfig
+
 	// The context for the generator. All work should cease when this context is cancelled.
 	ctx *context.Context
 
@@ -25,9 +28,6 @@ type BlobWriter struct {
 
 	// All logs should be written using this logger.
 	logger logging.Logger
-
-	// Config contains the configuration for the generator.
-	config *config.WorkerConfig
 
 	// disperser is the client used to send blobs to the disperser.
 	disperser clients.DisperserClient
@@ -48,9 +48,9 @@ type BlobWriter struct {
 // NewBlobWriter creates a new BlobWriter instance.
 func NewBlobWriter(
 	ctx *context.Context,
+	config *config.BlobWriterConfig,
 	waitGroup *sync.WaitGroup,
 	logger logging.Logger,
-	config *config.WorkerConfig,
 	disperser clients.DisperserClient,
 	generatorMetrics metrics.Metrics) BlobWriter {
 

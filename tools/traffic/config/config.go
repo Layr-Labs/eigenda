@@ -24,8 +24,8 @@ type Config struct {
 	// Configuration for the graph.
 	TheGraphConfig *thegraph.Config
 
-	// Configures the traffic generator workers.
-	WorkerConfig WorkerConfig
+	// Configures the blob writers.
+	BlobWriterConfig BlobWriterConfig
 
 	// The port at which the metrics server listens for HTTP requests.
 	MetricsHTTPPort string
@@ -35,6 +35,28 @@ type Config struct {
 
 	// The amount of time to sleep after launching each worker thread.
 	InstanceLaunchInterval time.Duration
+}
+
+// BlobWriterConfig configures the blob writer.
+type BlobWriterConfig struct {
+	// The number of worker threads that generate write traffic.
+	NumWriteInstances uint
+
+	// The period of the submission rate of new blobs for each write worker thread.
+	WriteRequestInterval time.Duration
+
+	// The Size of each blob dispersed, in bytes.
+	DataSize uint64
+
+	// If true, then each blob will contain unique random data. If false, the same random data
+	// will be dispersed for each blob by a particular worker thread.
+	RandomizeBlobs bool
+
+	// The amount of time to wait for a blob to be written.
+	WriteTimeout time.Duration
+
+	// Custom quorum numbers to use for the traffic generator.
+	CustomQuorums []uint8
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -63,41 +85,20 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		},
 
 		SignerPrivateKey: ctx.String(SignerPrivateKeyFlag.Name),
-
-		TheGraphConfig: &thegraph.Config{
-			Endpoint:     ctx.String(TheGraphUrlFlag.Name),
-			PullInterval: ctx.Duration(TheGraphPullIntervalFlag.Name),
-			MaxRetries:   ctx.Int(TheGraphRetriesFlag.Name),
-		},
-
-		LoggingConfig: *loggerConfig,
+		LoggingConfig:    *loggerConfig,
 
 		MetricsHTTPPort:   ctx.GlobalString(MetricsHTTPPortFlag.Name),
 		NodeClientTimeout: ctx.Duration(NodeClientTimeoutFlag.Name),
 
 		InstanceLaunchInterval: ctx.Duration(InstanceLaunchIntervalFlag.Name),
 
-		WorkerConfig: WorkerConfig{
+		BlobWriterConfig: BlobWriterConfig{
 			NumWriteInstances:    ctx.GlobalUint(NumWriteInstancesFlag.Name),
 			WriteRequestInterval: ctx.Duration(WriteRequestIntervalFlag.Name),
 			DataSize:             ctx.GlobalUint64(DataSizeFlag.Name),
-			RandomizeBlobs:       !ctx.GlobalBool(UniformBlobsFlag.Name),
+			RandomizeBlobs:       ctx.GlobalBool(RandomizeBlobsFlag.Name),
 			WriteTimeout:         ctx.Duration(WriteTimeoutFlag.Name),
-
-			TrackerInterval:      ctx.Duration(VerifierIntervalFlag.Name),
-			GetBlobStatusTimeout: ctx.Duration(GetBlobStatusTimeoutFlag.Name),
-
-			NumReadInstances:             ctx.GlobalUint(NumReadInstancesFlag.Name),
-			ReadRequestInterval:          ctx.Duration(ReadRequestIntervalFlag.Name),
-			RequiredDownloads:            ctx.Float64(RequiredDownloadsFlag.Name),
-			FetchBatchHeaderTimeout:      ctx.Duration(FetchBatchHeaderTimeoutFlag.Name),
-			RetrieveBlobChunksTimeout:    ctx.Duration(RetrieveBlobChunksTimeoutFlag.Name),
-			StatusTrackerChannelCapacity: ctx.Uint(VerificationChannelCapacityFlag.Name),
-
-			CustomQuorums: customQuorumsUint8,
-
-			MetricsBlacklist:      ctx.StringSlice(MetricsBlacklistFlag.Name),
-			MetricsFuzzyBlacklist: ctx.StringSlice(MetricsFuzzyBlacklistFlag.Name),
+			CustomQuorums:        customQuorumsUint8,
 		},
 	}
 
