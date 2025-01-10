@@ -5,7 +5,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/urfave/cli"
 )
 
@@ -19,9 +18,6 @@ type Config struct {
 
 	// Signer private key
 	SignerPrivateKey string
-
-	// Configuration for the graph.
-	TheGraphConfig *thegraph.Config
 
 	// The port at which the metrics server listens for HTTP requests.
 	MetricsHTTPPort string
