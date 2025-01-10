@@ -522,7 +522,9 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
-			d.metrics.reportCompletedBlob(int(cert.BlobHeader.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL, v2.Failed)
+			if metadata, ok := batch.Metadata[blobKey]; ok {
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+			}
 			continue
 		}
 
@@ -540,7 +542,9 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
-			d.metrics.reportCompletedBlob(int(cert.BlobHeader.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL, v2.InsufficientSignatures)
+			if metadata, ok := batch.Metadata[blobKey]; ok {
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.InsufficientSignatures)
+			}
 			continue
 		}
 

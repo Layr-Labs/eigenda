@@ -230,7 +230,6 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				if err == nil || errors.Is(err, dispcommon.ErrAlreadyExists) {
 					// Successfully updated the status to Encoded
 					success = true
-					e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 					break
 				}
 
@@ -250,6 +249,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 				requestedAt := time.Unix(0, int64(blob.RequestedAt))
 				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)

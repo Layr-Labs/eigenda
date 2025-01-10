@@ -27,37 +27,18 @@ type dispatcherMetrics struct {
 	sendChunksLatency           *prometheus.SummaryVec
 	sendChunksRetryCount        *prometheus.GaugeVec
 	putDispersalResponseLatency *prometheus.SummaryVec
-<<<<<<< HEAD
-
-	handleSignaturesLatency    *prometheus.SummaryVec
-	receiveSignaturesLatency   *prometheus.SummaryVec
-	aggregateSignaturesLatency *prometheus.SummaryVec
-	putAttestationLatency      *prometheus.SummaryVec
-	updateBatchStatusLatency   *prometheus.SummaryVec
-
-	blobE2EDispersalLatency *prometheus.SummaryVec
-=======
 	handleSignaturesLatency     *prometheus.SummaryVec
 	receiveSignaturesLatency    *prometheus.SummaryVec
 	aggregateSignaturesLatency  *prometheus.SummaryVec
 	putAttestationLatency       *prometheus.SummaryVec
 	updateBatchStatusLatency    *prometheus.SummaryVec
+	blobE2EDispersalLatency     *prometheus.SummaryVec
 	completedBlobs              *prometheus.CounterVec
->>>>>>> ca1c0eb (Add throughput metrics to controller)
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
 func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
-
-	completedBlobs := promauto.With(registry).NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: dispatcherNamespace,
-			Name:      "completed_blobs_total",
-			Help:      "The number and size of completed blobs by status.",
-		},
-		[]string{"state", "data"},
-	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -258,8 +239,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	completedBlobs := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "completed_blobs_total",
+			Help:      "The number and size of completed blobs by status.",
+		},
+		[]string{"state", "data"},
+	)
+
 	return &dispatcherMetrics{
-		completedBlobs:              completedBlobs,
 		handleBatchLatency:          handleBatchLatency,
 		newBatchLatency:             newBatchLatency,
 		getBlobMetadataLatency:      getBlobMetadataLatency,
@@ -280,26 +269,8 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		putAttestationLatency:       putAttestationLatency,
 		updateBatchStatusLatency:    updateBatchStatusLatency,
 		blobE2EDispersalLatency:     blobE2EDispersalLatency,
+		completedBlobs:              completedBlobs,
 	}
-}
-
-func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
-	switch status {
-	case dispv2.Certified:
-		m.completedBlobs.WithLabelValues("certified", "number").Inc()
-		m.completedBlobs.WithLabelValues("certified", "size").Add(float64(size))
-	case dispv2.Failed:
-		m.completedBlobs.WithLabelValues("failed", "number").Inc()
-		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
-	case dispv2.InsufficientSignatures:
-		m.completedBlobs.WithLabelValues("insufficient_signature", "number").Inc()
-		m.completedBlobs.WithLabelValues("insufficient_signature", "size").Add(float64(size))
-	default:
-		return
-	}
-
-	m.completedBlobs.WithLabelValues("total", "number").Inc()
-	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }
 
 func (m *dispatcherMetrics) reportHandleBatchLatency(duration time.Duration) {
@@ -380,4 +351,23 @@ func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duratio
 
 func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
 	m.blobE2EDispersalLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
+	switch status {
+	case dispv2.Certified:
+		m.completedBlobs.WithLabelValues("certified", "number").Inc()
+		m.completedBlobs.WithLabelValues("certified", "size").Add(float64(size))
+	case dispv2.Failed:
+		m.completedBlobs.WithLabelValues("failed", "number").Inc()
+		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
+	case dispv2.InsufficientSignatures:
+		m.completedBlobs.WithLabelValues("insufficient_signature", "number").Inc()
+		m.completedBlobs.WithLabelValues("insufficient_signature", "size").Add(float64(size))
+	default:
+		return
+	}
+
+	m.completedBlobs.WithLabelValues("total", "number").Inc()
+	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
 }
