@@ -110,4 +110,8 @@ done
 # Wait for all processes to finish
 for PID in "${PID_LIST[@]}"; do
   wait $PID
+  if [ $? -ne 0 ]; then
+    echo "Failed to wait for process $PID."
+    exit 1
+  fi
 done
