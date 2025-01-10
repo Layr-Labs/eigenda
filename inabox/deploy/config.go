@@ -329,7 +329,10 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	return v
 }
 
-func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
+func (env *Config) generateControllerVars(
+	ind int,
+	graphUrl string) ControllerVars {
+
 	v := ControllerVars{
 		CONTROLLER_LOG_FORMAT:                              "text",
 		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
@@ -352,7 +355,8 @@ func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVa
 		CONTROLLER_AWS_ENDPOINT_URL:                        "",
 		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
-		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "true",
+		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
+		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -442,7 +446,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_NUM_CONFIRMATIONS:                "0",
 		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
 		NODE_ENABLE_V2:                        "true",
-		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "true",
+		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
@@ -583,14 +587,12 @@ func (env *Config) GenerateAllVariables() {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
+	env.localstackEndpoint = "http://localhost:4570"
+	env.localstackRegion = "us-east-1"
+
 	// Create envs directory
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
-
-	// Gather keys
-	// keyData := readFile(gethPrivateKeys)
-	// keys := strings.Split(string(keyData), "\n")
-	// id := 1
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"

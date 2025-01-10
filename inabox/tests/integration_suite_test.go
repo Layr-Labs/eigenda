@@ -111,12 +111,12 @@ var _ = BeforeSuite(func() {
 			testConfig.StartGraphNode()
 		}
 
-		fmt.Println("Deploying experiment")
-		testConfig.DeployExperiment()
-
 		loggerConfig := common.DefaultLoggerConfig()
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
+
+		fmt.Println("Deploying experiment")
+		testConfig.DeployExperiment()
 
 		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
@@ -128,11 +128,18 @@ var _ = BeforeSuite(func() {
 			NumRetries:       numRetries,
 		}, gcommon.Address{}, logger)
 		Expect(err).To(BeNil())
+
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
+
+		fmt.Println("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient)
+		if err != nil {
+			panic(err)
+		}
 
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
