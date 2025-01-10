@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: retriever/v2/retriever.proto
+// source: retriever/v2/retriever_v2.proto
 
 package v2
 
@@ -109,5 +109,5 @@ var Retriever_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "retriever/v2/retriever.proto",
+	Metadata: "retriever/v2/retriever_v2.proto",
 }

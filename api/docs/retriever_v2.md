@@ -3,69 +3,49 @@
 
 ## Table of Contents
 
-- [common/common.proto](#common_common-proto)
-    - [BlobCommitment](#common-BlobCommitment)
-    - [G1Commitment](#common-G1Commitment)
-    - [PaymentHeader](#common-PaymentHeader)
+- [retriever/v2/retriever_v2.proto](#retriever_v2_retriever_v2-proto)
+    - [BlobReply](#retriever-v2-BlobReply)
+    - [BlobRequest](#retriever-v2-BlobRequest)
+  
+    - [Retriever](#retriever-v2-Retriever)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="common_common-proto"></a>
+<a name="retriever_v2_retriever_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## common/common.proto
+## retriever/v2/retriever_v2.proto
 
 
 
-<a name="common-BlobCommitment"></a>
+<a name="retriever-v2-BlobReply"></a>
 
-### BlobCommitment
-BlobCommitment represents commitment of a specific blob, containing its
-KZG commitment, degree proof, the actual degree, and data length in number of symbols.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  |  |
-| length_commitment | [bytes](#bytes) |  |  |
-| length_proof | [bytes](#bytes) |  |  |
-| length | [uint32](#uint32) |  |  |
-
-
-
-
-
-
-<a name="common-G1Commitment"></a>
-
-### G1Commitment
+### BlobReply
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
 
 
 
 
 
 
-<a name="common-PaymentHeader"></a>
+<a name="retriever-v2-BlobRequest"></a>
 
-### PaymentHeader
+### BlobRequest
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
-| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
-| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
-| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | header of the blob to be retrieved |
+| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
 
 
 
@@ -76,6 +56,28 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
  
 
  
+
+
+<a name="retriever-v2-Retriever"></a>
+
+### Retriever
+The Retriever is a service for retrieving chunks corresponding to a blob from
+the EigenDA operator nodes and reconstructing the original blob from the chunks.
+This is a client-side library that the users are supposed to operationalize.
+
+Note: Users generally have two ways to retrieve a blob from EigenDA V2:
+  1) Retrieve from the relay that the blob is assigned to: the API
+     is Relay.GetBlob() as defined in api/proto/relay/relay.proto
+  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+
+The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the
+relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+(the 2nd approach here) removes the need to trust the relay, with the downside of
+worse cost and performance.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
 
  
 
