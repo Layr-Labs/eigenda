@@ -1132,7 +1132,8 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of </p></td>
+                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
+All quorums must be specified (including required quorums). </p></td>
                 </tr>
               
                 <tr>
@@ -2443,7 +2444,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p>quorum splits between allowed quorums </p></td>
+                  <td><p>quorum splits describes how the payment is split among the quorums </p></td>
                 </tr>
               
             </tbody>
@@ -2487,7 +2488,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p><p>- UNKNOWN</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -2497,7 +2498,8 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
               <tr>
                 <td>UNKNOWN</td>
                 <td>0</td>
-                <td><p>UNKNOWN means that the status of the blob is unknown.</p></td>
+                <td><p>UNKNOWN means that the status of the blob is unknown.
+This is a catch all and should not be encountered absent a bug.</p></td>
               </tr>
             
               <tr>

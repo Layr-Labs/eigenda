@@ -369,7 +369,7 @@ BlobHeader is the header of a blob
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | version | [uint32](#uint32) |  | Blob version |
-| quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of |
+| quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of. All quorums must be specified (including required quorums). |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment of the blob |
 | payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
@@ -961,7 +961,7 @@ Reservation parameters of an account, used to determine the rate limit for the a
 | start_timestamp | [uint32](#uint32) |  | start timestamp of the reservation |
 | end_timestamp | [uint32](#uint32) |  | end timestamp of the reservation |
 | quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make reserved dispersals |
-| quorum_splits | [uint32](#uint32) | repeated | quorum splits between allowed quorums |
+| quorum_splits | [uint32](#uint32) | repeated | quorum splits describes how the payment is split among the quorums |
 
 
 
@@ -999,10 +999,11 @@ Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
 - INSUFFICIENT_SIGNATURES
+- UNKNOWN
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. |
+| UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug. |
 | QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. |
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes. |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes. |

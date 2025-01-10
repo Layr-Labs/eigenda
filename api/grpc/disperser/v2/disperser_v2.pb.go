@@ -32,10 +32,12 @@ const (
 // - CERTIFIED
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
+// - UNKNOWN
 type BlobStatus int32
 
 const (
 	// UNKNOWN means that the status of the blob is unknown.
+	// This is a catch all and should not be encountered absent a bug.
 	BlobStatus_UNKNOWN BlobStatus = 0
 	// QUEUED means that the blob has been queued by the disperser for processing.
 	BlobStatus_QUEUED BlobStatus = 1
@@ -898,7 +900,7 @@ type Reservation struct {
 	EndTimestamp uint32 `protobuf:"varint,3,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
 	// quorums allowed to make reserved dispersals
 	QuorumNumbers []uint32 `protobuf:"varint,4,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// quorum splits between allowed quorums
+	// quorum splits describes how the payment is split among the quorums
 	QuorumSplits []uint32 `protobuf:"varint,5,rep,packed,name=quorum_splits,json=quorumSplits,proto3" json:"quorum_splits,omitempty"`
 }
 

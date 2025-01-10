@@ -113,8 +113,10 @@ message GetPaymentStateReply {
 // - CERTIFIED
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
+// - UNKNOWN
 enum BlobStatus {
   // UNKNOWN means that the status of the blob is unknown.
+  // This is a catch all and should not be encountered absent a bug.
   UNKNOWN = 0;
 
   // QUEUED means that the blob has been queued by the disperser for processing.
@@ -191,7 +193,7 @@ message Reservation {
   uint32 end_timestamp = 3;
   // quorums allowed to make reserved dispersals
   repeated uint32 quorum_numbers = 4;
-  // quorum splits between allowed quorums
+  // quorum splits describes how the payment is split among the quorums
   repeated uint32 quorum_splits = 5;
 }
 
