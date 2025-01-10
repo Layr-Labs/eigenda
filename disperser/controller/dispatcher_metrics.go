@@ -231,7 +231,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	blobE2EDispersalLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
-			Namespace:  encodingManagerNamespace,
+			Namespace:  dispatcherNamespace,
 			Name:       "e2e_dispersal_latency_ms",
 			Help:       "The time required to disperse a blob end-to-end.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
