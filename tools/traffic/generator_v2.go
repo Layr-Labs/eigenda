@@ -6,10 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
+	trafficconfig "github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/Layr-Labs/eigenda/tools/traffic/workers"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -31,17 +32,23 @@ import (
 // When a writer finishes writing a blob, it sends information about that blob to the statusTracker.
 // When the statusTracker observes that a blob has been confirmed, it sends information about the blob
 // to the readers. The readers only attempt to read blobs that have been confirmed by the statusTracker.
+type WriterGroup struct {
+	name    string
+	writers []*workers.BlobWriter
+	cancels map[*workers.BlobWriter]context.CancelFunc
+}
+
 type Generator struct {
 	ctx              *context.Context
 	cancel           *context.CancelFunc
 	waitGroup        *sync.WaitGroup
 	generatorMetrics metrics.Metrics
 	logger           logging.Logger
-	disperserClient  clients.DisperserClient
-	// eigenDAClient    *clients.EigenDAClient #TODO: Add this back in when the client is implemented
-	config *config.Config
-
-	writers []*workers.BlobWriter
+	disperserClient  clientsv2.DisperserClient
+	config           *config.Config
+	writerGroups     map[string]*WriterGroup
+	configManager    *config.RuntimeConfigManager
+	mu               sync.RWMutex
 }
 
 func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
@@ -65,6 +72,10 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Info("Initializing traffic generator", "accountId", accountId)
 
+	if config.RuntimeConfigPath == "" {
+		return nil, fmt.Errorf("runtime config path is required")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	waitGroup := sync.WaitGroup{}
 
@@ -73,25 +84,13 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		logger,
 	)
 
-	disperserClient, err := clients.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(config.DisperserClientConfig, signer, nil, nil)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
 
-	writers := make([]*workers.BlobWriter, 0)
-	for i := 0; i < int(config.BlobWriterConfig.NumWriteInstances); i++ {
-		writer := workers.NewBlobWriter(
-			&ctx,
-			&config.BlobWriterConfig,
-			&waitGroup,
-			logger,
-			disperserClient,
-			generatorMetrics)
-		writers = append(writers, &writer)
-	}
-
-	return &Generator{
+	generator := &Generator{
 		ctx:              &ctx,
 		cancel:           &cancel,
 		waitGroup:        &waitGroup,
@@ -99,8 +98,105 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		logger:           logger,
 		disperserClient:  disperserClient,
 		config:           config,
-		writers:          writers,
-	}, nil
+		writerGroups:     make(map[string]*WriterGroup),
+	}
+
+	// Initialize runtime config manager
+	configManager, err := trafficconfig.NewRuntimeConfigManager(config.RuntimeConfigPath, generator.handleConfigUpdate)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to initialize runtime config manager: %w", err)
+	}
+	generator.configManager = configManager
+
+	return generator, nil
+}
+
+// handleConfigUpdate is called when the runtime configuration changes
+func (generator *Generator) handleConfigUpdate(runtimeConfig *trafficconfig.RuntimeConfig) {
+	generator.mu.Lock()
+	defer generator.mu.Unlock()
+
+	generator.logger.Info("Received runtime configuration update")
+
+	// Track existing groups to identify which ones to remove
+	existingGroups := make(map[string]bool)
+	for name := range generator.writerGroups {
+		existingGroups[name] = true
+	}
+
+	// Update or create writer groups
+	for _, groupConfig := range runtimeConfig.WriterGroups {
+		delete(existingGroups, groupConfig.Name)
+
+		writerConfig := &trafficconfig.BlobWriterConfig{
+			NumWriteInstances:    groupConfig.NumWriteInstances,
+			WriteRequestInterval: groupConfig.WriteRequestInterval,
+			DataSize:             groupConfig.DataSize,
+			RandomizeBlobs:       groupConfig.RandomizeBlobs,
+			WriteTimeout:         groupConfig.WriteTimeout,
+			CustomQuorums:        groupConfig.CustomQuorums,
+		}
+
+		group, exists := generator.writerGroups[groupConfig.Name]
+		if !exists {
+			group = &WriterGroup{
+				name:    groupConfig.Name,
+				writers: make([]*workers.BlobWriter, 0),
+				cancels: make(map[*workers.BlobWriter]context.CancelFunc),
+			}
+			generator.writerGroups[groupConfig.Name] = group
+		}
+
+		// Update writer count
+		currentWriters := len(group.writers)
+		targetWriters := int(groupConfig.NumWriteInstances)
+
+		// Scale down if needed
+		if targetWriters < currentWriters {
+			for i := targetWriters; i < currentWriters; i++ {
+				if cancel, exists := group.cancels[group.writers[i]]; exists {
+					cancel()
+					delete(group.cancels, group.writers[i])
+				}
+			}
+			group.writers = group.writers[:targetWriters]
+		}
+
+		// Scale up if needed
+		if targetWriters > currentWriters {
+			for i := currentWriters; i < targetWriters; i++ {
+				writerCtx, writerCancel := context.WithCancel(*generator.ctx)
+				writer := workers.NewBlobWriter(
+					groupConfig.Name,
+					&writerCtx,
+					writerConfig,
+					generator.waitGroup,
+					generator.logger,
+					generator.disperserClient,
+					generator.generatorMetrics)
+				group.writers = append(group.writers, &writer)
+				group.cancels[&writer] = writerCancel
+				writer.Start()
+			}
+		}
+
+		// Update configuration for existing writers
+		for _, writer := range group.writers[:min(currentWriters, targetWriters)] {
+			writer.UpdateConfig(writerConfig)
+		}
+	}
+
+	// Remove any groups that are no longer in the config
+	for name := range existingGroups {
+		group := generator.writerGroups[name]
+		for _, writer := range group.writers {
+			if cancel, exists := group.cancels[writer]; exists {
+				cancel()
+			}
+		}
+		delete(generator.writerGroups, name)
+	}
 }
 
 // Start instantiates goroutines that generate read/write traffic.
@@ -108,12 +204,9 @@ func (generator *Generator) Start() error {
 	// Start metrics server
 	generator.generatorMetrics.Start()
 
-	// Start writers
-	generator.logger.Info("Starting writers")
-	for _, writer := range generator.writers {
-		generator.logger.Info("Starting writer", "writer", writer)
-		writer.Start()
-		time.Sleep(generator.config.InstanceLaunchInterval)
+	// Start runtime config watcher if configured
+	if generator.configManager != nil {
+		generator.configManager.StartWatching(*generator.ctx)
 	}
 
 	// Wait for context cancellation to keep the process running

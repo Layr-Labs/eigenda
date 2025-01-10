@@ -45,6 +45,7 @@ func TestBlobWriter(t *testing.T) {
 	generatorMetrics := metrics.NewMockMetrics()
 
 	writer := NewBlobWriter(
+		"test-writer",
 		&ctx,
 		config,
 		&waitGroup,

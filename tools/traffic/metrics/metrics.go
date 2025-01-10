@@ -78,7 +78,6 @@ func (metrics *metrics) Start() error {
 	}
 
 	go func() {
-		metrics.logger.Info("Starting metrics server", "port", metrics.httpPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			metrics.logger.Error("Prometheus server failed", "err", err)
 		}

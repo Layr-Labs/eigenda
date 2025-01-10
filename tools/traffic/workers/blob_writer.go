@@ -17,7 +17,10 @@ import (
 
 // BlobWriter sends blobs to a disperser at a configured rate.
 type BlobWriter struct {
-	// Config contains the configuration for the generator.
+	// Name of the writer group this writer belongs to
+	name string
+
+	// Config contains the configuration for the blob writer.
 	config *config.BlobWriterConfig
 
 	// The context for the generator. All work should cease when this context is cancelled.
@@ -43,10 +46,20 @@ type BlobWriter struct {
 
 	// writeFailureMetric is used to record the number of failed write requests.
 	writeFailureMetric metrics.CountMetric
+
+	// Mutex to protect configuration updates
+	configMutex sync.RWMutex
+
+	// Ticker for controlling write intervals
+	ticker *time.Ticker
+
+	// cancel is used to cancel the context
+	cancel *context.CancelFunc
 }
 
 // NewBlobWriter creates a new BlobWriter instance.
 func NewBlobWriter(
+	name string,
 	ctx *context.Context,
 	config *config.BlobWriterConfig,
 	waitGroup *sync.WaitGroup,
@@ -69,6 +82,7 @@ func NewBlobWriter(
 	}
 
 	return BlobWriter{
+		name:               name,
 		ctx:                ctx,
 		waitGroup:          waitGroup,
 		logger:             logger,
@@ -83,40 +97,75 @@ func NewBlobWriter(
 
 // Start begins the blob writer goroutine.
 func (writer *BlobWriter) Start() {
-	writer.logger.Info("Starting blob writer")
+	writer.logger.Info("Starting blob writer", "name", writer.name)
 	writer.waitGroup.Add(1)
-	ticker := time.NewTicker(writer.config.WriteRequestInterval)
+	writer.configMutex.Lock()
+	writer.ticker = time.NewTicker(writer.config.WriteRequestInterval)
+	writer.configMutex.Unlock()
 
 	go func() {
 		defer writer.waitGroup.Done()
-		defer ticker.Stop()
+		defer writer.ticker.Stop()
 
 		for {
 			select {
 			case <-(*writer.ctx).Done():
-				writer.logger.Info("context cancelled, stopping blob writer")
+				writer.logger.Info("context cancelled, stopping blob writer", "name", writer.name)
 				return
-			case <-ticker.C:
+			case <-writer.ticker.C:
 				if err := writer.writeNextBlob(); err != nil {
-					writer.logger.Error("failed to write blob", "err", err)
+					writer.logger.Error("failed to write blob", "name", writer.name, "err", err)
 				}
 			}
 		}
 	}()
 }
 
+// UpdateConfig updates the writer's configuration
+func (writer *BlobWriter) UpdateConfig(config *config.BlobWriterConfig) {
+	writer.configMutex.Lock()
+	defer writer.configMutex.Unlock()
+
+	// Update the ticker if the interval changed
+	if writer.config.WriteRequestInterval != config.WriteRequestInterval {
+		writer.ticker.Reset(config.WriteRequestInterval)
+	}
+
+	// Update the fixed random data if needed
+	if writer.config.RandomizeBlobs != config.RandomizeBlobs || writer.config.DataSize != config.DataSize {
+		if config.RandomizeBlobs {
+			writer.fixedRandomData = nil
+		} else {
+			writer.fixedRandomData = make([]byte, config.DataSize)
+			_, err := rand.Read(writer.fixedRandomData)
+			if err != nil {
+				writer.logger.Error("failed to generate new fixed random data", "name", writer.name, "err", err)
+				return
+			}
+			writer.fixedRandomData = codec.ConvertByPaddingEmptyByte(writer.fixedRandomData)
+		}
+	}
+
+	writer.config = config
+	writer.logger.Info("Updated blob writer configuration",
+		"name", writer.name,
+		"writeInterval", config.WriteRequestInterval,
+		"dataSize", config.DataSize,
+		"randomizeBlobs", config.RandomizeBlobs)
+}
+
 // writeNextBlob attempts to send a random blob to the disperser.
 func (writer *BlobWriter) writeNextBlob() error {
 	data, err := writer.getRandomData()
 	if err != nil {
-		writer.logger.Error("failed to get random data", "err", err)
+		writer.logger.Error("failed to get random data", "name", writer.name, "err", err)
 		return err
 	}
 	start := time.Now()
 	_, err = writer.sendRequest(data)
 	if err != nil {
 		writer.writeFailureMetric.Increment()
-		writer.logger.Error("failed to send blob request", "err", err)
+		writer.logger.Error("failed to send blob request", "name", writer.name, "err", err)
 		return err
 	}
 
@@ -130,6 +179,9 @@ func (writer *BlobWriter) writeNextBlob() error {
 
 // getRandomData returns a slice of random data to be used for a blob.
 func (writer *BlobWriter) getRandomData() ([]byte, error) {
+	writer.configMutex.RLock()
+	defer writer.configMutex.RUnlock()
+
 	if writer.fixedRandomData != nil {
 		return writer.fixedRandomData, nil
 	}
@@ -146,23 +198,28 @@ func (writer *BlobWriter) getRandomData() ([]byte, error) {
 
 // sendRequest sends a blob to a disperser.
 func (writer *BlobWriter) sendRequest(data []byte) (key v2.BlobKey, err error) {
-	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writer.config.WriteTimeout)
+	writer.configMutex.RLock()
+	writeTimeout := writer.config.WriteTimeout
+	customQuorums := writer.config.CustomQuorums
+	writer.configMutex.RUnlock()
+
+	ctxTimeout, cancel := context.WithTimeout(*writer.ctx, writeTimeout)
 	defer cancel()
 
-	writer.logger.Info("sending blob request", "size", len(data))
+	writer.logger.Info("sending blob request", "name", writer.name, "size", len(data))
 	status, key, err := writer.disperser.DisperseBlob(
 		ctxTimeout,
 		data,
 		0,
-		writer.config.CustomQuorums,
+		customQuorums,
 		0,
 	)
 	if err != nil {
-		writer.logger.Error("failed to send blob request", "err", err)
+		writer.logger.Error("failed to send blob request", "name", writer.name, "err", err)
 		return
 	}
 
-	writer.logger.Info("blob request sent", "key", key.Hex(), "status", status.String())
+	writer.logger.Info("blob request sent", "name", writer.name, "key", key.Hex(), "status", status.String())
 
 	return
 }
