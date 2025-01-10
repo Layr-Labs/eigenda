@@ -14,7 +14,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
@@ -564,12 +563,14 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 
 func (d *Dispatcher) failBatch(ctx context.Context, batch *batchData) error {
 	var multierr error
-	for i, blobKey := range batch.BlobKeys {
+	for _, blobKey := range batch.BlobKeys {
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 		if err != nil {
 			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 		}
-		d.metrics.reportCompletedBlob(int(batch.Batch.BlobCertificates[i].BlobHeader.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL, v2.Failed)
+		if metadata, ok := batch.Metadata[blobKey]; ok {
+			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+		}
 	}
 
 	return multierr
