@@ -82,7 +82,12 @@ func TestBlobWriter(t *testing.T) {
 		).Return(&status, keyToReturn, errorToReturn)
 
 		// Simulate the advancement of time (i.e. allow the writer to write the next blob).
-		writer.writeNextBlob()
+		err = writer.writeNextBlob()
+		if errorToReturn != nil {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
 
 		disperserClient.mock.AssertNumberOfCalls(t, "DisperseBlob", 1)
 

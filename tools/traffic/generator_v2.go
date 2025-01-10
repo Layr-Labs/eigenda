@@ -202,7 +202,9 @@ func (generator *Generator) handleConfigUpdate(runtimeConfig *trafficconfig.Runt
 // Start instantiates goroutines that generate read/write traffic.
 func (generator *Generator) Start() error {
 	// Start metrics server
-	generator.generatorMetrics.Start()
+	if err := generator.generatorMetrics.Start(); err != nil {
+		return fmt.Errorf("failed to start metrics server: %w", err)
+	}
 
 	// Start runtime config watcher if configured
 	if generator.configManager != nil {

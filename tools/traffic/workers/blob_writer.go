@@ -52,9 +52,6 @@ type BlobWriter struct {
 
 	// Ticker for controlling write intervals
 	ticker *time.Ticker
-
-	// cancel is used to cancel the context
-	cancel *context.CancelFunc
 }
 
 // NewBlobWriter creates a new BlobWriter instance.

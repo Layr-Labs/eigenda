@@ -58,7 +58,9 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 		return err
 	case sig := <-sigChan:
 		fmt.Printf("\nReceived signal %v, shutting down...\n", sig)
-		generator.Stop()
+		if err := generator.Stop(); err != nil {
+			fmt.Printf("Failed to stop generator: %v\n", err)
+		}
 		return nil
 	}
 }
