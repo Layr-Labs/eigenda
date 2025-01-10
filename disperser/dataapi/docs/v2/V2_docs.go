@@ -445,7 +445,7 @@ const docTemplateV2 = `{
                     },
                     {
                         "type": "string",
-                        "description": "Operator ID in hex string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
                         "name": "operator_id",
                         "in": "query"
                     }
@@ -454,7 +454,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.OperatorDispersalResponse"
+                            "$ref": "#/definitions/v2.OperatorDispersalResponses"
                         }
                     },
                     "400": {
@@ -920,11 +920,14 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorDispersalResponse": {
+        "v2.OperatorDispersalResponses": {
             "type": "object",
             "properties": {
-                "operator_dispersal_response": {
-                    "$ref": "#/definitions/v2.DispersalResponse"
+                "operator_dispersal_responses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.DispersalResponse"
+                    }
                 }
             }
         },

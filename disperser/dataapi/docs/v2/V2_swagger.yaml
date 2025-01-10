@@ -302,10 +302,12 @@ definitions:
           $ref: '#/definitions/big.Int'
         type: object
     type: object
-  v2.OperatorDispersalResponse:
+  v2.OperatorDispersalResponses:
     properties:
-      operator_dispersal_response:
-        $ref: '#/definitions/v2.DispersalResponse'
+      operator_dispersal_responses:
+        items:
+          $ref: '#/definitions/v2.DispersalResponse'
+        type: array
     type: object
   v2.OperatorPortCheckResponse:
     properties:
@@ -561,7 +563,7 @@ paths:
         name: batch_header_hash
         required: true
         type: string
-      - description: Operator ID in hex string
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
         in: query
         name: operator_id
         type: string
@@ -571,7 +573,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.OperatorDispersalResponse'
+            $ref: '#/definitions/v2.OperatorDispersalResponses'
         "400":
           description: 'error: Bad request'
           schema:
