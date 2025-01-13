@@ -1,5 +1,5 @@
 # Use the official Go image as the base image
-FROM golang:1.21.1-alpine3.18 as builder
+FROM golang:1.21.13-alpine3.18 as builder
 
 # Copy only the test file and necessary files to the container
 COPY ./disperser /app/disperser

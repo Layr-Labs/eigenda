@@ -1,8 +1,8 @@
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
 # Install Go
-ENV GOLANG_VERSION=1.21.1
-ENV GOLANG_SHA256=b3075ae1ce5dab85f89bc7905d1632de23ca196bd8336afd93fa97434cfa55ae
+ENV GOLANG_VERSION=1.21.13
+ENV GOLANG_SHA256=502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7
 
 ADD https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz /tmp/go.tar.gz
 RUN echo "${GOLANG_SHA256} /tmp/go.tar.gz" | sha256sum -c - && \
