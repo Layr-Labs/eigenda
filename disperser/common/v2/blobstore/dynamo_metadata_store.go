@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ const (
 	StatusIndexName            = "StatusIndex"
 	OperatorDispersalIndexName = "OperatorDispersalIndex"
 	OperatorResponseIndexName  = "OperatorResponseIndex"
+	RequestedAtIndexName       = "RequestedAtIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -38,6 +40,15 @@ const (
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
 	attestationSK             = "Attestation"
+
+	// The number of seconds for a requestedAt bucket (1h).
+	// The rationales are:
+	// - 1h would be a good estimate for blob feed request (e.g. fetch blobs in past hour can be a common use case)
+	// - at 100 blobs/s, it'll be 360,000 blobs in a bucket, which is reasonable
+	// - and then it'll be 336 buckets in total (24 buckets/day * 14 days), which is also reasonable
+	requestedAtBucketSizeSecs = uint64(time.Hour / time.Second)
+	// 14 days with 1 hour margin of safety.
+	maxBlobAgeInNano = uint64(1e9 * (14*24*3600 + 3600))
 )
 
 var (
@@ -54,6 +65,61 @@ var (
 type StatusIndexCursor struct {
 	BlobKey   *corev2.BlobKey
 	UpdatedAt uint64
+}
+
+// Blob feed is all blobs that are accepted by Disperser, ordered by <requestedAt, blobKey>
+type BlobFeedCursor struct {
+	RequestedAt uint64
+	BlobKey     *corev2.BlobKey
+}
+
+// Returns true if the cursor is equal to the given <requestedAt, blobKey>
+func (cursor *BlobFeedCursor) Equal(requestedAt uint64, blobKey *corev2.BlobKey) bool {
+	if cursor.RequestedAt != requestedAt {
+		return false
+	}
+	if cursor.BlobKey == nil && blobKey == nil {
+		return true
+	}
+	if cursor.BlobKey == nil || blobKey == nil {
+		return false
+	}
+	return cursor.BlobKey.Hex() == blobKey.Hex()
+}
+
+// LessThan method compares the current BlobFeedCursor with another BlobFeedCursor
+func (cursor *BlobFeedCursor) LessThan(other *BlobFeedCursor) bool {
+	// First, compare the RequestedAt timestamps
+	if cursor.RequestedAt != other.RequestedAt {
+		return cursor.RequestedAt < other.RequestedAt
+	}
+
+	// If RequestedAt is the same, compare BlobKey
+	if cursor.BlobKey != nil && other.BlobKey != nil {
+		return cursor.BlobKey.Hex() < other.BlobKey.Hex()
+	}
+
+	// Handle cases where BlobKey might be nil
+	if cursor.BlobKey == nil && other.BlobKey != nil {
+		return true // cursor.BlobKey is nil, so it comes first
+	}
+	if cursor.BlobKey != nil && other.BlobKey == nil {
+		return false // other.BlobKey is nil, so "other" comes first
+	}
+
+	// If both RequestedAt and BlobKey are equal, return false (because they are equal)
+	return false
+}
+
+// ToRequestedAtBlobKey encodes BlobFeedCursor into string that preserves the ordering.
+// If there are two cursors A and B:
+// - A < B if and only if A.ToRequestedAtBlobKey() < B.ToRequestedAtBlobKey()
+// - A == B if and only if A.ToRequestedAtBlobKey() == B.ToRequestedAtBlobKey()
+func (cursor *BlobFeedCursor) ToRequestedAtBlobKey() string {
+	if cursor.BlobKey == nil {
+		return encodeRequestedAtBlobKey(cursor.RequestedAt, "")
+	}
+	return encodeRequestedAtBlobKey(cursor.RequestedAt, cursor.BlobKey.Hex())
 }
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -192,6 +258,96 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	}
 
 	return metadata, nil
+}
+
+// GetBlobMetadataByRequestedAt returns blobs (as BlobMetadata) that are in range (start, end]
+// cursor position. Blobs returned are in cursor order.
+// If "limit" is greater than 0, and there are more than "limit" blobs in the range, it cuts off and
+// returns early. It will get all blobs in the cursor range if "limit" is <= 0.
+// This also returns the cursor of the last processed blob. If there is no blob returned/processed, this cursor will be nil.
+func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
+	ctx context.Context,
+	start BlobFeedCursor,
+	end BlobFeedCursor,
+	limit int,
+) ([]*v2.BlobMetadata, *BlobFeedCursor, error) {
+	if !start.LessThan(&end) {
+		return nil, nil, errors.New("start cursor is expected to be less than end cursor")
+	}
+
+	startBucket := computeBucketID(start.RequestedAt, requestedAtBucketSizeSecs)
+	endBucket := computeBucketID(end.RequestedAt, requestedAtBucketSizeSecs)
+	// Bring the start and end buckets to a range that's permitted by the spec, so it doesn't
+	// process buckets unnecessarily (hyper inefficient).
+	if oldestTimestamp := uint64(time.Now().UnixNano()) - maxBlobAgeInNano; start.RequestedAt < oldestTimestamp {
+		startBucket = computeBucketID(oldestTimestamp, requestedAtBucketSizeSecs)
+	}
+	if nowBucket := computeBucketID(uint64(time.Now().UnixNano()), requestedAtBucketSizeSecs); endBucket > nowBucket {
+		endBucket = nowBucket
+	}
+
+	metadata := make([]*v2.BlobMetadata, 0)
+	var lastProcessedCursor *BlobFeedCursor
+
+	startKey := start.ToRequestedAtBlobKey()
+	endKey := end.ToRequestedAtBlobKey()
+
+	for bucket := startBucket; bucket <= endBucket; bucket++ {
+		if limit > 0 && len(metadata) >= limit {
+			break
+		}
+
+		items, err := s.dynamoDBClient.QueryIndex(
+			ctx,
+			s.tableName,
+			RequestedAtIndexName,
+			"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk": &types.AttributeValueMemberS{
+					Value: fmt.Sprintf("%d", bucket),
+				},
+				":start": &types.AttributeValueMemberS{
+					Value: startKey,
+				},
+				":end": &types.AttributeValueMemberS{
+					Value: endKey,
+				},
+			},
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+		}
+
+		for _, item := range items {
+			bm, err := UnmarshalBlobMetadata(item)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+			}
+
+			// Skip the start key
+			bk, err := bm.BlobHeader.BlobKey()
+			if err != nil {
+				return nil, nil, err
+			}
+			if start.Equal(bm.RequestedAt, &bk) {
+				continue
+			}
+
+			metadata = append(metadata, bm)
+
+			// Update last processed cursor
+			lastProcessedCursor = &BlobFeedCursor{
+				RequestedAt: bm.RequestedAt,
+				BlobKey:     &bk,
+			}
+
+			if limit > 0 && len(metadata) >= limit {
+				break
+			}
+		}
+	}
+
+	return metadata, lastProcessedCursor, nil
 }
 
 // GetBlobMetadataByStatusPaginated returns all the metadata with the given status that were updated after the given cursor.
@@ -749,6 +905,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("RespondedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("RequestedAtBucket"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("RequestedAtBlobKey"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -822,6 +986,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
 				},
 			},
+			{
+				IndexName: aws.String(RequestedAtIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("RequestedAtBucket"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAtBlobKey"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(readCapacityUnits),
@@ -843,7 +1027,8 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	}
 	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + blobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
-
+	fields["RequestedAtBucket"] = &types.AttributeValueMemberS{Value: computeRequestedAtBucket(metadata.RequestedAt)}
+	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeRequestedAtBlobKey(metadata.RequestedAt, blobKey.Hex())}
 	return fields, nil
 }
 
@@ -1107,4 +1292,30 @@ func hexToHash(h string) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	return [32]byte(b), nil
+}
+
+// computeBucketID maps a given timestamp to a time bucket.
+// Note each bucket represents a time range [start, end) (i.e. inclusive start, exclusive end).
+func computeBucketID(timestamp, bucketSizeSecs uint64) uint64 {
+	return timestamp / (bucketSizeSecs * 1e9)
+}
+
+func computeRequestedAtBucket(requestedAt uint64) string {
+	id := computeBucketID(requestedAt, requestedAtBucketSizeSecs)
+	return fmt.Sprintf("%d", id)
+}
+
+// encodeRequestedAtBlobKey encodes <requestedAt, blobKey> into string which
+// preserves the order.
+func encodeRequestedAtBlobKey(requestedAt uint64, blobKey string) string {
+	result := make([]byte, 40) // 8 bytes for timestamp + 32 bytes for blobKey
+
+	// Write timestamp
+	binary.BigEndian.PutUint64(result[:8], requestedAt)
+
+	if blobKey != "" {
+		copy(result[8:], []byte(blobKey))
+	}
+	// Use hex encoding to preserve byte ordering
+	return hex.EncodeToString(result)
 }

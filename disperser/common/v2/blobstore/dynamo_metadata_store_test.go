@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -23,6 +24,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	bk, err := blobHeader.BlobKey()
+	assert.Nil(t, err)
+	assert.Equal(t, blobKey, bk)
+}
 
 func TestBlobMetadataStoreOperations(t *testing.T) {
 	ctx := context.Background()
@@ -87,6 +94,259 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		},
 	})
+}
+
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *testing.T) {
+	ctx := context.Background()
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(time.Hour.Nanoseconds())
+	numBlobs := 5
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		// The first 3 blobs have the same requestedAt, and last 2 blobs have the same requestedAt
+		requestedAt := firstBlobTime
+		if i >= 3 {
+			requestedAt += 1
+		}
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(time.Now().Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   now,
+			RequestedAt: requestedAt,
+		}
+
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAts := make([]uint64, numBlobs)
+	// Test blobs are returned in cursor order, i.e. <requestedAt, blobKey>
+	startCursor := blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime - 1,
+		BlobKey:     nil,
+	}
+	endCursor := blobstore.BlobFeedCursor{
+		RequestedAt: now,
+		BlobKey:     nil,
+	}
+	metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 5)
+	require.NotNil(t, lastProcessedCursor)
+	for i := 0; i < len(metadata); i++ {
+		keys[i], err = metadata[i].BlobHeader.BlobKey()
+		require.NoError(t, err)
+		requestedAts[i] = metadata[i].RequestedAt
+		if i > 0 {
+			if metadata[i].RequestedAt != metadata[i-1].RequestedAt {
+				assert.True(t, metadata[i].RequestedAt > metadata[i-1].RequestedAt)
+			} else {
+				assert.True(t, keys[i].Hex() > keys[i-1].Hex())
+			}
+		}
+	}
+	// The first 3 blobs have same requestedAt
+	assert.Equal(t, requestedAts[0], requestedAts[1])
+	assert.Equal(t, requestedAts[0], requestedAts[2])
+	// The last 2 blobs have same requestedAt
+	assert.Equal(t, requestedAts[3], requestedAts[4])
+
+	// Test iteration from the middle of blob keys that share the same requestedAt
+	startCursor = blobstore.BlobFeedCursor{
+		RequestedAt: requestedAts[1],
+		BlobKey:     &keys[1],
+	}
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: requestedAts[3],
+		BlobKey:     nil,
+	}
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(metadata))
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, requestedAts[2], metadata[0].RequestedAt)
+	assert.Equal(t, keys[2], *lastProcessedCursor.BlobKey)
+	checkBlobKeyEqual(t, keys[2], metadata[0].BlobHeader)
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: requestedAts[3],
+		BlobKey:     &keys[3],
+	}
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 2, len(metadata))
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, keys[3], *lastProcessedCursor.BlobKey)
+	checkBlobKeyEqual(t, keys[2], metadata[0].BlobHeader)
+	checkBlobKeyEqual(t, keys[3], metadata[1].BlobHeader)
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: requestedAts[3],
+		BlobKey:     &keys[4],
+	}
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 3, len(metadata))
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, keys[4], *lastProcessedCursor.BlobKey)
+	checkBlobKeyEqual(t, keys[2], metadata[0].BlobHeader)
+	checkBlobKeyEqual(t, keys[3], metadata[1].BlobHeader)
+	checkBlobKeyEqual(t, keys[4], metadata[2].BlobHeader)
+
+	deleteItems(t, dynamoKeys)
+}
+
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
+	ctx := context.Background()
+	numBlobs := 103
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(24*time.Hour.Nanoseconds())
+	// 1 blob requested per 60 seconds. This means 60 blobs per bucket (bucket size is 1h).
+	nanoSecsPerBlob := uint64(60 * 1e9)
+	keys := make([]corev2.BlobKey, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: firstBlobTime + nanoSecsPerBlob*uint64(i),
+		}
+
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+
+	// Test querying with a range that covers no blob
+	startCursor := blobstore.BlobFeedCursor{
+		RequestedAt: now,
+		BlobKey:     nil,
+	}
+	endCursor := blobstore.BlobFeedCursor{
+		RequestedAt: now + 10*1e9,
+		BlobKey:     nil,
+	}
+	_, _, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, startCursor, 10)
+	assert.Error(t, err)
+	assert.Equal(t, "start cursor is expected to be less than end cursor", err.Error())
+	metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 10)
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(metadata))
+	assert.Nil(t, lastProcessedCursor)
+
+	// Test querying with a range that covers all blobs
+	startCursor = blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime,
+		BlobKey:     nil,
+	}
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: now,
+		BlobKey:     nil,
+	}
+	// Without "limit", it gets all blobs
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 103, len(metadata))
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob*102, lastProcessedCursor.RequestedAt)
+	assert.Equal(t, keys[102], *lastProcessedCursor.BlobKey)
+	// Limit to 32 blobs (span 4 buckets)
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 32)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 32)
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob*31, lastProcessedCursor.RequestedAt)
+	assert.Equal(t, keys[31], *lastProcessedCursor.BlobKey)
+
+	// Test the handling of cursor range boundary, i.e. it must be (start, end]
+	startCursor = blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime,
+		BlobKey:     &keys[0],
+	}
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime + nanoSecsPerBlob,
+		BlobKey:     nil,
+	}
+	// The start cursor is pointing to the first blob, but since start is exclusive, there
+	// is no result
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 0)
+	require.Nil(t, lastProcessedCursor)
+	// The end cursor is inclusive, so setting the blob key to keys[1] will actually include
+	// it in the result
+	endCursor.BlobKey = &keys[1]
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 1)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt)
+	checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, keys[1], *lastProcessedCursor.BlobKey)
+	// When the start cursor has nil blob key, it should return the first blob
+	startCursor.BlobKey = nil
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 2)
+	assert.Equal(t, firstBlobTime, metadata[0].RequestedAt)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[1].RequestedAt)
+	checkBlobKeyEqual(t, keys[0], metadata[0].BlobHeader)
+	checkBlobKeyEqual(t, keys[1], metadata[1].BlobHeader)
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, keys[1], *lastProcessedCursor.BlobKey)
+
+	// Test start/end cursor with the max timestamp range
+	startCursor = blobstore.BlobFeedCursor{
+		RequestedAt: 0,
+		BlobKey:     nil,
+	}
+	endCursor = blobstore.BlobFeedCursor{
+		RequestedAt: math.MaxUint64,
+		BlobKey:     nil,
+	}
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 103)
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob*102, lastProcessedCursor.RequestedAt)
+	assert.Equal(t, keys[102], *lastProcessedCursor.BlobKey)
+	startCursor.RequestedAt = uint64(time.Now().UnixNano()) + 3600*1e9
+	metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	assert.Equal(t, len(metadata), 0)
+	assert.Nil(t, lastProcessedCursor)
+
+	// Test pagination iteration
+	startCursor = blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime,
+		BlobKey:     nil,
+	}
+	for i := 0; i < numBlobs; i++ {
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 1)
+		require.NoError(t, err)
+		assert.Equal(t, len(metadata), 1)
+		checkBlobKeyEqual(t, keys[i], metadata[0].BlobHeader)
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
+		startCursor = *lastProcessedCursor
+	}
+
+	deleteItems(t, dynamoKeys)
 }
 
 func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
