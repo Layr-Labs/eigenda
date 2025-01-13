@@ -13,7 +13,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
-// EigenDAClient provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
+// EigenDAClient provides the ability to get payloads from the relay subsystem, and to send new payloads to the disperser.
 //
 // This struct is not threadsafe.
 type EigenDAClient struct {
@@ -137,29 +137,18 @@ func (c *EigenDAClient) verifyBlobFromRelay(
 
 	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
 	//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
-	valid, err := verification.GenerateAndCompareBlobCommitment(
-		c.g1Srs,
-		blob,
-		blobCommitments.Commitment)
+	valid, err := verification.GenerateAndCompareBlobCommitment(c.g1Srs, blob, blobCommitments.Commitment)
 	if err != nil {
 		c.log.Warn(
 			"error generating commitment from received blob",
-			"blobKey",
-			blobKey,
-			"relayKey",
-			relayKey,
-			"error",
-			err)
+			"blobKey", blobKey, "relayKey", relayKey, "error", err)
 		return false
 	}
 
 	if !valid {
 		c.log.Warn(
 			"blob commitment is invalid for received bytes",
-			"blobKey",
-			blobKey,
-			"relayKey",
-			relayKey)
+			"blobKey", blobKey, "relayKey", relayKey)
 		return false
 	}
 
@@ -168,14 +157,8 @@ func (c *EigenDAClient) verifyBlobFromRelay(
 	if uint(len(blob)) != blobCommitments.Length {
 		c.log.Warn(
 			"blob length doesn't match length claimed in blob commitments",
-			"blobKey",
-			blobKey,
-			"relayKey",
-			relayKey,
-			"blobLength",
-			len(blob),
-			"blobCommitments.Length",
-			blobCommitments.Length)
+			"blobKey", blobKey, "relayKey", relayKey, "blobLength", len(blob),
+			"blobCommitments.Length", blobCommitments.Length)
 		return false
 	}
 
