@@ -903,21 +903,25 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>length_commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>A commitment to the degree of the polynomial used to generate the blob commitment. </p></td>
+                  <td><p>A commitment to the blob data with G2 SRS, used to work with length_proof
+such that the claimed length below is verifiable. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_proof</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid. </p></td>
+                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
+It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+at the end of the highest order. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The degree of the polynomial used to generate the blob commitment. Must be a power of 2. </p></td>
+                  <td><p>The length specifies the degree of the polynomial used to generate the blob commitment. The length
+must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                 </tr>
               
             </tbody>

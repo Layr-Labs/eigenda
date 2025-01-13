@@ -87,11 +87,15 @@ type BlobCommitment struct {
 
 	// A commitment to the blob data.
 	Commitment []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	// A commitment to the degree of the polynomial used to generate the blob commitment.
+	// A commitment to the blob data with G2 SRS, used to work with length_proof
+	// such that the claimed length below is verifiable.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
 	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
+	// It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+	// at the end of the highest order.
 	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
-	// The degree of the polynomial used to generate the blob commitment. Must be a power of 2.
+	// The length specifies the degree of the polynomial used to generate the blob commitment. The length
+	// must equal to the degree + 1, and it must be a power of 2.
 	Length uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
 }
 

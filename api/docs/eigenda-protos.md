@@ -253,9 +253,9 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | commitment | [bytes](#bytes) |  | A commitment to the blob data. |
-| length_commitment | [bytes](#bytes) |  | A commitment to the degree of the polynomial used to generate the blob commitment. |
-| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. |
-| length | [uint32](#uint32) |  | The degree of the polynomial used to generate the blob commitment. Must be a power of 2. |
+| length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed such that the coefficient of the polynomial is committing with the G2 SRS at the end of the highest order. |
+| length | [uint32](#uint32) |  | The length specifies the degree of the polynomial used to generate the blob commitment. The length must equal to the degree &#43; 1, and it must be a power of 2. |
 
 
 
