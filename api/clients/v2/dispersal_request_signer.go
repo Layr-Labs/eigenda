@@ -31,7 +31,6 @@ type requestSigner struct {
 func NewDispersalRequestSigner(
 	ctx context.Context,
 	region string,
-	endpoint string,
 	keyID string) (DispersalRequestSigner, error) {
 
 	// Load the AWS SDK configuration, which will automatically detect credentials
