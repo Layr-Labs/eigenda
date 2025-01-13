@@ -132,19 +132,16 @@ func (v *Verifier) VerifyCommitment(certCommitment *common.G1Commitment, blob []
 
 	certCommitmentX := &fp.Element{}
 	certCommitmentX.Unmarshal(certCommitment.X)
-
-	// map coordinates to G1 and ensure they are on the curve
-	xAffine := bn254.MapToG1(*certCommitmentX)
-	if !xAffine.IsOnCurve() {
-		return fmt.Errorf("commitment x field element is not on the curve: %x", certCommitmentX.Marshal())
-	}
-
 	certCommitmentY := &fp.Element{}
 	certCommitmentY.Unmarshal(certCommitment.Y)
 
-	yAffine := bn254.MapToG1(*certCommitmentY)
-	if !yAffine.IsOnCurve() {
-		return fmt.Errorf("commitment y field element is not on the curve: %x", certCommitmentY.Marshal())
+	certCommitmentAffine := bn254.G1Affine{
+		X: *certCommitmentX,
+		Y: *certCommitmentY,
+	}
+
+	if !certCommitmentAffine.IsOnCurve() {
+		return fmt.Errorf("commitment (x,y) field elements are not on the BN254 curve")
 	}
 
 	errMsg := ""
