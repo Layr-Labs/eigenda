@@ -18,21 +18,40 @@ service Disperser {
   rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
   
   // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+  // It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+  // and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
-  // GetPaymentState is a utility method to get the payment state of a given account.
+  // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+  // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+  // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
 // Requests and Replys
 
 message DisperseBlobRequest {
-  // The data to be dispersed.
-  // The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-  // where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-  // as a field element on the bn254 curve. The valid range is
-  // 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-  // If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
+  // The encoded data to be dispersed to the EigenDA network.
+  //
+  // Validation rules:
+  //  1. The size of data must be <= 16MiB.
+  //  2. The data is allowed to not be a multiple of 32 bytes: the last chunk will be padded with zeros to make it so.
+  //  3. Every 32 bytes chunk (including the last after rule 2) must be a valid bid-endian serialized field element on the bn254 curve.
+  //     The valid range for each 32 byte chunk is: 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+  // If rule 1 or 3 is violated, the whole request is deemed as invalid, and rejected.
+  //
+  // To encode your payload data into the correct blob format, you can make use of our codec:
+  // https://github.com/Layr-Labs/eigenda/blob/82192985a2d15b88d85a6090404b2595f4922bef/api/clients/codecs/default_blob_codec.go#L21
+  // Most users will not need to interact with this low level codec directly however, given that the high-level eigenda_client does the encoding for you:
+  // https://github.com/Layr-Labs/eigenda/blob/master/api/clients/eigenda_client.go
   bytes data = 1;
   common.v2.BlobHeader blob_header = 2;
 }
