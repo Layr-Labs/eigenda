@@ -14,6 +14,7 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -47,6 +48,7 @@ var (
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
 	mockRollup          *rollupbindings.ContractMockRollup
+	verifierContract    *verifierbindings.ContractEigenDABlobVerifier
 	retrievalClient     clients.RetrievalClient
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
@@ -109,12 +111,12 @@ var _ = BeforeSuite(func() {
 			testConfig.StartGraphNode()
 		}
 
-		fmt.Println("Deploying experiment")
-		testConfig.DeployExperiment()
-
 		loggerConfig := common.DefaultLoggerConfig()
 		logger, err = common.NewLogger(loggerConfig)
 		Expect(err).To(BeNil())
+
+		fmt.Println("Deploying experiment")
+		testConfig.DeployExperiment()
 
 		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
@@ -126,16 +128,25 @@ var _ = BeforeSuite(func() {
 			NumRetries:       numRetries,
 		}, gcommon.Address{}, logger)
 		Expect(err).To(BeNil())
+
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
 		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
 
+		fmt.Println("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient)
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 
 		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+		Expect(err).To(BeNil())
+		verifierContract, err = verifierbindings.NewContractEigenDABlobVerifier(gcommon.HexToAddress(testConfig.EigenDA.BlobVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())

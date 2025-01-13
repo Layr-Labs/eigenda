@@ -50,6 +50,7 @@ type batchData struct {
 	Batch           *corev2.Batch
 	BatchHeaderHash [32]byte
 	BlobKeys        []corev2.BlobKey
+	Metadata        map[corev2.BlobKey]*v2.BlobMetadata
 	OperatorState   *core.IndexedOperatorState
 }
 
@@ -351,6 +352,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
+	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
 	for i, metadata := range blobMetadatas {
 		if metadata == nil || metadata.BlobHeader == nil {
 			return nil, fmt.Errorf("invalid blob metadata")
@@ -360,6 +362,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			return nil, fmt.Errorf("failed to get blob key: %w", err)
 		}
 		keys[i] = blobKey
+		metadataMap[blobKey] = metadata
 	}
 
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
@@ -471,6 +474,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		},
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
+		Metadata:        metadataMap,
 		OperatorState:   state,
 	}, nil
 }
@@ -517,6 +521,9 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
+			if metadata, ok := batch.Metadata[blobKey]; ok {
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
+			}
 			continue
 		}
 
@@ -534,12 +541,20 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
+			if metadata, ok := batch.Metadata[blobKey]; ok {
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.InsufficientSignatures)
+			}
 			continue
 		}
 
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
 		if err != nil {
 			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to certified: %w", blobKey.Hex(), err))
+		}
+		if metadata, ok := batch.Metadata[blobKey]; ok {
+			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
+			d.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
+			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Certified)
 		}
 	}
 
@@ -552,6 +567,9 @@ func (d *Dispatcher) failBatch(ctx context.Context, batch *batchData) error {
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 		if err != nil {
 			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
+		}
+		if metadata, ok := batch.Metadata[blobKey]; ok {
+			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
 		}
 	}
 

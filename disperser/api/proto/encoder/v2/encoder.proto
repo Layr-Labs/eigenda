@@ -15,6 +15,7 @@ service Encoder {
 message EncodeBlobRequest {
   bytes blob_key = 1;
   EncodingParams encoding_params = 2;
+  uint64 blob_size = 3;
 }
 
 // EncodingParams specifies how the blob should be encoded into chunks

@@ -523,7 +523,7 @@ func (s *Server) RefreshOnchainState(ctx context.Context) error {
 // Stop stops the server.
 func (s *Server) Stop() error {
 	if s.grpcServer != nil {
-		s.grpcServer.Stop()
+		s.grpcServer.GracefulStop()
 	}
 
 	err := s.metrics.Stop()

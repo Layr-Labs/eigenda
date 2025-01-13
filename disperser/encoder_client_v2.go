@@ -8,5 +8,5 @@ import (
 )
 
 type EncoderClientV2 interface {
-	EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*encoding.FragmentInfo, error)
+	EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams, blobSize uint64) (*encoding.FragmentInfo, error)
 }

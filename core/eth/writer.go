@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api"
+	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
+	"log"
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
@@ -328,4 +331,40 @@ func (t *Writer) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader
 		return nil, err
 	}
 	return receipt, nil
+}
+
+// SetDisperserAddress sets the address of the disperser. Since there is currently only one disperser, this function
+// can only be used to set the address of that disperser.
+func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Address) error {
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		log.Printf("disperser registry not deployed")
+		return errors.New("disperser registry not deployed")
+	}
+
+	log.Printf("Setting disperser %d address to %s", api.EigenLabsDisperserID, address.String())
+
+	options, err := t.ethClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	options.Context = ctx
+
+	transaction, err := registry.SetDisperserInfo(
+		options,
+		api.EigenLabsDisperserID,
+		dreg.DisperserInfo{
+			DisperserAddress: address,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create transaction for setting disperser address: %w", err)
+	}
+
+	err = t.ethClient.SendTransaction(ctx, transaction)
+	if err != nil {
+		return fmt.Errorf("failed to set disperser address: %w", err)
+	}
+
+	return nil
 }

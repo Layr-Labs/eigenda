@@ -136,6 +136,7 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 // Generates churner .env
 func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort string) ChurnerVars {
 	v := ChurnerVars{
+		CHURNER_LOG_FORMAT:                  "text",
 		CHURNER_HOSTNAME:                    "",
 		CHURNER_GRPC_PORT:                   grpcPort,
 		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
@@ -160,6 +161,7 @@ func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort stri
 // Generates disperser .env
 func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
 	v := DisperserVars{
+		DISPERSER_SERVER_LOG_FORMAT:             "text",
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata",
 		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
@@ -197,6 +199,7 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 
 func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort string) DisperserVars {
 	v := DisperserVars{
+		DISPERSER_SERVER_LOG_FORMAT:             "text",
 		DISPERSER_SERVER_S3_BUCKET_NAME:         "test-eigenda-blobstore",
 		DISPERSER_SERVER_DYNAMODB_TABLE_NAME:    "test-BlobMetadata-v2",
 		DISPERSER_SERVER_RATE_BUCKET_TABLE_NAME: "",
@@ -240,6 +243,7 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 // Generates batcher .env
 func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) BatcherVars {
 	v := BatcherVars{
+		BATCHER_LOG_FORMAT:                    "text",
 		BATCHER_S3_BUCKET_NAME:                "test-eigenda-blobstore",
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
 		BATCHER_ENABLE_METRICS:                "true",
@@ -273,6 +277,7 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		DISPERSER_ENCODER_LOG_FORMAT:              "text",
 		DISPERSER_ENCODER_AWS_REGION:              "",
 		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
 		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
@@ -288,6 +293,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 		DISPERSER_ENCODER_NUM_WORKERS:             fmt.Sprint(runtime.GOMAXPROCS(0)),
 		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS: "16",
 		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
@@ -297,6 +303,7 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
+		DISPERSER_ENCODER_LOG_FORMAT:              "text",
 		DISPERSER_ENCODER_AWS_REGION:              "",
 		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:       "",
 		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:   "",
@@ -314,6 +321,7 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 		DISPERSER_ENCODER_REQUEST_POOL_SIZE:       "32",
 		DISPERSER_ENCODER_ENCODER_VERSION:         "2",
 		DISPERSER_ENCODER_S3_BUCKET_NAME:          "test-eigenda-blobstore",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:      "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
@@ -321,28 +329,34 @@ func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	return v
 }
 
-func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVars {
+func (env *Config) generateControllerVars(
+	ind int,
+	graphUrl string) ControllerVars {
+
 	v := ControllerVars{
-		CONTROLLER_DYNAMODB_TABLE_NAME:         "test-BlobMetadata-v2",
-		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		CONTROLLER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		CONTROLLER_USE_GRAPH:                   "true",
-		CONTROLLER_GRAPH_URL:                   graphUrl,
-		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
-		CONTROLLER_AVAILABLE_RELAYS:            "0,1,2,3",
-		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "3s",
-		CONTROLLER_NODE_REQUEST_TIMEOUT:        "5s",
-		CONTROLLER_NUM_CONNECTIONS_TO_NODES:    "10",
-		CONTROLLER_CHAIN_RPC:                   "",
-		CONTROLLER_PRIVATE_KEY:                 "123",
-		CONTROLLER_NUM_CONFIRMATIONS:           "0",
-		CONTROLLER_INDEXER_PULL_INTERVAL:       "1s",
-		CONTROLLER_AWS_REGION:                  "",
-		CONTROLLER_AWS_ACCESS_KEY_ID:           "",
-		CONTROLLER_AWS_SECRET_ACCESS_KEY:       "",
-		CONTROLLER_AWS_ENDPOINT_URL:            "",
-		CONTROLLER_ENCODER_ADDRESS:             "0.0.0.0:34001",
-		CONTROLLER_FINALIZATION_BLOCK_DELAY:    "0",
+		CONTROLLER_LOG_FORMAT:                              "text",
+		CONTROLLER_DYNAMODB_TABLE_NAME:                     "test-BlobMetadata-v2",
+		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:             env.EigenDA.OperatorStateRetreiver,
+		CONTROLLER_EIGENDA_SERVICE_MANAGER:                 env.EigenDA.ServiceManager,
+		CONTROLLER_USE_GRAPH:                               "true",
+		CONTROLLER_GRAPH_URL:                               graphUrl,
+		CONTROLLER_ENCODING_PULL_INTERVAL:                  "1s",
+		CONTROLLER_AVAILABLE_RELAYS:                        "0,1,2,3",
+		CONTROLLER_DISPATCHER_PULL_INTERVAL:                "3s",
+		CONTROLLER_NODE_REQUEST_TIMEOUT:                    "5s",
+		CONTROLLER_NUM_CONNECTIONS_TO_NODES:                "10",
+		CONTROLLER_CHAIN_RPC:                               "",
+		CONTROLLER_PRIVATE_KEY:                             "123",
+		CONTROLLER_NUM_CONFIRMATIONS:                       "0",
+		CONTROLLER_INDEXER_PULL_INTERVAL:                   "1s",
+		CONTROLLER_AWS_REGION:                              "",
+		CONTROLLER_AWS_ACCESS_KEY_ID:                       "",
+		CONTROLLER_AWS_SECRET_ACCESS_KEY:                   "",
+		CONTROLLER_AWS_ENDPOINT_URL:                        "",
+		CONTROLLER_ENCODER_ADDRESS:                         "0.0.0.0:34001",
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
+		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
+		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -351,6 +365,7 @@ func (env *Config) generateControllerVars(ind int, graphUrl string) ControllerVa
 
 func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVars {
 	v := RelayVars{
+		RELAY_LOG_FORMAT:                            "text",
 		RELAY_GRPC_PORT:                             grpcPort,
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
@@ -390,46 +405,48 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 	ecdsaPassword := env.Pks.EcdsaMap[name].Password
 
 	v := OperatorVars{
-		NODE_HOSTNAME:                    "",
-		NODE_DISPERSAL_PORT:              dispersalPort,
-		NODE_RETRIEVAL_PORT:              retrievalPort,
-		NODE_INTERNAL_DISPERSAL_PORT:     dispersalPort,
-		NODE_INTERNAL_RETRIEVAL_PORT:     retrievalPort,
-		NODE_ENABLE_METRICS:              "true",
-		NODE_METRICS_PORT:                metricsPort,
-		NODE_ENABLE_NODE_API:             "true",
-		NODE_API_PORT:                    nodeApiPort,
-		NODE_TIMEOUT:                     "10s",
-		NODE_QUORUM_ID_LIST:              "0,1",
-		NODE_DB_PATH:                     dbPath,
-		NODE_ENABLE_TEST_MODE:            "false", // using encrypted key in inabox
-		NODE_TEST_PRIVATE_BLS:            blsKey,
-		NODE_BLS_KEY_FILE:                blsKeyFile,
-		NODE_ECDSA_KEY_FILE:              ecdsaKeyFile,
-		NODE_BLS_KEY_PASSWORD:            blsPassword,
-		NODE_ECDSA_KEY_PASSWORD:          ecdsaPassword,
-		NODE_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetreiver,
-		NODE_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		NODE_REGISTER_AT_NODE_START:      "true",
-		NODE_CHURNER_URL:                 churnerUrl,
-		NODE_CHURNER_USE_SECURE_GRPC:     "false",
-		NODE_EXPIRATION_POLL_INTERVAL:    "10",
-		NODE_G1_PATH:                     "",
-		NODE_G2_PATH:                     "",
-		NODE_G2_POWER_OF_2_PATH:          "",
-		NODE_CACHE_PATH:                  "",
-		NODE_SRS_ORDER:                   "",
-		NODE_SRS_LOAD:                    "",
-		NODE_NUM_WORKERS:                 fmt.Sprint(runtime.GOMAXPROCS(0)),
-		NODE_VERBOSE:                     "true",
-		NODE_CHAIN_RPC:                   "",
-		NODE_PRIVATE_KEY:                 key[2:],
-		NODE_NUM_BATCH_VALIDATORS:        "128",
-		NODE_PUBLIC_IP_PROVIDER:          "mockip",
-		NODE_PUBLIC_IP_CHECK_INTERVAL:    "10s",
-		NODE_NUM_CONFIRMATIONS:           "0",
-		NODE_ONCHAIN_METRICS_INTERVAL:    "-1",
-		NODE_ENABLE_V2:                   "true",
+		NODE_LOG_FORMAT:                       "text",
+		NODE_HOSTNAME:                         "",
+		NODE_DISPERSAL_PORT:                   dispersalPort,
+		NODE_RETRIEVAL_PORT:                   retrievalPort,
+		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
+		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
+		NODE_ENABLE_METRICS:                   "true",
+		NODE_METRICS_PORT:                     metricsPort,
+		NODE_ENABLE_NODE_API:                  "true",
+		NODE_API_PORT:                         nodeApiPort,
+		NODE_TIMEOUT:                          "10s",
+		NODE_QUORUM_ID_LIST:                   "0,1",
+		NODE_DB_PATH:                          dbPath,
+		NODE_ENABLE_TEST_MODE:                 "false", // using encrypted key in inabox
+		NODE_TEST_PRIVATE_BLS:                 blsKey,
+		NODE_BLS_KEY_FILE:                     blsKeyFile,
+		NODE_ECDSA_KEY_FILE:                   ecdsaKeyFile,
+		NODE_BLS_KEY_PASSWORD:                 blsPassword,
+		NODE_ECDSA_KEY_PASSWORD:               ecdsaPassword,
+		NODE_BLS_OPERATOR_STATE_RETRIVER:      env.EigenDA.OperatorStateRetreiver,
+		NODE_EIGENDA_SERVICE_MANAGER:          env.EigenDA.ServiceManager,
+		NODE_REGISTER_AT_NODE_START:           "true",
+		NODE_CHURNER_URL:                      churnerUrl,
+		NODE_CHURNER_USE_SECURE_GRPC:          "false",
+		NODE_EXPIRATION_POLL_INTERVAL:         "10",
+		NODE_G1_PATH:                          "",
+		NODE_G2_PATH:                          "",
+		NODE_G2_POWER_OF_2_PATH:               "",
+		NODE_CACHE_PATH:                       "",
+		NODE_SRS_ORDER:                        "",
+		NODE_SRS_LOAD:                         "",
+		NODE_NUM_WORKERS:                      fmt.Sprint(runtime.GOMAXPROCS(0)),
+		NODE_VERBOSE:                          "true",
+		NODE_CHAIN_RPC:                        "",
+		NODE_PRIVATE_KEY:                      key[2:],
+		NODE_NUM_BATCH_VALIDATORS:             "128",
+		NODE_PUBLIC_IP_PROVIDER:               "mockip",
+		NODE_PUBLIC_IP_CHECK_INTERVAL:         "10s",
+		NODE_NUM_CONFIRMATIONS:                "0",
+		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
+		NODE_ENABLE_V2:                        "true",
+		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
 	env.applyDefaults(&v, "NODE", "opr", ind)
@@ -441,6 +458,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 // Generates retriever .env
 func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath, grpcPort string) RetrieverVars {
 	v := RetrieverVars{
+		RETRIEVER_LOG_FORMAT:                  "text",
 		RETRIEVER_HOSTNAME:                    "",
 		RETRIEVER_GRPC_PORT:                   grpcPort,
 		RETRIEVER_TIMEOUT:                     "10s",
@@ -463,8 +481,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_GRAPH_URL:           graphUrl,
 		RETRIEVER_GRAPH_BACKOFF:       "1s",
 		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
-
-		RETRIEVER_INDEXER_PULL_INTERVAL: "1s",
 	}
 
 	v.RETRIEVER_G2_PATH = ""
@@ -571,14 +587,12 @@ func (env *Config) GenerateAllVariables() {
 	// hardcode graphurl for now
 	graphUrl := "http://localhost:8000/subgraphs/name/Layr-Labs/eigenda-operator-state"
 
+	env.localstackEndpoint = "http://localhost:4570"
+	env.localstackRegion = "us-east-1"
+
 	// Create envs directory
 	createDirectory(env.Path + "/envs")
 	changeDirectory(env.rootPath + "/inabox")
-
-	// Gather keys
-	// keyData := readFile(gethPrivateKeys)
-	// keys := strings.Split(string(keyData), "\n")
-	// id := 1
 
 	// Create compose file
 	composeFile := env.Path + "/docker-compose.yml"

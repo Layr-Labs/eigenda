@@ -59,6 +59,9 @@ dataapi-build:
 unit-tests:
 	./test.sh
 
+fuzz-tests:
+	go test --fuzz=FuzzParseSignatureKMS -fuzztime=5m ./common
+
 integration-tests-churner:
 	go test -v ./churner/tests
 

@@ -1126,12 +1126,6 @@ const docTemplateV1 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -1140,9 +1134,6 @@ const docTemplateV1 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -1150,9 +1141,6 @@ const docTemplateV1 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -1180,12 +1168,6 @@ const docTemplateV1 = `{
             "type": "object",
             "properties": {
                 "a0": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
