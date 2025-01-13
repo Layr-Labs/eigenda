@@ -41,12 +41,12 @@ const (
 	batchHeaderSK             = "BatchHeader"
 	attestationSK             = "Attestation"
 
-	// The number of seconds for a requestedAt bucket (1h).
+	// The number of nanoseconds for a requestedAt bucket (1h).
 	// The rationales are:
 	// - 1h would be a good estimate for blob feed request (e.g. fetch blobs in past hour can be a common use case)
 	// - at 100 blobs/s, it'll be 360,000 blobs in a bucket, which is reasonable
 	// - and then it'll be 336 buckets in total (24 buckets/day * 14 days), which is also reasonable
-	requestedAtBucketSizeSecs = uint64(time.Hour / time.Second)
+	requestedAtBucketSizeNano = uint64(time.Hour / time.Nanosecond)
 	// 14 days with 1 hour margin of safety.
 	maxBlobAgeInNano = uint64(1e9 * (14*24*3600 + 3600))
 )
@@ -279,14 +279,14 @@ func (s *BlobMetadataStore) getBucketIDRange(startTime, endTime uint64) (uint64,
 	now := uint64(time.Now().UnixNano())
 	oldestAllowed := now - maxBlobAgeInNano
 
-	startBucket := computeBucketID(startTime, requestedAtBucketSizeSecs)
+	startBucket := computeBucketID(startTime, requestedAtBucketSizeNano)
 	if startTime < oldestAllowed {
-		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeSecs)
+		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeNano)
 	}
 
-	endBucket := computeBucketID(endTime, requestedAtBucketSizeSecs)
+	endBucket := computeBucketID(endTime, requestedAtBucketSizeNano)
 	if endTime > now {
-		endBucket = computeBucketID(now, requestedAtBucketSizeSecs)
+		endBucket = computeBucketID(now, requestedAtBucketSizeNano)
 	}
 
 	return startBucket, endBucket
@@ -1331,12 +1331,12 @@ func hexToHash(h string) ([32]byte, error) {
 
 // computeBucketID maps a given timestamp to a time bucket.
 // Note each bucket represents a time range [start, end) (i.e. inclusive start, exclusive end).
-func computeBucketID(timestamp, bucketSizeSecs uint64) uint64 {
-	return timestamp / (bucketSizeSecs * 1e9)
+func computeBucketID(timestamp, bucketSizeNano uint64) uint64 {
+	return timestamp / bucketSizeNano
 }
 
 func computeRequestedAtBucket(requestedAt uint64) string {
-	id := computeBucketID(requestedAt, requestedAtBucketSizeSecs)
+	id := computeBucketID(requestedAt, requestedAtBucketSizeNano)
 	return fmt.Sprintf("%d", id)
 }
 
