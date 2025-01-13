@@ -7,6 +7,7 @@ import (
 	"math/rand"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -113,7 +114,56 @@ func (c *EigenDAClient) GetBlob(
 	return nil, fmt.Errorf("unable to retrieve blob from any relay. relay count: %d", relayKeyCount)
 }
 
-func (c *EigenDAClient) VerifyBlobCommitment(blob []byte)
+// GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
+// blob certificate. The relays are attempted in random order.
+//
+// If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
+// to yield the payload (the original user data), and the payload is returned.
+func (c *EigenDAClient) GetPayload(
+	ctx context.Context,
+	blobKey core.BlobKey,
+	blobCertificate *core.BlobCertificate) ([]byte, error) {
+
+	blob, err := c.GetBlob(ctx, blobKey, blobCertificate.RelayKeys)
+	if err != nil {
+		return nil, fmt.Errorf("get blob %v: %w", blobKey, err)
+	}
+
+	blobCommitments := blobCertificate.BlobHeader.BlobCommitments
+
+	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
+	//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
+	valid, err := verification.GenerateAndCompareBlobCommitment(
+		c.g1Srs,
+		blob,
+		blobCommitments.Commitment)
+	if err != nil {
+		return nil, fmt.Errorf("generate and compare blob commitment for blob %v: %w", blobKey, err)
+	}
+
+	if !valid {
+		return nil, fmt.Errorf("blob commitment for blob %v is invalid", blobKey)
+	}
+
+	// checking that the length returned by the relay matches the claimed length is sufficient here: it isn't necessary
+	// to verify the length proof itself, since this will have been done by DA nodes prior to signing for availability.
+	if uint(len(blob)) != blobCommitments.Length {
+		return nil, fmt.Errorf(
+			"blob %v length (%d) doesn't match length claimed in blob commitments (%d)",
+			blobKey,
+			len(blob),
+			blobCommitments.Length)
+	}
+
+	// TODO: call verifyBlobV2
+
+	payload, err := c.codec.DecodeBlob(blob)
+	if err != nil {
+		return nil, fmt.Errorf("decode blob %v: %w", blobKey, err)
+	}
+
+	return payload, nil
+}
 
 // getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
 func (c *EigenDAClient) getBlobWithTimeout(
