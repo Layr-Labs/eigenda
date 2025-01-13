@@ -10,10 +10,10 @@ github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Layr-Labs/cerberus-api v0.0.2-0.20250108174619-d5e1eb03fbd5 h1:s24M6HYObEuV9OSY36jUM09kp5fOhuz/g1ev2qWDPzU=
 github.com/Layr-Labs/cerberus-api v0.0.2-0.20250108174619-d5e1eb03fbd5/go.mod h1:Lm4fhzy0S3P7GjerzuseGaBFVczsIKmEhIjcT52Hluo=
-github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250113205313-04f1688dbfdf h1:kLgBNQR5Whd2YxuOL1KHde1gc6HfOY6x8bAQw22pVQk=
-github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250113205313-04f1688dbfdf/go.mod h1:G4yqiK+5NfUuEMVGGncOEm7QskuGRPmKA7bKxpPzPT4=
-github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250113205313-04f1688dbfdf h1:U+tVyNlN0sCzPtzVVycLXQzLqr1GHh96U9NURqBSlkc=
-github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250113205313-04f1688dbfdf/go.mod h1:p/coyQpMG0aaF+JekxNoacPWP6FqSuWLI2YpiC+YVKs=
+github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250113223831-1f7860a17f04 h1:AQcSNdNYDGsjcT9cyzM+NWBvWkHsadG/wOOfj9eyfBE=
+github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250113223831-1f7860a17f04/go.mod h1:G4yqiK+5NfUuEMVGGncOEm7QskuGRPmKA7bKxpPzPT4=
+github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250113223831-1f7860a17f04 h1:9nLbACTtSOYGRG/O+f080FbyZsucOF4kBTExt1RW0Ms=
+github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250113223831-1f7860a17f04/go.mod h1:A8KqCQnvx8BERH35etN9VlubNSpR92zrogV6LkV9hHo=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Microsoft/hcsshim v0.11.4 h1:68vKo2VN8DE9AdN4tnkWnmdhqdbpUFM8OF3Airm7fz8=
