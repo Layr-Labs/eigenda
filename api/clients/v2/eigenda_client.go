@@ -30,7 +30,8 @@ type EigenDAClient struct {
 func BuildEigenDAClient(
 	log logging.Logger,
 	config *EigenDAClientConfig,
-	relayClientConfig *RelayClientConfig) (*EigenDAClient, error) {
+	relayClientConfig *RelayClientConfig,
+	g1Srs []bn254.G1Affine) (*EigenDAClient, error) {
 
 	relayClient, err := NewRelayClient(relayClientConfig, log)
 	if err != nil {
@@ -42,7 +43,7 @@ func BuildEigenDAClient(
 		return nil, err
 	}
 
-	return NewEigenDAClient(log, rand.New(rand.NewSource(rand.Int63())), config, relayClient, codec)
+	return NewEigenDAClient(log, rand.New(rand.NewSource(rand.Int63())), config, relayClient, codec, g1Srs)
 }
 
 // NewEigenDAClient assembles an EigenDAClient from subcomponents that have already been constructed and initialized.
@@ -51,7 +52,8 @@ func NewEigenDAClient(
 	random *rand.Rand,
 	config *EigenDAClientConfig,
 	relayClient RelayClient,
-	codec codecs.BlobCodec) (*EigenDAClient, error) {
+	codec codecs.BlobCodec,
+	g1Srs []bn254.G1Affine) (*EigenDAClient, error) {
 
 	return &EigenDAClient{
 		log:         log,
@@ -59,19 +61,21 @@ func NewEigenDAClient(
 		config:      config,
 		codec:       codec,
 		relayClient: relayClient,
+		g1Srs:       g1Srs,
 	}, nil
 }
 
-// GetBlob iteratively attempts to retrieve a given blob with key blobKey from supplied relays.
+// GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
+// blob certificate. The relays are attempted in random order.
 //
-// The relays are attempted in random order.
-//
-// IMPORTANT: The returned blob is NOT decoded and NOT verified
-func (c *EigenDAClient) GetBlob(
+// If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
+// to yield the payload (the original user data), and the payload is returned.
+func (c *EigenDAClient) GetPayload(
 	ctx context.Context,
 	blobKey core.BlobKey,
-	relayKeys []core.RelayKey) ([]byte, error) {
+	blobCertificate *core.BlobCertificate) ([]byte, error) {
 
+	relayKeys := blobCertificate.RelayKeys
 	relayKeyCount := len(relayKeys)
 
 	if relayKeyCount == 0 {
@@ -87,7 +91,7 @@ func (c *EigenDAClient) GetBlob(
 	for _, val := range indices {
 		relayKey := relayKeys[val]
 
-		data, err := c.getBlobWithTimeout(ctx, relayKey, blobKey)
+		blob, err := c.getBlobWithTimeout(ctx, relayKey, blobKey)
 
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
@@ -95,38 +99,38 @@ func (c *EigenDAClient) GetBlob(
 			continue
 		}
 
-		// An honest relay should never send an empty blob
-		if len(data) == 0 {
-			c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey)
+		// An honest relay should never send a blob which doesn't verify
+		if !c.verifyBlobFromRelay(blobKey, relayKey, blob, blobCertificate) {
+			// specifics are logged in verifyBlobFromRelay
 			continue
 		}
 
-		// An honest relay should never send a blob which cannot be decoded
-		decodedData, err := c.codec.DecodeBlob(data)
+		// An honest relay should never send a blob which cannot be decoded into a payload
+		payload, err := c.codec.DecodeBlob(blob)
 		if err != nil {
 			c.log.Warn("error decoding blob from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
-		return decodedData, nil
+		return payload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve blob from any relay. relay count: %d", relayKeyCount)
+	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey, relayKeyCount)
 }
 
-// GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
-// blob certificate. The relays are attempted in random order.
+// verifyBlobFromRelay performs the necessary verification after having retrieved a blob from a relay.
 //
-// If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
-// to yield the payload (the original user data), and the payload is returned.
-func (c *EigenDAClient) GetPayload(
-	ctx context.Context,
+// If all verifications succeed, the method returns true. Otherwise, it logs a warning and returns false.
+func (c *EigenDAClient) verifyBlobFromRelay(
 	blobKey core.BlobKey,
-	blobCertificate *core.BlobCertificate) ([]byte, error) {
+	relayKey core.RelayKey,
+	blob []byte,
+	blobCertificate *core.BlobCertificate) bool {
 
-	blob, err := c.GetBlob(ctx, blobKey, blobCertificate.RelayKeys)
-	if err != nil {
-		return nil, fmt.Errorf("get blob %v: %w", blobKey, err)
+	// An honest relay should never send an empty blob
+	if len(blob) == 0 {
+		c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey)
+		return false
 	}
 
 	blobCommitments := blobCertificate.BlobHeader.BlobCommitments
@@ -138,31 +142,46 @@ func (c *EigenDAClient) GetPayload(
 		blob,
 		blobCommitments.Commitment)
 	if err != nil {
-		return nil, fmt.Errorf("generate and compare blob commitment for blob %v: %w", blobKey, err)
+		c.log.Warn(
+			"error generating commitment from received blob",
+			"blobKey",
+			blobKey,
+			"relayKey",
+			relayKey,
+			"error",
+			err)
+		return false
 	}
 
 	if !valid {
-		return nil, fmt.Errorf("blob commitment for blob %v is invalid", blobKey)
+		c.log.Warn(
+			"blob commitment is invalid for received bytes",
+			"blobKey",
+			blobKey,
+			"relayKey",
+			relayKey)
+		return false
 	}
 
 	// checking that the length returned by the relay matches the claimed length is sufficient here: it isn't necessary
 	// to verify the length proof itself, since this will have been done by DA nodes prior to signing for availability.
 	if uint(len(blob)) != blobCommitments.Length {
-		return nil, fmt.Errorf(
-			"blob %v length (%d) doesn't match length claimed in blob commitments (%d)",
+		c.log.Warn(
+			"blob length doesn't match length claimed in blob commitments",
+			"blobKey",
 			blobKey,
+			"relayKey",
+			relayKey,
+			"blobLength",
 			len(blob),
+			"blobCommitments.Length",
 			blobCommitments.Length)
+		return false
 	}
 
 	// TODO: call verifyBlobV2
 
-	payload, err := c.codec.DecodeBlob(blob)
-	if err != nil {
-		return nil, fmt.Errorf("decode blob %v: %w", blobKey, err)
-	}
-
-	return payload, nil
+	return true
 }
 
 // getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
