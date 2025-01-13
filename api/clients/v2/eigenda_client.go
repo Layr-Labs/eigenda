@@ -105,11 +105,16 @@ func (c *EigenDAClient) GetPayload(
 			continue
 		}
 
-		// An honest relay should never send a blob which cannot be decoded into a payload
 		payload, err := c.codec.DecodeBlob(blob)
 		if err != nil {
-			c.log.Warn("error decoding blob from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
-			continue
+			c.log.Error(
+				`Blob verification was successful, but decode blob failed!
+					This is likely a problem with the local blob codec configuration,
+					but could potentially indicate a maliciously generated blob certificate.
+					It should not be possible for an honestly generated certificate to verify
+					for an invalid blob!`,
+				"blobKey", blobKey, "relayKey", relayKey, "blobCertificate", blobCertificate, "error", err)
+			return nil, fmt.Errorf("decode blob: %w", err)
 		}
 
 		return payload, nil

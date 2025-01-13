@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"runtime"
@@ -31,11 +32,6 @@ type ClientTester struct {
 	MockRelayClient *clientsmock.MockRelayClient
 	Codec           *codecs.DefaultBlobCodec
 	G1Srs           []bn254.G1Affine
-}
-
-func (c *ClientTester) requireExpectations(t *testing.T) {
-	c.MockRelayClient.AssertExpectations(t)
-	// TODO: get rid of this
 }
 
 // buildClientTester sets up a client with mocks necessary for testing
@@ -121,7 +117,7 @@ func TestGetPayloadSuccess(t *testing.T) {
 	require.NotNil(t, payload)
 	require.NoError(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestRelayCallTimeout verifies that calls to the relay timeout after the expected duration
@@ -169,7 +165,7 @@ func TestRelayCallTimeout(t *testing.T) {
 			_, _ = tester.Client.GetPayload(context.Background(), blobKey, blobCert)
 		})
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestRandomRelayRetries verifies correct behavior when some relays do not respond with the blob,
@@ -217,7 +213,7 @@ func TestRandomRelayRetries(t *testing.T) {
 	// with 100 random tries, with possible values between 1 and 100, we can very confidently require that there are at least 10 unique values
 	require.Greater(t, len(requiredTries), 10)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestNoRelayResponse tests functionality when none of the relays respond
@@ -240,7 +236,7 @@ func TestNoRelayResponse(t *testing.T) {
 	require.Nil(t, blob)
 	require.NotNil(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestNoRelays tests that having no relay keys is handled gracefully
@@ -252,7 +248,7 @@ func TestNoRelays(t *testing.T) {
 	require.Nil(t, blob)
 	require.NotNil(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestGetBlobReturns0Len verifies that a 0 length blob returned from a relay is handled gracefully, and that the client retries after such a failure
@@ -278,7 +274,7 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	require.NotNil(t, blob)
 	require.NoError(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestFailedDecoding verifies that a failed blob decode is handled gracefully, and that the client retries after such a failure
@@ -292,21 +288,26 @@ func TestFailedDecoding(t *testing.T) {
 	}
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	// payloadLength random bytes are guaranteed to be an invalid blob
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
-		tester.Random.Bytes(payloadLength),
-		nil).Once()
-	// the second call will return blob bytes
+	// intentionally cause the claimed length to differ from the actual length
+	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
+
+	// generate a malicious cert, which will verify for the invalid blob
+	maliciousCommitment, err := verification.GenerateBlobCommitment(tester.G1Srs, blobBytes)
+	require.NoError(t, err)
+	require.NotNil(t, maliciousCommitment)
+
+	blobCert.BlobHeader.BlobCommitments.Commitment = maliciousCommitment
+
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
 
 	// decoding will fail the first time, but succeed the second time
 	blob, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
-	require.NotNil(t, blob)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Nil(t, blob)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestErrorFreeClose tests the happy case, where none of the internal closes yield an error
@@ -318,7 +319,7 @@ func TestErrorFreeClose(t *testing.T) {
 	err := tester.Client.Close()
 	require.NoError(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestErrorClose tests what happens when subcomponents throw errors when being closed
@@ -330,7 +331,7 @@ func TestErrorClose(t *testing.T) {
 	err := tester.Client.Close()
 	require.NotNil(t, err)
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestGetCodec checks that the codec used in construction is returned by GetCodec
@@ -339,7 +340,7 @@ func TestGetCodec(t *testing.T) {
 
 	require.Equal(t, tester.Codec, tester.Client.GetCodec())
 
-	tester.requireExpectations(t)
+	tester.MockRelayClient.AssertExpectations(t)
 }
 
 // TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
