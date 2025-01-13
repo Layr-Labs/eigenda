@@ -20,6 +20,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// G1Commitment represents the serialized coordinates of a G1 KZG commitment.
+// We use gnark-crypto so adopt its serialization, which is big-endian. See:
+// https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862
 type G1Commitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -78,16 +81,25 @@ func (x *G1Commitment) GetY() []byte {
 }
 
 // BlobCommitment represents commitment of a specific blob, containing its
-// KZG commitment, degree proof, the actual degree, and data length in number of symbols.
+// KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
+// It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
+//
+// See https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/attestation/encoding.md#validation-via-kzg
+// to understand how this commitment is used to validate the blob.
 type BlobCommitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Commitment       []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// Concatenation of the x and y coordinates of `common.G1Commitment`.
+	Commitment []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// Serialization of the G2Commitment to the blob length.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
-	LengthProof      []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
-	Length           uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
+	// Serialization of the G2Affine element representing the proof of the blob length.
+	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
+	// The length of the blob in symbols (field elements).
+	// TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc.
+	Length uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
 }
 
 func (x *BlobCommitment) Reset() {

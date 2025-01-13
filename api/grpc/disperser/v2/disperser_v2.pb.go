@@ -100,12 +100,20 @@ type DisperseBlobRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The data to be dispersed.
-	// The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-	// as a field element on the bn254 curve. The valid range is
-	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
-	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
+	// The encoded data to be dispersed to the EigenDA network.
+	//
+	// Validation rules:
+	//  1. The size of data must be <= 16MiB.
+	//  2. The data is allowed to not be a multiple of 32 bytes: the last chunk will be padded with zeros to make it so.
+	//  3. Every 32 bytes chunk (including the last after rule 2) must be a valid bid-endian serialized field element on the bn254 curve.
+	//     The valid range for each 32 byte chunk is: 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+	//
+	// If rule 1 or 3 is violated, the whole request is deemed as invalid, and rejected.
+	//
+	// To encode your payload data into the correct blob format, you can make use of our codec:
+	// https://github.com/Layr-Labs/eigenda/blob/82192985a2d15b88d85a6090404b2595f4922bef/api/clients/codecs/default_blob_codec.go#L21
+	// Most users will not need to interact with this low level codec directly however, given that the high-level eigenda_client does the encoding for you:
+	// https://github.com/Layr-Labs/eigenda/blob/master/api/clients/eigenda_client.go
 	Data       []byte         `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	BlobHeader *v2.BlobHeader `protobuf:"bytes,2,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 }

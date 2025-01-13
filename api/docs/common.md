@@ -23,15 +23,19 @@
 
 ### BlobCommitment
 BlobCommitment represents commitment of a specific blob, containing its
-KZG commitment, degree proof, the actual degree, and data length in number of symbols.
+KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
+It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
+
+See https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/attestation/encoding.md#validation-via-kzg
+to understand how this commitment is used to validate the blob.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  |  |
-| length_commitment | [bytes](#bytes) |  |  |
-| length_proof | [bytes](#bytes) |  |  |
-| length | [uint32](#uint32) |  |  |
+| commitment | [bytes](#bytes) |  | Concatenation of the x and y coordinates of `common.G1Commitment`. |
+| length_commitment | [bytes](#bytes) |  | Serialization of the G2Commitment to the blob length. |
+| length_proof | [bytes](#bytes) |  | Serialization of the G2Affine element representing the proof of the blob length. |
+| length | [uint32](#uint32) |  | The length of the blob in symbols (field elements). TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc. |
 
 
 
@@ -41,7 +45,9 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-G1Commitment"></a>
 
 ### G1Commitment
-
+G1Commitment represents the serialized coordinates of a G1 KZG commitment.
+We use gnark-crypto so adopt its serialization, which is big-endian. See:
+https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862
 
 
 | Field | Type | Label | Description |
