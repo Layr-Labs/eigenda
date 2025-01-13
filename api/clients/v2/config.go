@@ -6,28 +6,20 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 )
 
-// VerificationMode is an enum that represents the different ways that a blob may be encoded/decoded between
-// the client and the disperser.
-type VerificationMode uint
-
-const (
-	// TODO: write good docs here for IFFT and NoIFFT (I need to update my understanding to be able to write this)
-	IFFT VerificationMode = iota
-	NoIFFT
-)
-
 // EigenDAClientConfig contains configuration values for EigenDAClient
 type EigenDAClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
-	// If PointVerificationMode is IFFT, then the client codec will do an IFFT on blobs before they are dispersed, and
-	// will do an FFT on blobs after receiving them. This makes it possible to open points on the KZG commitment to prove
-	// that the field elements correspond to the commitment.
+	// BlobPolynomialForm is the form that the blob polynomial is commited to and dispersed in, as well as the form the
+	// blob polynomial will be received in from the relay.
 	//
-	// If PointVerificationMode is NoIFFT, the blob must be supplied in its entirety, to perform a verification
-	// that any part of the data matches the KZG commitment.
-	PointVerificationMode VerificationMode
+	// The chosen form dictates how the KZG commitment made to the blob can be used. If the polynomial is in Coeff form
+	// when committed to, then it will be possible to open points on the KZG commitment to prove that the field elements
+	// correspond to the commitment. If the polynomial is in Eval form when committed to, then it will not be possible
+	// to create a commitment opening: the blob will need to be supplied in its entirety to perform a verification that
+	// any part of the data matches the KZG commitment.
+	BlobPolynomialForm codecs.PolynomialForm
 
 	// The timeout duration for relay calls
 	RelayTimeout time.Duration

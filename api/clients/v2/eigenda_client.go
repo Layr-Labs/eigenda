@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // EigenDAClient provides the ability to get blobs from the relay subsystem, and to send new blobs to the disperser.
@@ -21,6 +22,7 @@ type EigenDAClient struct {
 	config      *EigenDAClientConfig
 	codec       codecs.BlobCodec
 	relayClient RelayClient
+	g1Srs       []bn254.G1Affine
 }
 
 // BuildEigenDAClient builds an EigenDAClient from config structs.
@@ -59,17 +61,17 @@ func NewEigenDAClient(
 	}, nil
 }
 
-// GetBlob iteratively attempts to retrieve a given blob with key blobKey from the relays listed in the blobCertificate.
+// GetBlob iteratively attempts to retrieve a given blob with key blobKey from supplied relays.
 //
 // The relays are attempted in random order.
 //
-// The returned blob is decoded.
+// IMPORTANT: The returned blob is NOT decoded and NOT verified
 func (c *EigenDAClient) GetBlob(
 	ctx context.Context,
 	blobKey core.BlobKey,
-	blobCertificate core.BlobCertificate) ([]byte, error) {
+	relayKeys []core.RelayKey) ([]byte, error) {
 
-	relayKeyCount := len(blobCertificate.RelayKeys)
+	relayKeyCount := len(relayKeys)
 
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
@@ -82,7 +84,7 @@ func (c *EigenDAClient) GetBlob(
 
 	// iterate over relays in random order, until we are able to get the blob from someone
 	for _, val := range indices {
-		relayKey := blobCertificate.RelayKeys[val]
+		relayKey := relayKeys[val]
 
 		data, err := c.getBlobWithTimeout(ctx, relayKey, blobKey)
 
@@ -110,6 +112,8 @@ func (c *EigenDAClient) GetBlob(
 
 	return nil, fmt.Errorf("unable to retrieve blob from any relay. relay count: %d", relayKeyCount)
 }
+
+func (c *EigenDAClient) VerifyBlobCommitment(blob []byte)
 
 // getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
 func (c *EigenDAClient) getBlobWithTimeout(
@@ -148,12 +152,17 @@ func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
 		return nil, fmt.Errorf("create low level codec: %w", err)
 	}
 
-	switch config.PointVerificationMode {
-	case NoIFFT:
+	switch config.BlobPolynomialForm {
+	case codecs.Eval:
+		// a blob polynomial is already in Eval form after being encoded. Therefore, we use the NoIFFTCodec, which
+		// doesn't do any further conversion.
 		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
-	case IFFT:
+	case codecs.Coeff:
+		// a blob polynomial starts in Eval form after being encoded. Therefore, we use the IFFT codec to transform
+		// the blob into Coeff form after initial encoding. This codec also transforms the Coeff form received from the
+		// relay back into Eval form when decoding.
 		return codecs.NewIFFTCodec(lowLevelCodec), nil
 	default:
-		return nil, fmt.Errorf("unsupported point verification mode: %d", config.PointVerificationMode)
+		return nil, fmt.Errorf("unsupported polynomial form: %d", config.BlobPolynomialForm)
 	}
 }
