@@ -175,23 +175,19 @@
         
           
           <li>
-            <a href="#common%2fv2%2fcommon.proto">common/v2/common.proto</a>
+            <a href="#common%2fcommon.proto">common/common.proto</a>
             <ul>
               
                 <li>
-                  <a href="#common.v2.Batch"><span class="badge">M</span>Batch</a>
+                  <a href="#common.BlobCommitment"><span class="badge">M</span>BlobCommitment</a>
                 </li>
               
                 <li>
-                  <a href="#common.v2.BatchHeader"><span class="badge">M</span>BatchHeader</a>
+                  <a href="#common.G1Commitment"><span class="badge">M</span>G1Commitment</a>
                 </li>
               
                 <li>
-                  <a href="#common.v2.BlobCertificate"><span class="badge">M</span>BlobCertificate</a>
-                </li>
-              
-                <li>
-                  <a href="#common.v2.BlobHeader"><span class="badge">M</span>BlobHeader</a>
+                  <a href="#common.PaymentHeader"><span class="badge">M</span>PaymentHeader</a>
                 </li>
               
               
@@ -207,13 +203,13 @@
     
       
       <div class="file-heading">
-        <h2 id="common/v2/common.proto">common/v2/common.proto</h2><a href="#title">Top</a>
+        <h2 id="common/common.proto">common/common.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
       
-        <h3 id="common.v2.Batch">Batch</h3>
-        <p>Batch is a batch of blob certificates</p>
+        <h3 id="common.BlobCommitment">BlobCommitment</h3>
+        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols.</p>
 
         
           <table class="field-table">
@@ -223,78 +219,30 @@
             <tbody>
               
                 <tr>
-                  <td>header</td>
-                  <td><a href="#common.v2.BatchHeader">BatchHeader</a></td>
-                  <td></td>
-                  <td><p>header contains metadata about the batch </p></td>
-                </tr>
-              
-                <tr>
-                  <td>blob_certificates</td>
-                  <td><a href="#common.v2.BlobCertificate">BlobCertificate</a></td>
-                  <td>repeated</td>
-                  <td><p>blob_certificates is the list of blob certificates in the batch </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="common.v2.BatchHeader">BatchHeader</h3>
-        <p>BatchHeader is the header of a batch of blobs</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>batch_root</td>
+                  <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>batch_root is the root of the merkle tree of the hashes of blob certificates in the batch </p></td>
+                  <td><p> </p></td>
                 </tr>
               
                 <tr>
-                  <td>reference_block_number</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p>reference_block_number is the block number that the state of the batch is based on for attestation </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
-        <p>BlobCertificate is what gets attested by the network</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>blob_header</td>
-                  <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
+                  <td>length_commitment</td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
               
                 <tr>
-                  <td>relays</td>
+                  <td>length_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
-                  <td>repeated</td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -305,7 +253,7 @@
 
         
       
-        <h3 id="common.v2.BlobHeader">BlobHeader</h3>
+        <h3 id="common.G1Commitment">G1Commitment</h3>
         <p></p>
 
         
@@ -316,38 +264,63 @@
             <tbody>
               
                 <tr>
-                  <td>version</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>Blob version </p></td>
-                </tr>
-              
-                <tr>
-                  <td>quorum_numbers</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>commitment</td>
-                  <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>payment_header</td>
-                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>signature</td>
+                  <td>x</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
+                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>y</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.PaymentHeader">PaymentHeader</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+corresponding to the key used by the client to sign the BlobHeader. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_period</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The reservation period of the dispersal request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The cumulative payment of the dispersal request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. </p></td>
                 </tr>
               
             </tbody>

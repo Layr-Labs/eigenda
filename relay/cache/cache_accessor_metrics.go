@@ -13,6 +13,7 @@ const namespace = "eigenda_relay"
 // CacheAccessorMetrics provides metrics for a CacheAccessor.
 type CacheAccessorMetrics struct {
 	cacheHits        *prometheus.CounterVec
+	cacheNearMisses  *prometheus.CounterVec
 	cacheMisses      *prometheus.CounterVec
 	size             *prometheus.GaugeVec
 	weight           *prometheus.GaugeVec
@@ -30,6 +31,15 @@ func NewCacheAccessorMetrics(
 			Namespace: namespace,
 			Name:      fmt.Sprintf("%s_cache_hit_count", cacheName),
 			Help:      "Number of cache hits",
+		},
+		[]string{},
+	)
+
+	cacheNearMisses := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      fmt.Sprintf("%s_cache_near_miss_count", cacheName),
+			Help:      "Number of near cache misses (i.e. a lookup is already in progress)",
 		},
 		[]string{},
 	)
@@ -82,6 +92,7 @@ func NewCacheAccessorMetrics(
 
 	return &CacheAccessorMetrics{
 		cacheHits:        cacheHits,
+		cacheNearMisses:  cacheNearMisses,
 		cacheMisses:      cacheMisses,
 		size:             size,
 		weight:           weight,
@@ -92,6 +103,10 @@ func NewCacheAccessorMetrics(
 
 func (m *CacheAccessorMetrics) ReportCacheHit() {
 	m.cacheHits.WithLabelValues().Inc()
+}
+
+func (m *CacheAccessorMetrics) ReportCacheNearMiss() {
+	m.cacheNearMisses.WithLabelValues().Inc()
 }
 
 func (m *CacheAccessorMetrics) ReportCacheMiss() {

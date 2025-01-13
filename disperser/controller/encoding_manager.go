@@ -246,6 +246,10 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				e.metrics.reportUpdateBlobStatusLatency(
 					finishedUpdateBlobStatusTime.Sub(finishedPutBlobCertificateTime))
 				e.metrics.reportBlobHandleLatency(time.Since(start))
+
+				requestedAt := time.Unix(0, int64(blob.RequestedAt))
+				e.metrics.reportE2EEncodingLatency(time.Since(requestedAt))
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Encoded)
 			} else {
 				e.metrics.reportFailedSubmission()
 				storeCtx, cancel := context.WithTimeout(ctx, e.StoreTimeout)
@@ -255,6 +259,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 					e.logger.Error("failed to update blob status to Failed", "blobKey", blobKey.Hex(), "err", err)
 					return
 				}
+				e.metrics.reportCompletedBlob(int(blob.BlobSize), v2.Failed)
 			}
 		})
 	}
@@ -299,7 +304,8 @@ func GetRelayKeys(numAssignment uint16, availableRelays []corev2.RelayKey) ([]co
 	if int(numAssignment) > len(availableRelays) {
 		return nil, fmt.Errorf("numAssignment (%d) cannot be greater than numRelays (%d)", numAssignment, len(availableRelays))
 	}
-	relayKeys := availableRelays
+	relayKeys := make([]corev2.RelayKey, len(availableRelays))
+	copy(relayKeys, availableRelays)
 	// shuffle relay keys
 	for i := len(relayKeys) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)

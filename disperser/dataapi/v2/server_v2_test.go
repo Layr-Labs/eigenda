@@ -484,7 +484,7 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchOperatorResponse(t *testing.T) {
+func TestFetchOperatorResponses(t *testing.T) {
 	r := setUpRouter()
 
 	ctx := context.Background()
@@ -515,7 +515,26 @@ func TestFetchOperatorResponse(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 	assert.NoError(t, err)
 
-	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorResponse)
+	// Set up the other dispersal response in metadata store
+	operatorId2 := core.OperatorID{2, 3}
+	dispersalRequest2 := &corev2.DispersalRequest{
+		OperatorID:      operatorId2,
+		OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+		Socket:          "socket",
+		DispersedAt:     uint64(time.Now().UnixNano()),
+		BatchHeader:     *batchHeader,
+	}
+	dispersalResponse2 := &corev2.DispersalResponse{
+		DispersalRequest: dispersalRequest2,
+		RespondedAt:      uint64(time.Now().UnixNano()),
+		Signature:        [32]byte{1, 1, 1},
+		Error:            "",
+	}
+	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
+	assert.NoError(t, err)
+
+	// Fetch response of a specific operator
+	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorsResponses)
 	w := httptest.NewRecorder()
 	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
 	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
@@ -526,11 +545,31 @@ func TestFetchOperatorResponse(t *testing.T) {
 	data, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
 
-	var response serverv2.OperatorDispersalResponse
+	var response serverv2.OperatorDispersalResponses
 	err = json.Unmarshal(data, &response)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
-	assert.Equal(t, response.Response, dispersalResponse)
+	assert.Equal(t, 1, len(response.Responses))
+	assert.Equal(t, response.Responses[0], dispersalResponse)
+
+	// Fetch all operators' responses for a batch
+	reqStr2 := fmt.Sprintf("/v2/operators/response/%s", batchHeaderHash)
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, reqStr2, nil)
+	r.ServeHTTP(w2, req2)
+	assert.Equal(t, w2.Code, http.StatusOK)
+	res2 := w2.Result()
+	defer res2.Body.Close()
+	data2, err := io.ReadAll(res2.Body)
+	assert.NoError(t, err)
+
+	var response2 serverv2.OperatorDispersalResponses
+	err = json.Unmarshal(data2, &response2)
+	assert.NoError(t, err)
+	assert.NotNil(t, response2)
+	assert.Equal(t, 2, len(response2.Responses))
+	assert.Equal(t, response2.Responses[0], dispersalResponse)
+	assert.Equal(t, response2.Responses[1], dispersalResponse2)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {

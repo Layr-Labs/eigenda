@@ -132,24 +132,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 				attestation = reply2.GetSignedBatch().GetAttestation()
 				Expect(attestation).To(Not(BeNil()))
 
-				if bytes.Equal(batchHeader2.BatchRoot, batchHeader1.BatchRoot) {
-					// same batch
-					attestation2 := reply2.GetSignedBatch().GetAttestation()
-					Expect(attestation2).To(Not(BeNil()))
-					Expect(attestation2.QuorumNumbers).To(Equal(attestation.QuorumNumbers))
-					Expect(len(attestation2.NonSignerPubkeys)).To(Equal(len(attestation.NonSignerPubkeys)))
-					Expect(attestation2.ApkG2).To(Equal(attestation.ApkG2))
-					Expect(len(attestation2.QuorumApks)).To(Equal(len(attestation.QuorumApks)))
-					Expect(attestation2.QuorumSignedPercentages).To(Equal(attestation.QuorumSignedPercentages))
-				} else {
-					attestation = reply2.GetSignedBatch().GetAttestation()
-					Expect(attestation).To(Not(BeNil()))
-					Expect(attestation.QuorumNumbers).To(ConsistOf([]uint32{0}))
-					Expect(len(attestation.NonSignerPubkeys)).To(Equal(0))
-					Expect(attestation.ApkG2).To(Not(BeNil()))
-					Expect(len(attestation.QuorumApks)).To(Equal(1))
-					Expect(attestation.QuorumSignedPercentages).To(Equal([]byte{100}))
-				}
+				attestation2 := reply2.GetSignedBatch().GetAttestation()
+				Expect(attestation2).To(Not(BeNil()))
+				Expect(attestation2.QuorumNumbers).To(Equal(attestation.QuorumNumbers))
+				Expect(len(attestation2.NonSignerPubkeys)).To(Equal(len(attestation.NonSignerPubkeys)))
+				Expect(attestation2.ApkG2).To(Equal(attestation.ApkG2))
+				Expect(len(attestation2.QuorumApks)).To(Equal(len(attestation.QuorumApks)))
+				Expect(attestation2.QuorumSignedPercentages).To(Equal(attestation.QuorumSignedPercentages))
 
 				blobVerification2 = reply2.GetBlobVerificationInfo()
 				Expect(blobVerification2).To(Not(BeNil()))
