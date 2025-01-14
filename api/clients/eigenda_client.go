@@ -151,17 +151,17 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 		return nil, fmt.Errorf("blob has length zero - this should not be possible")
 	}
 
-	encodedBlob, err := m.receivePolynomial(data)
+	encodedPayload, err := m.blobToEncodedPayload(data)
 	if err != nil {
 		return nil, fmt.Errorf("receive polynomial: %w", err)
 	}
 
-	decodedData, err := codecs.DecodePayload(encodedBlob)
+	decodedPayload, err := codecs.DecodePayload(encodedPayload)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding blob: %w", err)
+		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
-	return decodedData, nil
+	return decodedPayload, nil
 }
 
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
@@ -224,7 +224,7 @@ func (m *EigenDAClient) putBlob(
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
 	encodedPayload := codecs.EncodePayload(rawData)
-	polynomial, err := m.preparePolynomial(encodedPayload)
+	blob, err := m.encodedPayloadToBlob(encodedPayload)
 
 	if err != nil {
 		// Encode can only fail if there is something wrong with the data, so we return a 400 error
@@ -239,7 +239,7 @@ func (m *EigenDAClient) putBlob(
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
 	// clients with a payment signer setting can disperse paid blobs
-	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, polynomial, customQuorumNumbers)
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, blob, customQuorumNumbers)
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
@@ -478,12 +478,16 @@ func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint
 	return true, nil
 }
 
-func (m EigenDAClient) receivePolynomial(receivedPolynomial []byte) ([]byte, error) {
+// blobToEncodedPayload accepts blob bytes and converts them into an encoded payload
+//
+// If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the blob bytes.
+// If the system is configured to distribute blobs in Coeff form, the blob is FFTed before being returned
+func (m EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
 	switch m.polynomialForm {
 	case codecs.Eval:
-		return receivedPolynomial, nil
+		return blob, nil
 	case codecs.Coeff:
-		encodedPayload, err := codecs.FFT(receivedPolynomial)
+		encodedPayload, err := codecs.FFT(blob)
 		if err != nil {
 			return nil, fmt.Errorf("fft: %w", err)
 		}
@@ -494,7 +498,11 @@ func (m EigenDAClient) receivePolynomial(receivedPolynomial []byte) ([]byte, err
 	}
 }
 
-func (m EigenDAClient) preparePolynomial(encodedPayload []byte) ([]byte, error) {
+// encodedPayloadToBlob accepts encoded payload bytes and converts them into a blob
+//
+// If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the input bytes
+// If the system is configured to distribute blobs in Coeff form, the encoded payload is IFFTed before being returned
+func (m EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, error) {
 	switch m.polynomialForm {
 	case codecs.Eval:
 		return encodedPayload, nil
