@@ -27,8 +27,7 @@ const (
 func EncodePayload(payload []byte) []byte {
 	payloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
-	// encode version byte
-	payloadHeader[1] = byte(DefaultBlobEncoding)
+	payloadHeader[1] = byte(DefaultBlobEncoding) // encode version byte
 
 	// encode payload length as uint32
 	binary.BigEndian.PutUint32(
@@ -36,7 +35,7 @@ func EncodePayload(payload []byte) []byte {
 		uint32(len(payload))) // uint32 should be more than enough to store the length (approx 4gb)
 
 	// encode payload modulo bn254
-	// the resulting bytes are subsequently treated as the evaluation of a polynomial
+	// the resulting bytes subsequently may be treated as the evaluation of a polynomial
 	polynomialEval := codec.ConvertByPaddingEmptyByte(payload)
 
 	encodedPayload := append(payloadHeader, polynomialEval...)
@@ -56,10 +55,9 @@ func DecodePayload(encodedPayload []byte) ([]byte, error) {
 	payloadLength := binary.BigEndian.Uint32(encodedPayload[2:6])
 
 	// decode raw data modulo bn254
-	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedPayload[32:])
+	nonPaddedData := codec.RemoveEmptyByteFromPaddedBytes(encodedPayload[32:])
 
-	// get non blob header data
-	reader := bytes.NewReader(decodedData)
+	reader := bytes.NewReader(nonPaddedData)
 	payload := make([]byte, payloadLength)
 	readLength, err := reader.Read(payload)
 	if err != nil {

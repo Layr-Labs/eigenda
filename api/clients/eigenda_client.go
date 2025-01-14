@@ -28,6 +28,7 @@ import (
 type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
+	GetPolynomialForm() codecs.PolynomialForm
 	Close() error
 }
 
@@ -129,6 +130,14 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		edasmCaller:    edasmCaller,
 		PolynomialForm: polynomialForm,
 	}, nil
+}
+
+// GetPolynomialForm returns the form of polynomials, as they are distributed in the system
+//
+// The polynomial form indicates how blobs must be constructed before dispersal, and how received blobs ought to be
+// interpreted.
+func (m *EigenDAClient) GetPolynomialForm() codecs.PolynomialForm {
+	return m.PolynomialForm
 }
 
 // GetBlob retrieves a blob from the EigenDA service using the provided context,
