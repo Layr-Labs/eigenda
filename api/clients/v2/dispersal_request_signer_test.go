@@ -2,6 +2,12 @@ package clients
 
 import (
 	"context"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -12,11 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
-	"log"
-	"os"
-	"path/filepath"
-	"runtime"
-	"testing"
 )
 
 var (

@@ -263,6 +263,11 @@ function start_graph {
     popd
      ./wait-for http://0.0.0.0:8000 -- echo "GraphQL up"
 
+     if [ $? -ne 0 ]; then
+        echo "Failed to start graph node"
+        exit 1
+     fi
+
     echo "Graph node started ....."
 }
 
