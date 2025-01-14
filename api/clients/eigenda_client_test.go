@@ -52,7 +52,9 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
+		Return(
+			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
+			nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
@@ -71,7 +73,6 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -118,11 +119,12 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
+		Return(
+			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
+			nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
-	ifftCodec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
 		Config: clients.EigenDAClientConfig{
@@ -138,7 +140,6 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
-		Codec:  ifftCodec,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -148,10 +149,11 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 
 	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
-	encodedBlob, err := ifftCodec.EncodeBlob(resultBlob)
+	ifftBlob, err := codecs.IFFT(codecs.EncodeBlob(resultBlob))
 	require.NoError(t, err)
-
-	resultBlob, err = codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()).DecodeBlob(encodedBlob)
+	encodedBlob, err := codecs.FFT(ifftBlob)
+	require.NoError(t, err)
+	resultBlob, err = codecs.DecodeBlob(encodedBlob)
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, resultBlob)
 }
@@ -190,7 +192,9 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
+		Return(
+			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
+			nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
@@ -209,7 +213,6 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewNoIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -241,7 +244,6 @@ func TestPutBlobFailDispersal(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -274,7 +276,6 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -307,7 +308,6 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -340,7 +340,6 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -375,7 +374,6 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -388,9 +386,10 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(&expectedBlobStatus, []byte("mock-request-id"), nil))
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
-		}).
+		Run(
+			func(args mock.Arguments) {
+				time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
+			}).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
@@ -419,7 +418,9 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
+		Return(
+			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
+			nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
@@ -435,7 +436,6 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
@@ -451,9 +451,10 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(&expectedBlobStatus, []byte("mock-request-id"), nil))
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
-		}).
+		Run(
+			func(args mock.Arguments) {
+				time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
+			}).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
@@ -482,7 +483,9 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
+		Return(
+			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
+			nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
@@ -498,7 +501,6 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
-		Codec:  codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 

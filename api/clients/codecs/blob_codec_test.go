@@ -20,10 +20,7 @@ func randomByteSlice(length int64) []byte {
 }
 
 // TestIFFTCodec tests the encoding and decoding of random byte streams
-func TestIFFTCodec(t *testing.T) {
-	// Create an instance of the DefaultBlobEncodingCodec
-	codec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
-
+func TestCodec(t *testing.T) {
 	// Number of test iterations
 	const iterations = 100
 
@@ -36,55 +33,21 @@ func TestIFFTCodec(t *testing.T) {
 		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
 
 		// Encode the original data
-		encodedData, err := codec.EncodeBlob(originalData)
-		if err != nil {
-			t.Fatalf("Iteration %d: failed to encode blob: %v", i, err)
-		}
+		encodedData := codecs.EncodeBlob(originalData)
 
 		// Decode the encoded data
-		decodedData, err := codec.DecodeBlob(encodedData)
+		decodedData, err := codecs.DecodeBlob(encodedData)
 		if err != nil {
 			t.Fatalf("Iteration %d: failed to decode blob: %v", i, err)
 		}
 
 		// Compare the original data with the decoded data
 		if !bytes.Equal(originalData, decodedData) {
-			t.Fatalf("Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v", i, originalData, decodedData)
-		}
-	}
-}
-
-// TestIFFTCodec tests the encoding and decoding of random byte streams
-func TestNoIFFTCodec(t *testing.T) {
-	// Create an instance of the DefaultBlobEncodingCodec
-	codec := codecs.NewNoIFFTCodec(codecs.NewDefaultBlobCodec())
-
-	// Number of test iterations
-	const iterations = 100
-
-	for i := 0; i < iterations; i++ {
-		// Generate a random length for the byte slice
-		length, err := rand.Int(rand.Reader, big.NewInt(1024)) // Random length between 0 and 1023
-		if err != nil {
-			panic(err)
-		}
-		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
-
-		// Encode the original data
-		encodedData, err := codec.EncodeBlob(originalData)
-		if err != nil {
-			t.Fatalf("Iteration %d: failed to encode blob: %v", i, err)
-		}
-
-		// Decode the encoded data
-		decodedData, err := codec.DecodeBlob(encodedData)
-		if err != nil {
-			t.Fatalf("Iteration %d: failed to decode blob: %v", i, err)
-		}
-
-		// Compare the original data with the decoded data
-		if !bytes.Equal(originalData, decodedData) {
-			t.Fatalf("Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v", i, originalData, decodedData)
+			t.Fatalf(
+				"Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v",
+				i,
+				originalData,
+				decodedData)
 		}
 	}
 }
