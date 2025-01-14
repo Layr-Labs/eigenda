@@ -8,6 +8,7 @@ import (
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
@@ -31,6 +32,7 @@ type requestSigner struct {
 func NewDispersalRequestSigner(
 	ctx context.Context,
 	region string,
+	endpoint string,
 	keyID string) (DispersalRequestSigner, error) {
 
 	// Load the AWS SDK configuration, which will automatically detect credentials
@@ -42,7 +44,16 @@ func NewDispersalRequestSigner(
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	keyManager := kms.NewFromConfig(cfg)
+	var keyManager *kms.Client
+	if endpoint != "" {
+		keyManager = kms.New(kms.Options{
+			Region:       region,
+			BaseEndpoint: aws.String(endpoint),
+		})
+	} else {
+		keyManager = kms.NewFromConfig(cfg)
+	}
+
 	key, err := aws2.LoadPublicKeyKMS(ctx, keyManager, keyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ecdsa public key: %w", err)

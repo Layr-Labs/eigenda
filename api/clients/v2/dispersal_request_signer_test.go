@@ -100,7 +100,7 @@ func TestRequestSigning(t *testing.T) {
 			request := auth.RandomStoreChunksRequest(rand)
 			request.Signature = nil
 
-			signer, err := NewDispersalRequestSigner(context.Background(), region, keyID)
+			signer, err := NewDispersalRequestSigner(context.Background(), region, localstackHost, keyID)
 			require.NoError(t, err)
 
 			// Test a valid signature.
