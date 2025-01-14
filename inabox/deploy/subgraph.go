@@ -181,7 +181,7 @@ func (env *Config) updateSubgraph(updater subgraphUpdater, path string, startBlo
 
 func (env *Config) StartGraphNode() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-graph"}, []string{})
+	err := execCmd("./bin.sh", []string{"start-graph"}, []string{}, true)
 	if err != nil {
 		log.Panicf("Failed to start graph node. Err: %s", err)
 	}
@@ -189,7 +189,7 @@ func (env *Config) StartGraphNode() {
 
 func (env *Config) StopGraphNode() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-graph"}, []string{})
+	err := execCmd("./bin.sh", []string{"stop-graph"}, []string{}, true)
 	if err != nil {
 		log.Panicf("Failed to stop graph node. Err: %s", err)
 	}

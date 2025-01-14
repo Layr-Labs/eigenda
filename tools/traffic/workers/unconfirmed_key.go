@@ -1,11 +1,15 @@
 package workers
 
-import "time"
+import (
+	"time"
 
-// UnconfirmedKey is a Key that has not yet been confirmed by the disperser service.
-type UnconfirmedKey struct {
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
+)
+
+// UncertifiedKey is a Key that has not yet been certified by the disperser service.
+type UncertifiedKey struct {
 	// The Key of the blob.
-	Key []byte
+	Key v2.BlobKey
 	// The Size of the blob in bytes.
 	Size uint
 	// The Checksum of the blob.

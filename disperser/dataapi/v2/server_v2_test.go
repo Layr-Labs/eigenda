@@ -259,6 +259,26 @@ func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
 
+func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, url, nil)
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	return w
+}
+
+func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
+	body := w.Result().Body
+	defer body.Close()
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+
+	var response T
+	err = json.Unmarshal(data, &response)
+	require.NoError(t, err)
+	return response
+}
+
 func TestFetchBlobHandlerV2(t *testing.T) {
 	r := setUpRouter()
 
@@ -279,20 +299,10 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex(), nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BlobResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex())
+	response := decodeResponseBody[serverv2.BlobResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
@@ -320,20 +330,10 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificateHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate", nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BlobCertificateResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
+	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
 	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
@@ -353,8 +353,6 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	}
 	batchHeaderHash, err := batchHeader.Hash()
 	require.NoError(t, err)
-	fmt.Println("XXt batchHeaderHash bytes:", batchHeaderHash)
-	fmt.Println("XXt batchHeaderHash hex:", hex.EncodeToString(batchHeaderHash[:]))
 
 	ctx := context.Background()
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
@@ -369,21 +367,11 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/verification-info", testDataApiServerV2.FetchBlobVerificationInfoHandler)
-	w := httptest.NewRecorder()
+
 	reqStr := fmt.Sprintf("/v2/blobs/%s/verification-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[serverv2.BlobVerificationInfoResponse](t, w)
 
-	var response serverv2.BlobVerificationInfoResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, verificationInfo.InclusionProof, response.VerificationInfo.InclusionProof)
 }
 
@@ -423,20 +411,10 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/batches/"+batchHeaderHash, nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BatchResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/batches/"+batchHeaderHash)
+	response := decodeResponseBody[serverv2.BatchResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
 	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
@@ -455,25 +433,9 @@ func TestCheckOperatorsReachability(t *testing.T) {
 
 	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
 
-	w := httptest.NewRecorder()
 	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
-	defer cancel()
-	req = req.WithContext(ctxWithDeadline)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response dataapi.OperatorPortCheckResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
 	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
 	assert.Equal(t, false, response.DispersalOnline)
@@ -486,7 +448,6 @@ func TestCheckOperatorsReachability(t *testing.T) {
 
 func TestFetchOperatorResponses(t *testing.T) {
 	r := setUpRouter()
-
 	ctx := context.Background()
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
@@ -533,43 +494,23 @@ func TestFetchOperatorResponses(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
 	assert.NoError(t, err)
 
-	// Fetch response of a specific operator
 	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorsResponses)
-	w := httptest.NewRecorder()
-	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.OperatorDispersalResponses
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-	assert.Equal(t, 1, len(response.Responses))
-	assert.Equal(t, response.Responses[0], dispersalResponse)
+	// Fetch response of a specific operator
+	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w)
+	require.Equal(t, 1, len(response.Responses))
+	require.Equal(t, dispersalResponse, response.Responses[0])
 
 	// Fetch all operators' responses for a batch
 	reqStr2 := fmt.Sprintf("/v2/operators/response/%s", batchHeaderHash)
-	w2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, reqStr2, nil)
-	r.ServeHTTP(w2, req2)
-	assert.Equal(t, w2.Code, http.StatusOK)
-	res2 := w2.Result()
-	defer res2.Body.Close()
-	data2, err := io.ReadAll(res2.Body)
-	assert.NoError(t, err)
+	w2 := executeRequest(t, r, http.MethodGet, reqStr2)
+	response2 := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w2)
 
-	var response2 serverv2.OperatorDispersalResponses
-	err = json.Unmarshal(data2, &response2)
-	assert.NoError(t, err)
-	assert.NotNil(t, response2)
-	assert.Equal(t, 2, len(response2.Responses))
-	assert.Equal(t, response2.Responses[0], dispersalResponse)
-	assert.Equal(t, response2.Responses[1], dispersalResponse2)
+	require.Equal(t, 2, len(response2.Responses))
+	require.Equal(t, response2.Responses[0], dispersalResponse)
+	require.Equal(t, response2.Responses[1], dispersalResponse2)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {
@@ -578,19 +519,9 @@ func TestFetchOperatorsStake(t *testing.T) {
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/operators/stake", nil)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response dataapi.OperatorsStakeResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/operators/stake")
+	response := decodeResponseBody[dataapi.OperatorsStakeResponse](t, w)
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
 	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
@@ -628,23 +559,9 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 
 	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummaryHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/v2/metrics/summary", nil)
-	req.Close = true
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
+	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response serverv2.MetricSummary
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
 }
 
@@ -661,27 +578,14 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 
 	r.GET("/v2/metrics/timeseries/throughput", testDataApiServer.FetchMetricsThroughputHandler)
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/metrics/timeseries/throughput", nil)
-	r.ServeHTTP(w, req)
-
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response []*dataapi.Throughput
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/throughput")
+	response := decodeResponseBody[[]*dataapi.Throughput](t, w)
 
 	var totalThroughput float64
 	for _, v := range response {
 		totalThroughput += v.Throughput
 	}
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 3361, len(response))
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)

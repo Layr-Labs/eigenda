@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ const (
 	StatusIndexName            = "StatusIndex"
 	OperatorDispersalIndexName = "OperatorDispersalIndex"
 	OperatorResponseIndexName  = "OperatorResponseIndex"
+	RequestedAtIndexName       = "RequestedAtIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -38,6 +40,15 @@ const (
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
 	attestationSK             = "Attestation"
+
+	// The number of nanoseconds for a requestedAt bucket (1h).
+	// The rationales are:
+	// - 1h would be a good estimate for blob feed request (e.g. fetch blobs in past hour can be a common use case)
+	// - at 100 blobs/s, it'll be 360,000 blobs in a bucket, which is reasonable
+	// - and then it'll be 336 buckets in total (24 buckets/day * 14 days), which is also reasonable
+	requestedAtBucketSizeNano = uint64(time.Hour / time.Nanosecond)
+	// 14 days with 1 hour margin of safety.
+	maxBlobAgeInNano = uint64((14*24*time.Hour + 1*time.Hour) / time.Nanosecond)
 )
 
 var (
@@ -54,6 +65,74 @@ var (
 type StatusIndexCursor struct {
 	BlobKey   *corev2.BlobKey
 	UpdatedAt uint64
+}
+
+// BlobFeedCursor represents a position in the blob feed, which contains all blobs
+// accepted by Disperser, ordered by (requestedAt, blobKey).
+type BlobFeedCursor struct {
+	RequestedAt uint64
+
+	// The BlobKey can be nil, and a nil BlobKey is treated as equal to another nil BlobKey
+	BlobKey *corev2.BlobKey
+}
+
+// Equal returns true if the cursor is equal to the given <requestedAt, blobKey>
+func (cursor *BlobFeedCursor) Equal(requestedAt uint64, blobKey *corev2.BlobKey) bool {
+	if cursor.RequestedAt != requestedAt {
+		return false
+	}
+
+	// Both nil
+	if cursor.BlobKey == nil && blobKey == nil {
+		return true
+	}
+
+	// One nil
+	if cursor.BlobKey == nil || blobKey == nil {
+		return false
+	}
+
+	return cursor.BlobKey.Hex() == blobKey.Hex()
+}
+
+// LessThan returns true if the current cursor is less than the other cursor
+// in the ordering defined by (requestedAt, blobKey).
+func (cursor *BlobFeedCursor) LessThan(other *BlobFeedCursor) bool {
+	if other == nil {
+		return false
+	}
+
+	// First, compare the RequestedAt timestamps
+	if cursor.RequestedAt != other.RequestedAt {
+		return cursor.RequestedAt < other.RequestedAt
+	}
+
+	// If RequestedAt is the same, compare BlobKey
+	if cursor.BlobKey != nil && other.BlobKey != nil {
+		return cursor.BlobKey.Hex() < other.BlobKey.Hex()
+	}
+
+	// Handle cases where BlobKey might be nil
+	if cursor.BlobKey == nil && other.BlobKey != nil {
+		return true // cursor.BlobKey is nil, so it comes first
+	}
+	if cursor.BlobKey != nil && other.BlobKey == nil {
+		return false // other.BlobKey is nil, so "other" comes first
+	}
+
+	// If both RequestedAt and BlobKey are equal, return false (because they are equal)
+	return false
+}
+
+// ToRequestedAtBlobKey encodes the cursor into a string that preserves ordering.
+// For any two cursors A and B:
+// - A < B if and only if A.ToRequestedAtBlobKey() < B.ToRequestedAtBlobKey()
+// - A == B if and only if A.ToRequestedAtBlobKey() == B.ToRequestedAtBlobKey()
+func (cursor *BlobFeedCursor) ToRequestedAtBlobKey() string {
+	if cursor.BlobKey == nil {
+		return encodeRequestedAtBlobKey(cursor.RequestedAt, "")
+	}
+	return encodeRequestedAtBlobKey(cursor.RequestedAt, cursor.BlobKey.Hex())
 }
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -192,6 +271,118 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	}
 
 	return metadata, nil
+}
+
+// getBucketIDRange returns the adjusted start and end bucket IDs based on
+// the allowed time range for blobs.
+func (s *BlobMetadataStore) getBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+	now := uint64(time.Now().UnixNano())
+	oldestAllowed := now - maxBlobAgeInNano
+
+	startBucket := computeBucketID(startTime, requestedAtBucketSizeNano)
+	if startTime < oldestAllowed {
+		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeNano)
+	}
+
+	endBucket := computeBucketID(endTime, requestedAtBucketSizeNano)
+	if endTime > now {
+		endBucket = computeBucketID(now, requestedAtBucketSizeNano)
+	}
+
+	return startBucket, endBucket
+}
+
+// queryBucketMetadata queries a single bucket for blob metadata within the given key range.
+func (s *BlobMetadataStore) queryBucketMetadata(
+	ctx context.Context,
+	bucket uint64,
+	startKey string,
+	endKey string,
+) ([]*v2.BlobMetadata, error) {
+	items, err := s.dynamoDBClient.QueryIndex(
+		ctx,
+		s.tableName,
+		RequestedAtIndexName,
+		"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
+		commondynamodb.ExpressionValues{
+			":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
+			":start": &types.AttributeValueMemberS{Value: startKey},
+			":end":   &types.AttributeValueMemberS{Value: endKey},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+	}
+
+	metadata := make([]*v2.BlobMetadata, 0, len(items))
+	for _, item := range items {
+		bm, err := UnmarshalBlobMetadata(item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+		}
+		metadata = append(metadata, bm)
+	}
+
+	return metadata, nil
+}
+
+// GetBlobMetadataByRequestedAt returns blobs (as BlobMetadata) that are in cusor position
+// range (start, end]. Blobs returned are in cursor order.
+//
+// If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
+// Also returns the cursor of the last processed blob, or nil if no blobs were processed.
+func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
+	ctx context.Context,
+	start BlobFeedCursor,
+	end BlobFeedCursor,
+	limit int,
+) ([]*v2.BlobMetadata, *BlobFeedCursor, error) {
+	if !start.LessThan(&end) {
+		return nil, nil, errors.New("start cursor is expected to be less than end cursor")
+	}
+
+	startBucket, endBucket := s.getBucketIDRange(start.RequestedAt, end.RequestedAt)
+	startKey := start.ToRequestedAtBlobKey()
+	endKey := end.ToRequestedAtBlobKey()
+
+	result := make([]*v2.BlobMetadata, 0)
+	var lastProcessedCursor *BlobFeedCursor
+
+	for bucket := startBucket; bucket <= endBucket; bucket++ {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+
+		bucketMetadata, err := s.queryBucketMetadata(ctx, bucket, startKey, endKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Process bucket results
+		for _, bm := range bucketMetadata {
+			blobKey, err := bm.BlobHeader.BlobKey()
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
+			}
+
+			// Skip the start cursor's blob
+			if start.Equal(bm.RequestedAt, &blobKey) {
+				continue
+			}
+
+			result = append(result, bm)
+			lastProcessedCursor = &BlobFeedCursor{
+				RequestedAt: bm.RequestedAt,
+				BlobKey:     &blobKey,
+			}
+
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+
+	return result, lastProcessedCursor, nil
 }
 
 // GetBlobMetadataByStatusPaginated returns all the metadata with the given status that were updated after the given cursor.
@@ -778,6 +969,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeName: aws.String("RespondedAt"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("RequestedAtBucket"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("RequestedAtBlobKey"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
@@ -851,6 +1050,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
 				},
 			},
+			{
+				IndexName: aws.String(RequestedAtIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("RequestedAtBucket"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAtBlobKey"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
 		},
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(readCapacityUnits),
@@ -872,7 +1091,8 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	}
 	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + blobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
-
+	fields["RequestedAtBucket"] = &types.AttributeValueMemberS{Value: computeRequestedAtBucket(metadata.RequestedAt)}
+	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeRequestedAtBlobKey(metadata.RequestedAt, blobKey.Hex())}
 	return fields, nil
 }
 
@@ -1136,4 +1356,30 @@ func hexToHash(h string) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	return [32]byte(b), nil
+}
+
+// computeBucketID maps a given timestamp to a time bucket.
+// Note each bucket represents a time range [start, end) (i.e. inclusive start, exclusive end).
+func computeBucketID(timestamp, bucketSizeNano uint64) uint64 {
+	return timestamp / bucketSizeNano
+}
+
+func computeRequestedAtBucket(requestedAt uint64) string {
+	id := computeBucketID(requestedAt, requestedAtBucketSizeNano)
+	return fmt.Sprintf("%d", id)
+}
+
+// encodeRequestedAtBlobKey encodes <requestedAt, blobKey> into string which
+// preserves the order.
+func encodeRequestedAtBlobKey(requestedAt uint64, blobKey string) string {
+	result := make([]byte, 40) // 8 bytes for timestamp + 32 bytes for blobKey
+
+	// Write timestamp
+	binary.BigEndian.PutUint64(result[:8], requestedAt)
+
+	if blobKey != "" {
+		copy(result[8:], []byte(blobKey))
+	}
+	// Use hex encoding to preserve byte ordering
+	return hex.EncodeToString(result)
 }
