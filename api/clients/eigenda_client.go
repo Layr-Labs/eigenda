@@ -87,9 +87,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 	if err != nil {
 		return nil, fmt.Errorf("dial ETH RPC node: %w", err)
 	}
-	edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(
-		common.HexToAddress(config.SvcManagerAddr),
-		ethClient)
+	edasmCaller, err = edasm.NewContractEigenDAServiceManagerCaller(common.HexToAddress(config.SvcManagerAddr), ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("new EigenDAServiceManagerCaller: %w", err)
 	}
@@ -280,7 +278,9 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 				// batcher would most likely resubmit another blob, which is not ideal but there isn't much to be done...
 				// eigenDA v2 will have idempotency so one can just resubmit the same blob safely.
 				// TODO: (if timeout was not long enough to finalize in normal conditions): eigenda-client is badly configured, should be a 400 (INVALID_ARGUMENT)
-				errChan <- api.NewErrorFailover(fmt.Errorf("eigenda might be down. timed out waiting for blob to land onchain (request id=%s): %w", base64RequestID, ctxFinality.Err()))
+				errChan <- api.NewErrorDeadlineExceeded(
+					fmt.Sprintf("timed out waiting for blob that landed onchain to finalize (request id=%s). "+
+						"Either timeout not long enough, or ethereum might be experiencing difficulties: %v. ", base64RequestID, ctxFinality.Err()))
 			} else {
 				// this should not be reachable... indicates something wrong with either this client or eigenda, so we failover to ethda
 				errChan <- api.NewErrorFailover(fmt.Errorf("timed out in a state that shouldn't be possible (request id=%s): %w", base64RequestID, ctxFinality.Err()))
