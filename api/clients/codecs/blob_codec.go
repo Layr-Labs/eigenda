@@ -13,7 +13,6 @@ type BlobEncodingVersion byte
 const (
 	// DefaultBlobEncoding entails a 32 byte header = [0x00, version byte, uint32 len of data, 0x00, 0x00,...]
 	// followed by the encoded data [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
-	// The final result of this is then padded to a multiple of 32
 	DefaultBlobEncoding BlobEncodingVersion = 0x0
 )
 
