@@ -19,30 +19,30 @@ const (
 
 // EncodePayload accepts an arbitrary payload byte array, and encodes it.
 //
-// The returned bytes may be interpreted as a polynomial in evaluation form, where each contained field element of
+// The returned bytes may be interpreted as a polynomial in Eval form, where each contained field element of
 // length 32 represents the evaluation of the polynomial at an expanded root of unity
 //
 // The returned bytes may or may not represent a blob. If the system is configured to distribute blobs in Coeff form,
 // then the data returned from this function must be IFFTed to produce the final blob. If the system is configured to
 // distribute blobs in Eval form, then the data returned from this function is the final blob representation.
 func EncodePayload(payload []byte) []byte {
-	codecBlobHeader := make([]byte, 32)
-	// first byte is always 0 to ensure the codecBlobHeader is a valid bn254 element
+	payloadHeader := make([]byte, 32)
+	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
 	// encode version byte
-	codecBlobHeader[1] = byte(DefaultBlobEncoding)
+	payloadHeader[1] = byte(DefaultBlobEncoding)
 
-	// encode length as uint32
+	// encode payload length as uint32
 	binary.BigEndian.PutUint32(
-		codecBlobHeader[2:6],
+		payloadHeader[2:6],
 		uint32(len(payload))) // uint32 should be more than enough to store the length (approx 4gb)
 
 	// encode payload modulo bn254
-	rawDataPadded := codec.ConvertByPaddingEmptyByte(payload)
+	// the resulting bytes are subsequently treated as the evaluation of a polynomial
+	polynomialEval := codec.ConvertByPaddingEmptyByte(payload)
 
-	// append raw data
-	encodedData := append(codecBlobHeader, rawDataPadded...)
+	encodedPayload := append(payloadHeader, polynomialEval...)
 
-	return encodedData
+	return encodedPayload
 }
 
 // DecodePayload accepts bytes representing an encoded payload, and returns the decoded payload
@@ -51,24 +51,26 @@ func EncodePayload(payload []byte) []byte {
 // are being distributed in Coeff form, a blob must be FFTed prior to being passed into the function.
 func DecodePayload(encodedPayload []byte) ([]byte, error) {
 	if len(encodedPayload) < 32 {
-		return nil, fmt.Errorf("blob does not contain 32 header bytes, meaning it is malformed")
+		return nil, fmt.Errorf("encoded payload does not contain 32 header bytes, meaning it is malformed")
 	}
 
-	length := binary.BigEndian.Uint32(encodedPayload[2:6])
+	payloadLength := binary.BigEndian.Uint32(encodedPayload[2:6])
 
 	// decode raw data modulo bn254
 	decodedData := codec.RemoveEmptyByteFromPaddedBytes(encodedPayload[32:])
 
 	// get non blob header data
 	reader := bytes.NewReader(decodedData)
-	rawData := make([]byte, length)
-	n, err := reader.Read(rawData)
+	payload := make([]byte, payloadLength)
+	readLength, err := reader.Read(payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to copy unpadded data into final buffer, length: %d, bytes read: %d", length, n)
+		return nil, fmt.Errorf(
+			"failed to copy unpadded data into final buffer, length: %d, bytes read: %d",
+			payloadLength, readLength)
 	}
-	if uint32(n) != length {
+	if uint32(readLength) != payloadLength {
 		return nil, fmt.Errorf("data length does not match length prefix")
 	}
 
-	return rawData, nil
+	return payload, nil
 }
