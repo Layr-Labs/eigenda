@@ -9,6 +9,10 @@ message BlobHeader {
   uint32 version = 1;
   // quorum_numbers is the list of quorum numbers that the blob is part of.
   // All quorums must be specified (including required quorums).
+  //
+  // The following quorums are currently required:
+  // - 0: ETH
+  // - 1: EIGEN
   repeated uint32 quorum_numbers = 2;
   // commitment is the KZG commitment of the blob
   common.BlobCommitment commitment = 3;

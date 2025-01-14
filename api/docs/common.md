@@ -41,7 +41,7 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-G1Commitment"></a>
 
 ### G1Commitment
-A KZG commitment to a G1 point.
+A KZG commitment
 
 
 | Field | Type | Label | Description |

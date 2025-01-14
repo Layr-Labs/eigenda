@@ -11,7 +11,7 @@ service Dispersal {
   // StoreChunks stores a batch of chunks on the Node.
   rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
   // NodeInfo fetches metadata about the node.
-  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+  rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
 // Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
@@ -20,7 +20,7 @@ service Retrieval {
   // faster to retrieve chunks from the relay service if that service is available.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
   // Retrieve node info metadata
-  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+  rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
 // Requests and replies
@@ -86,11 +86,11 @@ message GetChunksReply {
 }
 
 // The parameter for the NodeInfo() RPC.
-message NodeInfoRequest {
+message GetNodeInfoRequest {
 }
 
 // Node info reply
-message NodeInfoReply {
+message GetNodeInfoReply {
   // The version of the node.
   string semver = 1;
   // The architecture of the node.

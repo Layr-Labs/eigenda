@@ -2,10 +2,7 @@ syntax = "proto3";
 package common;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 
-// TODO: I generated the comments in this file using copilot. Reviewers, please verify accuracy,
-// and after you do I will remove this comment. This PR should not merge until this comment is removed.
-
-// A KZG commitment to a G1 point.
+// A KZG commitment
 message G1Commitment {
   // The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
   bytes x = 1;

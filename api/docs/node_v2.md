@@ -6,8 +6,8 @@
 - [node/v2/node_v2.proto](#node_v2_node_v2-proto)
     - [GetChunksReply](#node-v2-GetChunksReply)
     - [GetChunksRequest](#node-v2-GetChunksRequest)
-    - [NodeInfoReply](#node-v2-NodeInfoReply)
-    - [NodeInfoRequest](#node-v2-NodeInfoRequest)
+    - [GetNodeInfoReply](#node-v2-GetNodeInfoReply)
+    - [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest)
     - [StoreChunksReply](#node-v2-StoreChunksReply)
     - [StoreChunksRequest](#node-v2-StoreChunksRequest)
   
@@ -56,9 +56,9 @@ The parameter for the GetChunks() RPC.
 
 
 
-<a name="node-v2-NodeInfoReply"></a>
+<a name="node-v2-GetNodeInfoReply"></a>
 
-### NodeInfoReply
+### GetNodeInfoReply
 Node info reply
 
 
@@ -75,9 +75,9 @@ Node info reply
 
 
 
-<a name="node-v2-NodeInfoRequest"></a>
+<a name="node-v2-GetNodeInfoRequest"></a>
 
-### NodeInfoRequest
+### GetNodeInfoRequest
 The parameter for the NodeInfo() RPC.
 
 
@@ -137,7 +137,7 @@ Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks stores a batch of chunks on the Node. |
-| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | NodeInfo fetches metadata about the node. |
+| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | NodeInfo fetches metadata about the node. |
 
 
 <a name="node-v2-Retrieval"></a>
@@ -148,7 +148,7 @@ Retrieval is utilized to retrieve chunk data. This chunk data can be used to rec
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
-| NodeInfo | [NodeInfoRequest](#node-v2-NodeInfoRequest) | [NodeInfoReply](#node-v2-NodeInfoReply) | Retrieve node info metadata |
+| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | Retrieve node info metadata |
 
  
 

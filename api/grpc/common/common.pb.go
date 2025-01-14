@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// A KZG commitment to a G1 point.
+// A KZG commitment
 type G1Commitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

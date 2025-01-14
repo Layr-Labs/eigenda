@@ -31,6 +31,10 @@ type BlobHeader struct {
 	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// quorum_numbers is the list of quorum numbers that the blob is part of.
 	// All quorums must be specified (including required quorums).
+	//
+	// The following quorums are currently required:
+	// - 0: ETH
+	// - 1: EIGEN
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
 	// commitment is the KZG commitment of the blob
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`

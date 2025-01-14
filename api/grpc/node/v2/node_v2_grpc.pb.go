@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Dispersal_StoreChunks_FullMethodName = "/node.v2.Dispersal/StoreChunks"
-	Dispersal_NodeInfo_FullMethodName    = "/node.v2.Dispersal/NodeInfo"
+	Dispersal_GetNodeInfo_FullMethodName = "/node.v2.Dispersal/GetNodeInfo"
 )
 
 // DispersalClient is the client API for Dispersal service.
@@ -30,7 +30,7 @@ type DispersalClient interface {
 	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
 	// NodeInfo fetches metadata about the node.
-	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
+	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
 }
 
 type dispersalClient struct {
@@ -50,9 +50,9 @@ func (c *dispersalClient) StoreChunks(ctx context.Context, in *StoreChunksReques
 	return out, nil
 }
 
-func (c *dispersalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
-	out := new(NodeInfoReply)
-	err := c.cc.Invoke(ctx, Dispersal_NodeInfo_FullMethodName, in, out, opts...)
+func (c *dispersalClient) GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error) {
+	out := new(GetNodeInfoReply)
+	err := c.cc.Invoke(ctx, Dispersal_GetNodeInfo_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ type DispersalServer interface {
 	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
 	// NodeInfo fetches metadata about the node.
-	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
+	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
 
@@ -77,8 +77,8 @@ type UnimplementedDispersalServer struct {
 func (UnimplementedDispersalServer) StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StoreChunks not implemented")
 }
-func (UnimplementedDispersalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
+func (UnimplementedDispersalServer) GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeInfo not implemented")
 }
 func (UnimplementedDispersalServer) mustEmbedUnimplementedDispersalServer() {}
 
@@ -111,20 +111,20 @@ func _Dispersal_StoreChunks_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Dispersal_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeInfoRequest)
+func _Dispersal_GetNodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNodeInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DispersalServer).NodeInfo(ctx, in)
+		return srv.(DispersalServer).GetNodeInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Dispersal_NodeInfo_FullMethodName,
+		FullMethod: Dispersal_GetNodeInfo_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DispersalServer).NodeInfo(ctx, req.(*NodeInfoRequest))
+		return srv.(DispersalServer).GetNodeInfo(ctx, req.(*GetNodeInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -141,8 +141,8 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Dispersal_StoreChunks_Handler,
 		},
 		{
-			MethodName: "NodeInfo",
-			Handler:    _Dispersal_NodeInfo_Handler,
+			MethodName: "GetNodeInfo",
+			Handler:    _Dispersal_GetNodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -150,8 +150,8 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Retrieval_GetChunks_FullMethodName = "/node.v2.Retrieval/GetChunks"
-	Retrieval_NodeInfo_FullMethodName  = "/node.v2.Retrieval/NodeInfo"
+	Retrieval_GetChunks_FullMethodName   = "/node.v2.Retrieval/GetChunks"
+	Retrieval_GetNodeInfo_FullMethodName = "/node.v2.Retrieval/GetNodeInfo"
 )
 
 // RetrievalClient is the client API for Retrieval service.
@@ -162,7 +162,7 @@ type RetrievalClient interface {
 	// faster to retrieve chunks from the relay service if that service is available.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 	// Retrieve node info metadata
-	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
+	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
 }
 
 type retrievalClient struct {
@@ -182,9 +182,9 @@ func (c *retrievalClient) GetChunks(ctx context.Context, in *GetChunksRequest, o
 	return out, nil
 }
 
-func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error) {
-	out := new(NodeInfoReply)
-	err := c.cc.Invoke(ctx, Retrieval_NodeInfo_FullMethodName, in, out, opts...)
+func (c *retrievalClient) GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error) {
+	out := new(GetNodeInfoReply)
+	err := c.cc.Invoke(ctx, Retrieval_GetNodeInfo_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ type RetrievalServer interface {
 	// faster to retrieve chunks from the relay service if that service is available.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	// Retrieve node info metadata
-	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
+	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
 }
 
@@ -210,8 +210,8 @@ type UnimplementedRetrievalServer struct {
 func (UnimplementedRetrievalServer) GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChunks not implemented")
 }
-func (UnimplementedRetrievalServer) NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeInfo not implemented")
+func (UnimplementedRetrievalServer) GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetNodeInfo not implemented")
 }
 func (UnimplementedRetrievalServer) mustEmbedUnimplementedRetrievalServer() {}
 
@@ -244,20 +244,20 @@ func _Retrieval_GetChunks_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Retrieval_NodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeInfoRequest)
+func _Retrieval_GetNodeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNodeInfoRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RetrievalServer).NodeInfo(ctx, in)
+		return srv.(RetrievalServer).GetNodeInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Retrieval_NodeInfo_FullMethodName,
+		FullMethod: Retrieval_GetNodeInfo_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RetrievalServer).NodeInfo(ctx, req.(*NodeInfoRequest))
+		return srv.(RetrievalServer).GetNodeInfo(ctx, req.(*GetNodeInfoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -274,8 +274,8 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Retrieval_GetChunks_Handler,
 		},
 		{
-			MethodName: "NodeInfo",
-			Handler:    _Retrieval_NodeInfo_Handler,
+			MethodName: "GetNodeInfo",
+			Handler:    _Retrieval_GetNodeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
