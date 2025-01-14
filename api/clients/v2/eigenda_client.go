@@ -157,11 +157,15 @@ func (c *EigenDAClient) verifyBlobFromRelay(
 		return false
 	}
 
-	// checking that the length returned by the relay matches the claimed length is sufficient here: it isn't necessary
-	// to verify the length proof itself, since this will have been done by DA nodes prior to signing for availability.
-	if uint(len(blob)) != blobCommitments.Length {
+	// Checking that the length returned by the relay is <= the length claimed in the BlobCommitments is sufficient
+	// here: it isn't necessary to verify the length proof itself, since this will have been done by DA nodes prior to
+	// signing for availability.
+	//
+	// Note that the length in the commitment is the length of the blob, padded to a power of 2. For this reason, we
+	// assert <=, as opposed to asserting equality
+	if uint(len(blob)) > blobCommitments.Length {
 		c.log.Warn(
-			"blob length doesn't match length claimed in blob commitments",
+			"blob length is greater than length claimed in blob commitments",
 			"blobKey", blobKey, "relayKey", relayKey, "blobLength", len(blob),
 			"blobCommitments.Length", blobCommitments.Length)
 		return false
