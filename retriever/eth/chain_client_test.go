@@ -3,7 +3,6 @@ package eth_test
 import (
 	"context"
 	"encoding/hex"
-
 	"math/big"
 	"testing"
 

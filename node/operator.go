@@ -86,7 +86,7 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 
 	// if we should call the churner, call it
 	if shouldCallChurner {
-		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.KeyPair, operator.Signer, quorumsToRegister)
+		churnReply, err := churnerClient.Churn(ctx, operator.Address, operator.Signer, quorumsToRegister)
 		if err != nil {
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}

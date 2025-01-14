@@ -16,7 +16,7 @@ type ChurnerClient struct {
 
 var _ node.ChurnerClient = (*ChurnerClient)(nil)
 
-func (c *ChurnerClient) Churn(ctx context.Context, operatorAddress string, keyPair *core.KeyPair, signer sdkSigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error) {
+func (c *ChurnerClient) Churn(ctx context.Context, operatorAddress string, signer sdkSigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error) {
 	args := c.Called()
 	var reply *churnerpb.ChurnReply
 	if args.Get(0) != nil {

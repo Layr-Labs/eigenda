@@ -24,7 +24,7 @@ type ChurnerClient interface {
 	// Churn sends a churn request to the churner service
 	// The quorumIDs cannot be empty, but may contain quorums that the operator is already registered in.
 	// If the operator is already registered in a quorum, the churner will ignore it and continue with the other quorums.
-	Churn(ctx context.Context, operatorAddress string, keyPair *core.KeyPair, sdkSigner sdkSigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
+	Churn(ctx context.Context, operatorAddress string, sdkSigner sdkSigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
 }
 
 type churnerClient struct {
@@ -46,7 +46,6 @@ func NewChurnerClient(churnerURL string, useSecureGrpc bool, timeout time.Durati
 func (c *churnerClient) Churn(
 	ctx context.Context,
 	operatorAddress string,
-	keyPair *core.KeyPair,
 	sdkSigner sdkSigner.Signer,
 	quorumIDs []core.QuorumID,
 ) (*churnerpb.ChurnReply, error) {

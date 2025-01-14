@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api"
-	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	"log"
 	"math/big"
+
+	"github.com/Layr-Labs/eigenda/api"
+	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
@@ -71,7 +72,7 @@ func (t *Writer) RegisterOperator(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -113,7 +114,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 	churnReply *churner.ChurnReply,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err

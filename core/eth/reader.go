@@ -290,7 +290,6 @@ func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator
 
 func (t *Reader) getRegistrationParams(
 	ctx context.Context,
-	keypair *core.KeyPair,
 	sdkSigner sdkSigner.Signer,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
