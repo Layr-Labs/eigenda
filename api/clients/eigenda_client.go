@@ -43,7 +43,7 @@ type EigenDAClient struct {
 	Client         DisperserClient
 	ethClient      *ethclient.Client
 	edasmCaller    *edasm.ContractEigenDAServiceManagerCaller
-	polynomialForm codecs.PolynomialForm
+	PolynomialForm codecs.PolynomialForm
 }
 
 var _ IEigenDAClient = &EigenDAClient{}
@@ -127,7 +127,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		Client:         disperserClient,
 		ethClient:      ethClient,
 		edasmCaller:    edasmCaller,
-		polynomialForm: polynomialForm,
+		PolynomialForm: polynomialForm,
 	}, nil
 }
 
@@ -365,12 +365,12 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 
 // Close simply calls Close() on the wrapped disperserClient, to close the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *EigenDAClient) Close() error {
-	return c.Client.Close()
+func (m *EigenDAClient) Close() error {
+	return m.Client.Close()
 }
 
 // getConfDeepBlockNumber returns the block number that is `depth` blocks behind the current block number.
-func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64) (*big.Int, error) {
+func (m *EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64) (*big.Int, error) {
 	curBlockNumber, err := m.ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block number: %w", err)
@@ -387,7 +387,7 @@ func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64)
 // batchIdConfirmedAtDepth checks if a batch ID has been confirmed at a certain depth.
 // It returns true if the batch ID has been confirmed at the given depth, and false otherwise,
 // or returns an error if any of the network calls fail.
-func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
+func (m *EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
 	confDeepBlockNumber, err := m.getConfDeepBlockNumber(ctx, depth)
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation deep block number: %w", err)
@@ -406,8 +406,8 @@ func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint
 //
 // If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the blob bytes.
 // If the system is configured to distribute blobs in Coeff form, the blob is FFTed before being returned
-func (m EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
-	switch m.polynomialForm {
+func (m *EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
+	switch m.PolynomialForm {
 	case codecs.Eval:
 		return blob, nil
 	case codecs.Coeff:
@@ -418,7 +418,7 @@ func (m EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
 
 		return encodedPayload, nil
 	default:
-		return nil, fmt.Errorf("unknown polynomial form: %v", m.polynomialForm)
+		return nil, fmt.Errorf("unknown polynomial form: %v", m.PolynomialForm)
 	}
 }
 
@@ -426,8 +426,8 @@ func (m EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
 //
 // If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the input bytes
 // If the system is configured to distribute blobs in Coeff form, the encoded payload is IFFTed before being returned
-func (m EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, error) {
-	switch m.polynomialForm {
+func (m *EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, error) {
+	switch m.PolynomialForm {
 	case codecs.Eval:
 		return encodedPayload, nil
 	case codecs.Coeff:
@@ -438,6 +438,6 @@ func (m EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, erro
 
 		return coeffPolynomial, nil
 	default:
-		return nil, fmt.Errorf("unknown polynomial form: %v", m.polynomialForm)
+		return nil, fmt.Errorf("unknown polynomial form: %v", m.PolynomialForm)
 	}
 }

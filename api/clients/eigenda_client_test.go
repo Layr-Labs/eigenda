@@ -71,6 +71,7 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -136,6 +137,7 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -207,6 +209,7 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 			WaitForFinalization:          true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Eval,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -238,6 +241,7 @@ func TestPutBlobFailDispersal(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -270,6 +274,7 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -302,6 +307,7 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -334,6 +340,7 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -368,6 +375,7 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -427,6 +435,7 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
@@ -489,6 +498,7 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 			WaitForFinalization:      true,
 		},
 		Client: disperserClient,
+		PolynomialForm: codecs.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
