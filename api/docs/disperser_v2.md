@@ -143,7 +143,9 @@ A reply to a DisperseBlob request.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | result | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob associated with the blob key. |
-| blob_key | [bytes](#bytes) |  | The unique identifier for the blob. Unique even if blob data is the identical. |
+| blob_key | [bytes](#bytes) |  | The unique 32 byte identifier for the blob.
+
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 The blob_key must thus be unique for every request, even if the same blob is being disperser. Meaning the blob_header must be different for each request. |
 
 
 

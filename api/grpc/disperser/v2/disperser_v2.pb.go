@@ -172,7 +172,12 @@ type DisperseBlobReply struct {
 
 	// The status of the blob associated with the blob key.
 	Result BlobStatus `protobuf:"varint,1,opt,name=result,proto3,enum=disperser.v2.BlobStatus" json:"result,omitempty"`
-	// The unique identifier for the blob. Unique even if blob data is the identical.
+	// The unique 32 byte identifier for the blob.
+	//
+	// The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+	// https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
+	// The blob_key must thus be unique for every request, even if the same blob is being disperser.
+	// Meaning the blob_header must be different for each request.
 	BlobKey []byte `protobuf:"bytes,2,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 }
 

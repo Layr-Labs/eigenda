@@ -55,13 +55,14 @@ BatchHeader is the header of a batch of blobs
 <a name="common-v2-BlobCertificate"></a>
 
 ### BlobCertificate
-BlobCertificate is what gets attested by the network
+BlobCertificate is what gets attested by the network.
+It gets constructed by the Disperser to which the DisperseBlob request was submitted.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header is the header of the blob |
-| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob |
+| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains metadata about the blob. The hash of this header is used to compute the blob key. |
+| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
 
@@ -71,7 +72,11 @@ BlobCertificate is what gets attested by the network
 <a name="common-v2-BlobHeader"></a>
 
 ### BlobHeader
-BlobHeader is the header of a blob
+BlobHeader contains the information needed to disperse a blob to the EigenDA network.
+It can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a 4844 blob.
+Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob
+to ethereum requires sending a tx who&#39;s data contains the hash of the kzg commit of the blob, which is
+dispersed separately.
 
 
 | Field | Type | Label | Description |

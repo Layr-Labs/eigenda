@@ -275,7 +275,7 @@
         
       
         <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
-        <p>BlobCertificate is what gets attested by the network</p>
+        <p>BlobCertificate is what gets attested by the network.</p><p>It gets constructed by the Disperser to which the DisperseBlob request was submitted.</p>
 
         
           <table class="field-table">
@@ -288,14 +288,18 @@
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p>blob_header is the header of the blob </p></td>
+                  <td><p>blob_header contains metadata about the blob. The hash of this header is used to compute the blob key. </p></td>
                 </tr>
               
                 <tr>
                   <td>relays</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p>relays is the list of relays that are in custody of the blob </p></td>
+                  <td><p>relays is the list of relays that are in custody of the blob.
+The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+It needs to contain at least 1 relay number.
+To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol </p></td>
                 </tr>
               
             </tbody>
@@ -306,7 +310,7 @@
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p>BlobHeader is the header of a blob</p>
+        <p>BlobHeader contains the information needed to disperse a blob to the EigenDA network.</p><p>It can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a 4844 blob.</p><p>Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob</p><p>to ethereum requires sending a tx who's data contains the hash of the kzg commit of the blob, which is</p><p>dispersed separately.</p>
 
         
           <table class="field-table">

@@ -21,7 +21,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// BlobHeader is the header of a blob
+// BlobHeader contains the information needed to disperse a blob to the EigenDA network.
+// It can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a 4844 blob.
+// Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob
+// to ethereum requires sending a tx who's data contains the hash of the kzg commit of the blob, which is
+// dispersed separately.
 type BlobHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -111,15 +115,20 @@ func (x *BlobHeader) GetSignature() []byte {
 	return nil
 }
 
-// BlobCertificate is what gets attested by the network
+// BlobCertificate is what gets attested by the network.
+// It gets constructed by the Disperser to which the DisperseBlob request was submitted.
 type BlobCertificate struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// blob_header is the header of the blob
+	// blob_header contains metadata about the blob. The hash of this header is used to compute the blob key.
 	BlobHeader *BlobHeader `protobuf:"bytes,1,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
-	// relays is the list of relays that are in custody of the blob
+	// relays is the list of relays that are in custody of the blob.
+	// The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+	// It needs to contain at least 1 relay number.
+	// To retrieve a blob from the relay, one can find that relay's URL in the EigenDARelayRegistry contract:
+	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol
 	Relays []uint32 `protobuf:"varint,2,rep,packed,name=relays,proto3" json:"relays,omitempty"`
 }
 
