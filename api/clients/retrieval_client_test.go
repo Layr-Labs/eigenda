@@ -3,7 +3,6 @@ package clients_test
 import (
 	"bytes"
 	"context"
-
 	"runtime"
 	"testing"
 

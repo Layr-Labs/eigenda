@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-
 	"math/big"
 	"runtime"
 	"sync"

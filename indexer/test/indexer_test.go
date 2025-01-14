@@ -2,7 +2,6 @@ package weth_test
 
 import (
 	"context"
-
 	"testing"
 	"time"
 
