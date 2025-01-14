@@ -52,9 +52,7 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(
-			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
-			nil).Once())
+		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
@@ -119,9 +117,7 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(
-			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
-			nil).Once())
+		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
@@ -192,9 +188,7 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(
-			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
-			nil).Once())
+		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
 	logger := log.NewLogger(log.DiscardHandler())
@@ -386,10 +380,9 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(&expectedBlobStatus, []byte("mock-request-id"), nil))
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Run(
-			func(args mock.Arguments) {
-				time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
-			}).
+		Run(func(args mock.Arguments) {
+			time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
+		}).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
@@ -418,9 +411,7 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(
-			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
-			nil).Once())
+		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
@@ -451,10 +442,9 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(&expectedBlobStatus, []byte("mock-request-id"), nil))
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Run(
-			func(args mock.Arguments) {
-				time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
-			}).
+		Run(func(args mock.Arguments) {
+			time.Sleep(100 * time.Millisecond) // Simulate a 100ms delay, which should fail the request
+		}).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
@@ -483,9 +473,7 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 		},
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
-		Return(
-			&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo},
-			nil).Once())
+		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	logger := log.NewLogger(log.DiscardHandler())
 	eigendaClient := clients.EigenDAClient{
 		Log: logger,
