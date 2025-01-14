@@ -48,7 +48,7 @@ The parameter for the GetChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 |
 | quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
 
 
@@ -93,7 +93,7 @@ StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  | a custody signature of the received batch |
+| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
 
 
 

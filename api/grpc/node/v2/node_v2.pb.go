@@ -120,7 +120,7 @@ type StoreChunksReply struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// a custody signature of the received batch
+	// a custody signature of the received chunks
 	Signature []byte `protobuf:"bytes,1,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
@@ -170,6 +170,8 @@ type GetChunksRequest struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The unique identifier for the blob the chunks are being requested for.
+	// The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+	// https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
 	BlobKey []byte `protobuf:"bytes,1,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 	// Which quorum of the blob to retrieve for (note: a blob can have multiple
 	// quorums and the chunks for different quorums at a Node can be different).

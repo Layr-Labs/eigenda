@@ -815,13 +815,15 @@ This is a catch all and should not be encountered absent a bug.</p></td>
               <tr>
                 <td>QUEUED</td>
                 <td>1</td>
-                <td><p>QUEUED means that the blob has been queued by the disperser for processing.</p></td>
+                <td><p>QUEUED means that the blob has been queued by the disperser for processing.
+The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
+the blob is stored in a queue of some sort, and a response immediately returned to the client.</p></td>
               </tr>
             
               <tr>
                 <td>ENCODED</td>
                 <td>2</td>
-                <td><p>ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes.</p></td>
+                <td><p>ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.</p></td>
               </tr>
             
               <tr>

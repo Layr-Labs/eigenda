@@ -40,8 +40,10 @@ const (
 	// This is a catch all and should not be encountered absent a bug.
 	BlobStatus_UNKNOWN BlobStatus = 0
 	// QUEUED means that the blob has been queued by the disperser for processing.
+	// The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
+	// the blob is stored in a queue of some sort, and a response immediately returned to the client.
 	BlobStatus_QUEUED BlobStatus = 1
-	// ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes.
+	// ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
 	BlobStatus_ENCODED BlobStatus = 2
 	// CERTIFIED means the blob has been dispersed and attested by the DA nodes.
 	BlobStatus_CERTIFIED BlobStatus = 3

@@ -266,7 +266,9 @@
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The unique identifier for the blob the chunks are being requested for. </p></td>
+                  <td><p>The unique identifier for the blob the chunks are being requested for.
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 </p></td>
                 </tr>
               
                 <tr>
@@ -358,7 +360,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>a custody signature of the received batch </p></td>
+                  <td><p>a custody signature of the received chunks </p></td>
                 </tr>
               
             </tbody>

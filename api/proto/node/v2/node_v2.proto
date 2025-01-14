@@ -65,13 +65,15 @@ message StoreChunksRequest {
 
 // StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 message StoreChunksReply {
-  // a custody signature of the received batch
+  // a custody signature of the received chunks
   bytes signature = 1;
 }
 
 // The parameter for the GetChunks() RPC.
 message GetChunksRequest {
   // The unique identifier for the blob the chunks are being requested for.
+  // The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+  // https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
   bytes blob_key = 1;
   // Which quorum of the blob to retrieve for (note: a blob can have multiple
   // quorums and the chunks for different quorums at a Node can be different).

@@ -1013,8 +1013,8 @@ Terminal states are states that will not be updated to a different state:
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug. |
-| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. |
-| ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes. |
+| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
+| ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes. |
 | FAILED | 4 | FAILED means that the blob has failed permanently. |
 | INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation. |
@@ -1443,7 +1443,7 @@ The parameter for the GetChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 |
 | quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
 
 
@@ -1488,7 +1488,7 @@ StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  | a custody signature of the received batch |
+| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
 
 
 

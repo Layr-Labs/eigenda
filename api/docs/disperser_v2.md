@@ -298,8 +298,8 @@ Terminal states are states that will not be updated to a different state:
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug. |
-| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. |
-| ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes. |
+| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
+| ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes. |
 | FAILED | 4 | FAILED means that the blob has failed permanently. |
 | INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation. |
