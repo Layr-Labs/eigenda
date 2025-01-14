@@ -156,7 +156,7 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 		return nil, fmt.Errorf("receive polynomial: %w", err)
 	}
 
-	decodedData, err := codecs.DecodeBlob(encodedBlob)
+	decodedData, err := codecs.DecodePayload(encodedBlob)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding blob: %w", err)
 	}
@@ -223,7 +223,7 @@ func (m *EigenDAClient) putBlob(
 	errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
-	encodedPayload := codecs.EncodeBlob(rawData)
+	encodedPayload := codecs.EncodePayload(rawData)
 	polynomial, err := m.preparePolynomial(encodedPayload)
 
 	if err != nil {

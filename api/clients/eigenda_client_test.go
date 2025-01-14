@@ -149,11 +149,11 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 
 	resultBlob, err := eigendaClient.GetBlob(context.Background(), []byte("mock-batch-header-hash"), 100)
 	require.NoError(t, err)
-	ifftBlob, err := codecs.IFFT(codecs.EncodeBlob(resultBlob))
+	ifftBlob, err := codecs.IFFT(codecs.EncodePayload(resultBlob))
 	require.NoError(t, err)
 	encodedBlob, err := codecs.FFT(ifftBlob)
 	require.NoError(t, err)
-	resultBlob, err = codecs.DecodeBlob(encodedBlob)
+	resultBlob, err = codecs.DecodePayload(encodedBlob)
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, resultBlob)
 }

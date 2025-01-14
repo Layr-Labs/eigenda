@@ -19,7 +19,7 @@ func randomByteSlice(length int64) []byte {
 	return b
 }
 
-// TestIFFTCodec tests the encoding and decoding of random byte streams
+// TestCodec tests the encoding and decoding of random byte streams
 func TestCodec(t *testing.T) {
 	// Number of test iterations
 	const iterations = 100
@@ -33,10 +33,10 @@ func TestCodec(t *testing.T) {
 		originalData := randomByteSlice(length.Int64() + 1) // ensure it's not length 0
 
 		// Encode the original data
-		encodedData := codecs.EncodeBlob(originalData)
+		encodedData := codecs.EncodePayload(originalData)
 
 		// Decode the encoded data
-		decodedData, err := codecs.DecodeBlob(encodedData)
+		decodedData, err := codecs.DecodePayload(encodedData)
 		if err != nil {
 			t.Fatalf("Iteration %d: failed to decode blob: %v", i, err)
 		}
