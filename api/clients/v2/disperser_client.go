@@ -213,6 +213,23 @@ func (c *disperserClient) DisperseBlob(
 		return nil, [32]byte{}, err
 	}
 
+	actualBlobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		// this shouldn't be possible, since the blob key has already been used when signing dispersal
+		return nil, [32]byte{}, fmt.Errorf("computing blob key: %w", err)
+	}
+
+	blobKeyFromDisperser, err := corev2.BytesToBlobKey(reply.GetBlobKey())
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("converting returned bytes to blob key: %w", err)
+	}
+
+	if actualBlobKey != blobKeyFromDisperser {
+		return nil, [32]byte{}, fmt.Errorf(
+			"blob key returned by disperser (%v) doesn't match blob which was dispersed (%v)",
+			blobKeyFromDisperser, actualBlobKey)
+	}
+
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
 }
 
