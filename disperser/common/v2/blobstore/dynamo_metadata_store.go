@@ -48,7 +48,7 @@ const (
 	// - and then it'll be 336 buckets in total (24 buckets/day * 14 days), which is also reasonable
 	requestedAtBucketSizeNano = uint64(time.Hour / time.Nanosecond)
 	// 14 days with 1 hour margin of safety.
-	maxBlobAgeInNano = uint64(1e9 * (14*24*3600 + 3600))
+	maxBlobAgeInNano = uint64((14*24*time.Hour + 1*time.Hour) / time.Nanosecond)
 )
 
 var (
