@@ -45,6 +45,9 @@ stop-infra:
 	./bin.sh stop-graph
 	docker stop localstack-test
 
+run-e2e-fuzz:
+	go test --fuzz -fuzztime=1m ./tests -v -config=../templates/testconfig-anvil.yaml
+
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml
 
