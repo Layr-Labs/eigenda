@@ -113,7 +113,11 @@ func DeployResources(
 	changeDirectory(filepath.Join(rootPath, "inabox"))
 	if err := pool.Retry(func() error {
 		fmt.Println("Creating S3 bucket")
-		return execCmd("./create-s3-bucket.sh", []string{}, []string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)})
+		return execCmd(
+			"./create-s3-bucket.sh",
+			[]string{},
+			[]string{fmt.Sprintf("AWS_URL=http://0.0.0.0:%s", localStackPort)},
+			true)
 	}); err != nil {
 		fmt.Println("Could not connect to docker:", err)
 		return err

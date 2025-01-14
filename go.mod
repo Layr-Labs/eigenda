@@ -41,6 +41,7 @@ require (
 	golang.org/x/sync v0.8.0
 	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.64.1
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -156,7 +157,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (
