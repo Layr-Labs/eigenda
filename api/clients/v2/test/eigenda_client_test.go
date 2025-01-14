@@ -46,7 +46,7 @@ func buildClientTester(t *testing.T) ClientTester {
 
 	random := testrandom.NewTestRandom(t)
 
-	g1Srs, err := kzg.ReadG1Points(g1Path, uint64(payloadLength), uint64(runtime.GOMAXPROCS(0)))
+	g1Srs, err := kzg.ReadG1Points(g1Path, 5, uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
@@ -70,6 +70,7 @@ func buildClientTester(t *testing.T) ClientTester {
 	}
 }
 
+// Builds a random blob key, blob bytes, and valid certificate
 func buildBlobAndCert(
 	t *testing.T,
 	tester ClientTester,
@@ -203,8 +204,8 @@ func TestRandomRelayRetries(t *testing.T) {
 
 	for i := 0; i < relayCount; i++ {
 		failedCallCount = 0
-		blob, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
-		require.NotNil(t, blob)
+		payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
+		require.NotNil(t, payload)
 		require.NoError(t, err)
 
 		requiredTries[failedCallCount] = true
@@ -229,11 +230,11 @@ func TestNoRelayResponse(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(nil, fmt.Errorf("offline relay"))
 
-	blob, err := tester.Client.GetPayload(
+	payload, err := tester.Client.GetPayload(
 		context.Background(),
 		blobKey,
 		blobCert)
-	require.Nil(t, blob)
+	require.Nil(t, payload)
 	require.NotNil(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
@@ -244,8 +245,8 @@ func TestNoRelays(t *testing.T) {
 	tester := buildClientTester(t)
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, []core.RelayKey{})
 
-	blob, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
-	require.Nil(t, blob)
+	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
+	require.Nil(t, payload)
 	require.NotNil(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
@@ -270,14 +271,95 @@ func TestGetBlobReturns0Len(t *testing.T) {
 		nil).Once()
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
-	blob, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
-	require.NotNil(t, blob)
+	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
+	require.NotNil(t, payload)
 	require.NoError(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
-// TestFailedDecoding verifies that a failed blob decode is handled gracefully, and that the client retries after such a failure
+// TestGetBlobReturnsDifferentBlob tests what happens when one relay returns a blob that doesn't match the commitment.
+// It also tests that the client retries to get the correct blob from a different relay
+func TestGetBlobReturnsDifferentBlob(t *testing.T) {
+	tester := buildClientTester(t)
+	relayCount := 10
+	relayKeys := make([]core.RelayKey, relayCount)
+	for i := 0; i < relayCount; i++ {
+		relayKeys[i] = tester.Random.Uint32()
+	}
+	blobKey1, blobBytes1, blobCert1 := buildBlobAndCert(t, tester, relayKeys)
+	_, blobBytes2, _ := buildBlobAndCert(t, tester, relayKeys)
+
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes2, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes1, nil).Once()
+
+	payload, err := tester.Client.GetPayload(
+		context.Background(),
+		blobKey1,
+		blobCert1)
+	require.NotNil(t, payload)
+	require.NoError(t, err)
+
+	tester.MockRelayClient.AssertExpectations(t)
+}
+
+// TestGetBlobReturnsInvalidBlob tests what happens if a relay returns a blob which causes commitment verification to
+// throw an error. It verifies that the client tries again with a different relay after such a failure.
+func TestGetBlobReturnsInvalidBlob(t *testing.T) {
+	tester := buildClientTester(t)
+	relayCount := 10
+	relayKeys := make([]core.RelayKey, relayCount)
+	for i := 0; i < relayCount; i++ {
+		relayKeys[i] = tester.Random.Uint32()
+	}
+	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+
+	tooLongBytes := make([]byte, len(blobBytes)+100)
+	copy(tooLongBytes[:], blobBytes)
+
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tooLongBytes, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+
+	// this will fail the first time, since there isn't enough srs loaded to compute the commitment of the returned bytes
+	// it will succeed when the second relay gives the correct bytes
+	payload, err := tester.Client.GetPayload(
+		context.Background(),
+		blobKey,
+		blobCert)
+
+	require.NotNil(t, payload)
+	require.NoError(t, err)
+
+	tester.MockRelayClient.AssertExpectations(t)
+}
+
+// TestGetBlobReturnsBlobWithInvalidLen check what happens if the blob length doesn't match the length that exists in
+// the BlobCommitment
+func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
+	tester := buildClientTester(t)
+
+	relayKeys := make([]core.RelayKey, 1)
+	relayKeys[0] = tester.Random.Uint32()
+
+	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+
+	blobCert.BlobHeader.BlobCommitments.Length--
+
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+
+	// this will fail, since the length in the BlobCommitment doesn't match the actual blob length
+	payload, err := tester.Client.GetPayload(
+		context.Background(),
+		blobKey,
+		blobCert)
+
+	require.Nil(t, payload)
+	require.Error(t, err)
+
+	tester.MockRelayClient.AssertExpectations(t)
+}
+
+// TestFailedDecoding verifies that a failed blob decode is handled gracefully
 func TestFailedDecoding(t *testing.T) {
 	tester := buildClientTester(t)
 
@@ -288,7 +370,7 @@ func TestFailedDecoding(t *testing.T) {
 	}
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	// intentionally cause the claimed length to differ from the actual length
+	// intentionally cause the payload header claimed length to differ from the actual length
 	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
 
 	// generate a malicious cert, which will verify for the invalid blob
@@ -302,10 +384,9 @@ func TestFailedDecoding(t *testing.T) {
 		blobBytes,
 		nil).Once()
 
-	// decoding will fail the first time, but succeed the second time
-	blob, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
+	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
 	require.Error(t, err)
-	require.Nil(t, blob)
+	require.Nil(t, payload)
 
 	tester.MockRelayClient.AssertExpectations(t)
 }
