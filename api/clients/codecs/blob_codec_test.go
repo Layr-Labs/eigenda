@@ -43,11 +43,7 @@ func TestCodec(t *testing.T) {
 
 		// Compare the original data with the decoded data
 		if !bytes.Equal(originalData, decodedData) {
-			t.Fatalf(
-				"Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v",
-				i,
-				originalData,
-				decodedData)
+			t.Fatalf("Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v", i, originalData, decodedData)
 		}
 	}
 }
