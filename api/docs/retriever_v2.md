@@ -23,7 +23,7 @@
 <a name="retriever-v2-BlobReply"></a>
 
 ### BlobReply
-
+A reply to a RetrieveBlob() request.
 
 
 | Field | Type | Label | Description |
@@ -38,7 +38,7 @@
 <a name="retriever-v2-BlobRequest"></a>
 
 ### BlobRequest
-
+A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().
 
 
 | Field | Type | Label | Description |

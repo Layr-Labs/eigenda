@@ -21,16 +21,25 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// BlobHeader contains the information needed to disperse a blob to the EigenDA network.
 type BlobHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	// Blob version
-	Version       uint32                 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
-	QuorumNumbers []uint32               `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	Commitment    *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	PaymentHeader *common.PaymentHeader  `protobuf:"bytes,4,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`
+	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	// quorum_numbers is the list of quorum numbers that the blob is part of.
+	// All quorums must be specified (including required quorums).
+	//
+	// The following quorums are currently required:
+	// - 0: ETH
+	// - 1: EIGEN
+	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
+	// commitment is the KZG commitment to the blob
+	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// payment_header contains payment information for the blob
+	PaymentHeader *common.PaymentHeader `protobuf:"bytes,4,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`
 	// signature over keccak hash of the blob_header that can be verified by blob_header.account_id
 	Signature []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
 }
@@ -102,14 +111,21 @@ func (x *BlobHeader) GetSignature() []byte {
 	return nil
 }
 
-// BlobCertificate is what gets attested by the network
+// BlobCertificate is what gets attested by the network.
+// It gets constructed by the Disperser to which the DisperseBlob request was submitted.
 type BlobCertificate struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// blob_header contains metadata about the blob.
 	BlobHeader *BlobHeader `protobuf:"bytes,1,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
-	Relays     []uint32    `protobuf:"varint,2,rep,packed,name=relays,proto3" json:"relays,omitempty"`
+	// relays is the list of relays that are in custody of the blob.
+	// The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+	// It needs to contain at least 1 relay number.
+	// To retrieve a blob from the relay, one can find that relay's URL in the EigenDARelayRegistry contract:
+	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol
+	Relays []uint32 `protobuf:"varint,2,rep,packed,name=relays,proto3" json:"relays,omitempty"`
 }
 
 func (x *BlobCertificate) Reset() {

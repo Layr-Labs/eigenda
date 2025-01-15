@@ -55,13 +55,14 @@ BatchHeader is the header of a batch of blobs
 <a name="common-v2-BlobCertificate"></a>
 
 ### BlobCertificate
-BlobCertificate is what gets attested by the network
+BlobCertificate is what gets attested by the network.
+It gets constructed by the Disperser to which the DisperseBlob request was submitted.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  |  |
-| relays | [uint32](#uint32) | repeated |  |
+| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains metadata about the blob. |
+| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
 
@@ -71,15 +72,17 @@ BlobCertificate is what gets attested by the network
 <a name="common-v2-BlobHeader"></a>
 
 ### BlobHeader
-
+BlobHeader contains the information needed to disperse a blob to the EigenDA network.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | version | [uint32](#uint32) |  | Blob version |
-| quorum_numbers | [uint32](#uint32) | repeated |  |
-| commitment | [common.BlobCommitment](#common-BlobCommitment) |  |  |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  |  |
+| quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of. All quorums must be specified (including required quorums).
+
+The following quorums are currently required: - 0: ETH - 1: EIGEN |
+| commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
+| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
 
 

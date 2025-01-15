@@ -275,7 +275,7 @@
         
       
         <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
-        <p>BlobCertificate is what gets attested by the network</p>
+        <p>BlobCertificate is what gets attested by the network.</p><p>It gets constructed by the Disperser to which the DisperseBlob request was submitted.</p>
 
         
           <table class="field-table">
@@ -288,14 +288,18 @@
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>blob_header contains metadata about the blob. </p></td>
                 </tr>
               
                 <tr>
                   <td>relays</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>relays is the list of relays that are in custody of the blob.
+The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+It needs to contain at least 1 relay number.
+To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol </p></td>
                 </tr>
               
             </tbody>
@@ -306,7 +310,7 @@
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p></p>
+        <p>BlobHeader contains the information needed to disperse a blob to the EigenDA network.</p>
 
         
           <table class="field-table">
@@ -326,21 +330,26 @@
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
+All quorums must be specified (including required quorums).
+
+The following quorums are currently required:
+- 0: ETH
+- 1: EIGEN </p></td>
                 </tr>
               
                 <tr>
                   <td>commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>commitment is the KZG commitment to the blob </p></td>
                 </tr>
               
                 <tr>
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>payment_header contains payment information for the blob </p></td>
                 </tr>
               
                 <tr>

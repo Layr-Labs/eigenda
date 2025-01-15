@@ -23,6 +23,7 @@ service Retriever {
 	rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
 }
 
+// A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().
 message BlobRequest {
 	// header of the blob to be retrieved
 	common.v2.BlobHeader blob_header = 1;
@@ -33,6 +34,7 @@ message BlobRequest {
 	uint32 quorum_id = 3;
 }
 
+// A reply to a RetrieveBlob() request.
 message BlobReply {
 	// The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest.
 	bytes data = 1;

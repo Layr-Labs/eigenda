@@ -21,6 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().
 type BlobRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -88,6 +89,7 @@ func (x *BlobRequest) GetQuorumId() uint32 {
 	return 0
 }
 
+// A reply to a RetrieveBlob() request.
 type BlobReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

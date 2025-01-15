@@ -4,8 +4,6 @@ import "common/common.proto";
 import "common/v2/common_v2.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
-// WARNING: the following RPCs are experimental and subject to change.
-
 // Disperser defines the public APIs for dispersing blobs.
 service Disperser {
   // DisperseBlob accepts blob to disperse from clients.
@@ -16,7 +14,7 @@ service Disperser {
 
   // GetBlobStatus is meant to be polled for the blob status.
   rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
-  
+
   // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
@@ -24,53 +22,80 @@ service Disperser {
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
-// Requests and Replys
+// Requests and Replies
 
+// A request to disperse a blob.
 message DisperseBlobRequest {
   // The data to be dispersed.
-  // The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-  // where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-  // as a field element on the bn254 curve. The valid range is
-  // 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+  //
+  // The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
+  // (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+  //
+  // Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
+  // significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
+  // The valid range is 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617.
   // If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
   bytes data = 1;
+  // The header contains metadata about the blob.
+  //
+  // This header can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a
+  // 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
+  // dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
+  // which is dispersed separately.
   common.v2.BlobHeader blob_header = 2;
 }
 
+// A reply to a DisperseBlob request.
 message DisperseBlobReply {
   // The status of the blob associated with the blob key.
   BlobStatus result = 1;
+  // The unique 32 byte identifier for the blob.
+  //
+  // The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+  // https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
+  // The blob_key must thus be unique for every request, even if the same blob is being dispersed.
+  // Meaning the blob_header must be different for each request.
+  //
+  // Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause
+  // the disperser to reject the blob (DisperseBlob() RPC will return an error).
   bytes blob_key = 2;
 }
 
 // BlobStatusRequest is used to query the status of a blob.
 message BlobStatusRequest {
+  // The unique identifier for the blob.
   bytes blob_key = 1;
 }
 
+// BlobStatusReply is the reply to a BlobStatusRequest.
 message BlobStatusReply {
   // The status of the blob.
   BlobStatus status = 1;
-  // The signed batch
+  // The signed batch. Unset if the status is not CERTIFIED.
   SignedBatch signed_batch = 2;
+  // BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+  // Unset if the status is not CERTIFIED.
   BlobVerificationInfo blob_verification_info = 3;
 }
 
-// Utility method used to generate the commitment of blob given its data.
-// This can be used to construct BlobHeader.commitment
+// The input for a BlobCommitmentRequest().
+// This can be used to construct a BlobHeader.commitment.
 message BlobCommitmentRequest {
+  // The blob data to compute the commitment for.
   bytes data = 1;
 }
 
+// The result of a BlobCommitmentRequest().
 message BlobCommitmentReply {
+  // The commitment of the blob.
   common.BlobCommitment blob_commitment = 1;
 }
 
 // GetPaymentStateRequest contains parameters to query the payment state of an account.
 message GetPaymentStateRequest {
+  // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
   // Signature over the account ID
-  // TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
   bytes signature = 2;
 }
 
@@ -93,29 +118,41 @@ message GetPaymentStateReply {
 // BlobStatus represents the status of a blob.
 // The status of a blob is updated as the blob is processed by the disperser.
 // The status of a blob can be queried by the client using the GetBlobStatus API.
-// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 // - QUEUED
 // - ENCODED
 // Terminal states are states that will not be updated to a different state:
+// - UNKNOWN
 // - CERTIFIED
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
+  // UNKNOWN means that the status of the blob is unknown.
+  // This is a catch all and should not be encountered absent a bug.
+  //
+  // This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+  // unanticipated bug.
   UNKNOWN = 0;
 
-  // QUEUED means that the blob has been queued by the disperser for processing
+  // QUEUED means that the blob has been queued by the disperser for processing.
+  // The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
+  // the blob is stored in a queue of some sort, and a response immediately returned to the client.
   QUEUED = 1;
 
-  // ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes
+  // ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
   ENCODED = 2;
 
-  // CERTIFIED means the blob has been dispersed and attested by the DA nodes
+  // CERTIFIED means the blob has been dispersed and attested by the DA nodes.
   CERTIFIED = 3;
 
-  // FAILED means that the blob has failed permanently
+  // FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+  // retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).
   FAILED = 4;
 
-  // INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation
+  // INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+  //
+  // This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+  // an inability to gather sufficient signatures.
   INSUFFICIENT_SIGNATURES = 5;
 }
 
@@ -153,25 +190,39 @@ message Attestation {
   bytes quorum_signed_percentages = 6;
 }
 
+// Global constant parameters defined by the payment vault.
 message PaymentGlobalParams {
+  // Global ratelimit for on-demand dispersals
   uint64 global_symbols_per_second = 1;
+  // Minimum number of symbols accounted for all dispersals
   uint32 min_num_symbols = 2;
+  // Price charged per symbol for on-demand dispersals
   uint32 price_per_symbol = 3;
+  // Reservation window for all reservations
   uint32 reservation_window = 4;
+  // quorums allowed to make on-demand dispersals
   repeated uint32 on_demand_quorum_numbers = 5;
 }
 
+// Reservation parameters of an account, used to determine the rate limit for the account.
 message Reservation {
+  // rate limit for the account
   uint64 symbols_per_second = 1;
+  // start timestamp of the reservation
   uint32 start_timestamp = 2;
+  // end timestamp of the reservation
   uint32 end_timestamp = 3;
+  // quorums allowed to make reserved dispersals
   repeated uint32 quorum_numbers = 4;
+  // quorum splits describes how the payment is split among the quorums
   repeated uint32 quorum_splits = 5;
 }
 
-// PeriodRecord is the usage record of an account in a bin. The API should return the active bin 
+// PeriodRecord is the usage record of an account in a bin. The API should return the active bin
 // record and the subsequent two records that contains potential overflows.
 message PeriodRecord {
+  // Period index of the reservation
   uint32 index = 1;
+  // symbol usage recorded
   uint64 usage = 2;
 }
