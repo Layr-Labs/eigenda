@@ -174,20 +174,31 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
 
         // Register Reservations for client as the eigenDACommunityMultisig
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
+        IPaymentVault.Reservation memory reservation1 = IPaymentVault.Reservation({
+            symbolsPerSecond: 50,   // 15k symbols over 5 minute bin interval
             startTimestamp: uint64(block.timestamp),
             endTimestamp: uint64(block.timestamp + 1000000000),
             quorumNumbers: hex"0001",
             quorumSplits: hex"3232"
         });
-        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand 
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
-        vm.stopBroadcast();
+        paymentVault.setReservation(address(0x1aa8226f6d354380dDE75eE6B634875c4203e522), reservation1);
 
+        // small reservation
+        IPaymentVault.Reservation memory reservation2 = IPaymentVault.Reservation({
+            symbolsPerSecond: 15,    // 4500 symbols over 5 minute bin interval
+            startTimestamp: uint64(block.timestamp),
+            endTimestamp: uint64(block.timestamp + 1000000000),
+            quorumNumbers: hex"0001",
+            quorumSplits: hex"3232"
+        });
+        paymentVault.setReservation(address(0x1113cAAD341fa57b14bBCfFa69b591f7032588C0), reservation2);
+
+        // Deposit OnDemand 
+        paymentVault.depositOnDemand{value: 0.1 ether}(address(0x1aa8226f6d354380dDE75eE6B634875c4203e522));
+        paymentVault.depositOnDemand{value: 2000 gwei}(address(0xFCAd0B19bB29D4674531d6f115237E16AfCE377c));
+
+        vm.stopBroadcast();
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
             vm.startBroadcast(stakerPrivateKeys[i]);
