@@ -117,13 +117,16 @@ func TestChurner(t *testing.T) {
 		assert.NoError(t, err)
 
 		opG1PointHex := opSigner.GetPublicKeyG1()
-		opG1PointByes, err := hex.DecodeString(opG1PointHex)
+		opG1PointBytes, err := hex.DecodeString(opG1PointHex)
 		assert.NoError(t, err)
 		opG1Point := new(core.G1Point)
-		opG1Point, err = opG1Point.Deserialize(opG1PointByes)
+		opG1Point, err = opG1Point.Deserialize(opG1PointBytes)
 		assert.NoError(t, err)
 		opG2PointHex := opSigner.GetPublicKeyG2()
-		opG2PointByes, err := hex.DecodeString(opG2PointHex)
+		opG2PointBytes, err := hex.DecodeString(opG2PointHex)
+		assert.NoError(t, err)
+		opG2Point := new(core.G2Point)
+		opG2Point, err = opG2Point.Deserialize(opG2PointBytes)
 		assert.NoError(t, err)
 		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
 		assert.NoError(t, err)
@@ -142,8 +145,8 @@ func TestChurner(t *testing.T) {
 			operatorAddr = sk.Address.Hex()
 			signer = opSigner
 			operatorPrivateKey = sk.PrivateKey
-			g1PointBytes = opG1PointByes
-			g2PointBytes = opG2PointByes
+			g1PointBytes = opG1Point.Serialize()
+			g2PointBytes = opG2Point.Serialize()
 			break
 		}
 		err = tx.RegisterOperator(ctx, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
