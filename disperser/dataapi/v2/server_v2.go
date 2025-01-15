@@ -309,17 +309,17 @@ func (s *ServerV2) Shutdown() error {
 
 // FetchBlobFeedHandler godoc
 //
-// @Summary      Fetch blob feed
-// @Tags         Blob
-// @Produce      json
-// @Param        end               query    string  false  "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-// @Param        interval          query    int     false  "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
-// @Param        pagination_token  query    string  false  "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
-// @Param        limit             query    int     false  "The maximum number of blobs to fetch. Unlimited if limit <= 0 [default: 20]"
-// @Success      200               {object} BlobFeedResponse
-// @Failure      400               {object} ErrorResponse  "error: Bad request"
-// @Failure      404               {object} ErrorResponse  "error: Not found"
-// @Failure      500               {object} ErrorResponse  "error: Server error"
+//	@Summary	Fetch blob feed
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
+//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. Unlimited if limit <= 0 [default: 20]"
+//	@Success	200					{object}	BlobFeedResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
 func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBlobFeedHandler", f*1000) // make milliseconds
