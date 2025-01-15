@@ -3,10 +3,13 @@ package testutils
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/rand"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/rand"
 )
 
 // InitializeRandom initializes the random number generator. If no arguments are provided, then the seed is randomly
@@ -111,4 +114,8 @@ func RandomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func GetLogger() logging.Logger {
+	return logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 }

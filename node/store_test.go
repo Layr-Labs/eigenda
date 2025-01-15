@@ -15,8 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/node"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -213,7 +213,7 @@ func CreateBatchWith(t *testing.T, encodeBundle bool) (*core.BatchHeader, []*cor
 func createStore(t *testing.T) *node.Store {
 	noopMetrics := metrics.NewNoopMetrics()
 	reg := prometheus.NewRegistry()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorId := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	tx := &coremock.MockWriter{}
 	dat, _ := mock.MakeChainDataMock(map[uint8]int{

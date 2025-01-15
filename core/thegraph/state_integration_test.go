@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -67,7 +68,7 @@ func setup() {
 		PrivateKeyString: pk,
 		NumConfirmations: 0,
 		NumRetries:       1,
-	}, gethcommon.Address{}, logging.NewNoopLogger())
+	}, gethcommon.Address{}, testutils.GetLogger())
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +96,7 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
