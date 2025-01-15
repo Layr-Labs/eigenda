@@ -6,15 +6,22 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/core"
+)
+
+const (
+	DefaultDispersalTimeout          = 30 * time.Second
+	DefaultConfirmationTimeout       = 15 * time.Minute
+	DefaultStatusQueryRetryInterval  = 5 * time.Second
+	DefaultStatusQueryTimeout        = 25 * time.Minute
 )
 
 type EigenDAClientConfig struct {
 	// RPC is the HTTP provider URL for the EigenDA Disperser
 	RPC string
 
-	// Timeout used when making dispersals to the EigenDA Disperser
-	// TODO: we should change this param as its name is quite confusing
-	ResponseTimeout time.Duration
+	// DispersalTimeout is the timeout used when making dispersal requests to the EigenDA Disperser
+	DispersalTimeout time.Duration
 
 	// The total amount of time that the client will spend waiting for EigenDA
 	// to "confirm" (include onchain) a blob after it has been dispersed. Note that
@@ -25,9 +32,10 @@ type EigenDAClientConfig struct {
 	// the client will return an api.ErrorFailover to let the caller failover to EthDA.
 	ConfirmationTimeout time.Duration
 
-	// The total amount of time that the client will spend waiting for EigenDA
-	// to confirm a blob after it has been dispersed
-	// Note that reasonable values for this field will depend on the value of WaitForFinalization.
+	// The maximum duration the client will spend querying for blob status
+	// after it has been dispersed and confirmed on-chain. This timeout is particularly
+	// important when WaitForFinalization is true, as finalization can take longer than
+	// just confirmation.
 	StatusQueryTimeout time.Duration
 
 	// The amount of time to wait between status queries of a newly dispersed blob
@@ -50,8 +58,7 @@ type EigenDAClientConfig struct {
 	WaitForFinalization bool
 
 	// The quorum IDs to write blobs to using this client. Should not include default quorums 0 or 1.
-	// TODO: should we change this to core.QuorumID instead? https://github.com/Layr-Labs/eigenda/blob/style--improve-api-clients-comments/core/data.go#L18
-	CustomQuorumIDs []uint
+	CustomQuorumIDs []core.QuorumID
 
 	// Signer private key in hex encoded format. This key is currently purely used for authn/authz on the disperser.
 	// For security, it should not be associated with an Ethereum address holding any funds.
@@ -90,19 +97,17 @@ func (c *EigenDAClientConfig) CheckAndSetDefaults() error {
 		return fmt.Errorf("EigenDAClientConfig.EthRpcUrl not set. Needed to verify blob confirmed on-chain.")
 	}
 
-	if c.ResponseTimeout == 0 {
-		c.ResponseTimeout = 30 * time.Second
+	if c.DispersalTimeout == 0 {
+		c.DispersalTimeout = DefaultDispersalTimeout
 	}
 	if c.ConfirmationTimeout == 0 {
-		// batching interval on mainnet is 10 minutes,
-		// so we set the confirmation timeout to 15 minutes to give some buffer
-		c.ConfirmationTimeout = 15 * time.Minute
+		c.ConfirmationTimeout = DefaultConfirmationTimeout
 	}
 	if c.StatusQueryRetryInterval == 0 {
-		c.StatusQueryRetryInterval = 5 * time.Second
+		c.StatusQueryRetryInterval = DefaultStatusQueryRetryInterval
 	}
 	if c.StatusQueryTimeout == 0 {
-		c.StatusQueryTimeout = 25 * time.Minute
+		c.StatusQueryTimeout = DefaultStatusQueryTimeout
 	}
 	if c.ConfirmationTimeout > c.StatusQueryTimeout {
 		// doesn't make sense... confirmation is about onchain inclusion, whereas status query is about reaching finality (after inclusion)
