@@ -8,8 +8,8 @@ import (
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -27,7 +27,7 @@ var _ core.IndexedChainState = (*ChainDataMock)(nil)
 type PrivateOperatorInfo struct {
 	*core.IndexedOperatorInfo
 	KeyPair       *core.KeyPair
-	Signer        sdkSigner.Signer
+	Signer        blssigner.Signer
 	Host          string
 	DispersalPort string
 	RetrievalPort string
@@ -146,9 +146,9 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
 		}
 
-		signer, _ := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+		signer, _ := blssigner.NewSigner(blssignerTypes.SignerConfig{
 			PrivateKey: d.KeyPairs[id].PrivKey.String(),
-			SignerType: sdkSignerTypes.PrivateKey,
+			SignerType: blssignerTypes.PrivateKey,
 		})
 
 		private := &PrivateOperatorInfo{

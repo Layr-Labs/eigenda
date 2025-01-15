@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/core"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +40,7 @@ func (t *MockWriter) GetRegisteredQuorumIdsForOperator(ctx context.Context, oper
 func (t *MockWriter) RegisterOperator(
 	ctx context.Context,
 	keypair *core.KeyPair,
-	signer sdkSigner.Signer,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -54,7 +54,7 @@ func (t *MockWriter) RegisterOperator(
 func (t *MockWriter) RegisterOperatorWithChurn(
 	ctx context.Context,
 	keypair *core.KeyPair,
-	signer sdkSigner.Signer,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,

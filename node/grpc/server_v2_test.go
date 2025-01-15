@@ -24,8 +24,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -57,8 +57,8 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	keyPair, err := core.GenRandomBlsKeys()
 	require.NoError(t, err)
 	require.NoError(t, err)
-	signer, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
-		SignerType: sdkSignerTypes.PrivateKey,
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		SignerType: blssignerTypes.PrivateKey,
 		PrivateKey: keyPair.PrivKey.String(),
 	})
 	require.NoError(t, err)

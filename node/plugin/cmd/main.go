@@ -15,8 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
@@ -59,7 +59,7 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: plugin configs and flags parsed")
 
-	signerCfg := sdkSignerTypes.SignerConfig{
+	signerCfg := blssignerTypes.SignerConfig{
 		PublicKeyHex:     config.BLSPublicKeyHex,
 		CerberusUrl:      config.BLSRemoteSignerUrl,
 		CerberusPassword: config.BlsKeyPassword,
@@ -68,11 +68,11 @@ func pluginOps(ctx *cli.Context) {
 		Password:         config.BlsKeyPassword,
 	}
 	if config.BLSRemoteSignerUrl != "" {
-		signerCfg.SignerType = sdkSignerTypes.Cerberus
+		signerCfg.SignerType = blssignerTypes.Cerberus
 	} else {
-		signerCfg.SignerType = sdkSignerTypes.Local
+		signerCfg.SignerType = blssignerTypes.Local
 	}
-	signer, err := sdkSigner.NewSigner(signerCfg)
+	signer, err := blssigner.NewSigner(signerCfg)
 	if err != nil {
 		log.Printf("Error: failed to create BLS signer: %v", err)
 		return

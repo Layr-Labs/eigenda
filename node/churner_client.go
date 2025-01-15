@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
@@ -24,7 +24,7 @@ type ChurnerClient interface {
 	// Churn sends a churn request to the churner service
 	// The quorumIDs cannot be empty, but may contain quorums that the operator is already registered in.
 	// If the operator is already registered in a quorum, the churner will ignore it and continue with the other quorums.
-	Churn(ctx context.Context, operatorAddress string, sdkSigner sdkSigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
+	Churn(ctx context.Context, operatorAddress string, blssigner blssigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
 }
 
 type churnerClient struct {
@@ -46,7 +46,7 @@ func NewChurnerClient(churnerURL string, useSecureGrpc bool, timeout time.Durati
 func (c *churnerClient) Churn(
 	ctx context.Context,
 	operatorAddress string,
-	sdkSigner sdkSigner.Signer,
+	blssigner blssigner.Signer,
 	quorumIDs []core.QuorumID,
 ) (*churnerpb.ChurnReply, error) {
 	if len(quorumIDs) == 0 {
@@ -60,7 +60,7 @@ func (c *churnerClient) Churn(
 	}
 	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumIDs[:], bytes)
 
-	g1, g2, err := getG1G2FromSdkSigner(sdkSigner)
+	g1, g2, err := getG1G2Fromblssigner(blssigner)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (c *churnerClient) Churn(
 	// sign the request
 	messageHash := churner.CalculateRequestHash(churnRequest)
 	messageHashBytes := messageHash[:]
-	signatureBytes, err := sdkSigner.Sign(ctx, messageHashBytes)
+	signatureBytes, err := blssigner.Sign(ctx, messageHashBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -128,10 +128,10 @@ func (c *churnerClient) Churn(
 	return gc.Churn(ctx, churnRequestPb, opt)
 }
 
-func getG1G2FromSdkSigner(sdkSigner sdkSigner.Signer) (*core.G1Point, *core.G2Point, error) {
+func getG1G2Fromblssigner(blssigner blssigner.Signer) (*core.G1Point, *core.G2Point, error) {
 	g1 := new(core.G1Point)
 	g2 := new(core.G2Point)
-	g1KeyBytes, err := hex.DecodeString(sdkSigner.GetPublicKeyG1())
+	g1KeyBytes, err := hex.DecodeString(blssigner.GetPublicKeyG1())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -139,7 +139,7 @@ func getG1G2FromSdkSigner(sdkSigner sdkSigner.Signer) (*core.G1Point, *core.G2Po
 	if err != nil {
 		return nil, nil, err
 	}
-	g2KeyBytes, err := hex.DecodeString(sdkSigner.GetPublicKeyG2())
+	g2KeyBytes, err := hex.DecodeString(blssigner.GetPublicKeyG2())
 	if err != nil {
 		return nil, nil, err
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -77,7 +77,7 @@ type Config struct {
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
 
-	BlsSignerConfig sdkSignerTypes.SignerConfig
+	BlsSignerConfig blssignerTypes.SignerConfig
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -166,11 +166,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ethClientConfig = geth.ReadEthClientConfig(ctx)
 	}
 
-	var blsSignerConfig sdkSignerTypes.SignerConfig
+	var blsSignerConfig blssignerTypes.SignerConfig
 	if !testMode {
 		blsSignerCertFilePath := ctx.GlobalString(flags.BLSSignerCertFileFlag.Name)
 		enableTLS := len(blsSignerCertFilePath) > 0
-		signerType := sdkSignerTypes.Local
+		signerType := blssignerTypes.Local
 
 		// check if BLS remote signer configuration is provided
 		blsRemoteSignerEnabled := ctx.GlobalBool(flags.BLSRemoteSignerEnabledFlag.Name)
@@ -187,10 +187,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 
 		if blsRemoteSignerEnabled {
-			signerType = sdkSignerTypes.Cerberus
+			signerType = blssignerTypes.Cerberus
 		}
 
-		blsSignerConfig = sdkSignerTypes.SignerConfig{
+		blsSignerConfig = blssignerTypes.SignerConfig{
 			SignerType:       signerType,
 			Path:             blsKeyFilePath,
 			Password:         blsKeyPassword,
@@ -202,8 +202,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		}
 	} else {
 		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
-		blsSignerConfig = sdkSignerTypes.SignerConfig{
-			SignerType: sdkSignerTypes.PrivateKey,
+		blsSignerConfig = blssignerTypes.SignerConfig{
+			SignerType: blssignerTypes.PrivateKey,
 			PrivateKey: privateBls,
 		}
 	}

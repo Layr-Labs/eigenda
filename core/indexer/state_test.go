@@ -27,8 +27,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -53,9 +53,9 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 	for _, op := range env.Operators {
 		tx := mustMakeOperatorTransactor(env, op, logger)
 
-		signer, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+		signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
 			PrivateKey: op.NODE_TEST_PRIVATE_BLS,
-			SignerType: sdkSignerTypes.PrivateKey,
+			SignerType: blssignerTypes.PrivateKey,
 		})
 		Expect(err).To(BeNil())
 

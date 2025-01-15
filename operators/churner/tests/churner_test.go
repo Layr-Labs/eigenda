@@ -24,8 +24,8 @@ import (
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -106,13 +106,13 @@ func TestChurner(t *testing.T) {
 	var tx *eth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
 	var keyPair *dacore.KeyPair
-	var signer sdkSigner.Signer
+	var signer blssigner.Signer
 	for i, op := range testConfig.Operators {
 		socket := fmt.Sprintf("%s:%s:%s", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT, op.NODE_RETRIEVAL_PORT)
-		opSigner, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+		opSigner, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
 			Path:       op.NODE_BLS_KEY_FILE,
 			Password:   op.NODE_BLS_KEY_PASSWORD,
-			SignerType: sdkSignerTypes.Local,
+			SignerType: blssignerTypes.Local,
 		})
 		assert.NoError(t, err)
 		kp, err := bls.ReadPrivateKeyFromFile(op.NODE_BLS_KEY_FILE, op.NODE_BLS_KEY_PASSWORD)

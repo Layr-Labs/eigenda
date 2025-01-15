@@ -12,7 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -22,7 +22,7 @@ type Operator struct {
 	Timeout             time.Duration
 	PrivKey             *ecdsa.PrivateKey
 	KeyPair             *core.KeyPair
-	Signer              sdkSigner.Signer
+	Signer              blssigner.Signer
 	OperatorId          core.OperatorID
 	QuorumIDs           []core.QuorumID
 	RegisterNodeAtStart bool

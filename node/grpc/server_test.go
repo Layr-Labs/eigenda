@@ -23,8 +23,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -101,8 +101,8 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	if err != nil {
 		panic("failed to create a BLS Key")
 	}
-	signer, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
-		SignerType: sdkSignerTypes.PrivateKey,
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		SignerType: blssignerTypes.PrivateKey,
 		PrivateKey: keyPair.PrivKey.String(),
 	})
 	if err != nil {

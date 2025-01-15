@@ -11,8 +11,8 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
-	sdkSignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,9 +23,9 @@ func TestRegisterOperator(t *testing.T) {
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
-	signer, err := sdkSigner.NewSigner(sdkSignerTypes.SignerConfig{
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
 		PrivateKey: keyPair.PrivKey.String(),
-		SignerType: sdkSignerTypes.PrivateKey,
+		SignerType: blssignerTypes.PrivateKey,
 	})
 	assert.NoError(t, err)
 	// Create a new operator

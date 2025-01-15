@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -147,7 +147,7 @@ type Writer interface {
 	RegisterOperator(
 		ctx context.Context,
 		keypair *KeyPair,
-		signer sdkSigner.Signer,
+		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,
 		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -160,7 +160,7 @@ type Writer interface {
 	RegisterOperatorWithChurn(
 		ctx context.Context,
 		keypair *KeyPair,
-		signer sdkSigner.Signer,
+		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,
 		operatorEcdsaPrivateKey *ecdsa.PrivateKey,

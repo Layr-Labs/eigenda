@@ -40,7 +40,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	sdkSigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 
 	"github.com/gammazero/workerpool"
 )
@@ -75,7 +75,7 @@ type Node struct {
 	ChainID                 *big.Int
 	BLSPublicKeyHex         string
 
-	BlsSigner sdkSigner.Signer
+	BlsSigner blssigner.Signer
 
 	RelayClient atomic.Value
 
@@ -125,7 +125,7 @@ func NewNode(
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
 
-	blsSigner, err := sdkSigner.NewSigner(config.BlsSignerConfig)
+	blsSigner, err := blssigner.NewSigner(config.BlsSignerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BLS signer: %w", err)
 	}
