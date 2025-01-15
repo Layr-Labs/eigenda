@@ -1,9 +1,11 @@
 package codec_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
@@ -46,6 +48,36 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 			require.Nil(t, err)
 			restored := codec.RemoveEmptyByteFromPaddedBytes(paddedData)
 			require.Equal(t, data, restored)
+		}
+	}
+}
+
+// TestCodec tests the encoding and decoding of random byte streams
+func TestPayloadEncoding(t *testing.T) {
+	testRandom := random.NewTestRandom(t)
+
+	// Number of test iterations
+	const iterations = 100
+
+	for i := 0; i < iterations; i++ {
+		originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
+
+		// Encode the original data
+		encodedData := codec.EncodePayload(originalData)
+
+		// Decode the encoded data
+		decodedData, err := codec.DecodePayload(encodedData)
+		if err != nil {
+			t.Fatalf("Iteration %d: failed to decode blob: %v", i, err)
+		}
+
+		// Compare the original data with the decoded data
+		if !bytes.Equal(originalData, decodedData) {
+			t.Fatalf(
+				"Iteration %d: original and decoded data do not match\nOriginal: %v\nDecoded: %v",
+				i,
+				originalData,
+				decodedData)
 		}
 	}
 }

@@ -10,13 +10,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
@@ -28,7 +28,7 @@ import (
 type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
-	GetCodec() codecs.BlobCodec
+	GetPolynomialForm() codec.PolynomialForm
 	Close() error
 }
 
@@ -39,12 +39,12 @@ type IEigenDAClient interface {
 type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
-	Config      EigenDAClientConfig
-	Log         log.Logger
-	Client      DisperserClient
-	ethClient   *ethclient.Client
-	edasmCaller *edasm.ContractEigenDAServiceManagerCaller
-	Codec       codecs.BlobCodec
+	Config         EigenDAClientConfig
+	Log            log.Logger
+	Client         DisperserClient
+	ethClient      *ethclient.Client
+	edasmCaller    *edasm.ContractEigenDAServiceManagerCaller
+	PolynomialForm codec.PolynomialForm
 }
 
 var _ IEigenDAClient = &EigenDAClient{}
@@ -115,30 +115,29 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
 
-	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.PutBlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create low level codec: %w", err)
-	}
-
-	var codec codecs.BlobCodec
+	var polynomialForm codec.PolynomialForm
 	if config.DisablePointVerificationMode {
-		codec = codecs.NewNoIFFTCodec(lowLevelCodec)
+		polynomialForm = codec.Eval
 	} else {
-		codec = codecs.NewIFFTCodec(lowLevelCodec)
+		polynomialForm = codec.Coeff
 	}
 
 	return &EigenDAClient{
-		Log:         log,
-		Config:      config,
-		Client:      disperserClient,
-		ethClient:   ethClient,
-		edasmCaller: edasmCaller,
-		Codec:       codec,
+		Log:            log,
+		Config:         config,
+		Client:         disperserClient,
+		ethClient:      ethClient,
+		edasmCaller:    edasmCaller,
+		PolynomialForm: polynomialForm,
 	}, nil
 }
 
-func (m *EigenDAClient) GetCodec() codecs.BlobCodec {
-	return m.Codec
+// GetPolynomialForm returns the form of polynomials, as they are distributed in the system
+//
+// The polynomial form indicates how blobs must be constructed before dispersal, and how received blobs ought to be
+// interpreted.
+func (m *EigenDAClient) GetPolynomialForm() codec.PolynomialForm {
+	return m.PolynomialForm
 }
 
 // GetBlob retrieves a blob from the EigenDA service using the provided context,
@@ -159,12 +158,17 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 		return nil, fmt.Errorf("blob has length zero - this should not be possible")
 	}
 
-	decodedData, err := m.Codec.DecodeBlob(data)
+	encodedPayload, err := m.blobToEncodedPayload(data)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding blob: %w", err)
+		return nil, fmt.Errorf("blob to encoded payload: %w", err)
 	}
 
-	return decodedData, nil
+	decodedPayload, err := codec.DecodePayload(encodedPayload)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding payload: %w", err)
+	}
+
+	return decodedPayload, nil
 }
 
 // PutBlob encodes and writes a blob to EigenDA, waiting for a desired blob status
@@ -220,13 +224,9 @@ func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultCh
 func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
-	// encode blob
-	if m.Codec == nil {
-		errChan <- api.NewErrorInternal("codec not initialized")
-		return
-	}
+	encodedPayload := codec.EncodePayload(rawData)
+	blob, err := m.encodedPayloadToBlob(encodedPayload)
 
-	data, err := m.Codec.EncodeBlob(rawData)
 	if err != nil {
 		// Encode can only fail if there is something wrong with the data, so we return a 400 error
 		errChan <- api.NewErrorInvalidArg(fmt.Sprintf("error encoding blob: %v", err))
@@ -240,7 +240,7 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 	// disperse blob
 	// TODO: would be nice to add a trace-id key to the context, to be able to follow requests from batcher->proxy->eigenda
 	// clients with a payment signer setting can disperse paid blobs
-	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, data, customQuorumNumbers)
+	_, requestID, err := m.Client.DisperseBlobAuthenticated(ctxFinality, blob, customQuorumNumbers)
 	if err != nil {
 		// DisperserClient returned error is already a grpc error which can be a 400 (eg rate limited) or 500,
 		// so we wrap the error such that clients can still use grpc's status.FromError() function to get the status code.
@@ -374,12 +374,12 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 
 // Close simply calls Close() on the wrapped disperserClient, to close the grpc connection to the disperser server.
 // It is thread safe and can be called multiple times.
-func (c *EigenDAClient) Close() error {
-	return c.Client.Close()
+func (m *EigenDAClient) Close() error {
+	return m.Client.Close()
 }
 
 // getConfDeepBlockNumber returns the block number that is `depth` blocks behind the current block number.
-func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64) (*big.Int, error) {
+func (m *EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64) (*big.Int, error) {
 	curBlockNumber, err := m.ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block number: %w", err)
@@ -396,7 +396,7 @@ func (m EigenDAClient) getConfDeepBlockNumber(ctx context.Context, depth uint64)
 // batchIdConfirmedAtDepth checks if a batch ID has been confirmed at a certain depth.
 // It returns true if the batch ID has been confirmed at the given depth, and false otherwise,
 // or returns an error if any of the network calls fail.
-func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
+func (m *EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint32, depth uint64) (bool, error) {
 	confDeepBlockNumber, err := m.getConfDeepBlockNumber(ctx, depth)
 	if err != nil {
 		return false, fmt.Errorf("failed to get confirmation deep block number: %w", err)
@@ -409,4 +409,44 @@ func (m EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uint
 		return false, nil
 	}
 	return true, nil
+}
+
+// blobToEncodedPayload accepts blob bytes and converts them into an encoded payload
+//
+// If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the blob bytes.
+// If the system is configured to distribute blobs in Coeff form, the blob is FFTed before being returned
+func (m *EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
+	switch m.PolynomialForm {
+	case codec.Eval:
+		return blob, nil
+	case codec.Coeff:
+		encodedPayload, err := codec.FFT(blob)
+		if err != nil {
+			return nil, fmt.Errorf("fft: %w", err)
+		}
+
+		return encodedPayload, nil
+	default:
+		return nil, fmt.Errorf("unknown polynomial form: %v", m.PolynomialForm)
+	}
+}
+
+// encodedPayloadToBlob accepts encoded payload bytes and converts them into a blob
+//
+// If the system is configured to distribute blobs in Eval form, the returned bytes exactly match the input bytes
+// If the system is configured to distribute blobs in Coeff form, the encoded payload is IFFTed before being returned
+func (m *EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, error) {
+	switch m.PolynomialForm {
+	case codec.Eval:
+		return encodedPayload, nil
+	case codec.Coeff:
+		coeffPolynomial, err := codec.IFFT(encodedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("ifft: %w", err)
+		}
+
+		return coeffPolynomial, nil
+	default:
+		return nil, fmt.Errorf("unknown polynomial form: %v", m.PolynomialForm)
+	}
 }
