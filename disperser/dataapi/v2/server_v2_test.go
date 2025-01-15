@@ -472,10 +472,10 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
-		// for i := 0; i < 60; i++ {
-		// 	checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
-		// 	assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
-		// }
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
+		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
 	})
@@ -484,7 +484,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		// Querying the blobs in the past hour, with limit=20
 		// It should return keys[43], ..., keys[62].
 		tm := time.Unix(0, time.Now().UnixNano()).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
