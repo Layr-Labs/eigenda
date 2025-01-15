@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -66,12 +66,12 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 			CustomQuorumIDs:              []uint{},
 			SignerPrivateKeyHex:          "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:                   false,
-			PutBlobEncodingVersion:       codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:       codec.BlobEncodingVersion0,
 			DisablePointVerificationMode: false,
 			WaitForFinalization:          true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -132,12 +132,12 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 			CustomQuorumIDs:              []uint{},
 			SignerPrivateKeyHex:          "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:                   false,
-			PutBlobEncodingVersion:       codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:       codec.BlobEncodingVersion0,
 			DisablePointVerificationMode: true,
 			WaitForFinalization:          true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Eval,
+		PolynomialForm: codec.Eval,
 	}
 	expectedBlob := []byte("dc49e7df326cfb2e7da5cf68f263e1898443ec2e862350606e7dfbda55ad10b5d61ed1d54baf6ae7a86279c1b4fa9c49a7de721dacb211264c1f5df31bade51c")
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), expectedBlob)
@@ -165,11 +165,11 @@ func TestPutBlobFailDispersal(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -198,11 +198,11 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -231,11 +231,11 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -264,11 +264,11 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -299,11 +299,11 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 	require.Error(t, err)
@@ -359,11 +359,11 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 
@@ -422,11 +422,11 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 			CustomQuorumIDs:          []uint{},
 			SignerPrivateKeyHex:      "75f9e29cac7f5774d106adb355ef294987ce39b7863b75bb3f2ea42ca160926d",
 			DisableTLS:               false,
-			PutBlobEncodingVersion:   codecs.BlobEncodingVersion0,
+			PutBlobEncodingVersion:   codec.BlobEncodingVersion0,
 			WaitForFinalization:      true,
 		},
 		Client:         disperserClient,
-		PolynomialForm: codecs.Coeff,
+		PolynomialForm: codec.Coeff,
 	}
 	blobInfo, err := eigendaClient.PutBlob(context.Background(), []byte("hello"))
 

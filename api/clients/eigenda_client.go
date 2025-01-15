@@ -10,13 +10,13 @@ import (
 	"net"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
@@ -28,7 +28,7 @@ import (
 type IEigenDAClient interface {
 	GetBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)
 	PutBlob(ctx context.Context, txData []byte) (*grpcdisperser.BlobInfo, error)
-	GetPolynomialForm() codecs.PolynomialForm
+	GetPolynomialForm() codec.PolynomialForm
 	Close() error
 }
 
@@ -44,7 +44,7 @@ type EigenDAClient struct {
 	Client         DisperserClient
 	ethClient      *ethclient.Client
 	edasmCaller    *edasm.ContractEigenDAServiceManagerCaller
-	PolynomialForm codecs.PolynomialForm
+	PolynomialForm codec.PolynomialForm
 }
 
 var _ IEigenDAClient = &EigenDAClient{}
@@ -115,11 +115,11 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 		return nil, fmt.Errorf("new disperser-client: %w", err)
 	}
 
-	var polynomialForm codecs.PolynomialForm
+	var polynomialForm codec.PolynomialForm
 	if config.DisablePointVerificationMode {
-		polynomialForm = codecs.Eval
+		polynomialForm = codec.Eval
 	} else {
-		polynomialForm = codecs.Coeff
+		polynomialForm = codec.Coeff
 	}
 
 	return &EigenDAClient{
@@ -136,7 +136,7 @@ func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClien
 //
 // The polynomial form indicates how blobs must be constructed before dispersal, and how received blobs ought to be
 // interpreted.
-func (m *EigenDAClient) GetPolynomialForm() codecs.PolynomialForm {
+func (m *EigenDAClient) GetPolynomialForm() codec.PolynomialForm {
 	return m.PolynomialForm
 }
 
@@ -163,7 +163,7 @@ func (m *EigenDAClient) GetBlob(ctx context.Context, batchHeaderHash []byte, blo
 		return nil, fmt.Errorf("blob to encoded payload: %w", err)
 	}
 
-	decodedPayload, err := codecs.DecodePayload(encodedPayload)
+	decodedPayload, err := codec.DecodePayload(encodedPayload)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
@@ -224,7 +224,7 @@ func (m *EigenDAClient) PutBlobAsync(ctx context.Context, data []byte) (resultCh
 func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, resultChan chan *grpcdisperser.BlobInfo, errChan chan error) {
 	m.Log.Info("Attempting to disperse blob to EigenDA")
 
-	encodedPayload := codecs.EncodePayload(rawData)
+	encodedPayload := codec.EncodePayload(rawData)
 	blob, err := m.encodedPayloadToBlob(encodedPayload)
 
 	if err != nil {
@@ -417,10 +417,10 @@ func (m *EigenDAClient) batchIdConfirmedAtDepth(ctx context.Context, batchId uin
 // If the system is configured to distribute blobs in Coeff form, the blob is FFTed before being returned
 func (m *EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
 	switch m.PolynomialForm {
-	case codecs.Eval:
+	case codec.Eval:
 		return blob, nil
-	case codecs.Coeff:
-		encodedPayload, err := codecs.FFT(blob)
+	case codec.Coeff:
+		encodedPayload, err := codec.FFT(blob)
 		if err != nil {
 			return nil, fmt.Errorf("fft: %w", err)
 		}
@@ -437,10 +437,10 @@ func (m *EigenDAClient) blobToEncodedPayload(blob []byte) ([]byte, error) {
 // If the system is configured to distribute blobs in Coeff form, the encoded payload is IFFTed before being returned
 func (m *EigenDAClient) encodedPayloadToBlob(encodedPayload []byte) ([]byte, error) {
 	switch m.PolynomialForm {
-	case codecs.Eval:
+	case codec.Eval:
 		return encodedPayload, nil
-	case codecs.Coeff:
-		coeffPolynomial, err := codecs.IFFT(encodedPayload)
+	case codec.Coeff:
+		coeffPolynomial, err := codec.IFFT(encodedPayload)
 		if err != nil {
 			return nil, fmt.Errorf("ifft: %w", err)
 		}

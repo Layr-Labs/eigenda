@@ -1,4 +1,4 @@
-package codecs
+package codec
 
 // PolynomialForm is an enum that represents the different ways that a blob polynomial may be represented
 type PolynomialForm uint
