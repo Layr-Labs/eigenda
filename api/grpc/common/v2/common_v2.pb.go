@@ -22,10 +22,6 @@ const (
 )
 
 // BlobHeader contains the information needed to disperse a blob to the EigenDA network.
-// It can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a 4844 blob.
-// Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob
-// to ethereum requires sending a tx who's data contains the hash of the kzg commit of the blob, which is
-// dispersed separately.
 type BlobHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -40,7 +36,7 @@ type BlobHeader struct {
 	// - 0: ETH
 	// - 1: EIGEN
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// commitment is the KZG commitment of the blob
+	// commitment is the KZG commitment to the blob
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
 	// payment_header contains payment information for the blob
 	PaymentHeader *common.PaymentHeader `protobuf:"bytes,4,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`
@@ -122,7 +118,7 @@ type BlobCertificate struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// blob_header contains metadata about the blob. The hash of this header is used to compute the blob key.
+	// blob_header contains metadata about the blob.
 	BlobHeader *BlobHeader `protobuf:"bytes,1,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 	// relays is the list of relays that are in custody of the blob.
 	// The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.

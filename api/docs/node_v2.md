@@ -78,7 +78,7 @@ Node info reply
 <a name="node-v2-GetNodeInfoRequest"></a>
 
 ### GetNodeInfoRequest
-The parameter for the NodeInfo() RPC.
+The parameter for the GetNodeInfo() RPC.
 
 
 
@@ -132,18 +132,18 @@ Note that this signature is not included in the hash for obvious reasons. |
 <a name="node-v2-Dispersal"></a>
 
 ### Dispersal
-Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.
+Dispersal is utilized to disperse chunk data.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks stores a batch of chunks on the Node. |
-| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | NodeInfo fetches metadata about the node. |
+| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
 
 
 <a name="node-v2-Retrieval"></a>
 
 ### Retrieval
-Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
+Retrieval is utilized to retrieve chunk data.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|

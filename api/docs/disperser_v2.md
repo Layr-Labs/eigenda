@@ -145,7 +145,9 @@ A reply to a DisperseBlob request.
 | result | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob associated with the blob key. |
 | blob_key | [bytes](#bytes) |  | The unique 32 byte identifier for the blob.
 
-The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 The blob_key must thus be unique for every request, even if the same blob is being disperser. Meaning the blob_header must be different for each request. |
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 The blob_key must thus be unique for every request, even if the same blob is being dispersed. Meaning the blob_header must be different for each request.
+
+Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause the disperser to reject the blob (DisperseBlob() RPC will return an error). |
 
 
 
@@ -165,7 +167,9 @@ A request to disperse a blob.
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 
 Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617. If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
-| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob. |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob.
+
+This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob, which is dispersed separately. |
 
 
 
@@ -199,7 +203,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The ID of the account being queried. |
+| account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
 | signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a reservation period or a nonce to mitigate signature replay attacks |
 
 
@@ -290,19 +294,23 @@ Intermediate states are states that the blob can be in while being processed, an
 - QUEUED
 - ENCODED
 Terminal states are states that will not be updated to a different state:
+- UNKNOWN
 - CERTIFIED
 - FAILED
 - INSUFFICIENT_SIGNATURES
-- UNKNOWN
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug. |
+| UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an unanticipated bug. |
 | QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
 | ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes. |
-| FAILED | 4 | FAILED means that the blob has failed permanently. |
-| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation. |
+| FAILED | 4 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again with different salt (blob key is required to be unique). |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an an inability to gather sufficient signatures. |
 
 
  

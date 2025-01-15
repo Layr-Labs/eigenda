@@ -29,7 +29,7 @@ const (
 type DispersalClient interface {
 	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
-	// NodeInfo fetches metadata about the node.
+	// GetNodeInfo fetches metadata about the node.
 	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
 }
 
@@ -65,7 +65,7 @@ func (c *dispersalClient) GetNodeInfo(ctx context.Context, in *GetNodeInfoReques
 type DispersalServer interface {
 	// StoreChunks stores a batch of chunks on the Node.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
-	// NodeInfo fetches metadata about the node.
+	// GetNodeInfo fetches metadata about the node.
 	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }

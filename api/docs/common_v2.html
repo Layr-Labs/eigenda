@@ -288,7 +288,7 @@
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p>blob_header contains metadata about the blob. The hash of this header is used to compute the blob key. </p></td>
+                  <td><p>blob_header contains metadata about the blob. </p></td>
                 </tr>
               
                 <tr>
@@ -310,7 +310,7 @@ https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelay
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p>BlobHeader contains the information needed to disperse a blob to the EigenDA network.</p><p>It can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a 4844 blob.</p><p>Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob</p><p>to ethereum requires sending a tx who's data contains the hash of the kzg commit of the blob, which is</p><p>dispersed separately.</p>
+        <p>BlobHeader contains the information needed to disperse a blob to the EigenDA network.</p>
 
         
           <table class="field-table">
@@ -342,7 +342,7 @@ The following quorums are currently required:
                   <td>commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p>commitment is the KZG commitment of the blob </p></td>
+                  <td><p>commitment is the KZG commitment to the blob </p></td>
                 </tr>
               
                 <tr>

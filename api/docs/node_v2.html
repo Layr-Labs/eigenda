@@ -340,7 +340,7 @@ The ID must be in range [0, 254]. </p></td>
         
       
         <h3 id="node.v2.GetNodeInfoRequest">GetNodeInfoRequest</h3>
-        <p>The parameter for the NodeInfo() RPC.</p>
+        <p>The parameter for the GetNodeInfo() RPC.</p>
 
         
 
@@ -441,7 +441,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
       
         <h3 id="node.v2.Dispersal">Dispersal</h3>
-        <p>Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.</p>
+        <p>Dispersal is utilized to disperse chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -459,7 +459,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>GetNodeInfo</td>
                 <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
                 <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
-                <td><p>NodeInfo fetches metadata about the node.</p></td>
+                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
               </tr>
             
           </tbody>
@@ -467,7 +467,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
         
         <h3 id="node.v2.Retrieval">Retrieval</h3>
-        <p>Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.</p>
+        <p>Retrieval is utilized to retrieve chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>

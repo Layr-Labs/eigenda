@@ -6,15 +6,15 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node/v2";
 // The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
 // for better security and separation of concerns.
 
-// Dispersal is utilized to disperse chunk data. The disperser calls these RPCs to store chunks on individual DA nodes.
+// Dispersal is utilized to disperse chunk data.
 service Dispersal {
   // StoreChunks stores a batch of chunks on the Node.
   rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
-  // NodeInfo fetches metadata about the node.
+  // GetNodeInfo fetches metadata about the node.
   rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
-// Retrieval is utilized to retrieve chunk data. This chunk data can be used to reconstruct the original blob.
+// Retrieval is utilized to retrieve chunk data.
 service Retrieval {
   // GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
   // faster to retrieve chunks from the relay service if that service is available.
@@ -87,7 +87,7 @@ message GetChunksReply {
   repeated bytes chunks = 1;
 }
 
-// The parameter for the NodeInfo() RPC.
+// The parameter for the GetNodeInfo() RPC.
 message GetNodeInfoRequest {
 }
 

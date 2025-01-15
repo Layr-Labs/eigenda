@@ -495,8 +495,11 @@ Unset if the status is not CERTIFIED. </p></td>
 
 The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
 https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
-The blob_key must thus be unique for every request, even if the same blob is being disperser.
-Meaning the blob_header must be different for each request. </p></td>
+The blob_key must thus be unique for every request, even if the same blob is being dispersed.
+Meaning the blob_header must be different for each request.
+
+Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause
+the disperser to reject the blob (DisperseBlob() RPC will return an error). </p></td>
                 </tr>
               
             </tbody>
@@ -535,7 +538,12 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">common.v2.BlobHeader</a></td>
                   <td></td>
-                  <td><p>The header contains metadata about the blob. </p></td>
+                  <td><p>The header contains metadata about the blob.
+
+This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a
+4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
+dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
+which is dispersed separately. </p></td>
                 </tr>
               
             </tbody>
@@ -611,7 +619,7 @@ If any one of the 32 bytes elements is outside the range, the whole request is d
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The ID of the account being queried. </p></td>
+                  <td><p>The ID of the account being queried. This account ID is an eth wallet address of the user. </p></td>
                 </tr>
               
                 <tr>
@@ -798,7 +806,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p><p>- UNKNOWN</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- UNKNOWN</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -809,7 +817,10 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                 <td>UNKNOWN</td>
                 <td>0</td>
                 <td><p>UNKNOWN means that the status of the blob is unknown.
-This is a catch all and should not be encountered absent a bug.</p></td>
+This is a catch all and should not be encountered absent a bug.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+unanticipated bug.</p></td>
               </tr>
             
               <tr>
@@ -835,13 +846,17 @@ the blob is stored in a queue of some sort, and a response immediately returned 
               <tr>
                 <td>FAILED</td>
                 <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently.</p></td>
+                <td><p>FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).</p></td>
               </tr>
             
               <tr>
                 <td>INSUFFICIENT_SIGNATURES</td>
                 <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.</p></td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+an inability to gather sufficient signatures.</p></td>
               </tr>
             
           </tbody>

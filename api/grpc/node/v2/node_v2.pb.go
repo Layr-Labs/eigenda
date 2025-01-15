@@ -274,7 +274,7 @@ func (x *GetChunksReply) GetChunks() [][]byte {
 	return nil
 }
 
-// The parameter for the NodeInfo() RPC.
+// The parameter for the GetNodeInfo() RPC.
 type GetNodeInfoRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

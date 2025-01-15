@@ -29,15 +29,18 @@ const (
 // - QUEUED
 // - ENCODED
 // Terminal states are states that will not be updated to a different state:
+// - UNKNOWN
 // - CERTIFIED
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
-// - UNKNOWN
 type BlobStatus int32
 
 const (
 	// UNKNOWN means that the status of the blob is unknown.
 	// This is a catch all and should not be encountered absent a bug.
+	//
+	// This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+	// unanticipated bug.
 	BlobStatus_UNKNOWN BlobStatus = 0
 	// QUEUED means that the blob has been queued by the disperser for processing.
 	// The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
@@ -47,9 +50,13 @@ const (
 	BlobStatus_ENCODED BlobStatus = 2
 	// CERTIFIED means the blob has been dispersed and attested by the DA nodes.
 	BlobStatus_CERTIFIED BlobStatus = 3
-	// FAILED means that the blob has failed permanently.
+	// FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+	// retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).
 	BlobStatus_FAILED BlobStatus = 4
 	// INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+	//
+	// This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+	// an inability to gather sufficient signatures.
 	BlobStatus_INSUFFICIENT_SIGNATURES BlobStatus = 5
 )
 
@@ -117,6 +124,11 @@ type DisperseBlobRequest struct {
 	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	// The header contains metadata about the blob.
+	//
+	// This header can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a
+	// 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
+	// dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
+	// which is dispersed separately.
 	BlobHeader *v2.BlobHeader `protobuf:"bytes,2,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 }
 
@@ -178,8 +190,11 @@ type DisperseBlobReply struct {
 	//
 	// The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
 	// https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
-	// The blob_key must thus be unique for every request, even if the same blob is being disperser.
+	// The blob_key must thus be unique for every request, even if the same blob is being dispersed.
 	// Meaning the blob_header must be different for each request.
+	//
+	// Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause
+	// the disperser to reject the blob (DisperseBlob() RPC will return an error).
 	BlobKey []byte `protobuf:"bytes,2,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 }
 
@@ -451,7 +466,7 @@ type GetPaymentStateRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The ID of the account being queried.
+	// The ID of the account being queried. This account ID is an eth wallet address of the user.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Signature over the account ID
 	// TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
