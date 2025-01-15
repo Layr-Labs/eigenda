@@ -39,7 +39,6 @@ func (t *MockWriter) GetRegisteredQuorumIdsForOperator(ctx context.Context, oper
 
 func (t *MockWriter) RegisterOperator(
 	ctx context.Context,
-	keypair *core.KeyPair,
 	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
@@ -47,13 +46,12 @@ func (t *MockWriter) RegisterOperator(
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
-	args := t.Called(ctx, keypair, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	return args.Error(0)
 }
 
 func (t *MockWriter) RegisterOperatorWithChurn(
 	ctx context.Context,
-	keypair *core.KeyPair,
 	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
@@ -61,7 +59,7 @@ func (t *MockWriter) RegisterOperatorWithChurn(
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 	churnReply *churner.ChurnReply) error {
-	args := t.Called(ctx, keypair, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
+	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
 	return args.Error(0)
 }
 

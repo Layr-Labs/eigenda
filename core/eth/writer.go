@@ -63,7 +63,6 @@ func NewWriter(
 // will be returned.
 func (t *Writer) RegisterOperator(
 	ctx context.Context,
-	keypair *core.KeyPair,
 	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
@@ -104,7 +103,6 @@ func (t *Writer) RegisterOperator(
 // with the provided signature from the churner
 func (t *Writer) RegisterOperatorWithChurn(
 	ctx context.Context,
-	keypair *core.KeyPair,
 	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,

@@ -59,9 +59,6 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 		})
 		Expect(err).To(BeNil())
 
-		keyPair, err := core.MakeKeyPairFromString(op.NODE_TEST_PRIVATE_BLS)
-		Expect(err).To(BeNil())
-
 		socket := fmt.Sprintf("%v:%v", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT)
 
 		salt := [32]byte{}
@@ -72,7 +69,7 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 		privKey, err := crypto.HexToECDSA(op.NODE_PRIVATE_KEY)
 		Expect(err).To(BeNil())
 
-		err = tx.RegisterOperator(context.Background(), keyPair, signer, socket, quorums, privKey, salt, expiry)
+		err = tx.RegisterOperator(context.Background(), signer, socket, quorums, privKey, salt, expiry)
 		Expect(err).To(BeNil())
 	}
 }

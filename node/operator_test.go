@@ -34,7 +34,6 @@ func TestRegisterOperator(t *testing.T) {
 		Socket:              "localhost:50051",
 		Timeout:             10 * time.Second,
 		PrivKey:             nil,
-		KeyPair:             keyPair,
 		Signer:              signer,
 		OperatorId:          operatorID,
 		QuorumIDs:           []core.QuorumID{0, 1},
@@ -49,7 +48,7 @@ func TestRegisterOperator(t *testing.T) {
 			ChurnBIPsOfTotalStake:    20000,
 		}, nil)
 		tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(0), nil)
-		tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		return tx
 
 	}
@@ -70,13 +69,18 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		PrivateKey: keyPair.PrivKey.String(),
+		SignerType: blssignerTypes.PrivateKey,
+	})
+	assert.NoError(t, err)
 	// Create a new operator
 	operator := &node.Operator{
 		Address:    "0xB7Ad27737D88B07De48CDc2f379917109E993Be4",
 		Socket:     "localhost:50051",
 		Timeout:    10 * time.Second,
+		Signer:     signer,
 		PrivKey:    nil,
-		KeyPair:    keyPair,
 		OperatorId: operatorID,
 		QuorumIDs:  []core.QuorumID{1},
 	}
@@ -88,10 +92,10 @@ func TestRegisterOperatorWithChurn(t *testing.T) {
 		ChurnBIPsOfTotalStake:    20000,
 	}, nil)
 	tx.On("GetNumberOfRegisteredOperatorForQuorum").Return(uint32(1), nil)
-	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	tx.On("RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	churnerClient := &nodemock.ChurnerClient{}
 	churnerClient.On("Churn").Return(nil, nil)
 	err = node.RegisterOperator(context.Background(), operator, tx, churnerClient, logger)
 	assert.NoError(t, err)
-	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	tx.AssertCalled(t, "RegisterOperatorWithChurn", mock.Anything, mock.Anything, mock.Anything, []core.QuorumID{1}, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

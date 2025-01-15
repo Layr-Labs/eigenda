@@ -146,7 +146,6 @@ type Writer interface {
 	// will be returned.
 	RegisterOperator(
 		ctx context.Context,
-		keypair *KeyPair,
 		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,
@@ -159,7 +158,6 @@ type Writer interface {
 	// with the provided signature from the churner
 	RegisterOperatorWithChurn(
 		ctx context.Context,
-		keypair *KeyPair,
 		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,

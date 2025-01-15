@@ -120,10 +120,6 @@ func TestChurner(t *testing.T) {
 		g1point := &core.G1Point{
 			G1Affine: kp.PubKey.G1Affine,
 		}
-		opKeyPair := &core.KeyPair{
-			PrivKey: kp.PrivKey,
-			PubKey:  g1point,
-		}
 		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
 		assert.NoError(t, err)
 		if i == 0 {
@@ -139,12 +135,11 @@ func TestChurner(t *testing.T) {
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
-			keyPair = opKeyPair
 			signer = opSigner
 			operatorPrivateKey = sk.PrivateKey
 			break
 		}
-		err = tx.RegisterOperator(ctx, opKeyPair, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
+		err = tx.RegisterOperator(ctx, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
 		assert.NoError(t, err)
 	}
 	assert.Greater(t, len(lowestStakeOperatorAddr), 0)
@@ -194,7 +189,7 @@ func TestChurner(t *testing.T) {
 	salt32 := [32]byte{}
 	copy(salt32[:], salt)
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-	err = tx.RegisterOperatorWithChurn(ctx, keyPair, signer, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
+	err = tx.RegisterOperatorWithChurn(ctx, signer, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
 	assert.NoError(t, err)
 }
 

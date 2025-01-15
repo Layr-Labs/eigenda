@@ -21,7 +21,6 @@ type Operator struct {
 	Socket              string
 	Timeout             time.Duration
 	PrivKey             *ecdsa.PrivateKey
-	KeyPair             *core.KeyPair
 	Signer              blssigner.Signer
 	OperatorId          core.OperatorID
 	QuorumIDs           []core.QuorumID
@@ -91,10 +90,10 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 			return fmt.Errorf("failed to request churn approval: %w", err)
 		}
 
-		return transactor.RegisterOperatorWithChurn(ctx, operator.KeyPair, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
+		return transactor.RegisterOperatorWithChurn(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		return transactor.RegisterOperator(ctx, operator.KeyPair, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
+		return transactor.RegisterOperator(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
 	}
 }
 

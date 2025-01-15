@@ -301,7 +301,6 @@ func (n *Node) Start(ctx context.Context) error {
 			Socket:              socket,
 			Timeout:             10 * time.Second,
 			PrivKey:             privateKey,
-			KeyPair:             n.KeyPair,
 			Signer:              n.BLSSigner,
 			OperatorId:          n.Config.ID,
 			QuorumIDs:           n.Config.QuorumIDList,
