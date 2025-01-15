@@ -35,6 +35,8 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	readinessProbePath string = "/tmp/ready"
 )
 
 func main() {
@@ -163,6 +165,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 	bucketName := config.BlobstoreConfig.BucketName
 	logger.Info("Blob store", "bucket", bucketName)
 	if config.DisperserVersion == V2 {
+		// Clean up readiness file
+		if err := os.Remove(readinessProbePath); err != nil {
+			log.Printf("Failed to clean up readiness file: %v at path %v \n", err, readinessProbePath)
+		}
+
 		config.EncodingConfig.LoadG2Points = true
 		prover, err := prover.NewProver(&config.EncodingConfig, nil)
 		if err != nil {
@@ -188,7 +195,17 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		return server.Start(context.Background())
+
+		err = server.Start(context.Background())
+		if err != nil {
+			return err
+		}
+
+		// Signal readiness
+		if _, err := os.Create(readinessProbePath); err != nil {
+			log.Printf("Failed to create readiness file: %v at path %v \n", err, readinessProbePath)
+		}
+		return nil
 	}
 
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
