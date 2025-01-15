@@ -85,7 +85,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		Config:      config,
 		Logger:      logger,
 		KeyPair:     keyPair,
-		BlsSigner:   signer,
+		BLSSigner:   signer,
 		Metrics:     metrics,
 		StoreV2:     s,
 		ChainState:  chainState,

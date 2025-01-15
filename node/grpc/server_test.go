@@ -164,7 +164,7 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 		Config:     config,
 		Logger:     logger,
 		KeyPair:    keyPair,
-		BlsSigner:  signer,
+		BLSSigner:  signer,
 		Metrics:    metrics,
 		Store:      store,
 		ChainState: chainState,

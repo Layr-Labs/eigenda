@@ -410,7 +410,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
-			BlsSigner:               op.Signer,
+			BLSSigner:               op.Signer,
 			Metrics:                 metrics,
 			Store:                   store,
 			ChainState:              cst,

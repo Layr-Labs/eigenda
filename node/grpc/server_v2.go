@@ -115,7 +115,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
-	if s.node.BlsSigner == nil {
+	if s.node.BLSSigner == nil {
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
@@ -179,7 +179,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
-	sig, err := s.node.BlsSigner.Sign(ctx, batchHeaderHash[:])
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
 	}

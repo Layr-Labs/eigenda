@@ -73,9 +73,8 @@ type Node struct {
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
-	BLSPublicKeyHex         string
 
-	BlsSigner blssigner.Signer
+	BLSSigner blssigner.Signer
 
 	RelayClient atomic.Value
 
@@ -129,7 +128,6 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create BLS signer: %w", err)
 	}
-	blsPublicKeyHex := blsSigner.GetPublicKeyG1()
 	operatorID, err := blsSigner.GetOperatorId()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator ID: %w", err)
@@ -204,8 +202,7 @@ func NewNode(
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
-		BlsSigner:               blsSigner,
-		BLSPublicKeyHex:         blsPublicKeyHex,
+		BLSSigner:               blsSigner,
 	}
 
 	if !config.EnableV2 {
@@ -305,7 +302,7 @@ func (n *Node) Start(ctx context.Context) error {
 			Timeout:             10 * time.Second,
 			PrivKey:             privateKey,
 			KeyPair:             n.KeyPair,
-			Signer:              n.BlsSigner,
+			Signer:              n.BLSSigner,
 			OperatorId:          n.Config.ID,
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
@@ -556,14 +553,14 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	}
 
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", n.BLSPublicKeyHex, "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.BLSSigner.GetPublicKeyG1(), "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
 	return signature, nil
 }
 
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
-	signature, err := n.BlsSigner.Sign(ctx, data[:])
+	signature, err := n.BLSSigner.Sign(ctx, data[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
 	}
