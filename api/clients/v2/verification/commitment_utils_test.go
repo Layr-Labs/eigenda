@@ -1,13 +1,14 @@
 package verification
 
 import (
+	"math"
+	"runtime"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
-	"math"
-	"runtime"
-	"testing"
 )
 
 const g1Path = "../../../../inabox/resources/kzg/g1.point"
@@ -42,10 +43,11 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	// make sure the commitment verifies correctly
-	err = GenerateAndCompareBlobCommitment(
+	result, err := GenerateAndCompareBlobCommitment(
 		g1Srs,
 		randomBytes,
 		commitment)
+	require.True(t, result)
 	require.NoError(t, err)
 }
 
@@ -65,11 +67,12 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 
 	// randomly modify the bytes, and make sure the commitment verification fails
 	randomlyModifyBytes(testRandom, randomBytes)
-	err = GenerateAndCompareBlobCommitment(
+	result, err := GenerateAndCompareBlobCommitment(
 		g1Srs,
 		randomBytes,
 		commitment)
-	require.NotNil(t, err)
+	require.False(t, result)
+	require.NoError(t, err)
 }
 
 func TestGenerateBlobCommitmentEquality(t *testing.T) {
