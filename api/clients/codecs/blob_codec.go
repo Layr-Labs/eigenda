@@ -11,23 +11,27 @@ import (
 type BlobEncodingVersion byte
 
 const (
-	// DefaultBlobEncoding entails a 32 byte header = [0x00, version byte, uint32 len of data, 0x00, 0x00,...]
+	// BlobEncodingVersion0 entails a 32 byte header = [0x00, version byte, big-endian uint32 len of payload, 0x00, 0x00,...]
 	// followed by the encoded data [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
-	DefaultBlobEncoding BlobEncodingVersion = 0x0
+	BlobEncodingVersion0 BlobEncodingVersion = 0x0
 )
 
 // EncodePayload accepts an arbitrary payload byte array, and encodes it.
 //
-// The returned bytes may be interpreted as a polynomial in Eval form, where each contained field element of
+// The returned bytes shall be interpreted as a polynomial in Eval form, where each contained field element of
 // length 32 represents the evaluation of the polynomial at an expanded root of unity
 //
 // The returned bytes may or may not represent a blob. If the system is configured to distribute blobs in Coeff form,
 // then the data returned from this function must be IFFTed to produce the final blob. If the system is configured to
 // distribute blobs in Eval form, then the data returned from this function is the final blob representation.
+//
+// Example encoding:
+//                  Payload header (32 bytes total)                                  Encoded Payload Data
+// [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
 func EncodePayload(payload []byte) []byte {
 	payloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
-	payloadHeader[1] = byte(DefaultBlobEncoding) // encode version byte
+	payloadHeader[1] = byte(BlobEncodingVersion0) // encode version byte
 
 	// encode payload length as uint32
 	binary.BigEndian.PutUint32(
