@@ -124,15 +124,30 @@ func (cursor *BlobFeedCursor) LessThan(other *BlobFeedCursor) bool {
 	return false
 }
 
-// ToRequestedAtBlobKey encodes the cursor into a string that preserves ordering.
+// ToCursorKey encodes the cursor into a string that preserves ordering.
 // For any two cursors A and B:
-// - A < B if and only if A.ToRequestedAtBlobKey() < B.ToRequestedAtBlobKey()
-// - A == B if and only if A.ToRequestedAtBlobKey() == B.ToRequestedAtBlobKey()
-func (cursor *BlobFeedCursor) ToRequestedAtBlobKey() string {
-	if cursor.BlobKey == nil {
-		return encodeRequestedAtBlobKey(cursor.RequestedAt, "")
+// - A < B if and only if A.ToCursorKey() < B.ToCursorKey()
+// - A == B if and only if A.ToCursorKey() == B.ToCursorKey()
+func (cursor *BlobFeedCursor) ToCursorKey() string {
+	return encodeBlobFeedCursorKey(cursor.RequestedAt, cursor.BlobKey)
+}
+
+// FromCursorKey decodes the cursor key string back to the cursor.
+func (cursor *BlobFeedCursor) FromCursorKey(encoded string) (*BlobFeedCursor, error) {
+	requestedAt, blobKey, err := decodeBlobFeedCursorKey(encoded)
+	if err != nil {
+		return nil, err
 	}
-	return encodeRequestedAtBlobKey(cursor.RequestedAt, cursor.BlobKey.Hex())
+	if len(blobKey) == 0 {
+		return &BlobFeedCursor{
+			RequestedAt: requestedAt,
+		}, nil
+
+	}
+	return &BlobFeedCursor{
+		RequestedAt: requestedAt,
+		BlobKey:     blobKey,
+	}, nil
 }
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
@@ -326,7 +341,7 @@ func (s *BlobMetadataStore) queryBucketMetadata(
 	return metadata, nil
 }
 
-// GetBlobMetadataByRequestedAt returns blobs (as BlobMetadata) that are in cusor position
+// GetBlobMetadataByRequestedAt returns blobs (as BlobMetadata) that are in cursor position
 // range (start, end]. Blobs returned are in cursor order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
@@ -342,8 +357,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 	}
 
 	startBucket, endBucket := s.getBucketIDRange(start.RequestedAt, end.RequestedAt)
-	startKey := start.ToRequestedAtBlobKey()
-	endKey := end.ToRequestedAtBlobKey()
+	startKey := start.ToCursorKey()
+	endKey := end.ToCursorKey()
 
 	result := make([]*v2.BlobMetadata, 0)
 	var lastProcessedCursor *BlobFeedCursor
@@ -1092,7 +1107,7 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + blobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
 	fields["RequestedAtBucket"] = &types.AttributeValueMemberS{Value: computeRequestedAtBucket(metadata.RequestedAt)}
-	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeRequestedAtBlobKey(metadata.RequestedAt, blobKey.Hex())}
+	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeBlobFeedCursorKey(metadata.RequestedAt, &blobKey)}
 	return fields, nil
 }
 
@@ -1369,17 +1384,50 @@ func computeRequestedAtBucket(requestedAt uint64) string {
 	return fmt.Sprintf("%d", id)
 }
 
-// encodeRequestedAtBlobKey encodes <requestedAt, blobKey> into string which
+// encodeBlobFeedCursorKey encodes <requestedAt, blobKey> into string which
 // preserves the order.
-func encodeRequestedAtBlobKey(requestedAt uint64, blobKey string) string {
+func encodeBlobFeedCursorKey(requestedAt uint64, blobKey *corev2.BlobKey) string {
 	result := make([]byte, 40) // 8 bytes for timestamp + 32 bytes for blobKey
 
 	// Write timestamp
 	binary.BigEndian.PutUint64(result[:8], requestedAt)
 
-	if blobKey != "" {
-		copy(result[8:], []byte(blobKey))
+	if blobKey != nil {
+		copy(result[8:], blobKey[:])
 	}
 	// Use hex encoding to preserve byte ordering
 	return hex.EncodeToString(result)
+}
+
+// decodeBlobFeedCursorKey decodes the cursor key back to <requestedAt, blobKey>.
+func decodeBlobFeedCursorKey(encoded string) (uint64, *corev2.BlobKey, error) {
+	// Decode hex string
+	bytes, err := hex.DecodeString(encoded)
+	if err != nil {
+		return 0, nil, fmt.Errorf("invalid hex encoding: %w", err)
+	}
+
+	// Check length
+	if len(bytes) != 40 { // 8 bytes timestamp + 32 bytes blobKey
+		return 0, nil, fmt.Errorf("invalid length: expected 40 bytes, got %d", len(bytes))
+	}
+
+	// Get timestamp
+	requestedAt := binary.BigEndian.Uint64(bytes[:8])
+
+	// Check if the remaining bytes are all zeros
+	allZeros := true
+	for i := 8; i < len(bytes); i++ {
+		if bytes[i] != 0 {
+			allZeros = false
+			break
+		}
+	}
+
+	if allZeros {
+		return requestedAt, nil, nil
+	}
+	var bk corev2.BlobKey
+	copy(bk[:], bytes[8:])
+	return requestedAt, &bk, nil
 }

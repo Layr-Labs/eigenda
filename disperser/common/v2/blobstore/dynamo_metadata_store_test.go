@@ -31,6 +31,152 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
+func TestBlobFeedCursor_Equal(t *testing.T) {
+	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
+	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
+	tests := []struct {
+		cursor      *blobstore.BlobFeedCursor
+		requestedAt uint64
+		blobKey     *corev2.BlobKey
+		expected    bool
+	}{
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			requestedAt: 1,
+			blobKey:     &bk1,
+			expected:    true,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
+			requestedAt: 1,
+			blobKey:     nil,
+			expected:    true,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			requestedAt: 2,
+			blobKey:     &bk1,
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			requestedAt: 1,
+			blobKey:     nil,
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
+			requestedAt: 1,
+			blobKey:     &bk1,
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			requestedAt: 1,
+			blobKey:     &bk2,
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("Equal", func(t *testing.T) {
+			result := tt.cursor.Equal(tt.requestedAt, tt.blobKey)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBlobFeedCursor_LessThan(t *testing.T) {
+	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
+	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
+	tests := []struct {
+		cursor      *blobstore.BlobFeedCursor
+		otherCursor *blobstore.BlobFeedCursor
+		expected    bool
+	}{
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 2, BlobKey: &bk1},
+			expected:    true,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 2, BlobKey: &bk1},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			expected:    true,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
+			expected:    false,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk2},
+			expected:    true,
+		},
+		{
+			cursor:      &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk2},
+			otherCursor: &blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk1},
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run("LessThan", func(t *testing.T) {
+			result := tt.cursor.LessThan(tt.otherCursor)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBlobFeedCursor_CursorKeyCodec(t *testing.T) {
+	bk := corev2.BlobKey([32]byte{1, 2, 3})
+	cursors := []*blobstore.BlobFeedCursor{
+		&blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
+		&blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk},
+	}
+	for _, cursor := range cursors {
+		encoded := cursor.ToCursorKey()
+		c, err := new(blobstore.BlobFeedCursor).FromCursorKey(encoded)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(1), c.RequestedAt)
+		assert.Equal(t, cursor.BlobKey, c.BlobKey)
+	}
+}
+
+func TestBlobFeedCursor_OrderPreserving(t *testing.T) {
+	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
+	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
+	cursors := []*blobstore.BlobFeedCursor{
+		{RequestedAt: 100, BlobKey: nil},
+		{RequestedAt: 100, BlobKey: &bk1},
+		{RequestedAt: 100, BlobKey: &bk2},
+		{RequestedAt: 101, BlobKey: nil},
+		{RequestedAt: 101, BlobKey: &bk1},
+	}
+
+	// Test that ordering is consistent between LessThan and ToCursorKey
+	for i := 0; i < len(cursors); i++ {
+		for j := 0; j < len(cursors); j++ {
+			if i != j {
+				cursorLessThan := cursors[i].LessThan(cursors[j])
+				encodedLessThan := cursors[i].ToCursorKey() < cursors[j].ToCursorKey()
+				assert.Equal(t, encodedLessThan, cursorLessThan)
+			}
+		}
+	}
+}
+
 func TestBlobMetadataStoreOperations(t *testing.T) {
 	ctx := context.Background()
 	blobKey1, blobHeader1 := newBlob(t)
