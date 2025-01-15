@@ -136,7 +136,7 @@ Dispersal is utilized to disperse chunk data.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks stores a batch of chunks on the Node. |
+| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
 | GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
 
 

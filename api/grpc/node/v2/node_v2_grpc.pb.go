@@ -27,7 +27,11 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DispersalClient interface {
-	// StoreChunks stores a batch of chunks on the Node.
+	// StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+	// either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+	// the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+	// This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+	// is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
 	// GetNodeInfo fetches metadata about the node.
 	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
@@ -63,7 +67,11 @@ func (c *dispersalClient) GetNodeInfo(ctx context.Context, in *GetNodeInfoReques
 // All implementations must embed UnimplementedDispersalServer
 // for forward compatibility
 type DispersalServer interface {
-	// StoreChunks stores a batch of chunks on the Node.
+	// StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+	// either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+	// the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+	// This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+	// is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
 	// GetNodeInfo fetches metadata about the node.
 	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)

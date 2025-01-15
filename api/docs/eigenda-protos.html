@@ -2333,8 +2333,7 @@ which is dispersed separately. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Signature over the account ID
-TODO: sign over a reservation period or a nonce to mitigate signature replay attacks </p></td>
+                  <td><p>Signature over the account ID </p></td>
                 </tr>
               
             </tbody>
@@ -3640,7 +3639,11 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>StoreChunks</td>
                 <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
                 <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
-                <td><p>StoreChunks stores a batch of chunks on the Node.</p></td>
+                <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
               </tr>
             
               <tr>
