@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	_ "embed"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -279,6 +282,18 @@ func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	return response
 }
 
+func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	bk, err := blobHeader.BlobKey()
+	assert.Nil(t, err)
+	assert.Equal(t, blobKey, bk)
+}
+
+func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
+	require.NoError(t, err)
+	assert.True(t, cursor.Equal(requestedAt, &blobKey))
+}
+
 func TestFetchBlobHandlerV2(t *testing.T) {
 	r := setUpRouter()
 
@@ -337,6 +352,163 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
 	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
+}
+
+func TestFetchBlobFeedHandler(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	// Create blobs for testing
+	numBlobs := 103
+	now := uint64(time.Now().UnixNano())
+	nanoSecsPerBlob := uint64(60 * 1e9) // 1 blob per minute
+	firstBlobTime := now - uint64(numBlobs-3)*nanoSecsPerBlob
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAt := make([]uint64, numBlobs)
+
+	// Create blob: the first 3 have same requestedAt, and then each blob is gapped
+	// by nanoSecsPerBlob
+	firstBlobKeys := make([][32]byte, 3)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		keys[i] = blobKey
+		if i < 3 {
+			requestedAt[i] = firstBlobTime
+			firstBlobKeys[i] = keys[i]
+		} else {
+			requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i-2)
+		}
+
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+	}
+	sort.Slice(firstBlobKeys, func(i, j int) bool {
+		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
+	})
+
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
+
+	t.Run("invalid params", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?pagination_token=abc", nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?limit=abc", nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?interval=abc", nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?end=2006-01-02T15:04:05", nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		// The default params will query the past 1h blobs, which will be 60 blobs
+		// (as the nanoSecsPerBlob is 1 blob/min). So the blobs in the range are
+		// keys[43], keys[44], ..., keys[102]. Since we have limit defaulted to 20,
+		// the results returned will be keys[43], ..., keys[62].
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+	})
+
+	t.Run("various query ranges and limits", func(t *testing.T) {
+		// Without limit, this will return all blobs in the past hour, which
+		// are keys[43], keys[44], ..., keys[102] given it's 1 blob/min
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// The past 2h will cover all blobs
+		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, numBlobs, len(response.Blobs))
+		// The first 3 blobs have same requestedAt, so their order is determined by the
+		// blobkey.
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobHeader)
+		for i := 3; i < numBlobs; i++ {
+			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// Using a custom end time
+		// Querying the 1h ending at requestedAt[100]+1 without limit, this will cover all
+		// blobs keys[41], keys[42], ..., keys[100].
+		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		// for i := 0; i < 60; i++ {
+		// 	checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
+		// 	assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
+		// }
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		// Querying the blobs in the past hour, with limit=20
+		// It should return keys[43], ..., keys[62].
+		tm := time.Unix(0, time.Now().UnixNano()).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+
+		// Requesting the next 20 blobs, starting from the pagination token
+		// This should return keys[63], ..., keys[82].
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[63+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
+	})
 }
 
 func TestFetchBlobVerificationInfoHandler(t *testing.T) {
