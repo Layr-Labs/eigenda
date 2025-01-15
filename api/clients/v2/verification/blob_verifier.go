@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -43,8 +44,6 @@ func NewBlobVerifier(
 // VerifyBlobV2FromSignedBatch calls the verifyBlobV2FromSignedBatch view function on the EigenDABlobVerifier contract
 //
 // This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
-//
-// It is the responsibility of the caller to configure a timeout on the ctx, if a timeout is required.
 func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	ctx context.Context,
 	// The signed batch that contains the blob being verified. This is obtained from the disperser, and is used
@@ -70,6 +69,41 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 
 	if err != nil {
 		return fmt.Errorf("verify blob v2 from signed batch: %s", err)
+	}
+
+	return nil
+}
+
+// VerifyBlobV2 calls the VerifyBlobV2 view function on the EigenDABlobVerifier contract
+//
+// This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
+func (v *BlobVerifier) VerifyBlobV2(
+	ctx context.Context,
+	// The header of the batch that the blob is contained in
+	batchHeader *commonv2.BatchHeader,
+	// Contains data pertaining to the blob's inclusion in the batch
+	blobVerificationProof *disperser.BlobVerificationInfo,
+	// Contains data that can be used to verify that the blob actually exists in the claimed batch
+	nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
+) error {
+	convertedBatchHeader, err := verifierBindings.ConvertBatchHeader(batchHeader)
+	if err != nil {
+		return fmt.Errorf("convert batch header: %s", err)
+	}
+
+	convertedBlobVerificationProof, err := verifierBindings.ConvertVerificationProof(blobVerificationProof)
+	if err != nil {
+		return fmt.Errorf("convert blob verification proof: %s", err)
+	}
+
+	err = v.blobVerifierCaller.VerifyBlobV2(
+		&bind.CallOpts{Context: ctx},
+		*convertedBatchHeader,
+		*convertedBlobVerificationProof,
+		nonSignerStakesAndSignature)
+
+	if err != nil {
+		return fmt.Errorf("verify blob v2: %s", err)
 	}
 
 	return nil

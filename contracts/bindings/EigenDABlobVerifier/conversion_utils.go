@@ -13,7 +13,7 @@ import (
 )
 
 func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, error) {
-	convertedBatchHeader, err := convertBatchHeader(inputBatch.GetHeader())
+	convertedBatchHeader, err := ConvertBatchHeader(inputBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header: %s", err)
 	}
@@ -31,7 +31,7 @@ func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, erro
 	return outputSignedBatch, nil
 }
 
-func convertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, error) {
+func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, error) {
 	var outputBatchRoot [32]byte
 
 	inputBatchRoot := inputHeader.GetBatchRoot()
