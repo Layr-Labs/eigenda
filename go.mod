@@ -3,8 +3,8 @@ module github.com/Layr-Labs/eigenda
 go 1.21.13
 
 require (
-	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250113223831-1f7860a17f04
-	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250113223831-1f7860a17f04
+	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250115171849-5af43b43bf20
+	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250115171849-5af43b43bf20
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.11
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
