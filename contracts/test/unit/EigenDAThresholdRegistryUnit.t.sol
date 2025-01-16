@@ -47,47 +47,6 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
         );
     }
 
-    function test_updateQuorumAdversaryThresholdPercentages() public {
-        bytes memory _quorumAdversaryThresholdPercentages = hex"AABBCC";
-        vm.expectEmit(address(eigenDAThresholdRegistry));
-        emit QuorumAdversaryThresholdPercentagesUpdated(quorumAdversaryThresholdPercentages, _quorumAdversaryThresholdPercentages);
-        vm.prank(registryCoordinatorOwner);
-        eigenDAThresholdRegistry.updateQuorumAdversaryThresholdPercentages(_quorumAdversaryThresholdPercentages);
-        assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages())), keccak256(abi.encode(_quorumAdversaryThresholdPercentages)));
-    }
-
-    function test_updateQuorumConfirmationThresholdPercentages() public {
-        bytes memory _quorumConfirmationThresholdPercentages = hex"AABBCC";
-        vm.expectEmit(address(eigenDAThresholdRegistry));
-        emit QuorumConfirmationThresholdPercentagesUpdated(quorumConfirmationThresholdPercentages, _quorumConfirmationThresholdPercentages);
-        vm.prank(registryCoordinatorOwner);
-        eigenDAThresholdRegistry.updateQuorumConfirmationThresholdPercentages(_quorumConfirmationThresholdPercentages);
-        assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages())), keccak256(abi.encode(_quorumConfirmationThresholdPercentages)));
-    }
-
-    function test_updateQuorumNumbersRequired() public {
-        bytes memory _quorumNumbersRequired = hex"AABBCC";
-        vm.expectEmit(address(eigenDAThresholdRegistry));
-        emit QuorumNumbersRequiredUpdated(quorumNumbersRequired, _quorumNumbersRequired);
-        vm.prank(registryCoordinatorOwner);
-        eigenDAThresholdRegistry.updateQuorumNumbersRequired(_quorumNumbersRequired);
-        assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumNumbersRequired())), keccak256(abi.encode(_quorumNumbersRequired)));
-    }
-
-    function test_updateDefaultSecurityThresholdsV2() public {
-        SecurityThresholds memory _defaultSecurityThresholds = SecurityThresholds({
-            adversaryThreshold: 10,
-            confirmationThreshold: 20
-        });
-        vm.expectEmit(address(eigenDAThresholdRegistry));
-        emit DefaultSecurityThresholdsV2Updated(defaultSecurityThresholds, _defaultSecurityThresholds);
-        vm.prank(registryCoordinatorOwner);
-        eigenDAThresholdRegistry.updateDefaultSecurityThresholdsV2(_defaultSecurityThresholds);
-        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDAThresholdRegistry.defaultSecurityThresholdsV2();
-        assertEq(adversaryThreshold, _defaultSecurityThresholds.adversaryThreshold);
-        assertEq(confirmationThreshold, _defaultSecurityThresholds.confirmationThreshold);
-    }
-
     function test_addVersionedBlobParams() public {
         VersionedBlobParams memory _versionedBlobParams = VersionedBlobParams({
             maxNumOperators: 999,
@@ -106,17 +65,6 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     }
 
     function test_revert_onlyOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        eigenDAThresholdRegistry.updateQuorumAdversaryThresholdPercentages(hex"AABBCC");
-        vm.expectRevert("Ownable: caller is not the owner");
-        eigenDAThresholdRegistry.updateQuorumConfirmationThresholdPercentages(hex"AABBCC");
-        vm.expectRevert("Ownable: caller is not the owner");
-        eigenDAThresholdRegistry.updateQuorumNumbersRequired(hex"AABBCC");
-        vm.expectRevert("Ownable: caller is not the owner");
-        eigenDAThresholdRegistry.updateDefaultSecurityThresholdsV2(SecurityThresholds({
-            adversaryThreshold: 10,
-            confirmationThreshold: 20
-        }));
         vm.expectRevert("Ownable: caller is not the owner");
         eigenDAThresholdRegistry.addVersionedBlobParams(VersionedBlobParams({
             maxNumOperators: 999,

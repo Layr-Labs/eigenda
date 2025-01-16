@@ -85,11 +85,11 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        vm.prank(registryCoordinatorOwner);
-        eigenDAThresholdRegistry.updateDefaultSecurityThresholdsV2(SecurityThresholds({
-            confirmationThreshold: 33,
-            adversaryThreshold: 55
-        }));
+        vm.store(
+            address(eigenDAThresholdRegistry),
+            bytes32(uint256(5)),
+            bytes32(uint256(14113))
+        );
 
         _registerRelayKeys();
 
