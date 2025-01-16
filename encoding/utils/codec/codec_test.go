@@ -49,3 +49,13 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 		}
 	}
 }
+
+// TestGetPaddedDataLength tests that GetPaddedDataLength is behaving as expected
+func TestGetPaddedDataLength(t *testing.T) {
+	startLengths := []uint32{30, 31, 32, 33, 68}
+	expectedResults := []uint32{32, 32, 64, 64, 96}
+
+	for i := range startLengths {
+		require.Equal(t, codec.GetPaddedDataLength(startLengths[i]), expectedResults[i])
+	}
+}

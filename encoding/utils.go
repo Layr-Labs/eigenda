@@ -34,3 +34,8 @@ func NextPowerOf2[T constraints.Integer](d T) T {
 	nextPower := math.Ceil(math.Log2(float64(d)))
 	return T(math.Pow(2.0, nextPower))
 }
+
+// IsPowerOfTwo returns true if the input is a power of 2, otherwise false
+func IsPowerOfTwo[T constraints.Integer](input T) bool {
+	return (input&(input-1) == 0) && input != 0
+}

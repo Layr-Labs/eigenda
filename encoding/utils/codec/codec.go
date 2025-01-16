@@ -1,6 +1,8 @@
 package codec
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -34,6 +36,80 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 
 	}
 	return validData[:validEnd]
+}
+
+// PadPayload internally pads the input data by prepending a zero to each chunk of 31 bytes. This guarantees that
+// the data will be a valid field element for the bn254 curve
+//
+// Additionally, this function will add necessary padding to align to output to 32 bytes
+func PadPayload(inputData []byte) []byte {
+	// 31 bytes, for the bn254 curve
+	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
+
+	// this is the length of the output, which is aligned to 32 bytes
+	outputLength := GetPaddedDataLength(uint32(len(inputData)))
+	paddedOutput := make([]byte, outputLength)
+
+	// pre-pad the input, so that it aligns to 31 bytes. This means that the internally padded result will automatically
+	// align to 32 bytes. Doing this padding in advance simplifies the for loop.
+	requiredPad := uint32(len(inputData)) % bytesPerChunk
+	prePaddedPayload := append(inputData, make([]byte, requiredPad)...)
+
+	for element := uint32(0); element < outputLength/encoding.BYTES_PER_SYMBOL; element++ {
+		// add the 0x00 internal padding to guarantee that the data is in the valid range
+		zeroByteIndex := element * encoding.BYTES_PER_SYMBOL
+		paddedOutput[zeroByteIndex] = 0x00
+
+		destIndex := zeroByteIndex + 1
+		srcIndex := element * bytesPerChunk
+
+		// copy 31 bytes of data from the payload to the padded output
+		copy(paddedOutput[destIndex:destIndex+bytesPerChunk], prePaddedPayload[srcIndex:srcIndex+bytesPerChunk])
+	}
+
+	return paddedOutput
+}
+
+// GetPaddedDataLength accepts the length of a byte array, and returns the length that the array would be after
+// adding internal byte padding
+func GetPaddedDataLength(inputLen uint32) uint32 {
+	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
+	chunkCount := inputLen / bytesPerChunk
+
+	if inputLen%bytesPerChunk != 0 {
+		chunkCount++
+	}
+
+	return chunkCount * encoding.BYTES_PER_SYMBOL
+}
+
+// RemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in PadPayload
+//
+// This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the output
+// from this function is not guaranteed to align to 32 bytes.
+func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
+	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
+		return nil, fmt.Errorf(
+			"padded data (length %d) must be multiple of encoding.BYTES_PER_SYMBOL %d",
+			len(paddedData),
+			encoding.BYTES_PER_SYMBOL)
+	}
+
+	bytesPerChunk := encoding.BYTES_PER_SYMBOL - 1
+
+	symbolCount := len(paddedData) / encoding.BYTES_PER_SYMBOL
+	outputLength := symbolCount * bytesPerChunk
+
+	outputData := make([]byte, outputLength)
+
+	for i := 0; i < symbolCount; i++ {
+		dstIndex := i * bytesPerChunk
+		srcIndex := i*encoding.BYTES_PER_SYMBOL + 1
+
+		copy(outputData[dstIndex:dstIndex+bytesPerChunk], paddedData[srcIndex:srcIndex+bytesPerChunk])
+	}
+
+	return outputData, nil
 }
 
 // RemoveEmptyByteFromPaddedBytes takes bytes and remove the first byte from every 32 bytes.
