@@ -483,6 +483,58 @@ const docTemplateV2 = `{
         "big.Int": {
             "type": "object"
         },
+        "core.BlobHeader": {
+            "type": "object",
+            "properties": {
+                "accountID": {
+                    "description": "AccountID is the account that is paying for the blob to be stored",
+                    "type": "string"
+                },
+                "commitment": {
+                    "$ref": "#/definitions/encoding.G1Commitment"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "length_commitment": {
+                    "$ref": "#/definitions/encoding.G2Commitment"
+                },
+                "length_proof": {
+                    "$ref": "#/definitions/encoding.LengthProof"
+                },
+                "quorumInfos": {
+                    "description": "QuorumInfos contains the quorum specific parameters for the blob",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core.BlobQuorumInfo"
+                    }
+                }
+            }
+        },
+        "core.BlobQuorumInfo": {
+            "type": "object",
+            "properties": {
+                "adversaryThreshold": {
+                    "description": "AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum",
+                    "type": "integer"
+                },
+                "chunkLength": {
+                    "description": "ChunkLength is the number of symbols in a chunk",
+                    "type": "integer"
+                },
+                "confirmationThreshold": {
+                    "description": "ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum",
+                    "type": "integer"
+                },
+                "quorumID": {
+                    "type": "integer"
+                },
+                "quorumRate": {
+                    "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
+                    "type": "integer"
+                }
+            }
+        },
         "core.G1Point": {
             "type": "object",
             "properties": {
@@ -741,6 +793,23 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4
+            ],
+            "x-enum-varnames": [
+                "Queued",
+                "Encoded",
+                "Certified",
+                "Failed",
+                "InsufficientSignatures"
+            ]
+        },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
             "properties": {
@@ -808,6 +877,64 @@ const docTemplateV2 = `{
             "properties": {
                 "blob_certificate": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                }
+            }
+        },
+        "v2.BlobFeedResponse": {
+            "type": "object",
+            "properties": {
+                "blobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.BlobMetadata"
+                    }
+                },
+                "pagination_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.BlobMetadata": {
+            "type": "object",
+            "properties": {
+                "blobHeader": {
+                    "$ref": "#/definitions/core.BlobHeader"
+                },
+                "blobSize": {
+                    "description": "BlobSize is the size of the blob in bytes",
+                    "type": "integer"
+                },
+                "blobStatus": {
+                    "description": "BlobStatus indicates the current status of the blob",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus"
+                        }
+                    ]
+                },
+                "expiry": {
+                    "description": "Expiry is Unix timestamp of the blob expiry in seconds from epoch",
+                    "type": "integer"
+                },
+                "fragmentSizeBytes": {
+                    "description": "FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.",
+                    "type": "integer"
+                },
+                "numRetries": {
+                    "description": "NumRetries is the number of times the blob has been retried",
+                    "type": "integer"
+                },
+                "requestedAt": {
+                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in seconds",
+                    "type": "integer"
+                },
+                "totalChunkSizeBytes": {
+                    "description": "TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_",
+                    "type": "integer"
                 }
             }
         },
