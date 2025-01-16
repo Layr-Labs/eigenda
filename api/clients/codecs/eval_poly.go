@@ -15,7 +15,7 @@ import (
 // evalPoly is a polynomial in evaluation form.
 //
 // The underlying bytes represent 32 byte field elements, and the field elements represent the evaluation at the
-// polynomial's expanded roots of unity
+// polynomial's roots of unity
 type evalPoly struct {
 	fieldElements []fr.Element
 }

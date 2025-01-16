@@ -9,6 +9,7 @@ import (
 )
 
 // TestFftEncode checks that data can be IfftEncoded and FftEncoded repeatedly, always getting back the original data
+// TODO: we should probably be using fuzzing instead of this kind of ad-hoc random search testing
 func TestFftEncode(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
 
