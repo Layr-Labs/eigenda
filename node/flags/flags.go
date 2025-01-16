@@ -238,6 +238,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
 		Value:    20 * time.Second,
 	}
+	GRPCMsgSizeLimitV2Flag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-msg-size-limit-v2"),
+		Usage:    "The maximum message size in bytes the V2 dispersal endpoint can receive from the client. This flag is only relevant in v2 (default: 1MB)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
+		Value:    1024 * 1024,
+	}
 	DisableDispersalAuthenticationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
 		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
@@ -409,6 +416,7 @@ var optionalFlags = []cli.Flag{
 	EnableV2Flag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
+	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
 	DisableDispersalAuthenticationFlag,

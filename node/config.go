@@ -86,6 +86,7 @@ type Config struct {
 	EnableV2                    bool
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
+	GRPCMsgSizeLimitV2          int
 
 	PprofHttpPort string
 	EnablePprof   bool
@@ -261,6 +262,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableV2:                            ctx.GlobalBool(flags.EnableV2Flag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
+		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
 		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),

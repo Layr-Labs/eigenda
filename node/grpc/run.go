@@ -59,7 +59,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				logger.Fatalf("Could not start tcp listener: %v", err)
 			}
 
-			opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
+			opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
 			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
 
 			// Register reflection service on gRPC server
