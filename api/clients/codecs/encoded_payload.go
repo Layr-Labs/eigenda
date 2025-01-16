@@ -46,13 +46,6 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 			len(nonPaddedData), claimedLength)
 	}
 
-	lengthDifference := uint32(len(nonPaddedData)) - claimedLength
-	if lengthDifference > 31 {
-		return nil, fmt.Errorf(
-			"difference in length between actual data (%d) and claimed data is too large. Payload encoding pads at most 31 bytes",
-			lengthDifference)
-	}
-
 	return NewPayload(nonPaddedData[0:claimedLength]), nil
 }
 

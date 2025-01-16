@@ -82,7 +82,7 @@ func PadPayload(inputData []byte) []byte {
 
 	// pre-pad the input, so that it aligns to 31 bytes. This means that the internally padded result will automatically
 	// align to 32 bytes. Doing this padding in advance simplifies the for loop.
-	requiredPad := uint32(len(inputData)) % bytesPerChunk
+	requiredPad := (bytesPerChunk - uint32(len(inputData))%bytesPerChunk) % bytesPerChunk
 	prePaddedPayload := append(inputData, make([]byte, requiredPad)...)
 
 	for element := uint32(0); element < outputLength/encoding.BYTES_PER_SYMBOL; element++ {
