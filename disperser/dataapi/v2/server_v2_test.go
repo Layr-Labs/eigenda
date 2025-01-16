@@ -515,6 +515,44 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
 	})
+
+	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
+		// Test pagination behavior in case of same-timestamp blobs
+		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
+		// - These are followed by sequential blobs: keys[3,4] with different timestamps
+		// - End time is set to requestedAt[5]
+		tm := time.Unix(0, int64(requestedAt[5])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+
+		// First page: fetch 2 blobs, which have same requestedAt timestamp
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=2", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 2, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, firstBlobTime, response.Blobs[1].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
+
+		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=0&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		// Verify second page contains:
+		// 1. Last same-timestamp blob
+		// 2. Following blobs with sequential timestamps
+		require.Equal(t, 3, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[3], response.Blobs[1].RequestedAt)
+		assert.Equal(t, requestedAt[4], response.Blobs[2].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
+	})
 }
 
 func TestFetchBlobVerificationInfoHandler(t *testing.T) {
