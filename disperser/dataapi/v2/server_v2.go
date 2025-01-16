@@ -32,12 +32,9 @@ import (
 var errNotFound = errors.New("not found")
 
 const (
-	// The blob feed API queries blobs in time range [start, end), this constant
-	// sets the max length of this interval.
-	// It's set to 4h (in seconds), so if the Disperser is operating at the max
-	// request rate (100 blobs/s), there will be 1,440,000 blobs (14400*100) at max
-	// fetched by one blob feed API call.
-	maxBlobfeedIntervalSecs = int(4 * time.Hour / time.Second)
+	// The max number of blobs to return from blob Feed API, regardless of the time
+	// range or "limit" param.
+	maxBlobFeedNumBlobs = 1000
 
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
@@ -320,9 +317,9 @@ func (s *ServerV2) Shutdown() error {
 //	@Tags		Blob
 //	@Produce	json
 //	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600; max: 14400]"
+//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
 //	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
-//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. Unlimited if limit <= 0 [default: 20]"
+//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
 //	@Success	200					{object}	BlobFeedResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
@@ -348,18 +345,21 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	interval := 3600
 	if c.Query("interval") != "" {
 		interval, err = strconv.Atoi(c.Query("interval"))
-		if err != nil || interval > maxBlobfeedIntervalSecs {
+		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("interval param is invalid: %w", err))
 			return
 		}
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if err != nil {
+	if err != nil || limit > maxBlobFeedNumBlobs {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
-		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		invalidParamsErrorResponse(c, fmt.Errorf("limit param is invalid: %w", err))
 		return
+	}
+	if limit <= 0 {
+		limit = maxBlobFeedNumBlobs
 	}
 
 	paginationCursor := blobstore.BlobFeedCursor{
