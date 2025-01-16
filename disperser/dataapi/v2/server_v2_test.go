@@ -404,26 +404,19 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
 
 	t.Run("invalid params", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?pagination_token=abc", nil)
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
-
-		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?limit=abc", nil)
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
-
-		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?interval=abc", nil)
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
-
-		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?interval=14401", nil)
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
-
-		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?end=2006-01-02T15:04:05", nil)
-		r.ServeHTTP(w, req)
-		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		reqUrls := []string{
+			"/v2/blobs/feed?pagination_token=abc",
+			"/v2/blobs/feed?limit=abc",
+			"/v2/blobs/feed?interval=abc",
+			"/v2/blobs/feed?interval=14401",
+			"/v2/blobs/feed?end=2006-01-02T15:04:05",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
 	})
 
 	t.Run("default params", func(t *testing.T) {
