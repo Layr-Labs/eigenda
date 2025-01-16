@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -16,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -295,7 +295,7 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 }
 
 func newTestComponents(t *testing.T, mockPool bool) *testComponents {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
 	var pool common.WorkerPool

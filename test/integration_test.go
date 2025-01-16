@@ -30,6 +30,7 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
@@ -361,7 +362,6 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			ExpirationPollIntervalSec:           10,
 			DbPath:                              dbPath,
 			LogPath:                             logPath,
-			PrivateBls:                          string(op.KeyPair.GetPubKeyG1().Serialize()),
 			ID:                                  id,
 			QuorumIDList:                        registeredQuorums,
 			DispersalAuthenticationKeyCacheSize: 1024,
@@ -410,6 +410,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
+			BLSSigner:               op.Signer,
 			Metrics:                 metrics,
 			Store:                   store,
 			ChainState:              cst,
@@ -491,7 +492,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	assert.NoError(t, err)
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)

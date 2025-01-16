@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/node/flags"
 
-	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -62,7 +62,6 @@ type Config struct {
 	QuorumIDList                   []core.QuorumID
 	DbPath                         string
 	LogPath                        string
-	PrivateBls                     string
 	ID                             core.OperatorID
 	BLSOperatorStateRetrieverAddr  string
 	EigenDAServiceManagerAddr      string
@@ -78,11 +77,7 @@ type Config struct {
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
 
-	BLSRemoteSignerEnabled   bool
-	BLSRemoteSignerUrl       string
-	BLSPublicKeyHex          string
-	BLSKeyPassword           string
-	BLSSignerTLSCertFilePath string
+	BlsSignerConfig blssignerTypes.SignerConfig
 
 	EthClientConfig geth.EthClientConfig
 	LoggerConfig    common.LoggerConfig
@@ -171,28 +166,46 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ethClientConfig = geth.ReadEthClientConfig(ctx)
 	}
 
-	// check if BLS remote signer configuration is provided
-	blsRemoteSignerEnabled := ctx.GlobalBool(flags.BLSRemoteSignerEnabledFlag.Name)
-	if blsRemoteSignerEnabled && (ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name) == "" || ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name) == "") {
-		return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
-	}
-	if !blsRemoteSignerEnabled && (ctx.GlobalString(flags.BlsKeyFileFlag.Name) == "" || ctx.GlobalString(flags.BlsKeyPasswordFlag.Name) == "") {
-		return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
-	}
-
-	// Decrypt BLS key
-	var privateBls string
+	var blsSignerConfig blssignerTypes.SignerConfig
 	if !testMode {
-		// If remote signer fields are empty then try to read the BLS key from the file
-		if !blsRemoteSignerEnabled {
-			kp, err := bls.ReadPrivateKeyFromFile(ctx.GlobalString(flags.BlsKeyFileFlag.Name), ctx.GlobalString(flags.BlsKeyPasswordFlag.Name))
-			if err != nil {
-				return nil, fmt.Errorf("could not read or decrypt the BLS private key: %v", err)
-			}
-			privateBls = kp.PrivKey.String()
+		blsSignerCertFilePath := ctx.GlobalString(flags.BLSSignerCertFileFlag.Name)
+		enableTLS := len(blsSignerCertFilePath) > 0
+		signerType := blssignerTypes.Local
+
+		// check if BLS remote signer configuration is provided
+		blsRemoteSignerEnabled := ctx.GlobalBool(flags.BLSRemoteSignerEnabledFlag.Name)
+		blsRemoteSignerUrl := ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name)
+		blsPublicKeyHex := ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name)
+		blsKeyFilePath := ctx.GlobalString(flags.BlsKeyFileFlag.Name)
+		blsKeyPassword := ctx.GlobalString(flags.BlsKeyPasswordFlag.Name)
+
+		if blsRemoteSignerEnabled && (blsRemoteSignerUrl == "" || blsPublicKeyHex == "") {
+			return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
+		}
+		if !blsRemoteSignerEnabled && (blsKeyFilePath == "" || blsKeyPassword == "") {
+			return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+		}
+
+		if blsRemoteSignerEnabled {
+			signerType = blssignerTypes.Cerberus
+		}
+
+		blsSignerConfig = blssignerTypes.SignerConfig{
+			SignerType:       signerType,
+			Path:             blsKeyFilePath,
+			Password:         blsKeyPassword,
+			CerberusUrl:      blsRemoteSignerUrl,
+			PublicKeyHex:     blsPublicKeyHex,
+			CerberusPassword: blsKeyPassword,
+			EnableTLS:        enableTLS,
+			TLSCertFilePath:  ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
 		}
 	} else {
-		privateBls = ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
+		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
+		blsSignerConfig = blssignerTypes.SignerConfig{
+			SignerType: blssignerTypes.PrivateKey,
+			PrivateKey: privateBls,
+		}
 	}
 
 	internalDispersalFlag := ctx.GlobalString(flags.InternalDispersalPortFlag.Name)
@@ -229,7 +242,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideStoreDurationBlocks:         ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
-		PrivateBls:                          privateBls,
 		EthClientConfig:                     ethClientConfig,
 		EncoderConfig:                       kzg.ReadCLIConfig(ctx),
 		LoggerConfig:                        *loggerConfig,
@@ -245,11 +257,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
-		BLSRemoteSignerUrl:                  ctx.GlobalString(flags.BLSRemoteSignerUrlFlag.Name),
-		BLSPublicKeyHex:                     ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name),
-		BLSKeyPassword:                      ctx.GlobalString(flags.BlsKeyPasswordFlag.Name),
-		BLSSignerTLSCertFilePath:            ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
-		BLSRemoteSignerEnabled:              blsRemoteSignerEnabled,
+		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            ctx.GlobalBool(flags.EnableV2Flag.Name),
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),

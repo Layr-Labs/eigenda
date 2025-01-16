@@ -1,4 +1,4 @@
-FROM golang:1.21.12-bookworm AS base
+FROM golang:1.21.13-bookworm AS base
 
 # Install core dependencies
 RUN apt update
@@ -29,7 +29,7 @@ WORKDIR /home/lnode/eigenda/lightnode
 RUN make build
 
 # In order to equip this image with a shell for debugging,
-# swap out the "FROM scratch" below with "FROM golang:1.21.12-bookworm"
+# swap out the "FROM scratch" below with "FROM golang:1.21.13-bookworm"
 FROM scratch AS final
 
 # Copy over files needed for lnode user.
