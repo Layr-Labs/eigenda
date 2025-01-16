@@ -417,6 +417,10 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
 
+		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?interval=14401", nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
 		req = httptest.NewRequest(http.MethodGet, "/v2/blobs/feed?end=2006-01-02T15:04:05", nil)
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
