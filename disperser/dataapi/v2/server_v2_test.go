@@ -358,7 +358,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
-	// Create blobs for testing
+	// Create a timeline of test blobs:
+	// - Total of 103 blobs
+	// - First 3 blobs share the same timestamp (firstBlobTime)
+	// - The last blob has timestamp "now"
+	// - Remaining blobs are spaced 1 minute apart
+	// - Timeline spans roughly 100 minutes into the past from now
 	numBlobs := 103
 	now := uint64(time.Now().UnixNano())
 	nanoSecsPerBlob := uint64(60 * 1e9) // 1 blob per minute
@@ -366,8 +371,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	keys := make([]corev2.BlobKey, numBlobs)
 	requestedAt := make([]uint64, numBlobs)
 
-	// Create blob: the first 3 have same requestedAt, and then each blob is gapped
-	// by nanoSecsPerBlob
+	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
@@ -419,12 +423,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 
 	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs (60 blobs total available, keys[43], ..., keys[102])
+		// - Limited to 20 results (the default "limit")
+		// - Starting from blob[43] through blob[62]
 		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed")
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
-		// The default params will query the past 1h blobs, which will be 60 blobs
-		// (as the nanoSecsPerBlob is 1 blob/min). So the blobs in the range are
-		// keys[43], keys[44], ..., keys[102]. Since we have limit defaulted to 20,
-		// the results returned will be keys[43], ..., keys[62].
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
@@ -435,8 +439,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 
 	t.Run("various query ranges and limits", func(t *testing.T) {
-		// Without limit, this will return all blobs in the past hour, which
-		// are keys[43], keys[44], ..., keys[102] given it's 1 blob/min
+		// Test 1: Unlimited results in 1-hour window
+		// Returns keys[43] through keys[102] (60 blobs)
 		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
@@ -447,12 +451,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
 
-		// The past 2h will cover all blobs
+		// Test 2: 2-hour window captures all test blobs
+		// Verifies correct ordering of timestamp-colliding blobs
 		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, numBlobs, len(response.Blobs))
-		// The first 3 blobs have same requestedAt, so their order is determined by the
-		// blobkey.
+		// First 3 blobs ordered by key due to same timestamp
 		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
 		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
 		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobHeader)
@@ -463,9 +467,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
 
-		// Using a custom end time
-		// Querying the 1h ending at requestedAt[100]+1 without limit, this will cover all
-		// blobs keys[41], keys[42], ..., keys[100].
+		// Test 3: Custom end time with 1-hour window
+		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
@@ -481,8 +484,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 
 	t.Run("pagination", func(t *testing.T) {
-		// Querying the blobs in the past hour, with limit=20
-		// It should return keys[43], ..., keys[62].
+		// Test pagination behavior:
+		// 1. First page: blobs in past 1h limited to 20, returns keys[43] through keys[62]
+		// 2. Second page: the next 20 blobs, returns keys[63] through keys[82]
+		// Verifies:
+		// - Correct sequencing across pages
+		// - Proper token handling
 		tm := time.Unix(0, time.Now().UnixNano()).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
@@ -496,8 +503,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
 
-		// Requesting the next 20 blobs, starting from the pagination token
-		// This should return keys[63], ..., keys[82].
+		// Request next page using pagination token
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
