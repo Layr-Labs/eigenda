@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -14,15 +15,16 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
-	dacore "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/node/plugin"
 	"github.com/Layr-Labs/eigenda/operators/churner"
-	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +39,7 @@ var (
 	testConfig                     *deploy.Config
 	templateName                   string
 	testName                       string
-	logger                         = logging.NewNoopLogger()
+	logger                         = testutils.GetLogger()
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	rpcURL                         = "http://localhost:8545"
 	quorumIds                      = []uint32{0, 1}
@@ -102,24 +104,36 @@ func TestChurner(t *testing.T) {
 	var lowestStakeOperatorPubKey *core.G1Point
 	var tx *eth.Writer
 	var operatorPrivateKey *ecdsa.PrivateKey
-	var keyPair *dacore.KeyPair
+	var signer blssigner.Signer
+	var g1PointBytes []byte
+	var g2PointBytes []byte
 	for i, op := range testConfig.Operators {
 		socket := fmt.Sprintf("%s:%s:%s", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT, op.NODE_RETRIEVAL_PORT)
-		kp, err := bls.ReadPrivateKeyFromFile(op.NODE_BLS_KEY_FILE, op.NODE_BLS_KEY_PASSWORD)
+		opSigner, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+			Path:       op.NODE_BLS_KEY_FILE,
+			Password:   op.NODE_BLS_KEY_PASSWORD,
+			SignerType: blssignerTypes.Local,
+		})
 		assert.NoError(t, err)
-		g1point := &core.G1Point{
-			G1Affine: kp.PubKey.G1Affine,
-		}
-		opKeyPair := &core.KeyPair{
-			PrivKey: kp.PrivKey,
-			PubKey:  g1point,
-		}
+
+		opG1PointHex := opSigner.GetPublicKeyG1()
+		opG1PointBytes, err := hex.DecodeString(opG1PointHex)
+		assert.NoError(t, err)
+		opG1Point := new(core.G1Point)
+		opG1Point, err = opG1Point.Deserialize(opG1PointBytes)
+		assert.NoError(t, err)
+		opG2PointHex := opSigner.GetPublicKeyG2()
+		opG2PointBytes, err := hex.DecodeString(opG2PointHex)
+		assert.NoError(t, err)
+		opG2Point := new(core.G2Point)
+		opG2Point, err = opG2Point.Deserialize(opG2PointBytes)
+		assert.NoError(t, err)
 		sk, privateKey, err := plugin.GetECDSAPrivateKey(op.NODE_ECDSA_KEY_FILE, op.NODE_ECDSA_KEY_PASSWORD)
 		assert.NoError(t, err)
 		if i == 0 {
 			// This is the lowest stake operator that will be eventually churned
 			lowestStakeOperatorAddr = sk.Address
-			lowestStakeOperatorPubKey = g1point
+			lowestStakeOperatorPubKey = opG1Point
 		}
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
@@ -129,11 +143,13 @@ func TestChurner(t *testing.T) {
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
 			operatorAddr = sk.Address.Hex()
-			keyPair = opKeyPair
+			signer = opSigner
 			operatorPrivateKey = sk.PrivateKey
+			g1PointBytes = opG1Point.Serialize()
+			g2PointBytes = opG2Point.Serialize()
 			break
 		}
-		err = tx.RegisterOperator(ctx, opKeyPair, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
+		err = tx.RegisterOperator(ctx, opSigner, socket, quorumIDsUint8, sk.PrivateKey, salt, expiry)
 		assert.NoError(t, err)
 	}
 	assert.Greater(t, len(lowestStakeOperatorAddr), 0)
@@ -141,8 +157,8 @@ func TestChurner(t *testing.T) {
 	salt := crypto.Keccak256([]byte(operatorToChurnInPrivateKeyHex), []byte("ChurnRequest"))
 	request := &pb.ChurnRequest{
 		OperatorAddress:            operatorAddr,
-		OperatorToRegisterPubkeyG1: keyPair.PubKey.Serialize(),
-		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2().Serialize(),
+		OperatorToRegisterPubkeyG1: g1PointBytes,
+		OperatorToRegisterPubkeyG2: g2PointBytes,
 		Salt:                       salt,
 		QuorumIds:                  quorumIds,
 	}
@@ -157,8 +173,9 @@ func TestChurner(t *testing.T) {
 	)
 	copy(requestHash[:], requestHashBytes)
 
-	signature := keyPair.SignMessage(requestHash)
-	request.OperatorRequestSignature = signature.Serialize()
+	signature, err := signer.Sign(context.Background(), requestHash[:])
+	assert.NoError(t, err)
+	request.OperatorRequestSignature = signature
 
 	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
 		PubkeyG1: lowestStakeOperatorPubKey,
@@ -183,7 +200,7 @@ func TestChurner(t *testing.T) {
 	salt32 := [32]byte{}
 	copy(salt32[:], salt)
 	expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-	err = tx.RegisterOperatorWithChurn(ctx, keyPair, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
+	err = tx.RegisterOperatorWithChurn(ctx, signer, "localhost:8080", quorumIDsUint8, operatorPrivateKey, salt32, expiry, reply)
 	assert.NoError(t, err)
 }
 
