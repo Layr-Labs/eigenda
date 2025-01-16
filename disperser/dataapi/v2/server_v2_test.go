@@ -407,8 +407,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		reqUrls := []string{
 			"/v2/blobs/feed?pagination_token=abc",
 			"/v2/blobs/feed?limit=abc",
+			"/v2/blobs/feed?limit=1001",
 			"/v2/blobs/feed?interval=abc",
-			"/v2/blobs/feed?interval=14401",
 			"/v2/blobs/feed?end=2006-01-02T15:04:05",
 		}
 		for _, url := range reqUrls {
