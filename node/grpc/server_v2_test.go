@@ -3,10 +3,11 @@ package grpc_test
 import (
 	"context"
 	"errors"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"os"
 	"sync/atomic"
 	"testing"
+
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -23,6 +24,8 @@ import (
 	"github.com/Layr-Labs/eigenda/node/grpc"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -53,6 +56,12 @@ type testComponents struct {
 func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	keyPair, err := core.GenRandomBlsKeys()
 	require.NoError(t, err)
+	require.NoError(t, err)
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		SignerType: blssignerTypes.PrivateKey,
+		PrivateKey: keyPair.PrivKey.String(),
+	})
+	require.NoError(t, err)
 	opID = [32]byte{0}
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
@@ -76,6 +85,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		Config:      config,
 		Logger:      logger,
 		KeyPair:     keyPair,
+		BLSSigner:   signer,
 		Metrics:     metrics,
 		StoreV2:     s,
 		ChainState:  chainState,

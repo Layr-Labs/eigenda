@@ -6,20 +6,27 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func TestRegisterOperator(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		PrivateKey: keyPair.PrivKey.String(),
+		SignerType: blssignerTypes.PrivateKey,
+	})
 	assert.NoError(t, err)
 	// Create a new operator
 	operator := &node.Operator{
@@ -27,7 +34,7 @@ func TestRegisterOperator(t *testing.T) {
 		Socket:              "localhost:50051",
 		Timeout:             10 * time.Second,
 		PrivKey:             nil,
-		KeyPair:             keyPair,
+		Signer:              signer,
 		OperatorId:          operatorID,
 		QuorumIDs:           []core.QuorumID{0, 1},
 		RegisterNodeAtStart: false,
@@ -58,17 +65,22 @@ func TestRegisterOperator(t *testing.T) {
 }
 
 func TestRegisterOperatorWithChurn(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	operatorID := [32]byte(hexutil.MustDecode("0x3fbfefcdc76462d2cdb7d0cea75f27223829481b8b4aa6881c94cb2126a316ad"))
 	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+		PrivateKey: keyPair.PrivKey.String(),
+		SignerType: blssignerTypes.PrivateKey,
+	})
 	assert.NoError(t, err)
 	// Create a new operator
 	operator := &node.Operator{
 		Address:    "0xB7Ad27737D88B07De48CDc2f379917109E993Be4",
 		Socket:     "localhost:50051",
 		Timeout:    10 * time.Second,
+		Signer:     signer,
 		PrivKey:    nil,
-		KeyPair:    keyPair,
 		OperatorId: operatorID,
 		QuorumIDs:  []core.QuorumID{1},
 	}

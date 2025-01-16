@@ -1,6 +1,3 @@
-> [!WARNING]
-> We do not accept trivial/documentation fixes from first-time contributors. These PRs will be closed without review.
-
 ## Why are these changes needed?
 
 <!-- Please give a short summary of the change and the problem this solves. -->
