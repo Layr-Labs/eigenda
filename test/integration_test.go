@@ -30,7 +30,9 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	dispatcher "github.com/Layr-Labs/eigenda/disperser/batcher/grpc"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
@@ -45,7 +47,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/core"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	batchermock "github.com/Layr-Labs/eigenda/disperser/batcher/mock"
@@ -351,19 +352,20 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		}
 
 		config := &node.Config{
-			Hostname:                  op.Host,
-			DispersalPort:             op.DispersalPort,
-			RetrievalPort:             op.RetrievalPort,
-			InternalRetrievalPort:     op.RetrievalPort,
-			InternalDispersalPort:     op.DispersalPort,
-			EnableMetrics:             false,
-			Timeout:                   10,
-			ExpirationPollIntervalSec: 10,
-			DbPath:                    dbPath,
-			LogPath:                   logPath,
-			PrivateBls:                string(op.KeyPair.GetPubKeyG1().Serialize()),
-			ID:                        id,
-			QuorumIDList:              registeredQuorums,
+			Hostname:                            op.Host,
+			DispersalPort:                       op.DispersalPort,
+			RetrievalPort:                       op.RetrievalPort,
+			InternalRetrievalPort:               op.RetrievalPort,
+			InternalDispersalPort:               op.DispersalPort,
+			EnableMetrics:                       false,
+			Timeout:                             10,
+			ExpirationPollIntervalSec:           10,
+			DbPath:                              dbPath,
+			LogPath:                             logPath,
+			ID:                                  id,
+			QuorumIDList:                        registeredQuorums,
+			DispersalAuthenticationKeyCacheSize: 1024,
+			DisableDispersalAuthentication:      false,
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
@@ -408,6 +410,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			Config:                  config,
 			Logger:                  logger,
 			KeyPair:                 op.KeyPair,
+			BLSSigner:               op.Signer,
 			Metrics:                 metrics,
 			Store:                   store,
 			ChainState:              cst,
@@ -417,10 +420,23 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			OperatorSocketsFilterer: mockOperatorSocketsFilterer,
 		}
 
-		ratelimiter := &commonmock.NoopRatelimiter{}
+		rateLimiter := &commonmock.NoopRatelimiter{}
 
-		serverV1 := nodegrpc.NewServer(config, n, logger, ratelimiter)
-		serverV2, err := nodegrpc.NewServerV2(config, n, logger, ratelimiter, prometheus.NewRegistry())
+		// TODO(cody-littley): Once we switch this test to use the v2 disperser, we will need to properly set up
+		//  the disperser's public/private keys for signing StoreChunks() requests
+		disperserAddress := gethcommon.Address{}
+		reader := &coremock.MockWriter{}
+		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+
+		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+		serverV2, err := nodegrpc.NewServerV2(
+			context.Background(),
+			config,
+			n,
+			logger,
+			rateLimiter,
+			prometheus.NewRegistry(),
+			reader)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{
@@ -476,7 +492,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 
 	cst.On("GetCurrentBlockNumber").Return(uint(10), nil)
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	assert.NoError(t, err)
 	store := inmem.NewBlobStore()
 	dis := mustMakeDisperser(t, cst, store, logger)

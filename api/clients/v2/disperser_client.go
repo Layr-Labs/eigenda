@@ -3,7 +3,6 @@ package clients
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -30,13 +29,14 @@ type DisperserClient interface {
 }
 
 type disperserClient struct {
-	config     *DisperserClientConfig
-	signer     corev2.BlobRequestSigner
-	initOnce   sync.Once
-	conn       *grpc.ClientConn
-	client     disperser_rpc.DisperserClient
-	prover     encoding.Prover
-	accountant *Accountant
+	config             *DisperserClientConfig
+	signer             corev2.BlobRequestSigner
+	initOnceGrpc       sync.Once
+	initOnceAccountant sync.Once
+	conn               *grpc.ClientConn
+	client             disperser_rpc.DisperserClient
+	prover             encoding.Prover
+	accountant         *Accountant
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -86,6 +86,14 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 
 // PopulateAccountant populates the accountant with the payment state from the disperser.
 func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
+	if c.accountant == nil {
+		accountId, err := c.signer.GetAccountID()
+		if err != nil {
+			return fmt.Errorf("error getting account ID: %w", err)
+		}
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+	}
+
 	paymentState, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
@@ -95,6 +103,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
+
 	return nil
 }
 
@@ -121,21 +130,20 @@ func (c *disperserClient) DisperseBlob(
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
+	err = c.initOncePopulateAccountant(ctx)
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
 
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
 
-	// TODO(hopeyen): uncomment this after the accountant is implemented
-	// if c.accountant == nil {
-	// 	return nil, [32]byte{}, api.NewErrorInternal("uninitialized accountant for paid dispersal; make sure to call PopulateAccountant after creating the client")
-	// }
-
-	// symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	// payment, err := c.accountant.AccountBlob(ctx, uint64(symbolLength), quorums, salt)
-	// if err != nil {
-	// 	return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	// }
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+	}
 
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
@@ -174,26 +182,18 @@ func (c *disperserClient) DisperseBlob(
 		}
 	}
 
-	var payment core.PaymentMetadata
-	accountId, err := c.signer.GetAccountID()
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorInvalidArg(fmt.Sprintf("please configure signer key if you want to use authenticated endpoint %v", err))
-	}
-	payment.AccountID = accountId
-	payment.ReservationPeriod = 0
-	payment.CumulativePayment = big.NewInt(0)
 	blobHeader := &corev2.BlobHeader{
 		BlobVersion:     blobVersion,
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
-		PaymentMetadata: payment,
+		PaymentMetadata: *payment,
 	}
-	// TODO(hopeyen): uncomment this and replace the payment metadata for authentication
-	// sig, err := c.signer.SignBlobRequest(blobHeader)
-	// if err != nil {
-	// 	return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
-	// }
-	// blobHeader.Signature = sig
+
+	sig, err := c.signer.SignBlobRequest(blobHeader)
+	if err != nil {
+		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
+	}
+	blobHeader.Signature = sig
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)
@@ -273,7 +273,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 // If initialization fails, it caches the error and will return it on every subsequent call.
 func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
-	c.initOnce.Do(func() {
+	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
 		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
 		conn, err := grpc.NewClient(addr, dialOptions...)
@@ -286,6 +286,25 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	})
 	if initErr != nil {
 		return fmt.Errorf("initializing grpc connection: %w", initErr)
+	}
+	return nil
+}
+
+// initOncePopulateAccountant initializes the accountant if it is not already initialized.
+// If initialization fails, it caches the error and will return it on every subsequent call.
+func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error {
+	var initErr error
+	c.initOnceAccountant.Do(func() {
+		if c.accountant == nil {
+			err := c.PopulateAccountant(ctx)
+			if err != nil {
+				initErr = err
+				return
+			}
+		}
+	})
+	if initErr != nil {
+		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
 }

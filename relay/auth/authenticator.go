@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"sync"
 	"time"
 
@@ -107,11 +107,6 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	request *pb.GetChunksRequest,
 	now time.Time) error {
 
-	if strings.HasPrefix(origin, "127.0.0.1") {
-		// TODO(ian-shim): Remove this block once we have a way to authenticate requests.
-		return nil
-	}
-
 	if a.isAuthenticationStillValid(now, origin) {
 		// We've recently authenticated this client. Do not authenticate again for a while.
 		return nil
@@ -135,7 +130,7 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		G1Point: g1Point,
 	}
 
-	hash := HashGetChunksRequest(request)
+	hash := hashing.HashGetChunksRequest(request)
 	isValid := signature.Verify(key, ([32]byte)(hash))
 
 	if !isValid {

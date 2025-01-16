@@ -16,7 +16,7 @@
     - [G1Commitment](#common-G1Commitment)
     - [PaymentHeader](#common-PaymentHeader)
   
-- [common/v2/common.proto](#common_v2_common-proto)
+- [common/v2/common_v2.proto](#common_v2_common_v2-proto)
     - [Batch](#common-v2-Batch)
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
@@ -47,7 +47,6 @@
   
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
-    - [BinRecord](#disperser-v2-BinRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -58,6 +57,7 @@
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [PeriodRecord](#disperser-v2-PeriodRecord)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
@@ -118,6 +118,12 @@
     - [BlobRequest](#retriever-BlobRequest)
   
     - [Retriever](#retriever-Retriever)
+  
+- [retriever/v2/retriever_v2.proto](#retriever_v2_retriever_v2-proto)
+    - [BlobReply](#retriever-v2-BlobReply)
+    - [BlobRequest](#retriever-v2-BlobRequest)
+  
+    - [Retriever](#retriever-v2-Retriever)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -299,10 +305,10 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 
 
 
-<a name="common_v2_common-proto"></a>
+<a name="common_v2_common_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## common/v2/common.proto
+## common/v2/common_v2.proto
 
 
 
@@ -746,26 +752,10 @@ If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): reque
 | ----- | ---- | ----- | ----------- |
 | non_signer_pubkeys | [bytes](#bytes) | repeated | Serialized bytes of non signer public keys (G1 points) |
 | apk_g2 | [bytes](#bytes) |  | Serialized bytes of G2 point that represents aggregate public key of all signers |
-| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum |
+| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum The order of the quorum_apks should match the order of the quorum_numbers |
 | sigma | [bytes](#bytes) |  | Serialized bytes of aggregate signature |
 | quorum_numbers | [uint32](#uint32) | repeated | Relevant quorum numbers for the attestation |
-
-
-
-
-
-
-<a name="disperser-v2-BinRecord"></a>
-
-### BinRecord
-BinRecord is the usage record of an account in a bin. The API should return the active bin 
-record and the subsequent two records that contains potential overflows.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| index | [uint32](#uint32) |  |  |
-| usage | [uint64](#uint64) |  |  |
+| quorum_signed_percentages | [bytes](#bytes) |  | The attestation rate for each quorum. The order of the quorum_signed_percentages should match the order of the quorum_numbers |
 
 
 
@@ -893,7 +883,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| period_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
@@ -932,6 +922,23 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | price_per_symbol | [uint32](#uint32) |  |  |
 | reservation_window | [uint32](#uint32) |  |  |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-PeriodRecord"></a>
+
+### PeriodRecord
+PeriodRecord is the usage record of an account in a bin. The API should return the active bin 
+record and the subsequent two records that contains potential overflows.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| index | [uint32](#uint32) |  |  |
+| usage | [uint64](#uint64) |  |  |
 
 
 
@@ -987,6 +994,7 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
+- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -995,6 +1003,7 @@ Terminal states are states that will not be updated to a different state:
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
 | FAILED | 4 | FAILED means that the blob has failed permanently |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation |
 
 
  
@@ -1475,12 +1484,20 @@ Node info request
 <a name="node-v2-StoreChunksRequest"></a>
 
 ### StoreChunksRequest
-
+Request that the Node store a batch of chunks.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
+| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
+| signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
+
+Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned). A reference implementation (golang) can be found at https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
+
+1. digest batch.BatchHeader.BatchRoot 2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian) 3. for each certificate in batch.BlobCertificates: a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian) b. for each quorum_number in certificate.BlobHeader.QuorumNumbers: i. digest quorum_number (4 bytes, unsigned big endian) c. digest certificate.BlobHeader.Commitment.Commitment d. digest certificate.BlobHeader.Commitment.LengthCommitment e. digest certificate.BlobHeader.Commitment.LengthProof f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian) g. digest certificate.BlobHeader.PaymentHeader.AccountId h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian) i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian) k. digest certificate.BlobHeader.Signature l. for each relay in certificate.Relays: i. digest relay (4 bytes, unsigned big endian) 4. digest disperserID (4 bytes, unsigned big endian)
+
+Note that this signature is not included in the hash for obvious reasons. |
 
 
 
@@ -1729,6 +1746,76 @@ worse cost and performance.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+
+ 
+
+
+
+<a name="retriever_v2_retriever_v2-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## retriever/v2/retriever_v2.proto
+
+
+
+<a name="retriever-v2-BlobReply"></a>
+
+### BlobReply
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  | The blob retrieved and reconstructed from the EigenDA Nodes per BlobRequest. |
+
+
+
+
+
+
+<a name="retriever-v2-BlobRequest"></a>
+
+### BlobRequest
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | header of the blob to be retrieved |
+| reference_block_number | [uint32](#uint32) |  | The Ethereum block number at which the batch for this blob was constructed. |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob this is requesting for (note a blob can participate in multiple quorums). |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="retriever-v2-Retriever"></a>
+
+### Retriever
+The Retriever is a service for retrieving chunks corresponding to a blob from
+the EigenDA operator nodes and reconstructing the original blob from the chunks.
+This is a client-side library that the users are supposed to operationalize.
+
+Note: Users generally have two ways to retrieve a blob from EigenDA V2:
+  1) Retrieve from the relay that the blob is assigned to: the API
+     is Relay.GetBlob() as defined in api/proto/relay/relay.proto
+  2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.
+
+The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the
+relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
+(the 2nd approach here) removes the need to trust the relay, with the downside of
+worse cost and performance.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
 
  
 

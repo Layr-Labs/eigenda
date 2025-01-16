@@ -47,6 +47,10 @@ func (p *G1Point) VerifyEquivalence(p2 *G2Point) (bool, error) {
 	return bn254utils.CheckG1AndG2DiscreteLogEquality(p.G1Affine, p2.G2Affine)
 }
 
+func (p *G1Point) SerializeCompressed() [32]byte {
+	return p.Bytes()
+}
+
 func (p *G1Point) Serialize() []byte {
 	res := p.RawBytes()
 	return res[:]

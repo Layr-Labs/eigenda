@@ -77,6 +77,11 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		return nil, err
 	}
 
+	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx)
 	if err != nil {
 		return nil, err
@@ -93,11 +98,12 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	}
 
 	return &PaymentVaultParams{
-		OnDemandQuorumNumbers:  quorumNumbers,
-		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
-		MinNumSymbols:          minNumSymbols,
-		PricePerSymbol:         pricePerSymbol,
-		ReservationWindow:      reservationWindow,
+		OnDemandQuorumNumbers:    quorumNumbers,
+		GlobalSymbolsPerSecond:   globalSymbolsPerSecond,
+		GlobalRatePeriodInterval: globalRatePeriodInterval,
+		MinNumSymbols:            minNumSymbols,
+		PricePerSymbol:           pricePerSymbol,
+		ReservationWindow:        reservationWindow,
 	}, nil
 }
 

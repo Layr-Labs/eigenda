@@ -62,6 +62,10 @@ func NewErrorCanceled(msg string) error {
 	return newErrorGRPC(codes.Canceled, msg)
 }
 
+func NewErrorAlreadyExists(msg string) error {
+	return newErrorGRPC(codes.AlreadyExists, msg)
+}
+
 // ErrorFailover is returned by the disperser-client and eigenda-client to signify
 // that eigenda is temporarily unavailable, and suggest to the caller
 // (most likely some rollup batcher via the eigenda-proxy) to failover

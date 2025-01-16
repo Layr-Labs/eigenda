@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"runtime"
 	"time"
@@ -14,9 +15,11 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
+	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
+	"google.golang.org/grpc/peer"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -24,32 +27,53 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config      *node.Config
-	node        *node.Node
-	ratelimiter common.RateLimiter
-	logger      logging.Logger
-	metrics     *MetricsV2
+	config        *node.Config
+	node          *node.Node
+	ratelimiter   common.RateLimiter
+	logger        logging.Logger
+	metrics       *MetricsV2
+	authenticator auth.RequestAuthenticator
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
 func NewServerV2(
+	ctx context.Context,
 	config *node.Config,
 	node *node.Node,
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
-	registry *prometheus.Registry) (*ServerV2, error) {
+	registry *prometheus.Registry,
+	reader core.Reader) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
 		return nil, err
 	}
 
+	var authenticator auth.RequestAuthenticator
+	if !config.DisableDispersalAuthentication {
+		authenticator, err = auth.NewRequestAuthenticator(
+			ctx,
+			reader,
+			config.DispersalAuthenticationKeyCacheSize,
+			config.DisperserKeyTimeout,
+			config.DispersalAuthenticationTimeout,
+			func(id uint32) bool {
+				return id == api.EigenLabsDisperserID
+			},
+			time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create authenticator: %w", err)
+		}
+	}
+
 	return &ServerV2{
-		config:      config,
-		node:        node,
-		ratelimiter: ratelimiter,
-		logger:      logger,
-		metrics:     metrics,
+		config:        config,
+		node:          node,
+		ratelimiter:   ratelimiter,
+		logger:        logger,
+		metrics:       metrics,
+		authenticator: authenticator,
 	}, nil
 }
 
@@ -74,13 +98,25 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
 
+	if s.authenticator != nil {
+		disperserPeer, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("could not get peer information")
+		}
+		disperserAddress := disperserPeer.Addr.String()
+
+		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
+		if err != nil {
+			return nil, fmt.Errorf("failed to authenticate request: %w", err)
+		}
+	}
+
 	if s.node.StoreV2 == nil {
 		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
-	// TODO(ian-shim): support remote signer
-	if s.node.KeyPair == nil {
-		return nil, api.NewErrorInternal("missing key pair")
+	if s.node.BLSSigner == nil {
+		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
 	batch, err := s.validateStoreChunksRequest(in)
@@ -143,12 +179,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
-	sig := s.node.KeyPair.SignMessage(batchHeaderHash).Bytes()
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
 
 	s.metrics.ReportStoreChunksLatency(time.Since(start))
 
 	return &pb.StoreChunksReply{
-		Signature: sig[:],
+		Signature: sig,
 	}, nil
 }
 

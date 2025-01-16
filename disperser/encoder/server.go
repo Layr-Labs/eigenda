@@ -111,7 +111,7 @@ func (s *EncoderServer) EncodeBlob(ctx context.Context, req *pb.EncodeBlobReques
 		s.metrics.ObserveQueue(s.queueStats)
 		s.queueLock.Unlock()
 	default:
-		s.metrics.IncrementRateLimitedBlobRequestNum(len(req.GetData()))
+		s.metrics.IncrementRateLimitedBlobRequestNum(blobSize)
 		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
 		return nil, errors.New("too many requests")
 	}

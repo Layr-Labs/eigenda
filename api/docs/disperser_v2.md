@@ -5,7 +5,6 @@
 
 - [disperser/v2/disperser_v2.proto](#disperser_v2_disperser_v2-proto)
     - [Attestation](#disperser-v2-Attestation)
-    - [BinRecord](#disperser-v2-BinRecord)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
@@ -16,6 +15,7 @@
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [PeriodRecord](#disperser-v2-PeriodRecord)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
@@ -44,26 +44,10 @@
 | ----- | ---- | ----- | ----------- |
 | non_signer_pubkeys | [bytes](#bytes) | repeated | Serialized bytes of non signer public keys (G1 points) |
 | apk_g2 | [bytes](#bytes) |  | Serialized bytes of G2 point that represents aggregate public key of all signers |
-| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum |
+| quorum_apks | [bytes](#bytes) | repeated | Serialized bytes of aggregate public keys (G1 points) from all nodes for each quorum The order of the quorum_apks should match the order of the quorum_numbers |
 | sigma | [bytes](#bytes) |  | Serialized bytes of aggregate signature |
 | quorum_numbers | [uint32](#uint32) | repeated | Relevant quorum numbers for the attestation |
-
-
-
-
-
-
-<a name="disperser-v2-BinRecord"></a>
-
-### BinRecord
-BinRecord is the usage record of an account in a bin. The API should return the active bin 
-record and the subsequent two records that contains potential overflows.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| index | [uint32](#uint32) |  |  |
-| usage | [uint64](#uint64) |  |  |
+| quorum_signed_percentages | [bytes](#bytes) |  | The attestation rate for each quorum. The order of the quorum_signed_percentages should match the order of the quorum_numbers |
 
 
 
@@ -191,7 +175,7 @@ GetPaymentStateReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
-| bin_records | [BinRecord](#disperser-v2-BinRecord) | repeated | off-chain account reservation usage records |
+| period_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
 | reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
@@ -230,6 +214,23 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | price_per_symbol | [uint32](#uint32) |  |  |
 | reservation_window | [uint32](#uint32) |  |  |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-PeriodRecord"></a>
+
+### PeriodRecord
+PeriodRecord is the usage record of an account in a bin. The API should return the active bin 
+record and the subsequent two records that contains potential overflows.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| index | [uint32](#uint32) |  |  |
+| usage | [uint64](#uint64) |  |  |
 
 
 
@@ -285,6 +286,7 @@ Intermediate states are states that the blob can be in while being processed, an
 Terminal states are states that will not be updated to a different state:
 - CERTIFIED
 - FAILED
+- INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -293,6 +295,7 @@ Terminal states are states that will not be updated to a different state:
 | ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
 | CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
 | FAILED | 4 | FAILED means that the blob has failed permanently |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation |
 
 
  

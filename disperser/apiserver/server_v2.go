@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -59,7 +58,8 @@ type DispersalServerV2 struct {
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
 
-	metrics *metricsV2
+	metricsConfig disperser.MetricsConfig
+	metrics       *metricsV2
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -75,6 +75,7 @@ func NewDispersalServerV2(
 	onchainStateRefreshInterval time.Duration,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
+	metricsConfig disperser.MetricsConfig,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -117,11 +118,17 @@ func NewDispersalServerV2(
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
-		metrics: newAPIServerV2Metrics(registry),
+		metricsConfig: metricsConfig,
+		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 	}, nil
 }
 
 func (s *DispersalServerV2) Start(ctx context.Context) error {
+	// Start the metrics server
+	if s.metricsConfig.EnableMetrics {
+		s.metrics.Start(context.Background())
+	}
+
 	// Serve grpc requests
 	addr := fmt.Sprintf("%s:%s", disperser.Localhost, s.serverConfig.GrpcPort)
 	listener, err := net.Listen("tcp", addr)
@@ -270,6 +277,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// validate the signature
 	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
+		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
@@ -281,13 +289,17 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := uint64(time.Now().Unix())
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	binRecords, err := s.meterer.OffchainStore.GetBinRecords(ctx, req.AccountId, currentReservationPeriod)
+	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, req.AccountId, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
+	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+
+	} else {
+		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
 	// on-Chain account state
 	var pbReservation *pb.Reservation
@@ -313,12 +325,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		}
 	}
 
-	var onchainCumulativePayment *big.Int
+	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
 	} else {
-		onchainCumulativePayment = onDemandPayment.CumulativePayment
+		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
 
 	paymentGlobalParams := pb.PaymentGlobalParams{
@@ -331,10 +343,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
-		BinRecords:               binRecords[:],
+		PeriodRecords:            periodRecords[:],
 		Reservation:              pbReservation,
-		CumulativePayment:        largestCumulativePayment.Bytes(),
-		OnchainCumulativePayment: onchainCumulativePayment.Bytes(),
+		CumulativePayment:        largestCumulativePaymentBytes,
+		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
 }

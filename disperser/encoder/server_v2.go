@@ -2,20 +2,24 @@ package encoder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
 	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
@@ -31,23 +35,38 @@ type EncoderServerV2 struct {
 	logger      logging.Logger
 	prover      encoding.Prover
 	metrics     *Metrics
+	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
 
 	runningRequests chan struct{}
-	requestPool     chan struct{}
+	requestQueue    chan blobRequest
+
+	queueStats map[string]int
+	queueLock  sync.Mutex
 }
 
-func NewEncoderServerV2(config ServerConfig, blobStore *blobstore.BlobStore, chunkWriter chunkstore.ChunkWriter, logger logging.Logger, prover encoding.Prover, metrics *Metrics) *EncoderServerV2 {
-	return &EncoderServerV2{
-		config:      config,
-		blobStore:   blobStore,
-		chunkWriter: chunkWriter,
-		logger:      logger.With("component", "EncoderServer"),
-		prover:      prover,
-		metrics:     metrics,
+func NewEncoderServerV2(
+	config ServerConfig,
+	blobStore *blobstore.BlobStore,
+	chunkWriter chunkstore.ChunkWriter,
+	logger logging.Logger,
+	prover encoding.Prover,
+	metrics *Metrics,
+	grpcMetrics *grpcprom.ServerMetrics,
+) *EncoderServerV2 {
+	metrics.SetQueueCapacity(config.RequestQueueSize)
 
+	return &EncoderServerV2{
+		config:          config,
+		blobStore:       blobStore,
+		chunkWriter:     chunkWriter,
+		logger:          logger.With("component", "EncoderServerV2"),
+		prover:          prover,
+		metrics:         metrics,
+		grpcMetrics:     grpcMetrics,
 		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestPool:     make(chan struct{}, config.RequestPoolSize),
+		requestQueue:    make(chan blobRequest, config.RequestQueueSize),
+		queueStats:      make(map[string]int),
 	}
 }
 
@@ -59,9 +78,14 @@ func (s *EncoderServerV2) Start() error {
 		log.Fatalf("Could not start tcp listener: %v", err)
 	}
 
-	gs := grpc.NewServer()
+	gs := grpc.NewServer(
+		grpc.UnaryInterceptor(
+			s.grpcMetrics.UnaryServerInterceptor(),
+		),
+	)
 	reflection.Register(gs)
 	pb.RegisterEncoderServer(gs, s)
+	s.grpcMetrics.InitializeMetrics(gs)
 
 	// Register Server for Health Checks
 	name := pb.Encoder_ServiceDesc.ServiceName
@@ -85,30 +109,36 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 		s.metrics.ObserveLatency("total", time.Since(totalStart))
 	}()
 
+	blobSize := req.GetBlobSize()
+	sizeBucket := common.BlobSizeBucket(int(blobSize))
+
 	// Rate limit
 	select {
-	case s.requestPool <- struct{}{}:
+	case s.requestQueue <- blobRequest{blobSizeByte: int(blobSize)}:
+		s.queueLock.Lock()
+		s.queueStats[sizeBucket]++
+		s.metrics.ObserveQueue(s.queueStats)
+		s.queueLock.Unlock()
 	default:
-		// TODO: Now that we no longer pass the data directly, should we pass in blob size as part of the request?
-		s.metrics.IncrementRateLimitedBlobRequestNum(1)
-		s.logger.Warn("rate limiting as request pool is full", "requestPoolSize", s.config.RequestPoolSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, status.Error(codes.ResourceExhausted, "request pool is full")
+		s.metrics.IncrementRateLimitedBlobRequestNum(int(blobSize))
+		s.logger.Warn("rate limiting as request queue is full", "requestQueueSize", s.config.RequestQueueSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		return nil, errors.New("too many requests")
 	}
 
 	// Limit the number of concurrent requests
 	s.runningRequests <- struct{}{}
 	defer s.popRequest()
 	if ctx.Err() != nil {
-		s.metrics.IncrementCanceledBlobRequestNum(1)
+		s.metrics.IncrementCanceledBlobRequestNum(int(blobSize))
 		return nil, status.Error(codes.Canceled, "request was canceled")
 	}
 
 	s.metrics.ObserveLatency("queuing", time.Since(totalStart))
 	reply, err := s.handleEncodingToChunkStore(ctx, req)
 	if err != nil {
-		s.metrics.IncrementFailedBlobRequestNum(1)
+		s.metrics.IncrementFailedBlobRequestNum(int(blobSize))
 	} else {
-		s.metrics.IncrementSuccessfulBlobRequestNum(1)
+		s.metrics.IncrementSuccessfulBlobRequestNum(int(blobSize))
 	}
 
 	return reply, err
@@ -146,6 +176,7 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 	if len(data) == 0 {
 		return nil, status.Error(codes.NotFound, "blob length is zero")
 	}
+	s.metrics.ObserveLatency("s3_download", time.Since(fetchStart))
 	s.logger.Info("fetched blob", "duration", time.Since(fetchStart).String())
 
 	// Encode the data
@@ -155,15 +186,19 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 		s.logger.Error("failed to encode frames", "error", err)
 		return nil, status.Errorf(codes.Internal, "encoding failed: %v", err)
 	}
+	s.metrics.ObserveLatency("encoding", time.Since(encodingStart))
 	s.logger.Info("encoding frames", "duration", time.Since(encodingStart).String())
 
-	// Process and store results
 	return s.processAndStoreResults(ctx, blobKey, frames)
 }
 
 func (s *EncoderServerV2) popRequest() {
-	<-s.requestPool
+	blobRequest := <-s.requestQueue
 	<-s.runningRequests
+	s.queueLock.Lock()
+	s.queueStats[common.BlobSizeBucket(blobRequest.blobSizeByte)]--
+	s.metrics.ObserveQueue(s.queueStats)
+	s.queueLock.Unlock()
 }
 
 func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (corev2.BlobKey, encoding.EncodingParams, error) {
@@ -214,13 +249,17 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 }
 
 func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey corev2.BlobKey, frames []*encoding.Frame) (*pb.EncodeBlobReply, error) {
-	proofs, coeffs := extractProofsAndCoeffs(frames)
-
 	// Store proofs
 	storeStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("process_and_store_results", time.Since(storeStart))
+	}()
+
+	proofs, coeffs := extractProofsAndCoeffs(frames)
 	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
+	s.metrics.ObserveLatency("s3_upload_proofs", time.Since(storeStart))
 	s.logger.Info("stored proofs", "duration", time.Since(storeStart).String())
 
 	// Store coefficients
@@ -229,6 +268,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
+	s.metrics.ObserveLatency("s3_upload_coefficients", time.Since(coeffStart))
 	s.logger.Info("stored coefficients", "duration", time.Since(coeffStart).String())
 
 	return &pb.EncodeBlobReply{

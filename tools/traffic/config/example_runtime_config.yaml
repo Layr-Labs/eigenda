@@ -1,0 +1,21 @@
+# Example runtime configuration file for the traffic generator
+# This file can be modified while the traffic generator is running
+
+writer_groups:
+  # 1kb/s writer (1024 bytes, 1 instance)
+  - name: "small_frequent"
+    num_write_instances: 1
+    write_request_interval: 1s
+    data_size: 1024
+    randomize_blobs: true
+    write_timeout: 10s
+    custom_quorums: [1]
+
+  # 2kb/s writer (1024 bytes, 2 instances)
+  - name: "medium_frequent"
+    num_write_instances: 2
+    write_request_interval: 1s
+    data_size: 1024
+    randomize_blobs: true
+    write_timeout: 10s
+    custom_quorums: [1]

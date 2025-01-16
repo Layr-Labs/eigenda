@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -25,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
@@ -106,6 +106,15 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.Expiry, uint64(now.Unix()))
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
+
+	// Try dispersing the same blob; if payment is different, blob will be considered as a differernt blob
+	// payment will cause failure before commitment check
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: blobHeaderProto,
+	})
+	assert.Nil(t, reply)
+	assert.ErrorContains(t, err, "payment already exists")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -204,9 +213,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	// TODO(hopeyen); re-enable this validation after adding signature verification
-	// assert.ErrorContains(t, err, "authentication failed")
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "authentication failed")
 
 	// request with invalid payment metadata
 	invalidReqProto = &pbcommonv2.BlobHeader{
@@ -216,7 +223,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 0,
-			CumulativePayment: big.NewInt(100).Bytes(),
+			CumulativePayment: big.NewInt(0).Bytes(),
 		},
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(invalidReqProto)
@@ -229,9 +236,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Data:       data,
 		BlobHeader: invalidReqProto,
 	})
-	// TODO(ian-shim): re-enable this validation after fixing the payment metadata validation
-	// assert.ErrorContains(t, err, "invalid payment metadata")
-	assert.NoError(t, err)
+	assert.ErrorContains(t, err, "invalid payment metadata")
 
 	// request with invalid commitment
 	invalidCommitment := commitmentProto
@@ -418,7 +423,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// if err != nil {
 	// 	panic("failed to create logger")
@@ -512,7 +517,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 		10,
 		time.Hour,
 		logger,
-		prometheus.NewRegistry())
+		prometheus.NewRegistry(),
+		disperser.MetricsConfig{
+			HTTPPort:      "9094",
+			EnableMetrics: false,
+		},
+	)
 	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())

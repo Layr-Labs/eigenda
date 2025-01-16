@@ -3,6 +3,8 @@ package eth
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -10,6 +12,7 @@ import (
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
+	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -27,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pingcap/errors"
+
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 )
 
 type ContractBindings struct {
@@ -45,6 +50,7 @@ type ContractBindings struct {
 	PaymentVault          *paymentvault.ContractPaymentVault
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
+	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
 }
 
 type Reader struct {
@@ -222,7 +228,21 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 			t.logger.Error("Failed to fetch PaymentVault contract", "err", err)
 			return err
 		}
+	}
 
+	var contractEigenDADisperserRegistry *disperserreg.ContractEigenDADisperserRegistry
+	disperserRegistryAddr, err := contractEigenDAServiceManager.EigenDADisperserRegistry(&bind.CallOpts{})
+	if err != nil {
+		t.logger.Error("Failed to fetch EigenDADisperserRegistry address", "err", err)
+		// TODO(cody-littley): return err when the contract is deployed
+		// return err
+	} else {
+		contractEigenDADisperserRegistry, err =
+			disperserreg.NewContractEigenDADisperserRegistry(disperserRegistryAddr, t.ethClient)
+		if err != nil {
+			t.logger.Error("Failed to fetch EigenDADisperserRegistry contract", "err", err)
+			return err
+		}
 	}
 
 	t.bindings = &ContractBindings{
@@ -241,6 +261,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		RelayRegistry:         contractRelayRegistry,
 		PaymentVault:          contractPaymentVault,
 		ThresholdRegistry:     contractThresholdRegistry,
+		DisperserRegistry:     contractEigenDADisperserRegistry,
 	}
 	return nil
 }
@@ -269,7 +290,7 @@ func (t *Reader) GetRegisteredQuorumIdsForOperator(ctx context.Context, operator
 
 func (t *Reader) getRegistrationParams(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	blssigner blssigner.Signer,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
@@ -285,24 +306,55 @@ func (t *Reader) getRegistrationParams(
 	}
 
 	msgToSignG1 := core.NewG1Point(msgToSignG1_.X, msgToSignG1_.Y)
-	signature := keypair.SignHashedToCurveMessage(msgToSignG1)
+	sigBytes, err := blssigner.SignG1(ctx, msgToSignG1.Serialize())
+	if err != nil {
+		return nil, nil, err
+	}
+	sig := new(core.Signature)
+	g, err := sig.Deserialize(sigBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	signature := &core.Signature{
+		G1Point: g,
+	}
 
 	signedMessageHashParam := regcoordinator.BN254G1Point{
 		X: signature.X.BigInt(big.NewInt(0)),
 		Y: signature.Y.BigInt(big.NewInt(0)),
 	}
 
-	g1Point_ := pubKeyG1ToBN254G1Point(keypair.GetPubKeyG1())
+	g1KeyHex := blssigner.GetPublicKeyG1()
+	g1KeyBytes, err := hex.DecodeString(g1KeyHex)
+	if err != nil {
+		return nil, nil, err
+	}
+	g1point := new(core.G1Point)
+	g1point, err = g1point.Deserialize(g1KeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	g1Point_ := pubKeyG1ToBN254G1Point(g1point)
 	g1Point := regcoordinator.BN254G1Point{
 		X: g1Point_.X,
 		Y: g1Point_.Y,
 	}
-	g2Point_ := pubKeyG2ToBN254G2Point(keypair.GetPubKeyG2())
+
+	g2KeyHex := blssigner.GetPublicKeyG2()
+	g2KeyBytes, err := hex.DecodeString(g2KeyHex)
+	if err != nil {
+		return nil, nil, err
+	}
+	g2point := new(core.G2Point)
+	g2point, err = g2point.Deserialize(g2KeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	g2Point_ := pubKeyG2ToBN254G2Point(g2point)
 	g2Point := regcoordinator.BN254G2Point{
 		X: g2Point_.X,
 		Y: g2Point_.Y,
 	}
-
 	params := regcoordinator.IBLSApkRegistryPubkeyRegistrationParams{
 		PubkeyRegistrationSignature: signedMessageHashParam,
 		PubkeyG1:                    g1Point,
@@ -416,8 +468,8 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 		Context: ctx,
 	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
 	if err != nil {
-		t.logger.Error("Failed to fetch operator state", "err", err)
-		return nil, err
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
 
 	state := make(core.OperatorStakes, len(state_))
@@ -791,7 +843,7 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context) (uint64, error) 
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
-	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalRatePeriodInterval(&bind.CallOpts{
+	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalSymbolsPerPeriod(&bind.CallOpts{
 		Context: ctx,
 	})
 	if err != nil {
@@ -812,6 +864,7 @@ func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context) (uint32, error
 	}
 	return uint32(globalRateBinInterval), nil
 }
+
 func (t *Reader) GetMinNumSymbols(ctx context.Context) (uint32, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
@@ -896,10 +949,10 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 	}
 
 	res := make(map[uint32]string)
-	for relayKey := uint32(0); relayKey < uint32(numRelays); relayKey++ {
+	for relayKey := uint32(0); relayKey < numRelays; relayKey++ {
 		url, err := t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
 			Context: ctx,
-		}, uint32(relayKey))
+		}, relayKey)
 
 		if err != nil && strings.Contains(err.Error(), "execution reverted") {
 			break
@@ -915,4 +968,27 @@ func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
 	}
 
 	return res, nil
+}
+
+func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		return gethcommon.Address{}, errors.New("disperser registry not deployed")
+	}
+
+	address, err := registry.DisperserKeyToAddress(
+		&bind.CallOpts{
+			Context: ctx,
+		},
+		disperserID)
+
+	var defaultAddress gethcommon.Address
+	if err != nil {
+		return defaultAddress, fmt.Errorf("failed to get disperser address: %w", err)
+	}
+	if address == defaultAddress {
+		return defaultAddress, fmt.Errorf("disperser with id %d not found", disperserID)
+	}
+
+	return address, nil
 }

@@ -1,4 +1,4 @@
-FROM golang:1.21.12-bookworm
+FROM golang:1.21.13-bookworm
 
 # The URL where the protoc binary can be downloaded. Is different depending on architecture.
 ARG PROTOC_URL

@@ -8,6 +8,7 @@ import (
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -18,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/retriever"
 	"github.com/Layr-Labs/eigenda/retriever/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -61,7 +61,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 	var err error
 	config := &retriever.Config{}
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
 		0: numOperators,

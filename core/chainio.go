@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -132,6 +133,9 @@ type Reader interface {
 
 	// GetRelayURLs returns the relay URL addresses for all relays.
 	GetRelayURLs(ctx context.Context) (map[uint32]string, error)
+
+	// GetDisperserAddress returns the disperser address with the given ID.
+	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
 }
 
 type Writer interface {
@@ -142,7 +146,7 @@ type Writer interface {
 	// will be returned.
 	RegisterOperator(
 		ctx context.Context,
-		keypair *KeyPair,
+		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,
 		operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -154,7 +158,7 @@ type Writer interface {
 	// with the provided signature from the churner
 	RegisterOperatorWithChurn(
 		ctx context.Context,
-		keypair *KeyPair,
+		signer blssigner.Signer,
 		socket string,
 		quorumIds []QuorumID,
 		operatorEcdsaPrivateKey *ecdsa.PrivateKey,

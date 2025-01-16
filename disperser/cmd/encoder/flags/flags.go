@@ -62,6 +62,13 @@ var (
 		Value:    32,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REQUEST_POOL_SIZE"),
 	}
+	RequestQueueSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "request-queue-size"),
+		Usage:    "maximum number of requests in the request queue",
+		Required: false,
+		Value:    32,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "REQUEST_QUEUE_SIZE"),
+	}
 	EnableGnarkChunkEncodingFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-gnark-chunk-encoding"),
 		Usage:    "if true, will produce chunks in Gnark, instead of Gob",
@@ -111,6 +118,7 @@ var optionalFlags = []cli.Flag{
 	EnableMetrics,
 	MaxConcurrentRequestsFlag,
 	RequestPoolSizeFlag,
+	RequestQueueSizeFlag,
 	EnableGnarkChunkEncodingFlag,
 	EncoderVersionFlag,
 	S3BucketNameFlag,

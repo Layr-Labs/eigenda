@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -18,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	reader := &mock.MockWriter{}
 	reader.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, reader)
@@ -227,7 +227,7 @@ func checkBatchByUniversalVerifier(
 
 	for id := range state.IndexedOperators {
 
-		val := corev2.NewShardValidator(v, id, logging.NewNoopLogger())
+		val := corev2.NewShardValidator(v, id, testutils.GetLogger())
 
 		blobs := packagedBlobs[id]
 
