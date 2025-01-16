@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	disperserv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
@@ -31,6 +32,10 @@ import (
 var errNotFound = errors.New("not found")
 
 const (
+	// The max number of blobs to return from blob Feed API, regardless of the time
+	// range or "limit" param.
+	maxBlobFeedNumBlobs = 1000
+
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
 	maxOperatorsStakeAge    = 300 // not expect the stake change to happen frequently
@@ -64,6 +69,11 @@ type (
 
 	BlobVerificationInfoResponse struct {
 		VerificationInfo *corev2.BlobVerificationInfo `json:"blob_verification_info"`
+	}
+
+	BlobFeedResponse struct {
+		Blobs           []*disperserv2.BlobMetadata `json:"blobs"`
+		PaginationToken string                      `json:"pagination_token"`
 	}
 
 	BatchResponse struct {
@@ -255,6 +265,13 @@ func errorResponse(c *gin.Context, err error) {
 	})
 }
 
+func invalidParamsErrorResponse(c *gin.Context, err error) {
+	_ = c.Error(err)
+	c.JSON(http.StatusBadRequest, ErrorResponse{
+		Error: err.Error(),
+	})
+}
+
 func run(logger logging.Logger, httpServer *http.Server) <-chan error {
 	errChan := make(chan error, 1)
 	ctx, stop := signal.NotifyContext(
@@ -294,8 +311,98 @@ func (s *ServerV2) Shutdown() error {
 	return nil
 }
 
+// FetchBlobFeedHandler godoc
+//
+//	@Summary	Fetch blob feed
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
+//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
+//	@Success	200					{object}	BlobFeedResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
 func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBlobFeedHandler unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBlobFeedHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	var err error
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+	}
+
+	interval := 3600
+	if c.Query("interval") != "" {
+		interval, err = strconv.Atoi(c.Query("interval"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			return
+		}
+	}
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		return
+	}
+	if limit <= 0 || limit > maxBlobFeedNumBlobs {
+		limit = maxBlobFeedNumBlobs
+	}
+
+	paginationCursor := blobstore.BlobFeedCursor{
+		RequestedAt: 0,
+	}
+	if c.Query("pagination_token") != "" {
+		cursor, err := paginationCursor.FromCursorKey(c.Query("pagination_token"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the pagination token: %w", err))
+			return
+		}
+		paginationCursor = *cursor
+	}
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+	startCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(startTime.UnixNano()),
+	}
+	if startCursor.LessThan(&paginationCursor) {
+		startCursor = paginationCursor
+	}
+	endCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(endTime.UnixNano()),
+	}
+
+	blobs, paginationToken, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(c.Request.Context(), startCursor, endCursor, limit)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobFeedHandler")
+		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
+	}
+
+	token := ""
+	if paginationToken != nil {
+		token = paginationToken.ToCursorKey()
+	}
+	response := &BlobFeedResponse{
+		Blobs:           blobs,
+		PaginationToken: token,
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeedHandler")
+	c.JSON(http.StatusOK, response)
 }
 
 // FetchBlobHandler godoc
