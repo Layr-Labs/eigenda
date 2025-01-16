@@ -347,18 +347,18 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 		interval, err = strconv.Atoi(c.Query("interval"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
-			invalidParamsErrorResponse(c, fmt.Errorf("interval param is invalid: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
 			return
 		}
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if err != nil || limit > maxBlobFeedNumBlobs {
+	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
-		invalidParamsErrorResponse(c, fmt.Errorf("limit param is invalid: %w", err))
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
 		return
 	}
-	if limit <= 0 {
+	if limit <= 0 || limit > maxBlobFeedNumBlobs {
 		limit = maxBlobFeedNumBlobs
 	}
 
