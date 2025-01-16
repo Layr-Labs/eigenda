@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 )
 
@@ -49,13 +48,9 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 	return NewPayload(nonPaddedData[0:claimedLength]), nil
 }
 
-// toEvalPoly converts an encodedPayload into an evalPoly, by padding the encodedPayload bytes to the next power of 2
+// toEvalPoly converts an encodedPayload into an evalPoly
 func (ep *encodedPayload) toEvalPoly() (*evalPoly, error) {
-	paddedLength := core.NextPowerOf2(len(ep.bytes))
-	paddedBytes := make([]byte, paddedLength)
-	copy(paddedBytes, ep.bytes)
-
-	evalPoly, err := evalPolyFromBytes(paddedBytes)
+	evalPoly, err := evalPolyFromBytes(ep.bytes)
 	if err != nil {
 		return nil, fmt.Errorf("new eval poly: %w", err)
 	}

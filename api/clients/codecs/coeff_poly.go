@@ -20,11 +20,9 @@ type coeffPoly struct {
 // coeffPolyFromBytes creates a new coeffPoly from bytes. This function performs the necessary checks to guarantee that the
 // bytes are well-formed, and returns a new object if they are
 func coeffPolyFromBytes(bytes []byte) (*coeffPoly, error) {
-	if !encoding.IsPowerOfTwo(len(bytes)) {
-		return nil, fmt.Errorf("bytes have length %d, expected a power of 2", len(bytes))
-	}
+	paddedBytes := encoding.PadToPowerOfTwo(bytes)
 
-	fieldElements, err := rs.BytesToFieldElements(bytes)
+	fieldElements, err := rs.BytesToFieldElements(paddedBytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
 	}

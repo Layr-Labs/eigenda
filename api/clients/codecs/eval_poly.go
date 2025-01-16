@@ -23,11 +23,9 @@ type evalPoly struct {
 // evalPolyFromBytes creates a new evalPoly from bytes. This function performs the necessary checks to guarantee that the
 // bytes are well-formed, and returns a new object if they are
 func evalPolyFromBytes(bytes []byte) (*evalPoly, error) {
-	if !encoding.IsPowerOfTwo(len(bytes)) {
-		return nil, fmt.Errorf("bytes have length %d, expected a power of 2", len(bytes))
-	}
+	paddedBytes := encoding.PadToPowerOfTwo(bytes)
 
-	fieldElements, err := rs.BytesToFieldElements(bytes)
+	fieldElements, err := rs.BytesToFieldElements(paddedBytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
 	}
