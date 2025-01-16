@@ -46,8 +46,8 @@ func (p *Payload) encode() (*encodedPayload, error) {
 	return encodedPayload, nil
 }
 
-// ToBlob converts the Payload bytes into a Blob
-func (p *Payload) ToBlob(form BlobForm) (*Blob, error) {
+// ToBlob converts the Payload bytes into a ProtoBlob
+func (p *Payload) ToBlob(form BlobForm) (*ProtoBlob, error) {
 	encodedPayload, err := p.encode()
 	if err != nil {
 		return nil, fmt.Errorf("encoding payload: %w", err)
@@ -55,7 +55,7 @@ func (p *Payload) ToBlob(form BlobForm) (*Blob, error) {
 
 	switch form {
 	case Eval:
-		return blobFromEncodedPayload(encodedPayload), nil
+		return protoBlobFromEncodedPayload(encodedPayload), nil
 	case Coeff:
 		evalPolynomial, err := encodedPayload.toEvalPoly()
 		if err != nil {
@@ -67,7 +67,7 @@ func (p *Payload) ToBlob(form BlobForm) (*Blob, error) {
 			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
 		}
 
-		return blobFromCoeffPoly(coeffPoly), nil
+		return protoBlobFromCoeffPoly(coeffPoly), nil
 	default:
 		return nil, fmt.Errorf("unknown polynomial form: %v", form)
 	}

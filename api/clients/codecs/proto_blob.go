@@ -4,29 +4,29 @@ import (
 	"fmt"
 )
 
-// Blob is data that is dispersed on eigenDA.
+// ProtoBlob is data that is dispersed to eigenDA. TODO: write a good description of a proto blob
 //
-// A Blob will contain either an encodedPayload, or a coeffPoly. Whether the Blob contains the former or the latter
-// is determined by how the dispersing client has been configured.
-type Blob struct {
+// A ProtoBlob will contain either an encodedPayload, or a coeffPoly. Whether the ProtoBlob contains the former or the
+// latter is determined by how the dispersing client has been configured.
+type ProtoBlob struct {
 	encodedPayload *encodedPayload
 	coeffPoly      *coeffPoly
 }
 
-// BlobFromEncodedPayload creates a Blob containing an encodedPayload
-func blobFromEncodedPayload(encodedPayload *encodedPayload) *Blob {
-	return &Blob{encodedPayload: encodedPayload}
+// protoBlobFromEncodedPayload creates a ProtoBlob containing an encodedPayload
+func protoBlobFromEncodedPayload(encodedPayload *encodedPayload) *ProtoBlob {
+	return &ProtoBlob{encodedPayload: encodedPayload}
 }
 
-// blobFromCoeffPoly creates a Blob containing a coeffPoly
-func blobFromCoeffPoly(poly *coeffPoly) *Blob {
-	return &Blob{coeffPoly: poly}
+// blobFromCoeffPoly creates a ProtoBlob containing a coeffPoly
+func protoBlobFromCoeffPoly(poly *coeffPoly) *ProtoBlob {
+	return &ProtoBlob{coeffPoly: poly}
 }
 
-// NewBlob initializes a Blob from raw bytes, and the expected BlobForm
+// NewProtoBlob initializes a ProtoBlob from raw bytes, and the expected BlobForm
 //
 // This function will return an error if the input bytes cannot be successfully interpreted as the claimed BlobForm
-func NewBlob(bytes []byte, blobForm BlobForm) (*Blob, error) {
+func NewProtoBlob(bytes []byte, blobForm BlobForm) (*ProtoBlob, error) {
 	switch blobForm {
 	case Eval:
 		encodedPayload, err := newEncodedPayload(bytes)
@@ -34,21 +34,21 @@ func NewBlob(bytes []byte, blobForm BlobForm) (*Blob, error) {
 			return nil, fmt.Errorf("new encoded payload: %v", err)
 		}
 
-		return blobFromEncodedPayload(encodedPayload), nil
+		return protoBlobFromEncodedPayload(encodedPayload), nil
 	case Coeff:
 		coeffPoly, err := coeffPolyFromBytes(bytes)
 		if err != nil {
 			return nil, fmt.Errorf("new coeff poly: %v", err)
 		}
 
-		return blobFromCoeffPoly(coeffPoly), nil
+		return protoBlobFromCoeffPoly(coeffPoly), nil
 	default:
 		return nil, fmt.Errorf("unsupported blob form type: %v", blobForm)
 	}
 }
 
 // GetBytes gets the raw bytes of the Blob
-func (b *Blob) GetBytes() []byte {
+func (b *ProtoBlob) GetBytes() []byte {
 	if b.encodedPayload == nil {
 		return b.encodedPayload.getBytes()
 	} else {
@@ -56,8 +56,8 @@ func (b *Blob) GetBytes() []byte {
 	}
 }
 
-// ToPayload converts the Blob into a Payload
-func (b *Blob) ToPayload() (*Payload, error) {
+// ToPayload converts the ProtoBlob into a Payload
+func (b *ProtoBlob) ToPayload() (*Payload, error) {
 	var encodedPayload *encodedPayload
 	var err error
 	if b.encodedPayload != nil {
@@ -73,7 +73,7 @@ func (b *Blob) ToPayload() (*Payload, error) {
 			return nil, fmt.Errorf("eval poly to encoded payload: %v", err)
 		}
 	} else {
-		return nil, fmt.Errorf("blob has no contents")
+		return nil, fmt.Errorf("proto blob has no contents")
 	}
 
 	payload, err := encodedPayload.decode()
