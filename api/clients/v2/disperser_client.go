@@ -231,7 +231,8 @@ func verifyReceivedBlobKey(
 	// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
 	// the reply received back from the disperser
-	disperserReply *disperser_rpc.DisperseBlobReply) error {
+	disperserReply *disperser_rpc.DisperseBlobReply,
+) error {
 
 	actualBlobKey, err := blobHeader.BlobKey()
 	if err != nil {
