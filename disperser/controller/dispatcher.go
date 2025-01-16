@@ -273,6 +273,23 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 			quorumResults[quorumID] = quorumResult.PercentSigned
 		}
 	}
+
+	// Track attestation metrics
+	operatorCount := make(map[core.QuorumID]int)
+	signerCount := make(map[core.QuorumID]int)
+	for quorumID, opState := range batchData.OperatorState.Operators {
+		operatorCount[quorumID] = len(opState)
+		if _, ok := signerCount[quorumID]; !ok {
+			signerCount[quorumID] = 0
+		}
+		for opID := range opState {
+			if _, ok := quorumAttestation.SignerMap[opID]; ok {
+				signerCount[quorumID]++
+			}
+		}
+	}
+	d.metrics.reportAttestation(operatorCount, signerCount, quorumAttestation.QuorumResults)
+
 	if len(nonZeroQuorums) == 0 {
 		err = d.updateBatchStatus(ctx, batchData, quorumResults)
 		if err != nil {
