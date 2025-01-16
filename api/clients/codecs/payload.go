@@ -19,7 +19,7 @@ func NewPayload(payloadBytes []byte) *Payload {
 	}
 }
 
-// Encode applies the DefaultBlobEncoding to the original payload bytes
+// Encode applies the PayloadEncodingVersion0 to the original payload bytes
 //
 // Example encoding:
 //
@@ -28,7 +28,7 @@ func NewPayload(payloadBytes []byte) *Payload {
 func (p *Payload) encode() (*encodedPayload, error) {
 	payloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
-	payloadHeader[1] = byte(DefaultBlobEncoding) // encode version byte
+	payloadHeader[1] = byte(PayloadEncodingVersion0) // encode version byte
 
 	// encode payload length as uint32
 	binary.BigEndian.PutUint32(

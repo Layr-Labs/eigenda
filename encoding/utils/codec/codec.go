@@ -38,10 +38,40 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 	return validData[:validEnd]
 }
 
-// PadPayload internally pads the input data by prepending a zero to each chunk of 31 bytes. This guarantees that
+// RemoveEmptyByteFromPaddedBytes takes bytes and remove the first byte from every 32 bytes.
+// This reverses the change made by the function ConvertByPaddingEmptyByte.
+// The function does not assume the input is a multiple of BYTES_PER_SYMBOL(32 bytes).
+// For the reminder of the input, the first byte is taken out, and the rest is appended to
+// the output.
+func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
+	dataSize := len(data)
+	parseSize := encoding.BYTES_PER_SYMBOL
+	dataLen := (dataSize + parseSize - 1) / parseSize
+
+	putSize := encoding.BYTES_PER_SYMBOL - 1
+
+	validData := make([]byte, dataLen*putSize)
+	validLen := len(validData)
+
+	for i := 0; i < dataLen; i++ {
+		// add 1 to leave the first empty byte untouched
+		start := i*parseSize + 1
+		end := (i + 1) * parseSize
+
+		if end > len(data) {
+			end = len(data)
+			validLen = end - start + i*putSize
+		}
+
+		copy(validData[i*putSize:(i+1)*putSize], data[start:end])
+	}
+	return validData[:validLen]
+}
+
+// PadPayload internally pads the input data by prepending a 0x00 to each chunk of 31 bytes. This guarantees that
 // the data will be a valid field element for the bn254 curve
 //
-// Additionally, this function will add necessary padding to align to output to 32 bytes
+// Additionally, this function will add necessary padding to align the output to 32 bytes
 func PadPayload(inputData []byte) []byte {
 	// 31 bytes, for the bn254 curve
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
@@ -110,34 +140,4 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	}
 
 	return outputData, nil
-}
-
-// RemoveEmptyByteFromPaddedBytes takes bytes and remove the first byte from every 32 bytes.
-// This reverses the change made by the function ConvertByPaddingEmptyByte.
-// The function does not assume the input is a multiple of BYTES_PER_SYMBOL(32 bytes).
-// For the reminder of the input, the first byte is taken out, and the rest is appended to
-// the output.
-func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
-	dataSize := len(data)
-	parseSize := encoding.BYTES_PER_SYMBOL
-	dataLen := (dataSize + parseSize - 1) / parseSize
-
-	putSize := encoding.BYTES_PER_SYMBOL - 1
-
-	validData := make([]byte, dataLen*putSize)
-	validLen := len(validData)
-
-	for i := 0; i < dataLen; i++ {
-		// add 1 to leave the first empty byte untouched
-		start := i*parseSize + 1
-		end := (i + 1) * parseSize
-
-		if end > len(data) {
-			end = len(data)
-			validLen = end - start + i*putSize
-		}
-
-		copy(validData[i*putSize:(i+1)*putSize], data[start:end])
-	}
-	return validData[:validLen]
 }
