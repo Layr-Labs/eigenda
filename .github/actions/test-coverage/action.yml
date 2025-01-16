@@ -39,7 +39,7 @@ runs:
     - name: Download coverage artifact
       uses: actions/download-artifact@v4
       with:
-        name: coverage
+        name: coverage-*
         path: .
 
     - name: Generate coverage report
