@@ -31,6 +31,14 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
+func checkAttestationsOrdered(t *testing.T, at []*corev2.Attestation) {
+	if len(at) > 1 {
+		for i := 1; i < len(at); i++ {
+			assert.True(t, at[i-1].AttestedAt < at[i].AttestedAt)
+		}
+	}
+}
+
 func TestBlobFeedCursor_Equal(t *testing.T) {
 	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
 	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
@@ -519,6 +527,130 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 			require.NotNil(t, lastProcessedCursor)
 			assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
 			startCursor = *lastProcessedCursor
+		}
+	})
+}
+
+func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
+	ctx := context.Background()
+	numBatches := 72
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64((72+2)*time.Hour.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Hour.Nanoseconds()) // 1 batch per hour
+
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		bhh, err := batchHeaders[i].Hash()
+		assert.NoError(t, err)
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		attestation := &corev2.Attestation{
+			BatchHeader: batchHeaders[i],
+			AttestedAt:  attestedAt[i],
+			NonSignerPubKeys: []*core.G1Point{
+				core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+				core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+			},
+			APKG2: apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, 1, 1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "start must be less than end", err.Error())
+
+		// Test empty range
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, now, now+uint64(240*time.Hour.Nanoseconds()), 0)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(attestations))
+	})
+
+	// Test full range query
+	t.Run("full range", func(t *testing.T) {
+		// Test without limit
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+
+		// Test with limit
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 10)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+
+		// Test min/max timestamp range
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, 0, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, math.MaxInt64, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+
+	// Test range boundaries
+	t.Run("range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches-1, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		assert.Equal(t, attestedAt[1], attestations[0].AttestedAt)
+		assert.Equal(t, batchHeaders[1].BatchRoot, attestations[0].BatchRoot)
+		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
+		assert.Equal(t, batchHeaders[numBatches-1].BatchRoot, attestations[numBatches-2].BatchRoot)
+
+		// Test inclusive end
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, attestedAt[4], 0)
+		require.NoError(t, err)
+		require.Equal(t, 5, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
+		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
+		assert.Equal(t, attestedAt[4], attestations[4].AttestedAt)
+		assert.Equal(t, batchHeaders[4].BatchRoot, attestations[4].BatchRoot)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numBatches; i++ {
+			attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, attestedAt[i-1], attestedAt[i], 1)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(attestations))
+			assert.Equal(t, attestedAt[i], attestations[0].AttestedAt)
+			assert.Equal(t, batchHeaders[i].BatchRoot, attestations[0].BatchRoot)
 		}
 	})
 }
