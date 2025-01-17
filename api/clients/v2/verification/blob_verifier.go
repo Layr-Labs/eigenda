@@ -4,14 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/geth"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
+
+type IBlobVerifier interface {
+	VerifyBlobV2(
+		ctx context.Context,
+		batchHeader verifierBindings.BatchHeaderV2,
+		blobVerificationProof verifierBindings.BlobVerificationProofV2,
+		nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
+	) error
+}
 
 // BlobVerifier is responsible for making eth calls against the BlobVerifier contract to ensure cryptographic and
 // structural integrity of V2 certificates
@@ -24,9 +32,9 @@ type BlobVerifier struct {
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-	ethClient *common.EthClient, // the eth client, which should already be set up
+	ethClient *geth.EthClient,  // the eth client, which should already be set up
 	blobVerifierAddress string, // the hex address of the EigenDABlobVerifier contract
-) (*BlobVerifier, error) {
+) (IBlobVerifier, error) {
 
 	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
 		gethcommon.HexToAddress(blobVerifierAddress),
@@ -80,26 +88,16 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 func (v *BlobVerifier) VerifyBlobV2(
 	ctx context.Context,
 	// The header of the batch that the blob is contained in
-	batchHeader *commonv2.BatchHeader,
+	batchHeader verifierBindings.BatchHeaderV2,
 	// Contains data pertaining to the blob's inclusion in the batch
-	blobVerificationProof *disperser.BlobVerificationInfo,
+	blobVerificationProof verifierBindings.BlobVerificationProofV2,
 	// Contains data that can be used to verify that the blob actually exists in the claimed batch
 	nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
 ) error {
-	convertedBatchHeader, err := verifierBindings.ConvertBatchHeader(batchHeader)
-	if err != nil {
-		return fmt.Errorf("convert batch header: %s", err)
-	}
-
-	convertedBlobVerificationProof, err := verifierBindings.ConvertVerificationProof(blobVerificationProof)
-	if err != nil {
-		return fmt.Errorf("convert blob verification proof: %s", err)
-	}
-
-	err = v.blobVerifierCaller.VerifyBlobV2(
+	err := v.blobVerifierCaller.VerifyBlobV2(
 		&bind.CallOpts{Context: ctx},
-		*convertedBatchHeader,
-		*convertedBlobVerificationProof,
+		batchHeader,
+		blobVerificationProof,
 		nonSignerStakesAndSignature)
 
 	if err != nil {

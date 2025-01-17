@@ -10,6 +10,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
 
 func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, error) {
@@ -177,6 +178,15 @@ func convertBlobCommitment(inputCommitment *common.BlobCommitment) (*BlobCommitm
 	}, nil
 }
 
+func BlobCommitmentBindingToProto(inputCommitment *BlobCommitment) *common.BlobCommitment {
+	return &common.BlobCommitment{
+		Commitment:       bn254G1PointToBytes(&inputCommitment.Commitment),
+		LengthCommitment: bn254G2PointToBytes(&inputCommitment.LengthCommitment),
+		LengthProof:      bn254G2PointToBytes(&inputCommitment.LengthProof),
+		Length:           inputCommitment.DataLength,
+	}
+}
+
 func bytesToBN254G1Point(bytes []byte) (*BN254G1Point, error) {
 	var g1Point bn254.G1Affine
 	_, err := g1Point.SetBytes(bytes)
@@ -189,6 +199,18 @@ func bytesToBN254G1Point(bytes []byte) (*BN254G1Point, error) {
 		X: g1Point.X.BigInt(new(big.Int)),
 		Y: g1Point.Y.BigInt(new(big.Int)),
 	}, nil
+}
+
+func bn254G1PointToBytes(inputPoint *BN254G1Point) []byte {
+	var x fp.Element
+	x.SetBigInt(inputPoint.X)
+	var y fp.Element
+	y.SetBigInt(inputPoint.Y)
+
+	g1Point := &bn254.G1Affine{X: x, Y: y}
+
+	bytes := g1Point.Bytes()
+	return bytes[:]
 }
 
 func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
@@ -214,6 +236,24 @@ func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
 		X: x,
 		Y: y,
 	}, nil
+}
+
+func bn254G2PointToBytes(inputPoint *BN254G2Point) []byte {
+	var g2Point bn254.G2Affine
+	
+	// Order is intentionally reversed when converting here
+	// (see https://github.com/Layr-Labs/eigenlayer-middleware/blob/512ce7326f35e8060b9d46e23f9c159c0000b546/src/libraries/BN254.sol#L43)
+
+	var xa0, xa1, ya0, ya1 fp.Element
+	g2Point.X.A0 = *(xa0.SetBigInt(inputPoint.X[1]))
+	g2Point.X.A1 = *(xa1.SetBigInt(inputPoint.X[0]))
+
+	g2Point.Y.A0 = *(ya0.SetBigInt(inputPoint.Y[1]))
+	g2Point.Y.A1 = *(ya1.SetBigInt(inputPoint.Y[0]))
+
+	pointBytes := g2Point.Bytes()
+
+	return pointBytes[:]
 }
 
 func repeatedBytesToG1Points(repeatedBytes [][]byte) ([]BN254G1Point, error) {

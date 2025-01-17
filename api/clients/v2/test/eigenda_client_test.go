@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"testing"
 	"time"
@@ -13,11 +14,16 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	common2 "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
+	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigensdk-go/logging"
+	prover2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,22 +33,27 @@ const g1Path = "../../../../inabox/resources/kzg/g1.point"
 const payloadLength = 100
 
 type ClientTester struct {
-	Random          *testrandom.TestRandom
-	Client          *clients.EigenDAClient
-	MockRelayClient *clientsmock.MockRelayClient
-	Codec           *codecs.DefaultBlobCodec
-	G1Srs           []bn254.G1Affine
+	Random           *testrandom.TestRandom
+	Client           *clients.EigenDAClient
+	MockRelayClient  *clientsmock.MockRelayClient
+	MockBlobVerifier *clientsmock.MockBlobVerifier
+	Codec            *codecs.DefaultBlobCodec
+	G1Srs            []bn254.G1Affine
 }
 
 // buildClientTester sets up a client with mocks necessary for testing
 func buildClientTester(t *testing.T) ClientTester {
-	logger := logging.NewNoopLogger()
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
 	clientConfig := &clients.EigenDAClientConfig{
 		RelayTimeout: 50 * time.Millisecond,
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	codec := codecs.NewDefaultBlobCodec()
+
+	mockBlobVerifier := clientsmock.MockBlobVerifier{}
 
 	random := testrandom.NewTestRandom(t)
 
@@ -55,6 +66,7 @@ func buildClientTester(t *testing.T) ClientTester {
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
+		&mockBlobVerifier,
 		&codec,
 		g1Srs)
 
@@ -62,11 +74,12 @@ func buildClientTester(t *testing.T) ClientTester {
 	require.NoError(t, err)
 
 	return ClientTester{
-		Random:          random,
-		Client:          client,
-		MockRelayClient: &mockRelayClient,
-		Codec:           &codec,
-		G1Srs:           g1Srs,
+		Random:           random,
+		Client:           client,
+		MockRelayClient:  &mockRelayClient,
+		MockBlobVerifier: &mockBlobVerifier,
+		Codec:            &codec,
+		G1Srs:            g1Srs,
 	}
 }
 
@@ -74,7 +87,8 @@ func buildClientTester(t *testing.T) ClientTester {
 func buildBlobAndCert(
 	t *testing.T,
 	tester ClientTester,
-	relayKeys []core.RelayKey) (core.BlobKey, []byte, *core.BlobCertificate) {
+	relayKeys []core.RelayKey,
+) (core.BlobKey, []byte, *verification.EigendaCert) {
 
 	blobKey := core.BlobKey(tester.Random.Bytes(32))
 	payloadBytes := tester.Random.Bytes(payloadLength)
@@ -82,22 +96,47 @@ func buildBlobAndCert(
 	require.NoError(t, err)
 	require.NotNil(t, blobBytes)
 
-	kzgCommitment, err := verification.GenerateBlobCommitment(tester.G1Srs, blobBytes)
+	kzgConfig := &kzg.KzgConfig{
+		G1Path:          "../../../../inabox/resources/kzg/g1.point",
+		G2Path:          "../../../../inabox/resources/kzg/g2.point",
+		CacheDir:        "../../../../inabox/resources/kzg/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
+	}
+
+	prover, err := prover2.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
-	require.NotNil(t, kzgCommitment)
 
-	commitments := encoding.BlobCommitments{
-		Commitment: kzgCommitment,
-		Length:     uint(len(blobBytes)),
+	params := encoding.ParamsFromMins(16, 16)
+	commitments, _, err := prover.EncodeAndProve(blobBytes, params)
+	require.NoError(t, err)
+
+	commitmentsProto, err := commitments.ToProtobuf()
+	require.NoError(t, err)
+
+	blobHeader := &commonv2.BlobHeader{
+		Version:       1,
+		QuorumNumbers: make([]uint32, 0),
+		PaymentHeader: &common2.PaymentHeader{},
+		Commitment:    commitmentsProto,
 	}
 
-	blobHeader := &core.BlobHeader{
-		BlobCommitments: commitments,
-	}
-
-	return blobKey, blobBytes, &core.BlobCertificate{
-		RelayKeys:  relayKeys,
+	blobCertificate := &commonv2.BlobCertificate{
+		Relays:     relayKeys,
 		BlobHeader: blobHeader,
+	}
+
+	verificationInfo := &disperserv2.BlobVerificationInfo{
+		BlobCertificate: blobCertificate,
+	}
+
+	verificationProof, err := contractEigenDABlobVerifier.ConvertVerificationProof(verificationInfo)
+	require.NoError(t, err)
+
+	return blobKey, blobBytes, &verification.EigendaCert{
+		BlobVerificationProof: *verificationProof,
 	}
 }
 
@@ -109,6 +148,12 @@ func TestGetPayloadSuccess(t *testing.T) {
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	payload, err := tester.Client.GetPayload(
 		context.Background(),
@@ -197,6 +242,12 @@ func TestRandomRelayRetries(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.MatchedBy(onlineKeyMatcher), blobKey).Return(
 		blobBytes,
 		nil)
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	// keep track of how many tries various blob retrievals require
 	// this allows us to require that there is variability, i.e. that relay call order is actually random
@@ -269,6 +320,12 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
 	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
@@ -292,6 +349,12 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes2, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes1, nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	payload, err := tester.Client.GetPayload(
 		context.Background(),
@@ -319,6 +382,12 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tooLongBytes, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	// this will fail the first time, since there isn't enough srs loaded to compute the commitment of the returned bytes
 	// it will succeed when the second relay gives the correct bytes
@@ -343,7 +412,7 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobHeader.BlobCommitments.Length--
+	blobCert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment.DataLength--
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
 
@@ -378,11 +447,20 @@ func TestFailedDecoding(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, maliciousCommitment)
 
-	blobCert.BlobHeader.BlobCommitments.Commitment = maliciousCommitment
+	blobCert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment.Commitment = contractEigenDABlobVerifier.BN254G1Point{
+		X: maliciousCommitment.X.BigInt(new(big.Int)),
+		Y: maliciousCommitment.Y.BigInt(new(big.Int)),
+	}
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
 	require.Error(t, err)
@@ -422,32 +500,4 @@ func TestGetCodec(t *testing.T) {
 	require.Equal(t, tester.Codec, tester.Client.GetCodec())
 
 	tester.MockRelayClient.AssertExpectations(t)
-}
-
-// TestBuilder tests that the method that builds the client from config doesn't throw any obvious errors
-func TestBuilder(t *testing.T) {
-	clientConfig := &clients.EigenDAClientConfig{
-		BlobEncodingVersion: codecs.DefaultBlobEncoding,
-		BlobPolynomialForm:  codecs.Coeff,
-		RelayTimeout:        500 * time.Millisecond,
-	}
-
-	sockets := make(map[core.RelayKey]string)
-	sockets[core.RelayKey(44)] = "socketVal"
-
-	relayClientConfig := &clients.RelayClientConfig{
-		Sockets:           sockets,
-		UseSecureGrpcFlag: true,
-	}
-
-	client, err := clients.BuildEigenDAClient(
-		logging.NewNoopLogger(),
-		clientConfig,
-		relayClientConfig,
-		[]bn254.G1Affine{})
-
-	require.NotNil(t, client)
-	require.NoError(t, err)
-
-	require.NotNil(t, client.GetCodec())
 }

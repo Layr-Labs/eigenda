@@ -11,6 +11,12 @@ type EigenDAClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
+	// The Ethereum RPC URL to use for querying the Ethereum blockchain.
+	EthRpcUrl string
+
+	// The address of the EigenDABlobVerifier contract
+	EigenDABlobVerifierAddr string
+
 	// BlobPolynomialForm is the form that the blob polynomial is commited to and dispersed in, as well as the form the
 	// blob polynomial will be received in from the relay.
 	//
@@ -23,4 +29,7 @@ type EigenDAClientConfig struct {
 
 	// The timeout duration for relay calls
 	RelayTimeout time.Duration
+
+	// The timeout duration for contract calls
+	ContractCallTimeout time.Duration
 }
