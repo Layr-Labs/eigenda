@@ -235,10 +235,6 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.DispersePaidBlobRequest"><span class="badge">M</span>DispersePaidBlobRequest</a>
-                </li>
-              
-                <li>
                   <a href="#disperser.RetrieveBlobReply"><span class="badge">M</span>RetrieveBlobReply</a>
                 </li>
               
@@ -802,51 +798,6 @@ within the same batch. </p></td>
                   <td></td>
                   <td><p>The account ID of the client. This should be a hex-encoded string of the ECSDA public key
 corresponding to the key used by the client to sign the BlobAuthHeader. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="disperser.DispersePaidBlobRequest">DispersePaidBlobRequest</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>data</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>The data to be dispersed. Same requirements as DisperseBlobRequest. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>quorum_numbers</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td>repeated</td>
-                  <td><p>The quorums to which the blob to be sent </p></td>
-                </tr>
-              
-                <tr>
-                  <td>payment_header</td>
-                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
-                  <td></td>
-                  <td><p>Payment header contains account_id, reservation_period, cumulative_payment, and salt </p></td>
-                </tr>
-              
-                <tr>
-                  <td>payment_signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>signature of payment_header </p></td>
                 </tr>
               
             </tbody>
