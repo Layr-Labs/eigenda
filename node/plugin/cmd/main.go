@@ -40,6 +40,7 @@ func main() {
 		plugin.BLSRemoteSignerUrlFlag,
 		plugin.BLSPublicKeyHexFlag,
 		plugin.BLSSignerCertFileFlag,
+		plugin.BLSSignerAPIKeyFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
@@ -66,6 +67,7 @@ func pluginOps(ctx *cli.Context) {
 		TLSCertFilePath:  config.BLSSignerCertFile,
 		Path:             config.BlsKeyFile,
 		Password:         config.BlsKeyPassword,
+		CerberusAPIKey:   config.BLSSignerAPIKey,
 	}
 	if config.BLSRemoteSignerUrl != "" {
 		signerCfg.SignerType = blssignerTypes.Cerberus

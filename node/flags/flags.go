@@ -347,6 +347,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
 	}
+
+	BLSSignerAPIKeyFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-signer-api-key"),
+		Usage:    "The API key for the BLS signer. Only required if BLSRemoteSignerEnabled is true",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_API_KEY"),
+	}
+
 	PprofHttpPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
 		Usage:    "the http port which the pprof server is listening",
