@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"strconv"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -582,20 +582,19 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	return nil
 }
 
-func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 	if pm == nil {
 		return nil
 	}
-	return &commonpb.PaymentHeader{
+	return &commonpbv2.PaymentHeader{
 		AccountId:         pm.AccountID,
 		ReservationPeriod: pm.ReservationPeriod,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
-		Salt:              pm.Salt,
 	}
 }
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
 	if ph == nil {
 		return nil
 	}
@@ -604,7 +603,6 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 		AccountID:         ph.AccountId,
 		ReservationPeriod: ph.ReservationPeriod,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
-		Salt:              ph.Salt,
 	}
 }
 
