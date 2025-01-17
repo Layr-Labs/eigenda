@@ -12,12 +12,13 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// IBlobVerifier is the interface representing a BlobVerifier
+//
+// This interface in order to allow verification mocking in unit tests.
 type IBlobVerifier interface {
 	VerifyBlobV2(
 		ctx context.Context,
-		batchHeader verifierBindings.BatchHeaderV2,
-		blobVerificationProof verifierBindings.BlobVerificationProofV2,
-		nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
+		eigenDACert *EigenDACert,
 	) error
 }
 
@@ -87,18 +88,13 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 // This method returns nil if the blob is successfully verified. Otherwise, it returns an error.
 func (v *BlobVerifier) VerifyBlobV2(
 	ctx context.Context,
-	// The header of the batch that the blob is contained in
-	batchHeader verifierBindings.BatchHeaderV2,
-	// Contains data pertaining to the blob's inclusion in the batch
-	blobVerificationProof verifierBindings.BlobVerificationProofV2,
-	// Contains data that can be used to verify that the blob actually exists in the claimed batch
-	nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
+	eigenDACert *EigenDACert,
 ) error {
 	err := v.blobVerifierCaller.VerifyBlobV2(
 		&bind.CallOpts{Context: ctx},
-		batchHeader,
-		blobVerificationProof,
-		nonSignerStakesAndSignature)
+		eigenDACert.BatchHeader,
+		eigenDACert.BlobVerificationProof,
+		eigenDACert.NonSignerStakesAndSignature)
 
 	if err != nil {
 		return fmt.Errorf("verify blob v2: %s", err)

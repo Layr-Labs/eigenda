@@ -88,7 +88,7 @@ func buildBlobAndCert(
 	t *testing.T,
 	tester ClientTester,
 	relayKeys []core.RelayKey,
-) (core.BlobKey, []byte, *verification.EigendaCert) {
+) (core.BlobKey, []byte, *verification.EigenDACert) {
 
 	blobKey := core.BlobKey(tester.Random.Bytes(32))
 	payloadBytes := tester.Random.Bytes(payloadLength)
@@ -135,7 +135,7 @@ func buildBlobAndCert(
 	verificationProof, err := contractEigenDABlobVerifier.ConvertVerificationProof(verificationInfo)
 	require.NoError(t, err)
 
-	return blobKey, blobBytes, &verification.EigendaCert{
+	return blobKey, blobBytes, &verification.EigenDACert{
 		BlobVerificationProof: *verificationProof,
 	}
 }

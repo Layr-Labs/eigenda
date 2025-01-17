@@ -98,7 +98,7 @@ func NewEigenDAClient(
 func (c *EigenDAClient) GetPayload(
 	ctx context.Context,
 	blobKey core.BlobKey,
-	eigenDACert *verification.EigendaCert) ([]byte, error) {
+	eigenDACert *verification.EigenDACert) ([]byte, error) {
 
 	relayKeys := eigenDACert.BlobVerificationProof.BlobCertificate.RelayKeys
 	relayKeyCount := len(relayKeys)
@@ -164,6 +164,11 @@ func (c *EigenDAClient) GetPayload(
 // verifyBlobFromRelay performs the necessary local verifications after having retrieved a blob from a relay.
 // This method does NOT verify the blob with a call to verifyBlobV2, that must be done separately.
 //
+// The following verifications are performed in this method:
+// 1. Verify that blob isn't empty
+// 2. Verify the blob kzg commitment
+// 3. Verify that the blob length is less than or equal to the claimed blob length
+//
 // If all verifications succeed, the method returns true. Otherwise, it logs a warning and returns false.
 func (c *EigenDAClient) verifyBlobFromRelay(
 	blobKey core.BlobKey,
@@ -223,21 +228,17 @@ func (c *EigenDAClient) getBlobWithTimeout(
 	return c.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 }
 
-// verifyBlobV2WithTimeout attempts to verify a blob by making a call to VerifyBlobV2.
+// verifyBlobV2WithTimeout verifies a blob by making a call to VerifyBlobV2.
 //
 // This method times out after the duration configured in clientConfig.ContractCallTimeout
 func (c *EigenDAClient) verifyBlobV2WithTimeout(
 	ctx context.Context,
-	eigenDACert *verification.EigendaCert,
+	eigenDACert *verification.EigenDACert,
 ) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, c.clientConfig.ContractCallTimeout)
 	defer cancel()
 
-	return c.blobVerifier.VerifyBlobV2(
-		timeoutCtx,
-		eigenDACert.BatchHeader,
-		eigenDACert.BlobVerificationProof,
-		eigenDACert.NonSignerStakesAndSignature)
+	return c.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
 }
 
 // GetCodec returns the codec the client uses for encoding and decoding blobs

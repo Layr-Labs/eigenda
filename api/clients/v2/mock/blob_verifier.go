@@ -5,7 +5,7 @@ package mock
 import (
 	"context"
 
-	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -14,17 +14,17 @@ type MockBlobVerifier struct {
 	mock.Mock
 }
 
-// VerifyBlobV2 provides a mock function with given fields: ctx, batchHeader, blobVerificationProof, nonSignerStakesAndSignature
-func (_m *MockBlobVerifier) VerifyBlobV2(ctx context.Context, batchHeader contractEigenDABlobVerifier.BatchHeaderV2, blobVerificationProof contractEigenDABlobVerifier.BlobVerificationProofV2, nonSignerStakesAndSignature contractEigenDABlobVerifier.NonSignerStakesAndSignature) error {
-	ret := _m.Called(ctx, batchHeader, blobVerificationProof, nonSignerStakesAndSignature)
+// VerifyBlobV2 provides a mock function with given fields: ctx, eigenDACert
+func (_m *MockBlobVerifier) VerifyBlobV2(ctx context.Context, eigenDACert *verification.EigenDACert) error {
+	ret := _m.Called(ctx, eigenDACert)
 
 	if len(ret) == 0 {
 		panic("no return value specified for VerifyBlobV2")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, contractEigenDABlobVerifier.BatchHeaderV2, contractEigenDABlobVerifier.BlobVerificationProofV2, contractEigenDABlobVerifier.NonSignerStakesAndSignature) error); ok {
-		r0 = rf(ctx, batchHeader, blobVerificationProof, nonSignerStakesAndSignature)
+	if rf, ok := ret.Get(0).(func(context.Context, *verification.EigenDACert) error); ok {
+		r0 = rf(ctx, eigenDACert)
 	} else {
 		r0 = ret.Error(0)
 	}
