@@ -109,6 +109,14 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg("blob header must contain commitments")
 	}
 
+	if blobHeaderProto.GetCommitment() == nil {
+		return api.NewErrorInvalidArg("blob header must contain a commitment")
+	}
+	commitmentLength := blobHeaderProto.GetCommitment().GetLength()
+	if commitmentLength == 0 || commitmentLength != encoding.NextPowerOf2(commitmentLength) {
+		return api.NewErrorInvalidArg("invalid commitment length, must be a power of 2")
+	}
+
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))

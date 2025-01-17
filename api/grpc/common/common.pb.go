@@ -20,6 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// A KZG commitment
 type G1Commitment struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -84,10 +85,18 @@ type BlobCommitment struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Commitment       []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// A commitment to the blob data.
+	Commitment []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
+	// A commitment to the blob data with G2 SRS, used to work with length_proof
+	// such that the claimed length below is verifiable.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
-	LengthProof      []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
-	Length           uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
+	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
+	// It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+	// at the end of the highest order.
+	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
+	// The length specifies the degree of the polynomial used to generate the blob commitment. The length
+	// must equal to the degree + 1, and it must be a power of 2.
+	Length uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
 }
 
 func (x *BlobCommitment) Reset() {
@@ -150,12 +159,13 @@ func (x *BlobCommitment) GetLength() uint32 {
 	return 0
 }
 
+// PaymentHeader contains payment information for a blob.
 type PaymentHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+	// The account ID of the disperser client. This account ID is an eth wallet address of the user,
 	// corresponding to the key used by the client to sign the BlobHeader.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// The reservation period of the dispersal request.

@@ -28,10 +28,10 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  |  |
-| length_commitment | [bytes](#bytes) |  |  |
-| length_proof | [bytes](#bytes) |  |  |
-| length | [uint32](#uint32) |  |  |
+| commitment | [bytes](#bytes) |  | A commitment to the blob data. |
+| length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed such that the coefficient of the polynomial is committing with the G2 SRS at the end of the highest order. |
+| length | [uint32](#uint32) |  | The length specifies the degree of the polynomial used to generate the blob commitment. The length must equal to the degree &#43; 1, and it must be a power of 2. |
 
 
 
@@ -41,7 +41,7 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-G1Commitment"></a>
 
 ### G1Commitment
-
+A KZG commitment
 
 
 | Field | Type | Label | Description |
@@ -57,12 +57,12 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-PaymentHeader"></a>
 
 ### PaymentHeader
-
+PaymentHeader contains payment information for a blob.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
 | reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
 | cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
 | salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
