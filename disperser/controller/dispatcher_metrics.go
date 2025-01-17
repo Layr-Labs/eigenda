@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -34,11 +36,21 @@ type dispatcherMetrics struct {
 	updateBatchStatusLatency    *prometheus.SummaryVec
 	blobE2EDispersalLatency     *prometheus.SummaryVec
 	completedBlobs              *prometheus.CounterVec
+	attestation                 *prometheus.GaugeVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
 func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+
+	attestation := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "attestation",
+			Help:      "number of signers and non-signers for the batch",
+		},
+		[]string{"type", "quorum"},
+	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -270,6 +282,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		updateBatchStatusLatency:    updateBatchStatusLatency,
 		blobE2EDispersalLatency:     blobE2EDispersalLatency,
 		completedBlobs:              completedBlobs,
+		attestation:                 attestation,
 	}
 }
 
@@ -370,4 +383,23 @@ func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 
 	m.completedBlobs.WithLabelValues("total", "number").Inc()
 	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+}
+
+func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+	for quorumID, count := range operatorCount {
+		quorumStr := fmt.Sprintf("%d", quorumID)
+		signers, ok := signerCount[quorumID]
+		if !ok {
+			continue
+		}
+		nonSigners := count - signers
+		quorumResult, ok := quorumResults[quorumID]
+		if !ok {
+			continue
+		}
+
+		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
+		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
+		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
+	}
 }
