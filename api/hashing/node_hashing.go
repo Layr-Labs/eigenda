@@ -3,7 +3,7 @@ package hashing
 import (
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"golang.org/x/crypto/sha3"
 	"hash"
 )

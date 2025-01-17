@@ -6,7 +6,7 @@ import (
 	"net"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
-	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -40,7 +40,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			reflection.Register(gs)
 
 			pb.RegisterDispersalServer(gs, serverV1)
-			pbv2.RegisterDispersalServer(gs, serverV2)
+			validator.RegisterDispersalServer(gs, serverV2)
 
 			healthcheck.RegisterHealthServer("node.Dispersal", gs)
 
@@ -67,7 +67,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			reflection.Register(gs)
 
 			pb.RegisterRetrievalServer(gs, serverV1)
-			pbv2.RegisterRetrievalServer(gs, serverV2)
+			validator.RegisterRetrievalServer(gs, serverV2)
 			healthcheck.RegisterHealthServer("node.Retrieval", gs)
 
 			logger.Info("port", config.InternalRetrievalPort, "address", listener.Addr().String(), "GRPC Listening")

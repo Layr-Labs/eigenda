@@ -3,7 +3,7 @@ package auth
 import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 )
 

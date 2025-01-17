@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/core"
