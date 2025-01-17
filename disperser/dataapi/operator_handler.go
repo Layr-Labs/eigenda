@@ -9,6 +9,9 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 )
 
 // OperatorHandler handles operations to collect and process operators info.
@@ -44,10 +47,18 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 	retrievalSocket := operatorSocket.GetRetrievalSocket()
-	retrievalOnline := checkIsOperatorOnline(retrievalSocket, 3, oh.logger)
+	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
+	retrievalOnline, retrievalStatus := false, "port closed"
+	if retrievalPortOpen {
+		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
+	}
 
 	dispersalSocket := operatorSocket.GetDispersalSocket()
-	dispersalOnline := checkIsOperatorOnline(dispersalSocket, 3, oh.logger)
+	dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
+	dispersalOnline, dispersalStatus := false, "port closed"
+	if dispersalPortOpen {
+		dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "node.Dispersal", dispersalSocket, 3*time.Second)
+	}
 
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
@@ -56,6 +67,8 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 		RetrievalSocket: retrievalSocket,
 		DispersalOnline: dispersalOnline,
 		RetrievalOnline: retrievalOnline,
+		DispersalStatus: dispersalStatus,
+		RetrievalStatus: retrievalStatus,
 	}
 
 	// Log the online status
@@ -63,6 +76,50 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 
 	// Send the metadata to the results channel
 	return portCheckResponse, nil
+}
+
+// query operator host info endpoint if available
+func checkServiceOnline(ctx context.Context, serviceName string, socket string, timeout time.Duration) (bool, string) {
+	conn, err := grpc.NewClient(socket, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return false, err.Error()
+	}
+	defer conn.Close()
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Create a reflection client
+	reflectionClient := grpc_reflection_v1.NewServerReflectionClient(conn)
+
+	// Send ListServices request
+	stream, err := reflectionClient.ServerReflectionInfo(ctxWithTimeout)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	// Send the ListServices request
+	listReq := &grpc_reflection_v1.ServerReflectionRequest{
+		MessageRequest: &grpc_reflection_v1.ServerReflectionRequest_ListServices{},
+	}
+	if err := stream.Send(listReq); err != nil {
+		return false, err.Error()
+	}
+
+	// Get the response
+	r, err := stream.Recv()
+	if err != nil {
+		return false, err.Error()
+	}
+
+	// Check if the service exists
+	if list := r.GetListServicesResponse(); list != nil {
+		for _, service := range list.GetService() {
+			if service.GetName() == serviceName {
+				return true, "available"
+			}
+		}
+	}
+	return false, "unavailable"
 }
 
 func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
