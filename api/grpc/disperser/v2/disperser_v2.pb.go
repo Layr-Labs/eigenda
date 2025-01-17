@@ -25,26 +25,38 @@ const (
 // BlobStatus represents the status of a blob.
 // The status of a blob is updated as the blob is processed by the disperser.
 // The status of a blob can be queried by the client using the GetBlobStatus API.
-// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 // - QUEUED
 // - ENCODED
 // Terminal states are states that will not be updated to a different state:
+// - UNKNOWN
 // - CERTIFIED
 // - FAILED
 // - INSUFFICIENT_SIGNATURES
 type BlobStatus int32
 
 const (
+	// UNKNOWN means that the status of the blob is unknown.
+	// This is a catch all and should not be encountered absent a bug.
+	//
+	// This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+	// unanticipated bug.
 	BlobStatus_UNKNOWN BlobStatus = 0
-	// QUEUED means that the blob has been queued by the disperser for processing
+	// QUEUED means that the blob has been queued by the disperser for processing.
+	// The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
+	// the blob is stored in a queue of some sort, and a response immediately returned to the client.
 	BlobStatus_QUEUED BlobStatus = 1
-	// ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes
+	// ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
 	BlobStatus_ENCODED BlobStatus = 2
-	// CERTIFIED means the blob has been dispersed and attested by the DA nodes
+	// CERTIFIED means the blob has been dispersed and attested by the DA nodes.
 	BlobStatus_CERTIFIED BlobStatus = 3
-	// FAILED means that the blob has failed permanently
+	// FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+	// retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).
 	BlobStatus_FAILED BlobStatus = 4
-	// INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation
+	// INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+	//
+	// This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+	// an inability to gather sufficient signatures.
 	BlobStatus_INSUFFICIENT_SIGNATURES BlobStatus = 5
 )
 
@@ -95,18 +107,28 @@ func (BlobStatus) EnumDescriptor() ([]byte, []int) {
 	return file_disperser_v2_disperser_v2_proto_rawDescGZIP(), []int{0}
 }
 
+// A request to disperse a blob.
 type DisperseBlobRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	// The data to be dispersed.
-	// The size of data must be <= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format
-	// where the lower address has more significant bits. The integer must stay in the valid range to be interpreted
-	// as a field element on the bn254 curve. The valid range is
-	// 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617
+	//
+	// The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
+	// (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+	//
+	// Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
+	// significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
+	// The valid range is 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617.
 	// If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
-	Data       []byte         `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	// The header contains metadata about the blob.
+	//
+	// This header can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a
+	// 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
+	// dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
+	// which is dispersed separately.
 	BlobHeader *v2.BlobHeader `protobuf:"bytes,2,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 }
 
@@ -156,14 +178,24 @@ func (x *DisperseBlobRequest) GetBlobHeader() *v2.BlobHeader {
 	return nil
 }
 
+// A reply to a DisperseBlob request.
 type DisperseBlobReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	// The status of the blob associated with the blob key.
-	Result  BlobStatus `protobuf:"varint,1,opt,name=result,proto3,enum=disperser.v2.BlobStatus" json:"result,omitempty"`
-	BlobKey []byte     `protobuf:"bytes,2,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
+	Result BlobStatus `protobuf:"varint,1,opt,name=result,proto3,enum=disperser.v2.BlobStatus" json:"result,omitempty"`
+	// The unique 32 byte identifier for the blob.
+	//
+	// The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+	// https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
+	// The blob_key must thus be unique for every request, even if the same blob is being dispersed.
+	// Meaning the blob_header must be different for each request.
+	//
+	// Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause
+	// the disperser to reject the blob (DisperseBlob() RPC will return an error).
+	BlobKey []byte `protobuf:"bytes,2,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 }
 
 func (x *DisperseBlobReply) Reset() {
@@ -218,6 +250,7 @@ type BlobStatusRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The unique identifier for the blob.
 	BlobKey []byte `protobuf:"bytes,1,opt,name=blob_key,json=blobKey,proto3" json:"blob_key,omitempty"`
 }
 
@@ -260,6 +293,7 @@ func (x *BlobStatusRequest) GetBlobKey() []byte {
 	return nil
 }
 
+// BlobStatusReply is the reply to a BlobStatusRequest.
 type BlobStatusReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -267,8 +301,10 @@ type BlobStatusReply struct {
 
 	// The status of the blob.
 	Status BlobStatus `protobuf:"varint,1,opt,name=status,proto3,enum=disperser.v2.BlobStatus" json:"status,omitempty"`
-	// The signed batch
-	SignedBatch          *SignedBatch          `protobuf:"bytes,2,opt,name=signed_batch,json=signedBatch,proto3" json:"signed_batch,omitempty"`
+	// The signed batch. Unset if the status is not CERTIFIED.
+	SignedBatch *SignedBatch `protobuf:"bytes,2,opt,name=signed_batch,json=signedBatch,proto3" json:"signed_batch,omitempty"`
+	// BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+	// Unset if the status is not CERTIFIED.
 	BlobVerificationInfo *BlobVerificationInfo `protobuf:"bytes,3,opt,name=blob_verification_info,json=blobVerificationInfo,proto3" json:"blob_verification_info,omitempty"`
 }
 
@@ -325,13 +361,14 @@ func (x *BlobStatusReply) GetBlobVerificationInfo() *BlobVerificationInfo {
 	return nil
 }
 
-// Utility method used to generate the commitment of blob given its data.
-// This can be used to construct BlobHeader.commitment
+// The input for a BlobCommitmentRequest().
+// This can be used to construct a BlobHeader.commitment.
 type BlobCommitmentRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The blob data to compute the commitment for.
 	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 }
 
@@ -374,11 +411,13 @@ func (x *BlobCommitmentRequest) GetData() []byte {
 	return nil
 }
 
+// The result of a BlobCommitmentRequest().
 type BlobCommitmentReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The commitment of the blob.
 	BlobCommitment *common.BlobCommitment `protobuf:"bytes,1,opt,name=blob_commitment,json=blobCommitment,proto3" json:"blob_commitment,omitempty"`
 }
 
@@ -427,9 +466,9 @@ type GetPaymentStateRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// The ID of the account being queried. This account ID is an eth wallet address of the user.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Signature over the account ID
-	// TODO: sign over a reservation period or a nonce to mitigate signature replay attacks
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
@@ -783,16 +822,22 @@ func (x *Attestation) GetQuorumSignedPercentages() []byte {
 	return nil
 }
 
+// Global constant parameters defined by the payment vault.
 type PaymentGlobalParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	GlobalSymbolsPerSecond uint64   `protobuf:"varint,1,opt,name=global_symbols_per_second,json=globalSymbolsPerSecond,proto3" json:"global_symbols_per_second,omitempty"`
-	MinNumSymbols          uint32   `protobuf:"varint,2,opt,name=min_num_symbols,json=minNumSymbols,proto3" json:"min_num_symbols,omitempty"`
-	PricePerSymbol         uint32   `protobuf:"varint,3,opt,name=price_per_symbol,json=pricePerSymbol,proto3" json:"price_per_symbol,omitempty"`
-	ReservationWindow      uint32   `protobuf:"varint,4,opt,name=reservation_window,json=reservationWindow,proto3" json:"reservation_window,omitempty"`
-	OnDemandQuorumNumbers  []uint32 `protobuf:"varint,5,rep,packed,name=on_demand_quorum_numbers,json=onDemandQuorumNumbers,proto3" json:"on_demand_quorum_numbers,omitempty"`
+	// Global ratelimit for on-demand dispersals
+	GlobalSymbolsPerSecond uint64 `protobuf:"varint,1,opt,name=global_symbols_per_second,json=globalSymbolsPerSecond,proto3" json:"global_symbols_per_second,omitempty"`
+	// Minimum number of symbols accounted for all dispersals
+	MinNumSymbols uint32 `protobuf:"varint,2,opt,name=min_num_symbols,json=minNumSymbols,proto3" json:"min_num_symbols,omitempty"`
+	// Price charged per symbol for on-demand dispersals
+	PricePerSymbol uint32 `protobuf:"varint,3,opt,name=price_per_symbol,json=pricePerSymbol,proto3" json:"price_per_symbol,omitempty"`
+	// Reservation window for all reservations
+	ReservationWindow uint32 `protobuf:"varint,4,opt,name=reservation_window,json=reservationWindow,proto3" json:"reservation_window,omitempty"`
+	// quorums allowed to make on-demand dispersals
+	OnDemandQuorumNumbers []uint32 `protobuf:"varint,5,rep,packed,name=on_demand_quorum_numbers,json=onDemandQuorumNumbers,proto3" json:"on_demand_quorum_numbers,omitempty"`
 }
 
 func (x *PaymentGlobalParams) Reset() {
@@ -862,16 +907,22 @@ func (x *PaymentGlobalParams) GetOnDemandQuorumNumbers() []uint32 {
 	return nil
 }
 
+// Reservation parameters of an account, used to determine the rate limit for the account.
 type Reservation struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	SymbolsPerSecond uint64   `protobuf:"varint,1,opt,name=symbols_per_second,json=symbolsPerSecond,proto3" json:"symbols_per_second,omitempty"`
-	StartTimestamp   uint32   `protobuf:"varint,2,opt,name=start_timestamp,json=startTimestamp,proto3" json:"start_timestamp,omitempty"`
-	EndTimestamp     uint32   `protobuf:"varint,3,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
-	QuorumNumbers    []uint32 `protobuf:"varint,4,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	QuorumSplits     []uint32 `protobuf:"varint,5,rep,packed,name=quorum_splits,json=quorumSplits,proto3" json:"quorum_splits,omitempty"`
+	// rate limit for the account
+	SymbolsPerSecond uint64 `protobuf:"varint,1,opt,name=symbols_per_second,json=symbolsPerSecond,proto3" json:"symbols_per_second,omitempty"`
+	// start timestamp of the reservation
+	StartTimestamp uint32 `protobuf:"varint,2,opt,name=start_timestamp,json=startTimestamp,proto3" json:"start_timestamp,omitempty"`
+	// end timestamp of the reservation
+	EndTimestamp uint32 `protobuf:"varint,3,opt,name=end_timestamp,json=endTimestamp,proto3" json:"end_timestamp,omitempty"`
+	// quorums allowed to make reserved dispersals
+	QuorumNumbers []uint32 `protobuf:"varint,4,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
+	// quorum splits describes how the payment is split among the quorums
+	QuorumSplits []uint32 `protobuf:"varint,5,rep,packed,name=quorum_splits,json=quorumSplits,proto3" json:"quorum_splits,omitempty"`
 }
 
 func (x *Reservation) Reset() {
@@ -948,7 +999,9 @@ type PeriodRecord struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Period index of the reservation
 	Index uint32 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	// symbol usage recorded
 	Usage uint64 `protobuf:"varint,2,opt,name=usage,proto3" json:"usage,omitempty"`
 }
 

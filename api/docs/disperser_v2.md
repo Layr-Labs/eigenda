@@ -57,12 +57,12 @@
 <a name="disperser-v2-BlobCommitmentReply"></a>
 
 ### BlobCommitmentReply
-
+The result of a BlobCommitmentRequest().
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_commitment | [common.BlobCommitment](#common-BlobCommitment) |  |  |
+| blob_commitment | [common.BlobCommitment](#common-BlobCommitment) |  | The commitment of the blob. |
 
 
 
@@ -72,13 +72,13 @@
 <a name="disperser-v2-BlobCommitmentRequest"></a>
 
 ### BlobCommitmentRequest
-Utility method used to generate the commitment of blob given its data.
-This can be used to construct BlobHeader.commitment
+The input for a BlobCommitmentRequest().
+This can be used to construct a BlobHeader.commitment.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  |  |
+| data | [bytes](#bytes) |  | The blob data to compute the commitment for. |
 
 
 
@@ -88,14 +88,14 @@ This can be used to construct BlobHeader.commitment
 <a name="disperser-v2-BlobStatusReply"></a>
 
 ### BlobStatusReply
-
+BlobStatusReply is the reply to a BlobStatusRequest.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | status | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob. |
-| signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch |
-| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  |  |
+| signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch. Unset if the status is not CERTIFIED. |
+| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  | BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
 
 
 
@@ -110,7 +110,7 @@ BlobStatusRequest is used to query the status of a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  |  |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob. |
 
 
 
@@ -137,13 +137,17 @@ BlobVerificationInfo is the information needed to verify the inclusion of a blob
 <a name="disperser-v2-DisperseBlobReply"></a>
 
 ### DisperseBlobReply
-
+A reply to a DisperseBlob request.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | result | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob associated with the blob key. |
-| blob_key | [bytes](#bytes) |  |  |
+| blob_key | [bytes](#bytes) |  | The unique 32 byte identifier for the blob.
+
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 The blob_key must thus be unique for every request, even if the same blob is being dispersed. Meaning the blob_header must be different for each request.
+
+Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause the disperser to reject the blob (DisperseBlob() RPC will return an error). |
 
 
 
@@ -153,13 +157,19 @@ BlobVerificationInfo is the information needed to verify the inclusion of a blob
 <a name="disperser-v2-DisperseBlobRequest"></a>
 
 ### DisperseBlobRequest
-
+A request to disperse a blob.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617 If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
-| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  |  |
+| data | [bytes](#bytes) |  | The data to be dispersed.
+
+The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+
+Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617. If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
+| blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob.
+
+This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob, which is dispersed separately. |
 
 
 
@@ -193,8 +203,8 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  |  |
-| signature | [bytes](#bytes) |  | Signature over the account ID TODO: sign over a reservation period or a nonce to mitigate signature replay attacks |
+| account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
+| signature | [bytes](#bytes) |  | Signature over the account ID |
 
 
 
@@ -204,16 +214,16 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 <a name="disperser-v2-PaymentGlobalParams"></a>
 
 ### PaymentGlobalParams
-
+Global constant parameters defined by the payment vault.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| global_symbols_per_second | [uint64](#uint64) |  |  |
-| min_num_symbols | [uint32](#uint32) |  |  |
-| price_per_symbol | [uint32](#uint32) |  |  |
-| reservation_window | [uint32](#uint32) |  |  |
-| on_demand_quorum_numbers | [uint32](#uint32) | repeated |  |
+| global_symbols_per_second | [uint64](#uint64) |  | Global ratelimit for on-demand dispersals |
+| min_num_symbols | [uint32](#uint32) |  | Minimum number of symbols accounted for all dispersals |
+| price_per_symbol | [uint32](#uint32) |  | Price charged per symbol for on-demand dispersals |
+| reservation_window | [uint32](#uint32) |  | Reservation window for all reservations |
+| on_demand_quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make on-demand dispersals |
 
 
 
@@ -223,14 +233,14 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 <a name="disperser-v2-PeriodRecord"></a>
 
 ### PeriodRecord
-PeriodRecord is the usage record of an account in a bin. The API should return the active bin 
+PeriodRecord is the usage record of an account in a bin. The API should return the active bin
 record and the subsequent two records that contains potential overflows.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| index | [uint32](#uint32) |  |  |
-| usage | [uint64](#uint64) |  |  |
+| index | [uint32](#uint32) |  | Period index of the reservation |
+| usage | [uint64](#uint64) |  | symbol usage recorded |
 
 
 
@@ -240,16 +250,16 @@ record and the subsequent two records that contains potential overflows.
 <a name="disperser-v2-Reservation"></a>
 
 ### Reservation
-
+Reservation parameters of an account, used to determine the rate limit for the account.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| symbols_per_second | [uint64](#uint64) |  |  |
-| start_timestamp | [uint32](#uint32) |  |  |
-| end_timestamp | [uint32](#uint32) |  |  |
-| quorum_numbers | [uint32](#uint32) | repeated |  |
-| quorum_splits | [uint32](#uint32) | repeated |  |
+| symbols_per_second | [uint64](#uint64) |  | rate limit for the account |
+| start_timestamp | [uint32](#uint32) |  | start timestamp of the reservation |
+| end_timestamp | [uint32](#uint32) |  | end timestamp of the reservation |
+| quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make reserved dispersals |
+| quorum_splits | [uint32](#uint32) | repeated | quorum splits describes how the payment is split among the quorums |
 
 
 
@@ -280,22 +290,27 @@ SignedBatch is a batch of blobs with a signature.
 BlobStatus represents the status of a blob.
 The status of a blob is updated as the blob is processed by the disperser.
 The status of a blob can be queried by the client using the GetBlobStatus API.
-Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 - QUEUED
 - ENCODED
 Terminal states are states that will not be updated to a different state:
+- UNKNOWN
 - CERTIFIED
 - FAILED
 - INSUFFICIENT_SIGNATURES
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 |  |
-| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing |
-| ENCODED | 2 | ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes |
-| CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes |
-| FAILED | 4 | FAILED means that the blob has failed permanently |
-| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation |
+| UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an unanticipated bug. |
+| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
+| ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
+| CERTIFIED | 3 | CERTIFIED means the blob has been dispersed and attested by the DA nodes. |
+| FAILED | 4 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again with different salt (blob key is required to be unique). |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an an inability to gather sufficient signatures. |
 
 
  

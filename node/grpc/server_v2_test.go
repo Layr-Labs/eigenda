@@ -118,7 +118,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
-	resp, err := c.server.NodeInfo(context.Background(), &pbv2.NodeInfoRequest{})
+	resp, err := c.server.GetNodeInfo(context.Background(), &pbv2.GetNodeInfoRequest{})
 	assert.True(t, resp.Semver == "0.0.0")
 	assert.True(t, err == nil)
 }
