@@ -414,6 +414,7 @@ var optionalFlags = []cli.Flag{
 	BLSRemoteSignerUrlFlag,
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
+	BLSSignerAPIKeyFlag,
 	EnableV2Flag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
