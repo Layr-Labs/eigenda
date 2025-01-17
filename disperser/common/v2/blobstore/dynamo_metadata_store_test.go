@@ -538,6 +538,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	firstBatchTs := now - uint64((72+2)*time.Hour.Nanoseconds())
 	nanoSecsPerBatch := uint64(time.Hour.Nanoseconds()) // 1 batch per hour
 
+	// Create attestations for testing
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
 	dynamoKeys := make([]commondynamodb.Key, numBatches)

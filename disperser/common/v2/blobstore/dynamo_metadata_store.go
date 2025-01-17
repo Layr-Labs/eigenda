@@ -51,7 +51,7 @@ const (
 	// 14 days with 1 hour margin of safety.
 	maxBlobAgeInNano = uint64((14*24*time.Hour + 1*time.Hour) / time.Nanosecond)
 
-	// The number of nanoseconds for a attestedAt bucket (1d)
+	// The number of nanoseconds for an attestedAt bucket (1d)
 	// - 1d would be a good estimate for attestation needs (e.g. signing rate over past 24h is a common use case)
 	// - even at 1 attesation/s, it'll be 86,400 attestations in a bucket, which is reasonable
 	attestedAtBucketSizeNano = uint64(24 * time.Hour / time.Nanosecond)
@@ -387,8 +387,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 	return result, lastProcessedCursor, nil
 }
 
-// queryBucketAttestation queries a single bucket for attestations within the given key range.
-func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, start, end uint64) ([]*corev2.Attestation, error) {
+// queryBucketAttestation queries a single bucket for attestations within the given time range.
+func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, startTs, endTs uint64) ([]*corev2.Attestation, error) {
 	items, err := s.dynamoDBClient.QueryIndex(
 		ctx,
 		s.tableName,
@@ -396,8 +396,8 @@ func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, 
 		"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
 		commondynamodb.ExpressionValues{
 			":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-			":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(start), 10)},
-			":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
+			":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTs), 10)},
+			":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(endTs), 10)},
 		},
 	)
 	if err != nil {
