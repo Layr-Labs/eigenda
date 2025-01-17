@@ -17,7 +17,7 @@ import (
 )
 
 func TestDownloadBundles(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.RelayClient.Store(c.relayClient)
 	ctx := context.Background()
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -49,7 +49,7 @@ func TestDownloadBundles(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
-	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
+	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op0)
 	require.NoError(t, err)
 	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state)
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestDownloadBundles(t *testing.T) {
 }
 
 func TestDownloadBundlesFail(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.RelayClient.Store(c.relayClient)
 	ctx := context.Background()
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -126,8 +126,78 @@ func TestDownloadBundlesFail(t *testing.T) {
 	require.Nil(t, rawBundles)
 }
 
+func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
+	// Operator 3 is not participating in quorum 2, so it should only download bundles for quorums 0 and 1
+	c := newComponents(t, op3)
+	c.node.RelayClient.Store(c.relayClient)
+	ctx := context.Background()
+	blobKeys, batch, bundles := nodemock.MockBatch(t)
+	blobCerts := batch.BlobCertificates
+
+	bundles00Bytes, err := bundles[0][0].Serialize()
+	require.NoError(t, err)
+	bundles01Bytes, err := bundles[0][1].Serialize()
+	require.NoError(t, err)
+	bundles10Bytes, err := bundles[1][0].Serialize()
+	require.NoError(t, err)
+	bundles11Bytes, err := bundles[1][1].Serialize()
+	require.NoError(t, err)
+	bundles21Bytes, err := bundles[2][1].Serialize()
+	require.NoError(t, err)
+	// there shouldn't be a request to quorum 2 for blobKeys[2]
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*clients.ChunkRequestByRange)
+		require.Len(t, requests, 3)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[0], requests[1].BlobKey)
+		require.Equal(t, blobKeys[2], requests[2].BlobKey)
+	})
+	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*clients.ChunkRequestByRange)
+		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[1], requests[0].BlobKey)
+		require.Equal(t, blobKeys[1], requests[1].BlobKey)
+	})
+	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op3)
+	require.NoError(t, err)
+	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state)
+	require.NoError(t, err)
+	require.Len(t, blobShards, 3)
+	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)
+	require.Equal(t, blobCerts[1], blobShards[1].BlobCertificate)
+	require.Equal(t, blobCerts[2], blobShards[2].BlobCertificate)
+	require.Contains(t, blobShards[0].Bundles, core.QuorumID(0))
+	require.Contains(t, blobShards[0].Bundles, core.QuorumID(1))
+	require.Contains(t, blobShards[1].Bundles, core.QuorumID(0))
+	require.Contains(t, blobShards[1].Bundles, core.QuorumID(1))
+	require.Contains(t, blobShards[2].Bundles, core.QuorumID(1))
+	require.Len(t, blobShards[2].Bundles, 1)
+	bundleEqual(t, bundles[0][0], blobShards[0].Bundles[0])
+	bundleEqual(t, bundles[0][1], blobShards[0].Bundles[1])
+	bundleEqual(t, bundles[1][0], blobShards[1].Bundles[0])
+	bundleEqual(t, bundles[1][1], blobShards[1].Bundles[1])
+	bundleEqual(t, bundles[2][1], blobShards[2].Bundles[1])
+
+	require.Len(t, rawBundles, 3)
+	require.Equal(t, blobCerts[0], rawBundles[0].BlobCertificate)
+	require.Equal(t, blobCerts[1], rawBundles[1].BlobCertificate)
+	require.Equal(t, blobCerts[2], rawBundles[2].BlobCertificate)
+	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(0))
+	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(1))
+	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(0))
+	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(1))
+	require.Contains(t, rawBundles[2].Bundles, core.QuorumID(1))
+	require.Len(t, rawBundles[2].Bundles, 1)
+
+	require.Equal(t, bundles00Bytes, rawBundles[0].Bundles[0])
+	require.Equal(t, bundles01Bytes, rawBundles[0].Bundles[1])
+	require.Equal(t, bundles10Bytes, rawBundles[1].Bundles[0])
+	require.Equal(t, bundles11Bytes, rawBundles[1].Bundles[1])
+	require.Equal(t, bundles21Bytes, rawBundles[2].Bundles[1])
+}
+
 func TestRefreshOnchainStateFailure(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.Config.EnableV2 = true
 	c.node.RelayClient.Store(c.relayClient)
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
@@ -175,7 +245,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 }
 
 func TestRefreshOnchainStateSuccess(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.Config.EnableV2 = true
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 	relayURLs := map[v2.RelayKey]string{
