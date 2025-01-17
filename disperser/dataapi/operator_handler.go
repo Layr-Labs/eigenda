@@ -48,14 +48,14 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 	retrievalSocket := operatorSocket.GetRetrievalSocket()
 	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-	retrievalOnline, retrievalStatus := false, "port closed"
+	retrievalOnline, retrievalStatus := false, fmt.Sprintf("port closed or unreachable for %s", retrievalSocket)
 	if retrievalPortOpen {
 		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
 	}
 
 	dispersalSocket := operatorSocket.GetDispersalSocket()
 	dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
-	dispersalOnline, dispersalStatus := false, "port closed"
+	dispersalOnline, dispersalStatus := false, fmt.Sprintf("port closed or unreachable for %s", dispersalSocket)
 	if dispersalPortOpen {
 		dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "node.Dispersal", dispersalSocket, 3*time.Second)
 	}
@@ -115,11 +115,11 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	if list := r.GetListServicesResponse(); list != nil {
 		for _, service := range list.GetService() {
 			if service.GetName() == serviceName {
-				return true, "available"
+				return true, fmt.Sprintf("%s is available", serviceName)
 			}
 		}
 	}
-	return false, "unavailable"
+	return false, fmt.Sprintf("grpc available but %s service not found at %s", serviceName, socket)
 }
 
 func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
