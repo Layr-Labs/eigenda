@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -16,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -57,6 +57,12 @@ func TestGetRelayKeys(t *testing.T) {
 			err:             nil,
 		},
 		{
+			name:            "All relays",
+			numRelays:       2,
+			availableRelays: []corev2.RelayKey{0, 1},
+			err:             nil,
+		},
+		{
 			name:            "Choose 1 from multiple relays",
 			numRelays:       3,
 			availableRelays: []corev2.RelayKey{0, 1, 2, 3},
@@ -78,6 +84,10 @@ func TestGetRelayKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			availableRelaysCopy := make([]corev2.RelayKey, len(tt.availableRelays))
+			copy(availableRelaysCopy, tt.availableRelays)
+
 			got, err := controller.GetRelayKeys(tt.numRelays, tt.availableRelays)
 			if err != nil {
 				require.Error(t, err)
@@ -90,6 +100,8 @@ func TestGetRelayKeys(t *testing.T) {
 					seen[relay] = struct{}{}
 				}
 				require.Equal(t, len(seen), len(got))
+				// GetRelayKeys should not modify the original list of available relays.
+				require.Equal(t, availableRelaysCopy, tt.availableRelays)
 			}
 		})
 	}
@@ -283,7 +295,7 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 }
 
 func newTestComponents(t *testing.T, mockPool bool) *testComponents {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
 	var pool common.WorkerPool

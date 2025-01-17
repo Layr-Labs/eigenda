@@ -42,7 +42,7 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		}
 	}
 
-	throughput, err := s.metricsHandler.getAvgThroughput(ctx, startTime, endTime)
+	throughput, err := s.metricsHandler.GetAvgThroughput(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}

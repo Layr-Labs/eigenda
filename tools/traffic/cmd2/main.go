@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Layr-Labs/eigenda/tools/traffic"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
@@ -40,5 +42,25 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 		panic(fmt.Sprintf("failed to create new traffic generator\n%s", err))
 	}
 
-	return generator.Start()
+	// Set up signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	// Run the generator in a goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- generator.Start()
+	}()
+
+	// Wait for either an error or a signal
+	select {
+	case err := <-errChan:
+		return err
+	case sig := <-sigChan:
+		fmt.Printf("\nReceived signal %v, shutting down...\n", sig)
+		if err := generator.Stop(); err != nil {
+			fmt.Printf("Failed to stop generator: %v\n", err)
+		}
+		return nil
+	}
 }

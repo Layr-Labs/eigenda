@@ -3,10 +3,13 @@ package testutils
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/rand"
+	"os"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/exp/rand"
 )
 
 // InitializeRandom initializes the random number generator. If no arguments are provided, then the seed is randomly
@@ -86,7 +89,7 @@ func ExecuteWithTimeout(f func(), duration time.Duration, debugInfo ...any) {
 }
 
 // RandomBytes generates a random byte slice of a given length.
-// Deprecated: use TestRandom.RandomBytes instead
+// Deprecated: use TestRandom.Bytes instead
 func RandomBytes(length int) []byte {
 	bytes := make([]byte, length)
 	_, err := rand.Read(bytes)
@@ -97,13 +100,13 @@ func RandomBytes(length int) []byte {
 }
 
 // RandomTime generates a random time.
-// Deprecated: use TestRandom.RandomTime instead
+// Deprecated: use TestRandom.Time instead
 func RandomTime() time.Time {
 	return time.Unix(int64(rand.Int31()), 0)
 }
 
 // RandomString generates a random string out of printable ASCII characters.
-// Deprecated: use TestRandom.RandomString instead
+// Deprecated: use TestRandom.String instead
 func RandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
@@ -111,4 +114,8 @@ func RandomString(length int) string {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func GetLogger() logging.Logger {
+	return logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 }

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"log"
 	"os"
 	"time"
@@ -72,8 +75,23 @@ func NodeMain(ctx *cli.Context) error {
 
 	ratelimiter := ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 
+	rpcCallsCollector := rpccalls.NewCollector(node.AppName, reg)
+	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
+	if err != nil {
+		return fmt.Errorf("cannot create chain.Client: %w", err)
+	}
+
+	reader, err := coreeth.NewReader(
+		logger,
+		client,
+		config.BLSOperatorStateRetrieverAddr,
+		config.EigenDAServiceManagerAddr)
+	if err != nil {
+		return fmt.Errorf("cannot create eth.Reader: %w", err)
+	}
+
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, logger)
+	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
@@ -89,7 +107,7 @@ func NodeMain(ctx *cli.Context) error {
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
 	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
-	serverV2, err := nodegrpc.NewServerV2(config, node, logger, ratelimiter, reg)
+	serverV2, err := nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, reg, reader)
 	if err != nil {
 		return fmt.Errorf("failed to create server v2: %v", err)
 	}

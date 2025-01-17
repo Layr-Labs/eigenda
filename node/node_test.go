@@ -125,7 +125,7 @@ func TestNodeStartOperatorIDMatch(t *testing.T) {
 		ChurnBIPsOfTotalStake:    uint16(10),
 	}, nil)
 	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID(opID), nil)
 
@@ -148,7 +148,7 @@ func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
 		ChurnBIPsOfTotalStake:    uint16(10),
 	}, nil)
 	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID{1}, nil)
 

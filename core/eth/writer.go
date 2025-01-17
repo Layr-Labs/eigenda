@@ -6,7 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
+
+	"github.com/Layr-Labs/eigenda/api"
+	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
@@ -14,6 +18,7 @@ import (
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -58,7 +63,7 @@ func NewWriter(
 // will be returned.
 func (t *Writer) RegisterOperator(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -66,7 +71,7 @@ func (t *Writer) RegisterOperator(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -98,7 +103,7 @@ func (t *Writer) RegisterOperator(
 // with the provided signature from the churner
 func (t *Writer) RegisterOperatorWithChurn(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -107,7 +112,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 	churnReply *churner.ChurnReply,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -328,4 +333,40 @@ func (t *Writer) ConfirmBatch(ctx context.Context, batchHeader *core.BatchHeader
 		return nil, err
 	}
 	return receipt, nil
+}
+
+// SetDisperserAddress sets the address of the disperser. Since there is currently only one disperser, this function
+// can only be used to set the address of that disperser.
+func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Address) error {
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		log.Printf("disperser registry not deployed")
+		return errors.New("disperser registry not deployed")
+	}
+
+	log.Printf("Setting disperser %d address to %s", api.EigenLabsDisperserID, address.String())
+
+	options, err := t.ethClient.GetNoSendTransactOpts()
+	if err != nil {
+		t.logger.Error("Failed to generate transact opts", "err", err)
+		return err
+	}
+	options.Context = ctx
+
+	transaction, err := registry.SetDisperserInfo(
+		options,
+		api.EigenLabsDisperserID,
+		dreg.DisperserInfo{
+			DisperserAddress: address,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create transaction for setting disperser address: %w", err)
+	}
+
+	err = t.ethClient.SendTransaction(ctx, transaction)
+	if err != nil {
+		return fmt.Errorf("failed to set disperser address: %w", err)
+	}
+
+	return nil
 }

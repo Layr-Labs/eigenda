@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -25,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
@@ -223,7 +223,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		PaymentHeader: &pbcommon.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 0,
-			CumulativePayment: big.NewInt(100).Bytes(),
+			CumulativePayment: big.NewInt(0).Bytes(),
 		},
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(invalidReqProto)
@@ -423,7 +423,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// if err != nil {
 	// 	panic("failed to create logger")
@@ -517,7 +517,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 		10,
 		time.Hour,
 		logger,
-		prometheus.NewRegistry())
+		prometheus.NewRegistry(),
+		disperser.MetricsConfig{
+			HTTPPort:      "9094",
+			EnableMetrics: false,
+		},
+	)
 	assert.NoError(t, err)
 
 	err = s.RefreshOnchainState(context.Background())

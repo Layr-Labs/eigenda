@@ -3,84 +3,69 @@
 
 ## Table of Contents
 
-- [common/v2/common.proto](#common_v2_common-proto)
-    - [Batch](#common-v2-Batch)
-    - [BatchHeader](#common-v2-BatchHeader)
-    - [BlobCertificate](#common-v2-BlobCertificate)
-    - [BlobHeader](#common-v2-BlobHeader)
+- [common/common.proto](#common_common-proto)
+    - [BlobCommitment](#common-BlobCommitment)
+    - [G1Commitment](#common-G1Commitment)
+    - [PaymentHeader](#common-PaymentHeader)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="common_v2_common-proto"></a>
+<a name="common_common-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## common/v2/common.proto
+## common/common.proto
 
 
 
-<a name="common-v2-Batch"></a>
+<a name="common-BlobCommitment"></a>
 
-### Batch
-Batch is a batch of blob certificates
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| header | [BatchHeader](#common-v2-BatchHeader) |  | header contains metadata about the batch |
-| blob_certificates | [BlobCertificate](#common-v2-BlobCertificate) | repeated | blob_certificates is the list of blob certificates in the batch |
-
-
-
-
-
-
-<a name="common-v2-BatchHeader"></a>
-
-### BatchHeader
-BatchHeader is the header of a batch of blobs
+### BlobCommitment
+BlobCommitment represents commitment of a specific blob, containing its
+KZG commitment, degree proof, the actual degree, and data length in number of symbols.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| batch_root | [bytes](#bytes) |  | batch_root is the root of the merkle tree of the hashes of blob certificates in the batch |
-| reference_block_number | [uint64](#uint64) |  | reference_block_number is the block number that the state of the batch is based on for attestation |
+| commitment | [bytes](#bytes) |  |  |
+| length_commitment | [bytes](#bytes) |  |  |
+| length_proof | [bytes](#bytes) |  |  |
+| length | [uint32](#uint32) |  |  |
 
 
 
 
 
 
-<a name="common-v2-BlobCertificate"></a>
+<a name="common-G1Commitment"></a>
 
-### BlobCertificate
-BlobCertificate is what gets attested by the network
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  |  |
-| relays | [uint32](#uint32) | repeated |  |
-
-
-
-
-
-
-<a name="common-v2-BlobHeader"></a>
-
-### BlobHeader
+### G1Commitment
 
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| version | [uint32](#uint32) |  | Blob version |
-| quorum_numbers | [uint32](#uint32) | repeated |  |
-| commitment | [common.BlobCommitment](#common-BlobCommitment) |  |  |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  |  |
-| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+
+
+
+
+
+
+<a name="common-PaymentHeader"></a>
+
+### PaymentHeader
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
+| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
 
 
 

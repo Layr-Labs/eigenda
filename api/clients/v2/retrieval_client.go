@@ -136,6 +136,10 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 		indices = append(indices, assignmentIndices...)
 	}
 
+	if len(chunks) == 0 {
+		return nil, errors.New("failed to retrieve any chunks")
+	}
+
 	return r.verifier.Decode(
 		chunks,
 		indices,

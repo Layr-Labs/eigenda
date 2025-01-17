@@ -14,15 +14,10 @@ type CountMetric interface {
 type countMetric struct {
 	metrics     *metrics
 	description string
-	// disabled specifies whether the metrics should behave as a no-op
-	disabled bool
 }
 
 // Increment increments the count of a type of event.
 func (metric *countMetric) Increment() {
-	if metric.disabled {
-		return
-	}
 	metric.metrics.count.WithLabelValues(metric.description).Inc()
 }
 

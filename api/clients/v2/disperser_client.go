@@ -103,6 +103,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
+
 	return nil
 }
 

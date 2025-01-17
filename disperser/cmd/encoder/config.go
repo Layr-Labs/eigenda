@@ -56,6 +56,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			GrpcPort:                 ctx.GlobalString(flags.GrpcPortFlag.Name),
 			MaxConcurrentRequests:    ctx.GlobalInt(flags.MaxConcurrentRequestsFlag.Name),
 			RequestPoolSize:          ctx.GlobalInt(flags.RequestPoolSizeFlag.Name),
+			RequestQueueSize:         ctx.GlobalInt(flags.RequestQueueSizeFlag.Name),
 			EnableGnarkChunkEncoding: ctx.Bool(flags.EnableGnarkChunkEncodingFlag.Name),
 			PreventReencoding:        ctx.Bool(flags.PreventReencodingFlag.Name),
 			Backend:                  ctx.String(flags.BackendFlag.Name),

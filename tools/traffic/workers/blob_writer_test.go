@@ -2,19 +2,20 @@ package workers
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
+	"sync"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/Layr-Labs/eigenda/disperser"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/rand"
-	"sync"
-	"testing"
 )
 
 func TestBlobWriter(t *testing.T) {
@@ -26,47 +27,30 @@ func TestBlobWriter(t *testing.T) {
 	assert.Nil(t, err)
 
 	dataSize := rand.Uint64()%1024 + 64
-	encodedDataSize := len(codec.ConvertByPaddingEmptyByte(make([]byte, dataSize)))
-
-	authenticated := rand.Intn(2) == 0
-	var signerPrivateKey string
-	if authenticated {
-		signerPrivateKey = "asdf"
-	}
-	var functionName string
-	if authenticated {
-		functionName = "DisperseBlobAuthenticated"
-	} else {
-		functionName = "DisperseBlob"
-	}
 
 	randomizeBlobs := rand.Intn(2) == 0
-
 	useCustomQuorum := rand.Intn(2) == 0
 	var customQuorum []uint8
 	if useCustomQuorum {
 		customQuorum = []uint8{1, 2, 3}
 	}
 
-	config := &config.WorkerConfig{
-		DataSize:         dataSize,
-		SignerPrivateKey: signerPrivateKey,
-		RandomizeBlobs:   randomizeBlobs,
-		CustomQuorums:    customQuorum,
+	config := &config.BlobWriterConfig{
+		DataSize:       dataSize,
+		RandomizeBlobs: randomizeBlobs,
+		CustomQuorums:  customQuorum,
 	}
 
 	disperserClient := &MockDisperserClient{}
-	unconfirmedKeyChannel := make(chan *UnconfirmedKey, 100)
-
 	generatorMetrics := metrics.NewMockMetrics()
 
 	writer := NewBlobWriter(
+		"test-writer",
 		&ctx,
+		config,
 		&waitGroup,
 		logger,
-		config,
 		disperserClient,
-		unconfirmedKeyChannel,
 		generatorMetrics)
 
 	errorCount := 0
@@ -83,36 +67,37 @@ func TestBlobWriter(t *testing.T) {
 		}
 
 		// This is the Key that will be assigned to the next blob.
-		keyToReturn := make([]byte, 32)
-		_, err = rand.Read(keyToReturn)
+		var keyToReturn corev2.BlobKey
+		_, err = rand.Read(keyToReturn[:])
 		assert.Nil(t, err)
 
-		status := disperser.Processing
+		status := dispv2.Queued
 		disperserClient.mock = mock.Mock{} // reset mock state
-		disperserClient.mock.On(functionName, mock.Anything, customQuorum).Return(&status, keyToReturn, errorToReturn)
+		disperserClient.mock.On("DisperseBlob",
+			mock.Anything,
+			mock.AnythingOfType("[]uint8"),
+			mock.AnythingOfType("uint16"),
+			mock.AnythingOfType("[]uint8"),
+			mock.AnythingOfType("uint32"),
+		).Return(&status, keyToReturn, errorToReturn)
 
 		// Simulate the advancement of time (i.e. allow the writer to write the next blob).
-		writer.writeNextBlob()
+		err = writer.writeNextBlob()
+		if errorToReturn != nil {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
 
-		disperserClient.mock.AssertNumberOfCalls(t, functionName, 1)
+		disperserClient.mock.AssertNumberOfCalls(t, "DisperseBlob", 1)
 
 		if errorToReturn == nil {
-			dataSentToDisperser := disperserClient.mock.Calls[0].Arguments.Get(0).([]byte)
+			dataSentToDisperser := disperserClient.mock.Calls[0].Arguments.Get(1).([]byte)
 			assert.NotNil(t, dataSentToDisperser)
 
 			// Strip away the extra encoding bytes. We should have data of the expected Size.
 			decodedData := codec.RemoveEmptyByteFromPaddedBytes(dataSentToDisperser)
 			assert.Equal(t, dataSize, uint64(len(decodedData)))
-
-			// Verify that the proper data was sent to the unconfirmed Key handler.
-			checksum := md5.Sum(dataSentToDisperser)
-
-			unconfirmedKey, ok := <-unconfirmedKeyChannel
-
-			assert.True(t, ok)
-			assert.Equal(t, keyToReturn, unconfirmedKey.Key)
-			assert.Equal(t, uint(encodedDataSize), unconfirmedKey.Size)
-			assert.Equal(t, checksum, unconfirmedKey.Checksum)
 
 			// Verify that data has the proper amount of randomness.
 			if previousData != nil {

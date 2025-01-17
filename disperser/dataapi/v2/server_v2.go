@@ -1,18 +1,25 @@
-package dataapi
+package v2
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	disperserv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/docs"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
@@ -22,13 +29,34 @@ import (
 	ginswagger "github.com/swaggo/gin-swagger"
 )
 
+var errNotFound = errors.New("not found")
+
+const (
+	// The max number of blobs to return from blob Feed API, regardless of the time
+	// range or "limit" param.
+	maxBlobFeedNumBlobs = 1000
+
+	cacheControlParam       = "Cache-Control"
+	maxFeedBlobAge          = 300 // this is completely static
+	maxOperatorsStakeAge    = 300 // not expect the stake change to happen frequently
+	maxOperatorResponseAge  = 300 // this is completely static
+	maxOperatorPortCheckAge = 60
+	maxMetricAge            = 10
+	maxThroughputAge        = 10
+)
+
 type (
+	ErrorResponse struct {
+		Error string `json:"error"`
+	}
+
 	SignedBatch struct {
 		BatchHeader *corev2.BatchHeader `json:"batch_header"`
 		Attestation *corev2.Attestation `json:"attestation"`
 	}
 
 	BlobResponse struct {
+		BlobKey       string             `json:"blob_key"`
 		BlobHeader    *corev2.BlobHeader `json:"blob_header"`
 		Status        string             `json:"status"`
 		DispersedAt   uint64             `json:"dispersed_at"`
@@ -43,6 +71,11 @@ type (
 		VerificationInfo *corev2.BlobVerificationInfo `json:"blob_verification_info"`
 	}
 
+	BlobFeedResponse struct {
+		Blobs           []*disperserv2.BlobMetadata `json:"blobs"`
+		PaginationToken string                      `json:"pagination_token"`
+	}
+
 	BatchResponse struct {
 		BatchHeaderHash       string                         `json:"batch_header_hash"`
 		SignedBatch           *SignedBatch                   `json:"signed_batch"`
@@ -52,12 +85,48 @@ type (
 	MetricSummary struct {
 		AvgThroughput float64 `json:"avg_throughput"`
 	}
-)
 
-type ServerInterface interface {
-	Start() error
-	Shutdown() error
-}
+	OperatorStake struct {
+		QuorumId        string  `json:"quorum_id"`
+		OperatorId      string  `json:"operator_id"`
+		StakePercentage float64 `json:"stake_percentage"`
+		Rank            int     `json:"rank"`
+	}
+
+	OperatorsStakeResponse struct {
+		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
+	}
+
+	// Operators' responses for a batch
+	OperatorDispersalResponses struct {
+		Responses []*corev2.DispersalResponse `json:"operator_dispersal_responses"`
+	}
+
+	OperatorPortCheckResponse struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+	}
+
+	SemverReportResponse struct {
+		Semver map[string]*semver.SemverMetrics `json:"semver"`
+	}
+
+	Metric struct {
+		Throughput float64 `json:"throughput"`
+		CostInGas  float64 `json:"cost_in_gas"`
+		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
+		TotalStake          *big.Int                   `json:"total_stake"`
+		TotalStakePerQuorum map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
+	}
+
+	Throughput struct {
+		Throughput float64 `json:"throughput"`
+		Timestamp  uint64  `json:"timestamp"`
+	}
+)
 
 type ServerV2 struct {
 	serverMode   string
@@ -66,27 +135,27 @@ type ServerV2 struct {
 	logger       logging.Logger
 
 	blobMetadataStore *blobstore.BlobMetadataStore
-	subgraphClient    SubgraphClient
+	subgraphClient    dataapi.SubgraphClient
 	chainReader       core.Reader
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
-	promClient        PrometheusClient
-	metrics           *Metrics
+	promClient        dataapi.PrometheusClient
+	metrics           *dataapi.Metrics
 
-	operatorHandler *operatorHandler
-	metricsHandler  *metricsHandler
+	operatorHandler *dataapi.OperatorHandler
+	metricsHandler  *dataapi.MetricsHandler
 }
 
 func NewServerV2(
-	config Config,
+	config dataapi.Config,
 	blobMetadataStore *blobstore.BlobMetadataStore,
-	promClient PrometheusClient,
-	subgraphClient SubgraphClient,
+	promClient dataapi.PrometheusClient,
+	subgraphClient dataapi.SubgraphClient,
 	chainReader core.Reader,
 	chainState core.ChainState,
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
-	metrics *Metrics,
+	metrics *dataapi.Metrics,
 ) *ServerV2 {
 	l := logger.With("component", "DataAPIServerV2")
 	return &ServerV2{
@@ -101,8 +170,8 @@ func NewServerV2(
 		chainState:        chainState,
 		indexedChainState: indexedChainState,
 		metrics:           metrics,
-		operatorHandler:   newOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
-		metricsHandler:    newMetricsHandler(promClient),
+		operatorHandler:   dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
+		metricsHandler:    dataapi.NewMetricsHandler(promClient),
 	}
 }
 
@@ -114,8 +183,9 @@ func (s *ServerV2) Start() error {
 
 	router := gin.New()
 	basePath := "/api/v2"
-	docs.SwaggerInfo.BasePath = basePath
-	docs.SwaggerInfo.Host = os.Getenv("SWAGGER_HOST")
+	docsv2.SwaggerInfoV2.BasePath = basePath
+	docsv2.SwaggerInfoV2.Host = os.Getenv("SWAGGER_HOST")
+
 	v2 := router.Group(basePath)
 	{
 		blob := v2.Group("/blob")
@@ -136,6 +206,7 @@ func (s *ServerV2) Start() error {
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
 			operators.GET("/reachability", s.CheckOperatorsReachability)
+			operators.GET("/response/:batch_header_hash", s.FetchOperatorsResponses)
 		}
 		metrics := v2.Group("/metrics")
 		{
@@ -144,7 +215,8 @@ func (s *ServerV2) Start() error {
 		}
 		swagger := v2.Group("/swagger")
 		{
-			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
+			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V2"), ginswagger.URL("/api/v2/swagger/doc.json")))
+
 		}
 	}
 
@@ -179,12 +251,158 @@ func (s *ServerV2) Start() error {
 	return <-errChan
 }
 
+func errorResponse(c *gin.Context, err error) {
+	_ = c.Error(err)
+	var code int
+	switch {
+	case errors.Is(err, errNotFound):
+		code = http.StatusNotFound
+	default:
+		code = http.StatusInternalServerError
+	}
+	c.JSON(code, ErrorResponse{
+		Error: err.Error(),
+	})
+}
+
+func invalidParamsErrorResponse(c *gin.Context, err error) {
+	_ = c.Error(err)
+	c.JSON(http.StatusBadRequest, ErrorResponse{
+		Error: err.Error(),
+	})
+}
+
+func run(logger logging.Logger, httpServer *http.Server) <-chan error {
+	errChan := make(chan error, 1)
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+	)
+
+	go func() {
+		<-ctx.Done()
+
+		logger.Info("shutdown signal received")
+
+		defer func() {
+			stop()
+			close(errChan)
+		}()
+
+		if err := httpServer.Shutdown(context.Background()); err != nil {
+			errChan <- err
+		}
+		logger.Info("shutdown completed")
+	}()
+
+	go func() {
+		logger.Info("server v2 running", "addr", httpServer.Addr)
+		if err := httpServer.ListenAndServe(); err != nil {
+			errChan <- err
+		}
+	}()
+
+	return errChan
+}
+
 func (s *ServerV2) Shutdown() error {
 	return nil
 }
 
+// FetchBlobFeedHandler godoc
+//
+//	@Summary	Fetch blob feed
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
+//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
+//	@Success	200					{object}	BlobFeedResponse
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
 func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBlobFeedHandler unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBlobFeedHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	var err error
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+	}
+
+	interval := 3600
+	if c.Query("interval") != "" {
+		interval, err = strconv.Atoi(c.Query("interval"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			return
+		}
+	}
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		return
+	}
+	if limit <= 0 || limit > maxBlobFeedNumBlobs {
+		limit = maxBlobFeedNumBlobs
+	}
+
+	paginationCursor := blobstore.BlobFeedCursor{
+		RequestedAt: 0,
+	}
+	if c.Query("pagination_token") != "" {
+		cursor, err := paginationCursor.FromCursorKey(c.Query("pagination_token"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the pagination token: %w", err))
+			return
+		}
+		paginationCursor = *cursor
+	}
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+	startCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(startTime.UnixNano()),
+	}
+	if startCursor.LessThan(&paginationCursor) {
+		startCursor = paginationCursor
+	}
+	endCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(endTime.UnixNano()),
+	}
+
+	blobs, paginationToken, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(c.Request.Context(), startCursor, endCursor, limit)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobFeedHandler")
+		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
+	}
+
+	token := ""
+	if paginationToken != nil {
+		token = paginationToken.ToCursorKey()
+	}
+	response := &BlobFeedResponse{
+		Blobs:           blobs,
+		PaginationToken: token,
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeedHandler")
+	c.JSON(http.StatusOK, response)
 }
 
 // FetchBlobHandler godoc
@@ -212,7 +430,14 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
+	bk, err := metadata.BlobHeader.BlobKey()
+	if err != nil || bk != blobKey {
+		s.metrics.IncrementFailedRequestNum("FetchBlob")
+		errorResponse(c, err)
+		return
+	}
 	response := &BlobResponse{
+		BlobKey:       bk.Hex(),
 		BlobHeader:    metadata.BlobHeader,
 		Status:        metadata.BlobStatus.String(),
 		DispersedAt:   metadata.RequestedAt,
@@ -226,7 +451,7 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 
 // FetchBlobCertificateHandler godoc
 //
-//	@Summary	Fetch blob certificate by blob key
+//	@Summary	Fetch blob certificate by blob key v2
 //	@Tags		Blob
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
@@ -280,7 +505,7 @@ func (s *ServerV2) FetchBlobVerificationInfoHandler(c *gin.Context) {
 		return
 	}
 	batchHeaderHashHex := c.Query("batch_header_hash")
-	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
 		errorResponse(c, err)
@@ -319,7 +544,7 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 	start := time.Now()
 	batchHeaderHashHex := c.Param("batch_header_hash")
-	batchHeaderHash, err := ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBatch")
 		errorResponse(c, errors.New("invalid batch header hash"))
@@ -348,7 +573,7 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 // FetchOperatorsStake godoc
 //
 //	@Summary	Operator stake distribution query
-//	@Tags		OperatorsStake
+//	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorsStakeResponse
@@ -365,7 +590,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
 
-	operatorsStakeResponse, err := s.operatorHandler.getOperatorsStake(c.Request.Context(), operatorId)
+	operatorsStakeResponse, err := s.operatorHandler.GetOperatorsStake(c.Request.Context(), operatorId)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
 		errorResponse(c, fmt.Errorf("failed to get operator stake - %s", err))
@@ -380,7 +605,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 // FetchOperatorsNodeInfo godoc
 //
 //	@Summary	Active operator semver
-//	@Tags		OperatorsNodeInfo
+//	@Tags		Operators
 //	@Produce	json
 //	@Success	200	{object}	SemverReportResponse
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
@@ -391,7 +616,7 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	}))
 	defer timer.ObserveDuration()
 
-	report, err := s.operatorHandler.scanOperatorsHostInfo(c.Request.Context())
+	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
 		s.logger.Error("failed to scan operators host info", "error", err)
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNodeInfo")
@@ -401,10 +626,70 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
+// FetchOperatorsResponses godoc
+//
+//	@Summary	Fetch operator attestation response for a batch
+//	@Tags		Operators
+//	@Produce	json
+//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
+//	@Param		operator_id			query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
+//	@Success	200					{object}	OperatorDispersalResponses
+//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404					{object}	ErrorResponse	"error: Not found"
+//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/{batch_header_hash} [get]
+func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchOperatorsResponses", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	batchHeaderHashHex := c.Param("batch_header_hash")
+	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
+		errorResponse(c, errors.New("invalid batch header hash"))
+		return
+	}
+	operatorIdStr := c.DefaultQuery("operator_id", "")
+
+	operatorResponses := make([]*corev2.DispersalResponse, 0)
+	if operatorIdStr == "" {
+		res, err := s.blobMetadataStore.GetDispersalResponses(c.Request.Context(), batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
+			errorResponse(c, err)
+			return
+		}
+		operatorResponses = append(operatorResponses, res...)
+	} else {
+		operatorId, err := core.OperatorIDFromHex(operatorIdStr)
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchOperatorsResponses")
+			errorResponse(c, errors.New("invalid operatorId"))
+			return
+		}
+
+		res, err := s.blobMetadataStore.GetDispersalResponse(c.Request.Context(), batchHeaderHash, operatorId)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsResponses")
+			errorResponse(c, err)
+			return
+		}
+		operatorResponses = append(operatorResponses, res)
+	}
+	response := &OperatorDispersalResponses{
+		Responses: operatorResponses,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsResponses")
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
+	c.JSON(http.StatusOK, response)
+}
+
 // CheckOperatorsReachability godoc
 //
 //	@Summary	Operator node reachability check
-//	@Tags		OperatorsReachability
+//	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
 //	@Success	200			{object}	OperatorPortCheckResponse
@@ -420,7 +705,7 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.probeOperatorHosts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.ProbeOperatorHosts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -470,7 +755,7 @@ func (s *ServerV2) FetchMetricsSummaryHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	avgThroughput, err := s.metricsHandler.getAvgThroughput(c.Request.Context(), start, end)
+	avgThroughput, err := s.metricsHandler.GetAvgThroughput(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsSummary")
 		errorResponse(c, err)
@@ -482,7 +767,7 @@ func (s *ServerV2) FetchMetricsSummaryHandler(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsSummary")
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAage))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAge))
 	c.JSON(http.StatusOK, metricSummary)
 }
 
@@ -515,7 +800,7 @@ func (s *ServerV2) FetchMetricsThroughputTimeseriesHandler(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	ths, err := s.metricsHandler.getThroughputTimeseries(c.Request.Context(), start, end)
+	ths, err := s.metricsHandler.GetThroughputTimeseries(c.Request.Context(), start, end)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsThroughputTimeseriesHandler")
 		errorResponse(c, err)

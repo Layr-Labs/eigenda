@@ -48,8 +48,12 @@ func (m *MockMetrics) GetLatency(description string) time.Duration {
 	return m.latencies[description]
 }
 
-func (m *MockMetrics) Start() {
-	// intentional no-op
+func (m *MockMetrics) Start() error {
+	return nil
+}
+
+func (m *MockMetrics) Shutdown() error {
+	return nil
 }
 
 func (m *MockMetrics) NewLatencyMetric(description string) LatencyMetric {

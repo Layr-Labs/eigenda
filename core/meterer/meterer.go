@@ -54,7 +54,7 @@ func NewMeterer(
 // Start starts to periodically refreshing the on-chain state
 func (m *Meterer) Start(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(m.UpdateInterval)
+		ticker := time.NewTicker(m.Config.UpdateInterval)
 		defer ticker.Stop()
 
 		for {
@@ -63,6 +63,7 @@ func (m *Meterer) Start(ctx context.Context) {
 				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
+				m.logger.Debug("Refreshed on-chain state")
 			case <-ctx.Done():
 				return
 			}
@@ -74,6 +75,7 @@ func (m *Meterer) Start(ctx context.Context) {
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) error {
 	accountID := gethcommon.HexToAddress(header.AccountID)
+	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
 		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
@@ -98,6 +100,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
 func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, numSymbols uint, quorumNumbers []uint8) error {
+	m.logger.Info("Recording and validating reservation usage", "header", header, "reservation", reservation)
 	if !reservation.IsActive(uint64(time.Now().Unix())) {
 		return fmt.Errorf("reservation not active")
 	}
@@ -186,6 +189,7 @@ func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, numSymbols uint, headerQuorums []uint8) error {
+	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
