@@ -194,6 +194,10 @@
                   <a href="#common.v2.BlobHeader"><span class="badge">M</span>BlobHeader</a>
                 </li>
               
+                <li>
+                  <a href="#common.v2.PaymentHeader"><span class="badge">M</span>PaymentHeader</a>
+                </li>
+              
               
               
               
@@ -350,7 +354,7 @@ The following quorums are currently required:
               
                 <tr>
                   <td>payment_header</td>
-                  <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
+                  <td><a href="#common.v2.PaymentHeader">PaymentHeader</a></td>
                   <td></td>
                   <td><p>payment_header contains payment information for the blob </p></td>
                 </tr>
@@ -360,6 +364,52 @@ The following quorums are currently required:
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
+                </tr>
+              
+                <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>salt is used to ensure that the dispersal request is intentionally unique. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentHeader">PaymentHeader</h3>
+        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period </p><p>is always considered before cumulative_payment. If reservation_period is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The account ID of the disperser client. This account ID is an eth wallet address of the user,
+corresponding to the key used by the client to sign the BlobHeader. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_period</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The reservation period of the dispersal request. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The cumulative payment of the dispersal request. This field will be parsed as a big integer. </p></td>
                 </tr>
               
             </tbody>
