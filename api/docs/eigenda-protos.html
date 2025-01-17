@@ -1133,7 +1133,10 @@ https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelay
                   <td>version</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>Blob version </p></td>
+                  <td><p>The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
+maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
+are checked against supplied or default security thresholds to validate the security assumptions of the
+blob&#39;s availability. </p></td>
                 </tr>
               
                 <tr>

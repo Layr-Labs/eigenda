@@ -27,7 +27,10 @@ type BlobHeader struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Blob version
+	// The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
+	// maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
+	// are checked against supplied or default security thresholds to validate the security assumptions of the
+	// blob's availability.
 	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// quorum_numbers is the list of quorum numbers that the blob is part of.
 	// All quorums must be specified (including required quorums).

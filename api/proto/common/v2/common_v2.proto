@@ -5,7 +5,10 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common/v2";
 
 // BlobHeader contains the information describing a blob and the way it is to be dispersed.
 message BlobHeader {
-  // Blob version
+  // The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
+  // maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
+  // are checked against supplied or default security thresholds to validate the security assumptions of the
+  // blob's availability.
   uint32 version = 1;
   // quorum_numbers is the list of quorum numbers that the blob is part of.
   // All quorums must be specified (including required quorums).

@@ -79,7 +79,7 @@ BlobHeader contains the information describing a blob and the way it is to be di
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| version | [uint32](#uint32) |  | Blob version |
+| version | [uint32](#uint32) |  | The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values are checked against supplied or default security thresholds to validate the security assumptions of the blob&#39;s availability. |
 | quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of. All quorums must be specified (including required quorums).
 
 The following quorums are currently required: - 0: ETH - 1: EIGEN |
