@@ -72,6 +72,9 @@ type BlobHeader struct {
 
 	// Signature is the signature of the blob header by the account ID
 	Signature []byte
+
+	// Salt is used to make blob intentionally unique when everything else is the same
+	Salt uint32
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -124,6 +127,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
 		Signature:       proto.GetSignature(),
+		Salt:            proto.GetSalt(),
 	}, nil
 }
 
@@ -144,6 +148,7 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
 		Signature:     b.Signature,
+		Salt:          b.Salt,
 	}, nil
 }
 
