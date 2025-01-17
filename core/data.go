@@ -492,11 +492,8 @@ type PaymentMetadata struct {
 
 	// ReservationPeriod represents the range of time at which the dispersal is made
 	ReservationPeriod uint32 `json:"reservation_period"`
-	// TODO: we are thinking the contract can use uint128 for cumulative payment,
-	// but the definition on v2 uses uint64. Double check with team.
+	// CumulativePayment represents the total amount of payment made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
-	// Allow same blob to be dispersed multiple times within the same reservation period
-	Salt uint32 `json:"salt"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -516,10 +513,6 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		{
 			Name: "cumulativePayment",
 			Type: "uint256",
-		},
-		{
-			Name: "salt",
-			Type: "uint32",
 		},
 	})
 	if err != nil {
@@ -557,7 +550,6 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
-			"Salt": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Salt)},
 		},
 	}, nil
 }
@@ -574,11 +566,6 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	}
 	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
-	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to parse Salt: %w", err)
-	}
-	pm.Salt = uint32(salt)
 	return nil
 }
 
