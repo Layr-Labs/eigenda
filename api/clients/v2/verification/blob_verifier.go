@@ -14,7 +14,7 @@ import (
 
 // IBlobVerifier is the interface representing a BlobVerifier
 //
-// This interface in order to allow verification mocking in unit tests.
+// This interface exists in order to allow verification mocking in unit tests.
 type IBlobVerifier interface {
 	VerifyBlobV2(
 		ctx context.Context,

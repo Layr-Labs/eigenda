@@ -178,6 +178,7 @@ func convertBlobCommitment(inputCommitment *common.BlobCommitment) (*BlobCommitm
 	}, nil
 }
 
+// BlobCommitmentBindingToProto converts a BlobCommitment binding into a common.BlobCommitment protobuf
 func BlobCommitmentBindingToProto(inputCommitment *BlobCommitment) *common.BlobCommitment {
 	return &common.BlobCommitment{
 		Commitment:       bn254G1PointToBytes(&inputCommitment.Commitment),
@@ -252,7 +253,6 @@ func bn254G2PointToBytes(inputPoint *BN254G2Point) []byte {
 	g2Point.Y.A1 = *(ya1.SetBigInt(inputPoint.Y[0]))
 
 	pointBytes := g2Point.Bytes()
-
 	return pointBytes[:]
 }
 

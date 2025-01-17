@@ -402,6 +402,47 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
+// TestBlobFailsVerifyBlobV2 tests what happens if a relay returns a blob which causes verifyBlobV2 to fail.
+// It verifies that the client tries again with a different relay after such a failure.
+func TestBlobFailsVerifyBlobV2(t *testing.T) {
+	tester := buildClientTester(t)
+	relayCount := 10
+	relayKeys := make([]core.RelayKey, relayCount)
+	for i := 0; i < relayCount; i++ {
+		relayKeys[i] = tester.Random.Uint32()
+	}
+	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+
+	tooLongBytes := make([]byte, len(blobBytes)+100)
+	copy(tooLongBytes[:], blobBytes)
+
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(errors.New("verification failed")).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil).Once()
+
+	// this will fail the first time, since verifyBlobV2 will fail
+	payload, err := tester.Client.GetPayload(
+		context.Background(),
+		blobKey,
+		blobCert)
+
+	require.NotNil(t, payload)
+	require.NoError(t, err)
+
+	tester.MockRelayClient.AssertExpectations(t)
+}
+
 // TestGetBlobReturnsBlobWithInvalidLen check what happens if the blob length doesn't match the length that exists in
 // the BlobCommitment
 func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
