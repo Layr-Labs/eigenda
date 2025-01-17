@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	_ "embed"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -279,6 +282,18 @@ func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	return response
 }
 
+func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	bk, err := blobHeader.BlobKey()
+	assert.Nil(t, err)
+	assert.Equal(t, blobKey, bk)
+}
+
+func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
+	require.NoError(t, err)
+	assert.True(t, cursor.Equal(requestedAt, &blobKey))
+}
+
 func TestFetchBlobHandlerV2(t *testing.T) {
 	r := setUpRouter()
 
@@ -337,6 +352,203 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
 	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
+}
+
+func TestFetchBlobFeedHandler(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	// Create a timeline of test blobs:
+	// - Total of 103 blobs
+	// - First 3 blobs share the same timestamp (firstBlobTime)
+	// - The last blob has timestamp "now"
+	// - Remaining blobs are spaced 1 minute apart
+	// - Timeline spans roughly 100 minutes into the past from now
+	numBlobs := 103
+	now := uint64(time.Now().UnixNano())
+	nanoSecsPerBlob := uint64(60 * 1e9) // 1 blob per minute
+	firstBlobTime := now - uint64(numBlobs-3)*nanoSecsPerBlob
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAt := make([]uint64, numBlobs)
+
+	// Actually create blobs
+	firstBlobKeys := make([][32]byte, 3)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		keys[i] = blobKey
+		if i < 3 {
+			requestedAt[i] = firstBlobTime
+			firstBlobKeys[i] = keys[i]
+		} else {
+			requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i-2)
+		}
+
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+	}
+	sort.Slice(firstBlobKeys, func(i, j int) bool {
+		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
+	})
+
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
+
+	t.Run("invalid params", func(t *testing.T) {
+		reqUrls := []string{
+			"/v2/blobs/feed?pagination_token=abc",
+			"/v2/blobs/feed?limit=abc",
+			"/v2/blobs/feed?interval=abc",
+			"/v2/blobs/feed?end=2006-01-02T15:04:05",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs (60 blobs total available, keys[43], ..., keys[102])
+		// - Limited to 20 results (the default "limit")
+		// - Starting from blob[43] through blob[62]
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+	})
+
+	t.Run("various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// Returns keys[43] through keys[102] (60 blobs)
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// Test 2: 2-hour window captures all test blobs
+		// Verifies correct ordering of timestamp-colliding blobs
+		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, numBlobs, len(response.Blobs))
+		// First 3 blobs ordered by key due to same timestamp
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobHeader)
+		for i := 3; i < numBlobs; i++ {
+			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// Test 3: Custom end time with 1-hour window
+		// Retrieves keys[41] through keys[100]
+		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		// Test pagination behavior:
+		// 1. First page: blobs in past 1h limited to 20, returns keys[43] through keys[62]
+		// 2. Second page: the next 20 blobs, returns keys[63] through keys[82]
+		// Verifies:
+		// - Correct sequencing across pages
+		// - Proper token handling
+		tm := time.Unix(0, time.Now().UnixNano()).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+
+		// Request next page using pagination token
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[63+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
+	})
+
+	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
+		// Test pagination behavior in case of same-timestamp blobs
+		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
+		// - These are followed by sequential blobs: keys[3,4] with different timestamps
+		// - End time is set to requestedAt[5]
+		tm := time.Unix(0, int64(requestedAt[5])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+
+		// First page: fetch 2 blobs, which have same requestedAt timestamp
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=2", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 2, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, firstBlobTime, response.Blobs[1].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
+
+		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=0&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		// Verify second page contains:
+		// 1. Last same-timestamp blob
+		// 2. Following blobs with sequential timestamps
+		require.Equal(t, 3, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[3], response.Blobs[1].RequestedAt)
+		assert.Equal(t, requestedAt[4], response.Blobs[2].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
+	})
 }
 
 func TestFetchBlobVerificationInfoHandler(t *testing.T) {
