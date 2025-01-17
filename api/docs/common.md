@@ -62,7 +62,7 @@ PaymentHeader contains payment information for a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
 | reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
 | cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
 | salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |

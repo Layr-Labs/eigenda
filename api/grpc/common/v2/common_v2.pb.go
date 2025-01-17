@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// BlobHeader contains the information needed to disperse a blob to the EigenDA network.
+// BlobHeader contains the information describing a blob and the way it is to be dispersed.
 type BlobHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -111,14 +111,16 @@ func (x *BlobHeader) GetSignature() []byte {
 	return nil
 }
 
-// BlobCertificate is what gets attested by the network.
-// It gets constructed by the Disperser to which the DisperseBlob request was submitted.
+// BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
+// is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).
+// Validator nodes eventually sign the blob certificate once they are in custody of the required chunks
+// (note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).
 type BlobCertificate struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// blob_header contains metadata about the blob.
+	// blob_header contains data about the blob.
 	BlobHeader *BlobHeader `protobuf:"bytes,1,opt,name=blob_header,json=blobHeader,proto3" json:"blob_header,omitempty"`
 	// relays is the list of relays that are in custody of the blob.
 	// The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.

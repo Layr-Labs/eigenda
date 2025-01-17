@@ -976,7 +976,7 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+                  <td><p>The account ID of the disperser client. This account ID is an eth wallet address of the user,
 corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               
@@ -1085,7 +1085,7 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
         
       
         <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
-        <p>BlobCertificate is what gets attested by the network.</p><p>It gets constructed by the Disperser to which the DisperseBlob request was submitted.</p>
+        <p>BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate</p><p>is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).</p><p>Validator nodes eventually sign the blob certificate once they are in custody of the required chunks</p><p>(note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).</p>
 
         
           <table class="field-table">
@@ -1098,7 +1098,7 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p>blob_header contains metadata about the blob. </p></td>
+                  <td><p>blob_header contains data about the blob. </p></td>
                 </tr>
               
                 <tr>
@@ -1120,7 +1120,7 @@ https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelay
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p>BlobHeader contains the information needed to disperse a blob to the EigenDA network.</p>
+        <p>BlobHeader contains the information describing a blob and the way it is to be dispersed.</p>
 
         
           <table class="field-table">

@@ -165,7 +165,7 @@ type PaymentHeader struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+	// The account ID of the disperser client. This account ID is an eth wallet address of the user,
 	// corresponding to the key used by the client to sign the BlobHeader.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// The reservation period of the dispersal request.

@@ -55,13 +55,15 @@ BatchHeader is the header of a batch of blobs
 <a name="common-v2-BlobCertificate"></a>
 
 ### BlobCertificate
-BlobCertificate is what gets attested by the network.
-It gets constructed by the Disperser to which the DisperseBlob request was submitted.
+BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
+is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).
+Validator nodes eventually sign the blob certificate once they are in custody of the required chunks
+(note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains metadata about the blob. |
+| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains data about the blob. |
 | relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
@@ -72,7 +74,7 @@ It gets constructed by the Disperser to which the DisperseBlob request was submi
 <a name="common-v2-BlobHeader"></a>
 
 ### BlobHeader
-BlobHeader contains the information needed to disperse a blob to the EigenDA network.
+BlobHeader contains the information describing a blob and the way it is to be dispersed.
 
 
 | Field | Type | Label | Description |
