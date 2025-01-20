@@ -177,7 +177,8 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
                 lengthProof: BN254.G2Point(lengthProofX, lengthProofY),
                 dataLength: uint32(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.dataLength"))))
             }),
-            paymentHeaderHash: keccak256(abi.encode(psuedoRandomNumber, "blobHeader.paymentHeaderHash"))
+            paymentHeaderHash: keccak256(abi.encode(psuedoRandomNumber, "blobHeader.paymentHeaderHash")),
+            salt: uint32(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.salt"))))
         });
 
         return blobHeader;
