@@ -31,6 +31,17 @@ func (c *Assignment) GetIndices() []uint32 {
 	return indices
 }
 
+// BlobKey is the unique identifier for a blob dispersal.
+//
+// It is computed as the Keccak256 hash of some serialization of the blob header
+// where the PaymentHeader has been replaced with Hash(PaymentHeader), in order
+// to be easily verifiable onchain. See the BlobKey method of BlobHeader for more
+// details.
+//
+// It can be used to retrieve a blob from relays.
+//
+// Note that two blobs can have the same content but different headers,
+// so they are allowed to both exist in the system.
 type BlobKey [32]byte
 
 func (b BlobKey) Hex() string {
