@@ -132,7 +132,7 @@ func buildBlobAndCert(
 		BlobCertificate: blobCertificate,
 	}
 
-	verificationProof, err := contractEigenDABlobVerifier.ConvertVerificationProof(verificationInfo)
+	verificationProof, err := contractEigenDABlobVerifier.VerificationProofProtoToBinding(verificationInfo)
 	require.NoError(t, err)
 
 	return blobKey, blobBytes, &verification.EigenDACert{

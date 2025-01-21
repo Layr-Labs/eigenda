@@ -35,7 +35,7 @@ type BlobVerifier struct {
 func NewBlobVerifier(
 	ethClient *geth.EthClient,  // the eth client, which should already be set up
 	blobVerifierAddress string, // the hex address of the EigenDABlobVerifier contract
-) (IBlobVerifier, error) {
+) (*BlobVerifier, error) {
 
 	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
 		gethcommon.HexToAddress(blobVerifierAddress),
@@ -61,12 +61,12 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	// Contains all necessary information about the blob, so that it can be verified.
 	blobVerificationProof *disperser.BlobVerificationInfo,
 ) error {
-	convertedSignedBatch, err := verifierBindings.ConvertSignedBatch(signedBatch)
+	convertedSignedBatch, err := verifierBindings.SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
 		return fmt.Errorf("convert signed batch: %s", err)
 	}
 
-	convertedBlobVerificationProof, err := verifierBindings.ConvertVerificationProof(blobVerificationProof)
+	convertedBlobVerificationProof, err := verifierBindings.VerificationProofProtoToBinding(blobVerificationProof)
 	if err != nil {
 		return fmt.Errorf("convert blob verification proof: %s", err)
 	}

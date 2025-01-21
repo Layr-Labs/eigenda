@@ -13,13 +13,13 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
 
-func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, error) {
-	convertedBatchHeader, err := ConvertBatchHeader(inputBatch.GetHeader())
+func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*SignedBatch, error) {
+	convertedBatchHeader, err := BatchHeaderProtoToBinding(inputBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header: %s", err)
 	}
 
-	convertedAttestation, err := convertAttestation(inputBatch.GetAttestation())
+	convertedAttestation, err := attestationProtoToBinding(inputBatch.GetAttestation())
 	if err != nil {
 		return nil, fmt.Errorf("convert attestation: %s", err)
 	}
@@ -32,7 +32,7 @@ func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, erro
 	return outputSignedBatch, nil
 }
 
-func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, error) {
+func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, error) {
 	var outputBatchRoot [32]byte
 
 	inputBatchRoot := inputHeader.GetBatchRoot()
@@ -57,13 +57,13 @@ func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, erro
 	return convertedHeader, nil
 }
 
-func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation, error) {
-	nonSignerPubkeys, err := repeatedBytesToG1Points(inputAttestation.GetNonSignerPubkeys())
+func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*Attestation, error) {
+	nonSignerPubkeys, err := repeatedBytesToBN254G1Points(inputAttestation.GetNonSignerPubkeys())
 	if err != nil {
 		return nil, fmt.Errorf("convert non signer pubkeys to g1 points: %s", err)
 	}
 
-	quorumApks, err := repeatedBytesToG1Points(inputAttestation.GetQuorumApks())
+	quorumApks, err := repeatedBytesToBN254G1Points(inputAttestation.GetQuorumApks())
 	if err != nil {
 		return nil, fmt.Errorf("convert quorum apks to g1 points: %s", err)
 	}
@@ -89,8 +89,8 @@ func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation
 	return convertedAttestation, nil
 }
 
-func ConvertVerificationProof(inputVerificationInfo *disperserv2.BlobVerificationInfo) (*BlobVerificationProofV2, error) {
-	convertedBlobCertificate, err := convertBlobCertificate(inputVerificationInfo.GetBlobCertificate())
+func VerificationProofProtoToBinding(inputVerificationInfo *disperserv2.BlobVerificationInfo) (*BlobVerificationProofV2, error) {
+	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputVerificationInfo.GetBlobCertificate())
 
 	if err != nil {
 		return nil, fmt.Errorf("convert blob certificate: %s", err)
@@ -103,8 +103,8 @@ func ConvertVerificationProof(inputVerificationInfo *disperserv2.BlobVerificatio
 	}, nil
 }
 
-func convertBlobCertificate(inputCertificate *commonv2.BlobCertificate) (*BlobCertificate, error) {
-	convertedBlobHeader, err := convertBlobHeader(inputCertificate.GetBlobHeader())
+func blobCertificateProtoToBinding(inputCertificate *commonv2.BlobCertificate) (*BlobCertificate, error) {
+	convertedBlobHeader, err := blobHeaderProtoToBinding(inputCertificate.GetBlobHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert blob header: %s", err)
 	}
@@ -115,7 +115,7 @@ func convertBlobCertificate(inputCertificate *commonv2.BlobCertificate) (*BlobCe
 	}, nil
 }
 
-func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) {
+func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) {
 	inputVersion := inputHeader.GetVersion()
 	if inputVersion > math.MaxUint16 {
 		return nil, fmt.Errorf(
@@ -136,7 +136,7 @@ func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) 
 		quorumNumbers = append(quorumNumbers, byte(quorumNumber))
 	}
 
-	convertedBlobCommitment, err := convertBlobCommitment(inputHeader.GetCommitment())
+	convertedBlobCommitment, err := blobCommitmentProtoToBinding(inputHeader.GetCommitment())
 	if err != nil {
 		return nil, fmt.Errorf("convert blob commitment: %s", err)
 	}
@@ -154,7 +154,7 @@ func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) 
 	}, nil
 }
 
-func convertBlobCommitment(inputCommitment *common.BlobCommitment) (*BlobCommitment, error) {
+func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*BlobCommitment, error) {
 	convertedCommitment, err := bytesToBN254G1Point(inputCommitment.GetCommitment())
 	if err != nil {
 		return nil, fmt.Errorf("convert commitment to g1 point: %s", err)
@@ -256,7 +256,7 @@ func bn254G2PointToBytes(inputPoint *BN254G2Point) []byte {
 	return pointBytes[:]
 }
 
-func repeatedBytesToG1Points(repeatedBytes [][]byte) ([]BN254G1Point, error) {
+func repeatedBytesToBN254G1Points(repeatedBytes [][]byte) ([]BN254G1Point, error) {
 	var outputPoints []BN254G1Point
 	for _, bytes := range repeatedBytes {
 		g1Point, err := bytesToBN254G1Point(bytes)

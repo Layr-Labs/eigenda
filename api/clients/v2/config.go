@@ -27,7 +27,7 @@ type EigenDAClientConfig struct {
 	// any part of the data matches the KZG commitment.
 	BlobPolynomialForm codecs.PolynomialForm
 
-	// The timeout duration for relay calls
+	// The timeout duration for relay calls to retrieve blobs.
 	RelayTimeout time.Duration
 
 	// The timeout duration for contract calls
