@@ -23,7 +23,7 @@ func NewPayload(payloadBytes []byte) *Payload {
 //
 // Example encoding:
 //
-//                  Payload header (32 bytes total)                                  Encoded Payload Data
+//              Encoded Payload header (32 bytes total)                                  Encoded Payload Data
 // [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
 func (p *Payload) encode() (*encodedPayload, error) {
 	payloadHeader := make([]byte, 32)

@@ -63,12 +63,12 @@ func (ep *evalPoly) toEncodedPayload() (*encodedPayload, error) {
 
 	payloadLength := binary.BigEndian.Uint32(polynomialBytes[2:6])
 
-	// add 32 to the padded data length, since the encoded payload includes a payload header
+	// add 32 to the padded data length, since the encoded payload includes an encoded payload header
 	encodedPayloadLength := codec.GetPaddedDataLength(payloadLength) + 32
 
 	if uint32(len(polynomialBytes)) < payloadLength {
 		return nil, fmt.Errorf(
-			"polynomial contains fewer bytes (%d) than expected encoded payload (%d), as determined by claimed length in payload header (%d)",
+			"polynomial contains fewer bytes (%d) than expected encoded payload (%d), as determined by claimed length in encoded payload header (%d)",
 			len(polynomialBytes), encodedPayloadLength, payloadLength)
 	}
 

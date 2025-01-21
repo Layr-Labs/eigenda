@@ -41,7 +41,7 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 
 	if uint32(len(nonPaddedData)) < claimedLength {
 		return nil, fmt.Errorf(
-			"data length %d is less than length claimed in payload header %d",
+			"data length %d is less than length claimed in encoded payload header %d",
 			len(nonPaddedData), claimedLength)
 	}
 
