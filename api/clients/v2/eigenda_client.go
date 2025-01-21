@@ -100,8 +100,16 @@ func (c *EigenDAClient) GetPayload(
 	blobKey core.BlobKey,
 	eigenDACert *verification.EigenDACert) ([]byte, error) {
 
+	err := c.verifyCertWithTimeout(ctx, eigenDACert)
+	if err != nil {
+		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
+	}
+
 	relayKeys := eigenDACert.BlobVerificationProof.BlobCertificate.RelayKeys
 	relayKeyCount := len(relayKeys)
+	if relayKeyCount == 0 {
+		return nil, errors.New("relay key count is zero")
+	}
 
 	blobCommitmentProto := contractEigenDABlobVerifier.BlobCommitmentBindingToProto(
 		&eigenDACert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment)
@@ -109,10 +117,6 @@ func (c *EigenDAClient) GetPayload(
 
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
-	}
-
-	if relayKeyCount == 0 {
-		return nil, errors.New("relay key count is zero")
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
@@ -131,17 +135,11 @@ func (c *EigenDAClient) GetPayload(
 			continue
 		}
 
-		err = c.verifyBlobFromRelay(blobKey, relayKey, blob, blobCommitment.Commitment, blobCommitment.Length)
+		err = c.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitment.Commitment, blobCommitment.Length)
 
 		// An honest relay should never send a blob which doesn't verify
 		if err != nil {
 			c.log.Warn("verify blob from relay: %w", err)
-			continue
-		}
-
-		err = c.verifyBlobV2WithTimeout(ctx, eigenDACert)
-		if err != nil {
-			c.log.Warn("verifyBlobV2 failed", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
@@ -163,8 +161,8 @@ func (c *EigenDAClient) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey, relayKeyCount)
 }
 
-// verifyBlobFromRelay performs the necessary local verifications after having retrieved a blob from a relay.
-// This method does NOT verify the blob with a call to verifyBlobV2, that must be done separately.
+// verifyBlobAgainstCert verifies the blob received from a relay against the certificate.
+// This method does NOT verify the blob with an eth_call to verifyBlobV2, that must be done separately.
 //
 // The following verifications are performed in this method:
 // 1. Verify that blob isn't empty
@@ -172,7 +170,7 @@ func (c *EigenDAClient) GetPayload(
 // 3. Verify that the blob length is less than or equal to the claimed blob length
 //
 // If all verifications succeed, the method returns nil. Otherwise, it returns an error.
-func (c *EigenDAClient) verifyBlobFromRelay(
+func (c *EigenDAClient) verifyBlobAgainstCert(
 	blobKey core.BlobKey,
 	relayKey core.RelayKey,
 	blob []byte,
@@ -196,9 +194,6 @@ func (c *EigenDAClient) verifyBlobFromRelay(
 	}
 
 	if !valid {
-		c.log.Warn(
-			"blob commitment is invalid for received bytes",
-			"blobKey", blobKey, "relayKey", relayKey)
 		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey, relayKey)
 	}
 
@@ -231,10 +226,10 @@ func (c *EigenDAClient) getBlobWithTimeout(
 	return c.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 }
 
-// verifyBlobV2WithTimeout verifies a blob by making a call to VerifyBlobV2.
+// verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyBlobV2.
 //
 // This method times out after the duration configured in clientConfig.ContractCallTimeout
-func (c *EigenDAClient) verifyBlobV2WithTimeout(
+func (c *EigenDAClient) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
 ) error {

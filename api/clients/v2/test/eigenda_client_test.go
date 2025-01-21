@@ -173,6 +173,13 @@ func TestRelayCallTimeout(t *testing.T) {
 	relayKeys[0] = tester.Random.Uint32()
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
+
 	// the timeout should occur before the panic has a chance to be triggered
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(
 		nil, errors.New("timeout")).Once().Run(
@@ -280,6 +287,12 @@ func TestNoRelayResponse(t *testing.T) {
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(nil, fmt.Errorf("offline relay"))
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	payload, err := tester.Client.GetPayload(
 		context.Background(),
@@ -294,6 +307,14 @@ func TestNoRelayResponse(t *testing.T) {
 // TestNoRelays tests that having no relay keys is handled gracefully
 func TestNoRelays(t *testing.T) {
 	tester := buildClientTester(t)
+
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
+
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, []core.RelayKey{})
 
 	payload, err := tester.Client.GetPayload(context.Background(), blobKey, blobCert)
@@ -402,8 +423,7 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
-// TestBlobFailsVerifyBlobV2 tests what happens if a relay returns a blob which causes verifyBlobV2 to fail.
-// It verifies that the client tries again with a different relay after such a failure.
+// TestBlobFailsVerifyBlobV2 tests what happens if cert verification fails
 func TestBlobFailsVerifyBlobV2(t *testing.T) {
 	tester := buildClientTester(t)
 	relayCount := 10
@@ -416,20 +436,12 @@ func TestBlobFailsVerifyBlobV2(t *testing.T) {
 	tooLongBytes := make([]byte, len(blobBytes)+100)
 	copy(tooLongBytes[:], blobBytes)
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
 	tester.MockBlobVerifier.On(
 		"VerifyBlobV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(errors.New("verification failed")).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil).Once()
 
 	// this will fail the first time, since verifyBlobV2 will fail
 	payload, err := tester.Client.GetPayload(
@@ -437,8 +449,8 @@ func TestBlobFailsVerifyBlobV2(t *testing.T) {
 		blobKey,
 		blobCert)
 
-	require.NotNil(t, payload)
-	require.NoError(t, err)
+	require.Nil(t, payload)
+	require.Error(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
 }
@@ -456,6 +468,12 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 	blobCert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment.DataLength--
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+	tester.MockBlobVerifier.On(
+		"VerifyBlobV2",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(nil)
 
 	// this will fail, since the length in the BlobCommitment doesn't match the actual blob length
 	payload, err := tester.Client.GetPayload(
