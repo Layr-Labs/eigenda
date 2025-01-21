@@ -131,9 +131,11 @@ func (c *EigenDAClient) GetPayload(
 			continue
 		}
 
+		err = c.verifyBlobFromRelay(blobKey, relayKey, blob, blobCommitment.Commitment, blobCommitment.Length)
+
 		// An honest relay should never send a blob which doesn't verify
-		if !c.verifyBlobFromRelay(blobKey, relayKey, blob, blobCommitment.Commitment, blobCommitment.Length) {
-			// specifics are logged in verifyBlobFromRelay
+		if err != nil {
+			c.log.Warn("verify blob from relay: %w", err)
 			continue
 		}
 
@@ -169,35 +171,35 @@ func (c *EigenDAClient) GetPayload(
 // 2. Verify the blob kzg commitment
 // 3. Verify that the blob length is less than or equal to the claimed blob length
 //
-// If all verifications succeed, the method returns true. Otherwise, it logs a warning and returns false.
+// If all verifications succeed, the method returns nil. Otherwise, it returns an error.
 func (c *EigenDAClient) verifyBlobFromRelay(
 	blobKey core.BlobKey,
 	relayKey core.RelayKey,
 	blob []byte,
 	kzgCommitment *encoding.G1Commitment,
-	blobLength uint) bool {
+	blobLength uint) error {
 
 	// An honest relay should never send an empty blob
 	if len(blob) == 0 {
-		c.log.Warn("blob received from relay had length 0", "blobKey", blobKey, "relayKey", relayKey)
-		return false
+		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey, relayKey)
 	}
 
 	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
 	//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
 	valid, err := verification.GenerateAndCompareBlobCommitment(c.g1Srs, blob, kzgCommitment)
 	if err != nil {
-		c.log.Warn(
-			"error generating commitment from received blob",
-			"blobKey", blobKey, "relayKey", relayKey, "error", err)
-		return false
+		return fmt.Errorf(
+			"generate and compare commitment for blob %v received from relay %v: %w",
+			blobKey,
+			relayKey,
+			err)
 	}
 
 	if !valid {
 		c.log.Warn(
 			"blob commitment is invalid for received bytes",
 			"blobKey", blobKey, "relayKey", relayKey)
-		return false
+		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey, relayKey)
 	}
 
 	// Checking that the length returned by the relay is <= the length claimed in the BlobCommitments is sufficient
@@ -206,14 +208,15 @@ func (c *EigenDAClient) verifyBlobFromRelay(
 	//
 	// Note that the length in the commitment is the length of the blob in symbols
 	if uint(len(blob)) > blobLength*encoding.BYTES_PER_SYMBOL {
-		c.log.Warn(
-			"blob length is greater than claimed blob length",
-			"blobKey", blobKey, "relayKey", relayKey, "blobLength", len(blob),
-			"claimedBlobLength", blobLength)
-		return false
+		return fmt.Errorf(
+			"length for blob %v (%d bytes) received from relay %v is greater than claimed blob length (%d bytes)",
+			blobKey,
+			len(blob),
+			relayKey,
+			blobLength*encoding.BYTES_PER_SYMBOL)
 	}
 
-	return true
+	return nil
 }
 
 // getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
