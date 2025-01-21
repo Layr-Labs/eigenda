@@ -262,6 +262,7 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 	if err != nil {
 		return nil, err
 	}
+	salt := blobCertificate.BlobHeader.Salt
 
 	inclusionProof := verificationInfo.GetInclusionProof()
 	blobIndex := verificationInfo.GetBlobIndex()
@@ -307,6 +308,7 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 					DataLength: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
+				Salt:              blobCertificate.BlobHeader.Salt,
 			},
 			RelayKeys: blobCertificate.RelayKeys,
 		},
