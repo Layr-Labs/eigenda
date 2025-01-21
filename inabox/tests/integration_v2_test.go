@@ -262,7 +262,6 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 	if err != nil {
 		return nil, err
 	}
-	salt := blobCertificate.BlobHeader.Salt
 
 	inclusionProof := verificationInfo.GetInclusionProof()
 	blobIndex := verificationInfo.GetBlobIndex()
