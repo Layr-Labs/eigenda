@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -328,10 +329,13 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("error computing required bandwidth: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
+		if strings.Contains(err.Error(), "internal error") {
+			return nil, api.NewErrorInternal(err.Error())
+		}
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
 	}
 	s.metrics.ReportChunkDataSize(requiredBandwidth)
@@ -343,7 +347,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	bytesToSend, err := gatherChunkDataToSend(frames, request)
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("error gathering chunk data: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
 	}
 
 	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
