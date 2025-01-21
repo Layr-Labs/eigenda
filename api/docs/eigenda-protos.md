@@ -358,8 +358,8 @@ BlobHeader contains the information describing a blob and the way it is to be di
 The following quorums are currently required: - 0: ETH - 1: EIGEN |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
 | payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
+| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
-| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. |
 
 
 

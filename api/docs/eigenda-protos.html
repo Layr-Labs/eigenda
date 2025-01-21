@@ -1116,17 +1116,19 @@ The following quorums are currently required:
                 </tr>
               
                 <tr>
+                  <td>salt</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
+reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
+payments already have unique cumulative_payment values for intentionally unique dispersal requests. </p></td>
+                </tr>
+              
+                <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
-                </tr>
-              
-                <tr>
-                  <td>salt</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>salt is used to ensure that the dispersal request is intentionally unique. </p></td>
                 </tr>
               
             </tbody>

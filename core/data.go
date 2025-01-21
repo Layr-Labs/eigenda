@@ -492,7 +492,7 @@ type PaymentMetadata struct {
 
 	// ReservationPeriod represents the range of time at which the dispersal is made
 	ReservationPeriod uint32 `json:"reservation_period"`
-	// CumulativePayment represents the total amount of payment made by the user up to this point
+	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
 
