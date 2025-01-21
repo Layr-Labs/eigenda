@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -25,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
@@ -423,7 +423,7 @@ func TestV2GetBlobCommitment(t *testing.T) {
 }
 
 func newTestServerV2(t *testing.T) *testComponents {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// if err != nil {
 	// 	panic("failed to create logger")
@@ -543,4 +543,52 @@ func newTestServerV2(t *testing.T) *testComponents {
 		Signer:            signer,
 		Peer:              p,
 	}
+}
+
+func TestInvalidLength(t *testing.T) {
+	c := newTestServerV2(t)
+	ctx := peer.NewContext(context.Background(), c.Peer)
+	data := make([]byte, 50)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	assert.NoError(t, err)
+
+	// Length we are commiting to should be a power of 2.
+	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+
+	// Changing the number of commitments should cause an error before a validity check of the commitments
+	commitments.Length += 1
+
+	accountID, err := c.Signer.GetAccountID()
+	assert.NoError(t, err)
+	commitmentProto, err := commitments.ToProtobuf()
+	assert.NoError(t, err)
+	blobHeaderProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommon.PaymentHeader{
+			AccountId:         accountID,
+			ReservationPeriod: 5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	assert.NoError(t, err)
+	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	sig, err := signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+	blobHeader.Signature = sig
+	blobHeaderProto.Signature = sig
+
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Data:       data,
+		BlobHeader: blobHeaderProto,
+	})
+	
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
 }

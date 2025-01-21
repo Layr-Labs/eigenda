@@ -229,22 +229,26 @@
                   <td>length_commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Serialization of the G2Commitment to the blob length. </p></td>
+                  <td><p>A commitment to the blob data with G2 SRS, used to work with length_proof
+such that the claimed length below is verifiable. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_proof</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Serialization of the G2Affine element representing the proof of the blob length. </p></td>
+                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
+It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+at the end of the highest order. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The length of the blob in symbols (field elements).
-TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc. </p></td>
+                  <td><p>The length of the blob in symbols (field elements), which must be a power of 2.
+This also specifies the degree of the polynomial used to generate the blob commitment,
+since length = degree &#43; 1. </p></td>
                 </tr>
               
             </tbody>
@@ -286,7 +290,7 @@ TODO: is this length always a power of 2? Are there any other characteristics th
         
       
         <h3 id="common.PaymentHeader">PaymentHeader</h3>
-        <p></p>
+        <p>PaymentHeader contains payment information for a blob.</p>
 
         
           <table class="field-table">
@@ -299,7 +303,7 @@ TODO: is this length always a power of 2? Are there any other characteristics th
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+                  <td><p>The account ID of the disperser client. This account ID is an eth wallet address of the user,
 corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               

@@ -71,9 +71,17 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 			if !ok {
 				return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
 			}
+
+			if _, ok := operatorState.Operators[quorum]; !ok {
+				// operator is not part of the quorum or the quorum is not valid
+				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid", "quorum", quorum)
+				continue
+			}
+
 			assgn, err := corev2.GetAssignment(operatorState, blobParams, quorum, n.Config.ID)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get assignments: %v", err)
+				n.Logger.Errorf("failed to get assignment: %v", err)
+				continue
 			}
 
 			req, ok := requests[relayKey]

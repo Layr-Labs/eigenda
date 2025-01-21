@@ -6,11 +6,11 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -162,7 +162,7 @@ func TestGetChunks(t *testing.T) {
 }
 
 func createStoreV2(t *testing.T) (node.StoreV2, kvstore.TableStore) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	config := tablestore.DefaultLevelDBConfig(t.TempDir())
 	config.Schema = []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}
 	tStore, err := tablestore.Start(logger, config)

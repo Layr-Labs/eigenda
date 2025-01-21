@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -17,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -96,7 +96,7 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 

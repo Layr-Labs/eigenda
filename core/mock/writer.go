@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/core"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/mock"
@@ -38,27 +39,27 @@ func (t *MockWriter) GetRegisteredQuorumIdsForOperator(ctx context.Context, oper
 
 func (t *MockWriter) RegisterOperator(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
-	args := t.Called(ctx, keypair, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	return args.Error(0)
 }
 
 func (t *MockWriter) RegisterOperatorWithChurn(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 	churnReply *churner.ChurnReply) error {
-	args := t.Called(ctx, keypair, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
+	args := t.Called(ctx, signer, socket, quorumIds, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry, churnReply)
 	return args.Error(0)
 }
 

@@ -21,7 +21,8 @@ import (
 
 var (
 	privateKey = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	opID       = [32]byte{0}
+	op0        = [32]byte{0}
+	op3        = [32]byte{3}
 
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
@@ -39,7 +40,7 @@ type components struct {
 	relayClient *clientsmock.MockRelayClient
 }
 
-func newComponents(t *testing.T) *components {
+func newComponents(t *testing.T, operatorID [32]byte) *components {
 	dbPath := t.TempDir()
 	keyPair, err := core.GenRandomBlsKeys()
 	if err != nil {
@@ -50,7 +51,7 @@ func newComponents(t *testing.T) *components {
 		ExpirationPollIntervalSec: 1,
 		QuorumIDList:              []core.QuorumID{0},
 		DbPath:                    dbPath,
-		ID:                        opID,
+		ID:                        operatorID,
 		NumBatchValidators:        runtime.GOMAXPROCS(0),
 		EnableNodeApi:             false,
 		EnableMetrics:             false,
@@ -74,7 +75,7 @@ func newComponents(t *testing.T) *components {
 	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 4,
 		1: 4,
-		2: 4,
+		2: 3,
 	})
 
 	store, err := node.NewLevelDBStore(dbPath, logger, nil, 1e9, 1e9)
@@ -101,7 +102,7 @@ func newComponents(t *testing.T) *components {
 }
 
 func TestNodeStartNoAddress(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.Config.RegisterNodeAtStart = false
 
 	c.tx.On("GetOperatorSocket", mock.Anything).Return("", errors.New("failed to get operator socket"))
@@ -111,7 +112,7 @@ func TestNodeStartNoAddress(t *testing.T) {
 }
 
 func TestNodeStartOperatorIDMatch(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.Config.RegisterNodeAtStart = true
 	c.node.Config.EthClientConfig = geth.EthClientConfig{
 		RPCURLs:          []string{"http://localhost:8545"},
@@ -125,16 +126,16 @@ func TestNodeStartOperatorIDMatch(t *testing.T) {
 		ChurnBIPsOfTotalStake:    uint16(10),
 	}, nil)
 	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID(opID), nil)
+	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID(op0), nil)
 
 	err := c.node.Start(context.Background())
 	assert.NoError(t, err)
 }
 
 func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
-	c := newComponents(t)
+	c := newComponents(t, op0)
 	c.node.Config.RegisterNodeAtStart = true
 	c.node.Config.EthClientConfig = geth.EthClientConfig{
 		RPCURLs:          []string{"http://localhost:8545"},
@@ -148,7 +149,7 @@ func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
 		ChurnBIPsOfTotalStake:    uint16(10),
 	}, nil)
 	c.tx.On("GetNumberOfRegisteredOperatorForQuorum", mock.Anything, mock.Anything).Return(uint32(0), nil)
-	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	c.tx.On("RegisterOperator", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	c.tx.On("OperatorAddressToID", mock.Anything).Return(core.OperatorID{1}, nil)
 

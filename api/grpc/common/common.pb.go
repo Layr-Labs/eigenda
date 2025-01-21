@@ -93,12 +93,16 @@ type BlobCommitment struct {
 
 	// Concatenation of the x and y coordinates of `common.G1Commitment`.
 	Commitment []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
-	// Serialization of the G2Commitment to the blob length.
+	// A commitment to the blob data with G2 SRS, used to work with length_proof
+	// such that the claimed length below is verifiable.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
-	// Serialization of the G2Affine element representing the proof of the blob length.
+	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
+	// It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+	// at the end of the highest order.
 	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
-	// The length of the blob in symbols (field elements).
-	// TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc.
+	// The length of the blob in symbols (field elements), which must be a power of 2.
+	// This also specifies the degree of the polynomial used to generate the blob commitment,
+	// since length = degree + 1.
 	Length uint32 `protobuf:"varint,4,opt,name=length,proto3" json:"length,omitempty"`
 }
 
@@ -162,12 +166,13 @@ func (x *BlobCommitment) GetLength() uint32 {
 	return 0
 }
 
+// PaymentHeader contains payment information for a blob.
 type PaymentHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+	// The account ID of the disperser client. This account ID is an eth wallet address of the user,
 	// corresponding to the key used by the client to sign the BlobHeader.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// The reservation period of the dispersal request.

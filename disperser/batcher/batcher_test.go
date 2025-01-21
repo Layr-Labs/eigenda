@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -78,7 +77,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	// Common Components
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// assert.NoError(t, err)
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	finalizationBlockDelay := uint(75)
 

@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -17,8 +20,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
 	"google.golang.org/grpc/peer"
-	"runtime"
-	"time"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -76,9 +77,9 @@ func NewServerV2(
 	}, nil
 }
 
-func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
+func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.GetNodeInfoReply{Semver: node.SemVer}, nil
 	}
 
 	memBytes := uint64(0)
@@ -87,7 +88,12 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 		memBytes = v.Total
 	}
 
-	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
+	return &pb.GetNodeInfoReply{
+		Semver:   node.SemVer,
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
+		MemBytes: memBytes}, nil
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
@@ -114,9 +120,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
-	// TODO(ian-shim): support remote signer
-	if s.node.KeyPair == nil {
-		return nil, api.NewErrorInternal("missing key pair")
+	if s.node.BLSSigner == nil {
+		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
 	batch, err := s.validateStoreChunksRequest(in)
@@ -179,12 +184,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
-	sig := s.node.KeyPair.SignMessage(batchHeaderHash).Bytes()
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
 
 	s.metrics.ReportStoreChunksLatency(time.Since(start))
 
 	return &pb.StoreChunksReply{
-		Signature: sig[:],
+		Signature: sig,
 	}, nil
 }
 

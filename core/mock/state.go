@@ -8,6 +8,8 @@ import (
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -25,6 +27,7 @@ var _ core.IndexedChainState = (*ChainDataMock)(nil)
 type PrivateOperatorInfo struct {
 	*core.IndexedOperatorInfo
 	KeyPair       *core.KeyPair
+	Signer        blssigner.Signer
 	Host          string
 	DispersalPort string
 	RetrievalPort string
@@ -143,9 +146,15 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
 		}
 
+		signer, _ := blssigner.NewSigner(blssignerTypes.SignerConfig{
+			PrivateKey: d.KeyPairs[id].PrivKey.String(),
+			SignerType: blssignerTypes.PrivateKey,
+		})
+
 		private := &PrivateOperatorInfo{
 			IndexedOperatorInfo: indexed,
 			KeyPair:             d.KeyPairs[id],
+			Signer:              signer,
 			Host:                host,
 			DispersalPort:       dispersalPort,
 			RetrievalPort:       retrievalPort,
@@ -231,8 +240,14 @@ func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, 
 }
 
 func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
+	quorums := make([]core.QuorumID, 0)
+	for quorumID, stake := range d.Stakes {
+		if _, ok := stake[operator]; ok {
+			quorums = append(quorums, quorumID)
+		}
+	}
 
-	state := d.GetTotalOperatorState(ctx, blockNumber)
+	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil
 

@@ -10,13 +10,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
@@ -262,7 +262,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	chunkSize := uint64(rand.Intn(1024) + 100)
 	fragmentSize := int(chunkSize / 2)

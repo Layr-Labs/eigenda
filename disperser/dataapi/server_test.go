@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -24,7 +25,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	subgraphmock "github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -43,7 +43,7 @@ var (
 	mockPrometheusRespAvgThroughput string
 
 	expectedBlobCommitment *encoding.BlobCommitments
-	mockLogger             = logging.NewNoopLogger()
+	mockLogger             = testutils.GetLogger()
 	blobstore              = inmem.NewBlobStore()
 	mockPrometheusApi      = &prommock.MockPrometheusApi{}
 	prometheusClient       = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")

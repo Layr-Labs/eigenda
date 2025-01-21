@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api"
-	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	"log"
 	"math/big"
+
+	"github.com/Layr-Labs/eigenda/api"
+	dreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
 	"github.com/Layr-Labs/eigenda/common"
@@ -17,6 +18,7 @@ import (
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -61,7 +63,7 @@ func NewWriter(
 // will be returned.
 func (t *Writer) RegisterOperator(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -69,7 +71,7 @@ func (t *Writer) RegisterOperator(
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
@@ -101,7 +103,7 @@ func (t *Writer) RegisterOperator(
 // with the provided signature from the churner
 func (t *Writer) RegisterOperatorWithChurn(
 	ctx context.Context,
-	keypair *core.KeyPair,
+	signer blssigner.Signer,
 	socket string,
 	quorumIds []core.QuorumID,
 	operatorEcdsaPrivateKey *ecdsa.PrivateKey,
@@ -110,7 +112,7 @@ func (t *Writer) RegisterOperatorWithChurn(
 	churnReply *churner.ChurnReply,
 ) error {
 
-	params, operatorSignature, err := t.getRegistrationParams(ctx, keypair, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
+	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err

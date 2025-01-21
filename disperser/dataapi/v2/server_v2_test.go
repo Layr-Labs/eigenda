@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	_ "embed"
@@ -12,17 +13,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -31,7 +35,6 @@ import (
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -57,7 +60,7 @@ var (
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
-	logger = logging.NewNoopLogger()
+	logger = testutils.GetLogger()
 
 	// Local stack
 	localStackPort     = "4566"
@@ -65,7 +68,7 @@ var (
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
 
-	mockLogger        = logging.NewNoopLogger()
+	mockLogger        = testutils.GetLogger()
 	blobstore         = inmem.NewBlobStore()
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
@@ -259,6 +262,38 @@ func setUpRouter() *gin.Engine {
 	return gin.Default()
 }
 
+func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httptest.ResponseRecorder {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, url, nil)
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	return w
+}
+
+func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
+	body := w.Result().Body
+	defer body.Close()
+	data, err := io.ReadAll(body)
+	require.NoError(t, err)
+
+	var response T
+	err = json.Unmarshal(data, &response)
+	require.NoError(t, err)
+	return response
+}
+
+func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.BlobHeader) {
+	bk, err := blobHeader.BlobKey()
+	assert.Nil(t, err)
+	assert.Equal(t, blobKey, bk)
+}
+
+func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
+	require.NoError(t, err)
+	assert.True(t, cursor.Equal(requestedAt, &blobKey))
+}
+
 func TestFetchBlobHandlerV2(t *testing.T) {
 	r := setUpRouter()
 
@@ -279,20 +314,10 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex(), nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BlobResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex())
+	response := decodeResponseBody[serverv2.BlobResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
@@ -320,23 +345,210 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificateHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate", nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BlobCertificateResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
+	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
 	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
+}
+
+func TestFetchBlobFeedHandler(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	// Create a timeline of test blobs:
+	// - Total of 103 blobs
+	// - First 3 blobs share the same timestamp (firstBlobTime)
+	// - The last blob has timestamp "now"
+	// - Remaining blobs are spaced 1 minute apart
+	// - Timeline spans roughly 100 minutes into the past from now
+	numBlobs := 103
+	now := uint64(time.Now().UnixNano())
+	nanoSecsPerBlob := uint64(60 * 1e9) // 1 blob per minute
+	firstBlobTime := now - uint64(numBlobs-3)*nanoSecsPerBlob
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAt := make([]uint64, numBlobs)
+
+	// Actually create blobs
+	firstBlobKeys := make([][32]byte, 3)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		keys[i] = blobKey
+		if i < 3 {
+			requestedAt[i] = firstBlobTime
+			firstBlobKeys[i] = keys[i]
+		} else {
+			requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i-2)
+		}
+
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+	}
+	sort.Slice(firstBlobKeys, func(i, j int) bool {
+		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
+	})
+
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
+
+	t.Run("invalid params", func(t *testing.T) {
+		reqUrls := []string{
+			"/v2/blobs/feed?pagination_token=abc",
+			"/v2/blobs/feed?limit=abc",
+			"/v2/blobs/feed?interval=abc",
+			"/v2/blobs/feed?end=2006-01-02T15:04:05",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs (60 blobs total available, keys[43], ..., keys[102])
+		// - Limited to 20 results (the default "limit")
+		// - Starting from blob[43] through blob[62]
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+	})
+
+	t.Run("various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// Returns keys[43] through keys[102] (60 blobs)
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// Test 2: 2-hour window captures all test blobs
+		// Verifies correct ordering of timestamp-colliding blobs
+		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, numBlobs, len(response.Blobs))
+		// First 3 blobs ordered by key due to same timestamp
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobHeader)
+		for i := 3; i < numBlobs; i++ {
+			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+
+		// Test 3: Custom end time with 1-hour window
+		// Retrieves keys[41] through keys[100]
+		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		// Test pagination behavior:
+		// 1. First page: blobs in past 1h limited to 20, returns keys[43] through keys[62]
+		// 2. Second page: the next 20 blobs, returns keys[63] through keys[82]
+		// Verifies:
+		// - Correct sequencing across pages
+		// - Proper token handling
+		tm := time.Unix(0, time.Now().UnixNano()).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+
+		// Request next page using pagination token
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobHeader)
+			assert.Equal(t, requestedAt[63+i], response.Blobs[i].RequestedAt)
+		}
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
+	})
+
+	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
+		// Test pagination behavior in case of same-timestamp blobs
+		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
+		// - These are followed by sequential blobs: keys[3,4] with different timestamps
+		// - End time is set to requestedAt[5]
+		tm := time.Unix(0, int64(requestedAt[5])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+
+		// First page: fetch 2 blobs, which have same requestedAt timestamp
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=2", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 2, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, firstBlobTime, response.Blobs[1].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
+
+		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=0&pagination_token=%s", endTime, response.PaginationToken)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		// Verify second page contains:
+		// 1. Last same-timestamp blob
+		// 2. Following blobs with sequential timestamps
+		require.Equal(t, 3, len(response.Blobs))
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobHeader)
+		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobHeader)
+		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[3], response.Blobs[1].RequestedAt)
+		assert.Equal(t, requestedAt[4], response.Blobs[2].RequestedAt)
+		assert.True(t, len(response.PaginationToken) > 0)
+		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
+	})
 }
 
 func TestFetchBlobVerificationInfoHandler(t *testing.T) {
@@ -353,8 +565,6 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	}
 	batchHeaderHash, err := batchHeader.Hash()
 	require.NoError(t, err)
-	fmt.Println("XXt batchHeaderHash bytes:", batchHeaderHash)
-	fmt.Println("XXt batchHeaderHash hex:", hex.EncodeToString(batchHeaderHash[:]))
 
 	ctx := context.Background()
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
@@ -369,21 +579,11 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/blobs/:blob_key/verification-info", testDataApiServerV2.FetchBlobVerificationInfoHandler)
-	w := httptest.NewRecorder()
+
 	reqStr := fmt.Sprintf("/v2/blobs/%s/verification-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[serverv2.BlobVerificationInfoResponse](t, w)
 
-	var response serverv2.BlobVerificationInfoResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, verificationInfo.InclusionProof, response.VerificationInfo.InclusionProof)
 }
 
@@ -423,20 +623,10 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/batches/"+batchHeaderHash, nil)
-	r.ServeHTTP(w, req)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.BatchResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/batches/"+batchHeaderHash)
+	response := decodeResponseBody[serverv2.BatchResponse](t, w)
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
 	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
@@ -455,25 +645,9 @@ func TestCheckOperatorsReachability(t *testing.T) {
 
 	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
 
-	w := httptest.NewRecorder()
 	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	ctxWithDeadline, cancel := context.WithTimeout(req.Context(), 500*time.Microsecond)
-	defer cancel()
-	req = req.WithContext(ctxWithDeadline)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response dataapi.OperatorPortCheckResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
 	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
 	assert.Equal(t, false, response.DispersalOnline)
@@ -486,7 +660,6 @@ func TestCheckOperatorsReachability(t *testing.T) {
 
 func TestFetchOperatorResponses(t *testing.T) {
 	r := setUpRouter()
-
 	ctx := context.Background()
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
@@ -533,43 +706,23 @@ func TestFetchOperatorResponses(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
 	assert.NoError(t, err)
 
-	// Fetch response of a specific operator
 	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorsResponses)
-	w := httptest.NewRecorder()
-	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
-	req := httptest.NewRequest(http.MethodGet, reqStr, nil)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response serverv2.OperatorDispersalResponses
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-	assert.Equal(t, 1, len(response.Responses))
-	assert.Equal(t, response.Responses[0], dispersalResponse)
+	// Fetch response of a specific operator
+	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w)
+	require.Equal(t, 1, len(response.Responses))
+	require.Equal(t, dispersalResponse, response.Responses[0])
 
 	// Fetch all operators' responses for a batch
 	reqStr2 := fmt.Sprintf("/v2/operators/response/%s", batchHeaderHash)
-	w2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodGet, reqStr2, nil)
-	r.ServeHTTP(w2, req2)
-	assert.Equal(t, w2.Code, http.StatusOK)
-	res2 := w2.Result()
-	defer res2.Body.Close()
-	data2, err := io.ReadAll(res2.Body)
-	assert.NoError(t, err)
+	w2 := executeRequest(t, r, http.MethodGet, reqStr2)
+	response2 := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w2)
 
-	var response2 serverv2.OperatorDispersalResponses
-	err = json.Unmarshal(data2, &response2)
-	assert.NoError(t, err)
-	assert.NotNil(t, response2)
-	assert.Equal(t, 2, len(response2.Responses))
-	assert.Equal(t, response2.Responses[0], dispersalResponse)
-	assert.Equal(t, response2.Responses[1], dispersalResponse2)
+	require.Equal(t, 2, len(response2.Responses))
+	require.Equal(t, response2.Responses[0], dispersalResponse)
+	require.Equal(t, response2.Responses[1], dispersalResponse2)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {
@@ -578,19 +731,9 @@ func TestFetchOperatorsStake(t *testing.T) {
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/operators/stake", nil)
-	r.ServeHTTP(w, req)
-	assert.Equal(t, w.Code, http.StatusOK)
-	res := w.Result()
-	defer res.Body.Close()
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
 
-	var response dataapi.OperatorsStakeResponse
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/operators/stake")
+	response := decodeResponseBody[dataapi.OperatorsStakeResponse](t, w)
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
 	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
@@ -628,23 +771,9 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 
 	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummaryHandler)
 
-	req := httptest.NewRequest(http.MethodGet, "/v2/metrics/summary", nil)
-	req.Close = true
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
+	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response serverv2.MetricSummary
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
-
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
 }
 
@@ -661,27 +790,14 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 
 	r.GET("/v2/metrics/timeseries/throughput", testDataApiServer.FetchMetricsThroughputHandler)
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v2/metrics/timeseries/throughput", nil)
-	r.ServeHTTP(w, req)
-
-	res := w.Result()
-	defer res.Body.Close()
-
-	data, err := io.ReadAll(res.Body)
-	assert.NoError(t, err)
-
-	var response []*dataapi.Throughput
-	err = json.Unmarshal(data, &response)
-	assert.NoError(t, err)
-	assert.NotNil(t, response)
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/throughput")
+	response := decodeResponseBody[[]*dataapi.Throughput](t, w)
 
 	var totalThroughput float64
 	for _, v := range response {
 		totalThroughput += v.Throughput
 	}
 
-	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, 3361, len(response))
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)

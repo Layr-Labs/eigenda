@@ -329,7 +329,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 // TODO: Supply the test path to the runner utility
 func (env *Config) StartBinaries() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-detached"}, []string{})
+	err := execCmd("./bin.sh", []string{"start-detached"}, []string{}, true)
 
 	if err != nil {
 		log.Panicf("Failed to start binaries. Err: %s", err)
@@ -339,7 +339,7 @@ func (env *Config) StartBinaries() {
 // TODO: Supply the test path to the runner utility
 func (env *Config) StopBinaries() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop"}, []string{})
+	err := execCmd("./bin.sh", []string{"stop"}, []string{}, true)
 	if err != nil {
 		log.Panicf("Failed to stop binaries. Err: %s", err)
 	}
@@ -347,7 +347,7 @@ func (env *Config) StopBinaries() {
 
 func (env *Config) StartAnvil() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{})
+	err := execCmd("./bin.sh", []string{"start-anvil"}, []string{}, false) // printing output causes hang
 	if err != nil {
 		log.Panicf("Failed to start anvil. Err: %s", err)
 	}
@@ -355,7 +355,7 @@ func (env *Config) StartAnvil() {
 
 func (env *Config) StopAnvil() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
-	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{})
+	err := execCmd("./bin.sh", []string{"stop-anvil"}, []string{}, true)
 	if err != nil {
 		log.Panicf("Failed to stop anvil. Err: %s", err)
 	}
@@ -381,7 +381,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_NUM_CONFIRMATIONS=0",
 	}
 
-	err := execCmd("./node-plugin.sh", []string{}, envVars)
+	err := execCmd("./node-plugin.sh", []string{}, envVars, true)
 
 	if err != nil {
 		log.Panicf("Failed to run node plugin. Err: %s", err)

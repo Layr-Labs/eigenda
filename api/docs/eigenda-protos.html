@@ -529,11 +529,11 @@
                 </li>
               
                 <li>
-                  <a href="#node.v2.NodeInfoReply"><span class="badge">M</span>NodeInfoReply</a>
+                  <a href="#node.v2.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.NodeInfoRequest"><span class="badge">M</span>NodeInfoRequest</a>
+                  <a href="#node.v2.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
                 </li>
               
                 <li>
@@ -903,22 +903,26 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>length_commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Serialization of the G2Commitment to the blob length. </p></td>
+                  <td><p>A commitment to the blob data with G2 SRS, used to work with length_proof
+such that the claimed length below is verifiable. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_proof</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Serialization of the G2Affine element representing the proof of the blob length. </p></td>
+                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
+It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+at the end of the highest order. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The length of the blob in symbols (field elements).
-TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc. </p></td>
+                  <td><p>The length of the blob in symbols (field elements), which must be a power of 2.
+This also specifies the degree of the polynomial used to generate the blob commitment,
+since length = degree &#43; 1. </p></td>
                 </tr>
               
             </tbody>
@@ -960,7 +964,7 @@ TODO: is this length always a power of 2? Are there any other characteristics th
         
       
         <h3 id="common.PaymentHeader">PaymentHeader</h3>
-        <p></p>
+        <p>PaymentHeader contains payment information for a blob.</p>
 
         
           <table class="field-table">
@@ -973,7 +977,7 @@ TODO: is this length always a power of 2? Are there any other characteristics th
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+                  <td><p>The account ID of the disperser client. This account ID is an eth wallet address of the user,
 corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               
@@ -1082,7 +1086,7 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
         
       
         <h3 id="common.v2.BlobCertificate">BlobCertificate</h3>
-        <p>BlobCertificate is what gets attested by the network</p>
+        <p>BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate</p><p>is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).</p><p>Validator nodes eventually sign the blob certificate once they are in custody of the required chunks</p><p>(note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).</p>
 
         
           <table class="field-table">
@@ -1095,14 +1099,18 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">BlobHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>blob_header contains data about the blob. </p></td>
                 </tr>
               
                 <tr>
                   <td>relays</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>relays is the list of relays that are in custody of the blob.
+The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+It needs to contain at least 1 relay number.
+To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract:
+https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol </p></td>
                 </tr>
               
             </tbody>
@@ -1113,7 +1121,7 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
         
       
         <h3 id="common.v2.BlobHeader">BlobHeader</h3>
-        <p></p>
+        <p>BlobHeader contains the information describing a blob and the way it is to be dispersed.</p>
 
         
           <table class="field-table">
@@ -1126,28 +1134,36 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>version</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>Blob version </p></td>
+                  <td><p>The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
+maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
+are checked against supplied or default security thresholds to validate the security assumptions of the
+blob&#39;s availability. </p></td>
                 </tr>
               
                 <tr>
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
+All quorums must be specified (including required quorums).
+
+The following quorums are currently required:
+- 0: ETH
+- 1: EIGEN </p></td>
                 </tr>
               
                 <tr>
                   <td>commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>commitment is the KZG commitment to the blob </p></td>
                 </tr>
               
                 <tr>
                   <td>payment_header</td>
                   <td><a href="#common.PaymentHeader">common.PaymentHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>payment_header contains payment information for the blob </p></td>
                 </tr>
               
                 <tr>
@@ -2017,7 +2033,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentReply">BlobCommitmentReply</h3>
-        <p></p>
+        <p>The result of a BlobCommitmentRequest().</p>
 
         
           <table class="field-table">
@@ -2030,7 +2046,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_commitment</td>
                   <td><a href="#common.BlobCommitment">common.BlobCommitment</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The commitment of the blob. </p></td>
                 </tr>
               
             </tbody>
@@ -2041,7 +2057,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</h3>
-        <p>Utility method used to generate the commitment of blob given its data.</p><p>This can be used to construct BlobHeader.commitment</p>
+        <p>The input for a BlobCommitmentRequest().</p><p>This can be used to construct a BlobHeader.commitment.</p>
 
         
           <table class="field-table">
@@ -2054,7 +2070,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The blob data to compute the commitment for. </p></td>
                 </tr>
               
             </tbody>
@@ -2065,7 +2081,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.BlobStatusReply">BlobStatusReply</h3>
-        <p></p>
+        <p>BlobStatusReply is the reply to a BlobStatusRequest.</p>
 
         
           <table class="field-table">
@@ -2085,14 +2101,15 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>signed_batch</td>
                   <td><a href="#disperser.v2.SignedBatch">SignedBatch</a></td>
                   <td></td>
-                  <td><p>The signed batch </p></td>
+                  <td><p>The signed batch. Unset if the status is not CERTIFIED. </p></td>
                 </tr>
               
                 <tr>
                   <td>blob_verification_info</td>
                   <td><a href="#disperser.v2.BlobVerificationInfo">BlobVerificationInfo</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+Unset if the status is not CERTIFIED. </p></td>
                 </tr>
               
             </tbody>
@@ -2116,7 +2133,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob. </p></td>
                 </tr>
               
             </tbody>
@@ -2165,7 +2182,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.DisperseBlobReply">DisperseBlobReply</h3>
-        <p></p>
+        <p>A reply to a DisperseBlob request.</p>
 
         
           <table class="field-table">
@@ -2185,7 +2202,15 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique 32 byte identifier for the blob.
+
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30
+The blob_key must thus be unique for every request, even if the same blob is being dispersed.
+Meaning the blob_header must be different for each request.
+
+Note that attempting to disperse a blob with the same blob key as a previously dispersed blob may cause
+the disperser to reject the blob (DisperseBlob() RPC will return an error). </p></td>
                 </tr>
               
             </tbody>
@@ -2196,7 +2221,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
         
       
         <h3 id="disperser.v2.DisperseBlobRequest">DisperseBlobRequest</h3>
-        <p></p>
+        <p>A request to disperse a blob.</p>
 
         
           <table class="field-table">
@@ -2228,7 +2253,12 @@ https://github.com/Layr-Labs/eigenda/blob/master/api/clients/eigenda_client.go <
                   <td>blob_header</td>
                   <td><a href="#common.v2.BlobHeader">common.v2.BlobHeader</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The header contains metadata about the blob.
+
+This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a
+4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
+dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
+which is dispersed separately. </p></td>
                 </tr>
               
             </tbody>
@@ -2304,15 +2334,14 @@ https://github.com/Layr-Labs/eigenda/blob/master/api/clients/eigenda_client.go <
                   <td>account_id</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The ID of the account being queried. This account ID is an eth wallet address of the user. </p></td>
                 </tr>
               
                 <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>Signature over the account ID
-TODO: sign over a reservation period or a nonce to mitigate signature replay attacks </p></td>
+                  <td><p>Signature over the account ID </p></td>
                 </tr>
               
             </tbody>
@@ -2323,7 +2352,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
         
       
         <h3 id="disperser.v2.PaymentGlobalParams">PaymentGlobalParams</h3>
-        <p></p>
+        <p>Global constant parameters defined by the payment vault.</p>
 
         
           <table class="field-table">
@@ -2336,35 +2365,35 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>global_symbols_per_second</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Global ratelimit for on-demand dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>min_num_symbols</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Minimum number of symbols accounted for all dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>price_per_symbol</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Price charged per symbol for on-demand dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>reservation_window</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Reservation window for all reservations </p></td>
                 </tr>
               
                 <tr>
                   <td>on_demand_quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorums allowed to make on-demand dispersals </p></td>
                 </tr>
               
             </tbody>
@@ -2375,7 +2404,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
         
       
         <h3 id="disperser.v2.PeriodRecord">PeriodRecord</h3>
-        <p>PeriodRecord is the usage record of an account in a bin. The API should return the active bin </p><p>record and the subsequent two records that contains potential overflows.</p>
+        <p>PeriodRecord is the usage record of an account in a bin. The API should return the active bin</p><p>record and the subsequent two records that contains potential overflows.</p>
 
         
           <table class="field-table">
@@ -2388,14 +2417,14 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>index</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Period index of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>usage</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>symbol usage recorded </p></td>
                 </tr>
               
             </tbody>
@@ -2406,7 +2435,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
         
       
         <h3 id="disperser.v2.Reservation">Reservation</h3>
-        <p></p>
+        <p>Reservation parameters of an account, used to determine the rate limit for the account.</p>
 
         
           <table class="field-table">
@@ -2419,35 +2448,35 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
                   <td>symbols_per_second</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>rate limit for the account </p></td>
                 </tr>
               
                 <tr>
                   <td>start_timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>start timestamp of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>end_timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>end timestamp of the reservation </p></td>
                 </tr>
               
                 <tr>
                   <td>quorum_numbers</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorums allowed to make reserved dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>quorum_splits</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>quorum splits describes how the payment is split among the quorums </p></td>
                 </tr>
               
             </tbody>
@@ -2491,7 +2520,7 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- UNKNOWN</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -2501,37 +2530,47 @@ TODO: sign over a reservation period or a nonce to mitigate signature replay att
               <tr>
                 <td>UNKNOWN</td>
                 <td>0</td>
-                <td><p></p></td>
+                <td><p>UNKNOWN means that the status of the blob is unknown.
+This is a catch all and should not be encountered absent a bug.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+unanticipated bug.</p></td>
               </tr>
             
               <tr>
                 <td>QUEUED</td>
                 <td>1</td>
-                <td><p>QUEUED means that the blob has been queued by the disperser for processing</p></td>
+                <td><p>QUEUED means that the blob has been queued by the disperser for processing.
+The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing,
+the blob is stored in a queue of some sort, and a response immediately returned to the client.</p></td>
               </tr>
             
               <tr>
                 <td>ENCODED</td>
                 <td>2</td>
-                <td><p>ENCODED means that the blob has been encoded and is ready to be dispersed to DA Nodes</p></td>
+                <td><p>ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.</p></td>
               </tr>
             
               <tr>
                 <td>CERTIFIED</td>
                 <td>3</td>
-                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes</p></td>
+                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes.</p></td>
               </tr>
             
               <tr>
                 <td>FAILED</td>
                 <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently</p></td>
+                <td><p>FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).</p></td>
               </tr>
             
               <tr>
                 <td>INSUFFICIENT_SIGNATURES</td>
                 <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation</p></td>
+                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
+
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
+an inability to gather sufficient signatures.</p></td>
               </tr>
             
           </tbody>
@@ -3397,7 +3436,7 @@ DEPRECATED: AttestBatch method is not used</p></td>
 
       
         <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
-        <p></p>
+        <p>The response to the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -3421,7 +3460,7 @@ DEPRECATED: AttestBatch method is not used</p></td>
         
       
         <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
-        <p></p>
+        <p>The parameter for the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -3434,7 +3473,9 @@ DEPRECATED: AttestBatch method is not used</p></td>
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob the chunks are being requested for.
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 </p></td>
                 </tr>
               
                 <tr>
@@ -3453,7 +3494,7 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.NodeInfoReply">NodeInfoReply</h3>
+        <h3 id="node.v2.GetNodeInfoReply">GetNodeInfoReply</h3>
         <p>Node info reply</p>
 
         
@@ -3467,35 +3508,35 @@ The ID must be in range [0, 254]. </p></td>
                   <td>semver</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The version of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>arch</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The architecture of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>os</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The operating system of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>num_cpu</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The number of CPUs on the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>mem_bytes</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The amount of memory on the node in bytes. </p></td>
                 </tr>
               
             </tbody>
@@ -3505,15 +3546,15 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.NodeInfoRequest">NodeInfoRequest</h3>
-        <p>Node info request</p>
+        <h3 id="node.v2.GetNodeInfoRequest">GetNodeInfoRequest</h3>
+        <p>The parameter for the GetNodeInfo() RPC.</p>
 
         
 
         
       
         <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
-        <p></p>
+        <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -3526,7 +3567,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>a custody signature of the received chunks </p></td>
                 </tr>
               
             </tbody>
@@ -3607,7 +3648,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
       
         <h3 id="node.v2.Dispersal">Dispersal</h3>
-        <p>WARNING: the following RPCs are experimental and subject to change.</p>
+        <p>Dispersal is utilized to disperse chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -3618,14 +3659,18 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>StoreChunks</td>
                 <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
                 <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
-                <td><p></p></td>
+                <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
               </tr>
             
               <tr>
-                <td>NodeInfo</td>
-                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
-                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
-                <td><p></p></td>
+                <td>GetNodeInfo</td>
+                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
               </tr>
             
           </tbody>
@@ -3633,7 +3678,7 @@ Note that this signature is not included in the hash for obvious reasons. </p></
 
         
         <h3 id="node.v2.Retrieval">Retrieval</h3>
-        <p></p>
+        <p>Retrieval is utilized to retrieve chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -3644,13 +3689,14 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>GetChunks</td>
                 <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
                 <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
-                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node.</p></td>
+                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+faster to retrieve chunks from the relay service if that service is available.</p></td>
               </tr>
             
               <tr>
-                <td>NodeInfo</td>
-                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
-                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
+                <td>GetNodeInfo</td>
+                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
                 <td><p>Retrieve node info metadata</p></td>
               </tr>
             
@@ -4046,7 +4092,7 @@ reconstructed original blob in response.</p></td>
 
       
         <h3 id="retriever.v2.BlobReply">BlobReply</h3>
-        <p></p>
+        <p>A reply to a RetrieveBlob() request.</p>
 
         
           <table class="field-table">
@@ -4070,7 +4116,7 @@ reconstructed original blob in response.</p></td>
         
       
         <h3 id="retriever.v2.BlobRequest">BlobRequest</h3>
-        <p></p>
+        <p>A request to retrieve a blob from the EigenDA Nodes via RetrieveBlob().</p>
 
         
           <table class="field-table">

@@ -33,9 +33,9 @@ to understand how this commitment is used to validate the blob.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | commitment | [bytes](#bytes) |  | Concatenation of the x and y coordinates of `common.G1Commitment`. |
-| length_commitment | [bytes](#bytes) |  | Serialization of the G2Commitment to the blob length. |
-| length_proof | [bytes](#bytes) |  | Serialization of the G2Affine element representing the proof of the blob length. |
-| length | [uint32](#uint32) |  | The length of the blob in symbols (field elements). TODO: is this length always a power of 2? Are there any other characteristics that we should list? etc. |
+| length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed such that the coefficient of the polynomial is committing with the G2 SRS at the end of the highest order. |
+| length | [uint32](#uint32) |  | The length of the blob in symbols (field elements), which must be a power of 2. This also specifies the degree of the polynomial used to generate the blob commitment, since length = degree &#43; 1. |
 
 
 
@@ -63,12 +63,12 @@ https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3
 <a name="common-PaymentHeader"></a>
 
 ### PaymentHeader
-
+PaymentHeader contains payment information for a blob.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobHeader. |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
 | reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
 | cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
 | salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |

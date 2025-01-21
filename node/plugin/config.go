@@ -63,6 +63,33 @@ var (
 		Usage:    "Password to decrypt the bls key",
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_KEY_PASSWORD"),
 	}
+	BLSRemoteSignerUrlFlag = cli.StringFlag{
+		Name:     "bls-remote-signer-url",
+		Usage:    "The URL of the BLS remote signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_REMOTE_SIGNER_URL"),
+	}
+
+	BLSPublicKeyHexFlag = cli.StringFlag{
+		Name:     "bls-public-key-hex",
+		Usage:    "The hex-encoded public key of the BLS signer",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_PUBLIC_KEY_HEX"),
+	}
+
+	BLSSignerCertFileFlag = cli.StringFlag{
+		Name:     "bls-signer-cert-file",
+		Usage:    "The path to the BLS signer certificate file",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
+	}
+
+	BLSSignerAPIKeyFlag = cli.StringFlag{
+		Name:     "bls-signer-api-key",
+		Usage:    "The API key for the BLS signer. Only required if BLSRemoteSignerEnabled is true",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_SIGNER_API_KEY"),
+	}
 
 	// The socket and the quorums to register.
 	SocketFlag = cli.StringFlag{
@@ -119,6 +146,9 @@ type Config struct {
 	BlsKeyFile                    string
 	EcdsaKeyPassword              string
 	BlsKeyPassword                string
+	BLSRemoteSignerUrl            string
+	BLSPublicKeyHex               string
+	BLSSignerCertFile             string
 	Socket                        string
 	QuorumIDList                  []core.QuorumID
 	ChainRpcUrl                   string
@@ -126,6 +156,7 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 	ChurnerUrl                    string
 	NumConfirmations              int
+	BLSSignerAPIKey               string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -157,6 +188,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		BlsKeyPassword:                ctx.GlobalString(BlsKeyPasswordFlag.Name),
 		EcdsaKeyFile:                  ctx.GlobalString(EcdsaKeyFileFlag.Name),
 		BlsKeyFile:                    ctx.GlobalString(BlsKeyFileFlag.Name),
+		BLSRemoteSignerUrl:            ctx.GlobalString(BLSRemoteSignerUrlFlag.Name),
+		BLSPublicKeyHex:               ctx.GlobalString(BLSPublicKeyHexFlag.Name),
+		BLSSignerCertFile:             ctx.GlobalString(BLSSignerCertFileFlag.Name),
 		Socket:                        ctx.GlobalString(SocketFlag.Name),
 		QuorumIDList:                  ids,
 		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
@@ -164,5 +198,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
 		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
 		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }
