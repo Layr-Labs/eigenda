@@ -19,7 +19,7 @@ import (
 
 // EigenDAClient provides the ability to get payloads from the relay subsystem, and to send new payloads to the disperser.
 //
-// This struct is not threadsafe.
+// This struct is goroutine safe.
 type EigenDAClient struct {
 	log logging.Logger
 	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
