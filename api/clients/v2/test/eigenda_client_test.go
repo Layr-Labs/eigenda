@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	common2 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -119,7 +118,7 @@ func buildBlobAndCert(
 	blobHeader := &commonv2.BlobHeader{
 		Version:       1,
 		QuorumNumbers: make([]uint32, 0),
-		PaymentHeader: &common2.PaymentHeader{},
+		PaymentHeader: &commonv2.PaymentHeader{},
 		Commitment:    commitmentsProto,
 	}
 
