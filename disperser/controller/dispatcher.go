@@ -137,7 +137,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
 
 	// Get a batch of blobs to dispatch
-	// This also writes a batch header and blob verification info for each blob in metadata store
+	// This also writes a batch header and blob inclusion info for each blob in metadata store
 	batchData, err := d.NewBatch(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, nil, err
@@ -438,9 +438,9 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put batch header: %w", err)
 	}
 
-	// accumulate verification infos in a map to avoid duplicate entries
+	// accumulate inclusion infos in a map to avoid duplicate entries
 	// batch write operation fails if there are duplicate entries
-	verificationInfoMap := make(map[corev2.BlobKey]*corev2.BlobVerificationInfo)
+	inclusionInfoMap := make(map[corev2.BlobKey]*corev2.BlobInclusionInfo)
 	for i, cert := range certs {
 		if cert == nil || cert.BlobHeader == nil {
 			return nil, fmt.Errorf("invalid blob certificate")
@@ -455,7 +455,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 			return nil, fmt.Errorf("failed to generate merkle proof: %w", err)
 		}
 
-		verificationInfoMap[blobKey] = &corev2.BlobVerificationInfo{
+		inclusionInfoMap[blobKey] = &corev2.BlobInclusionInfo{
 			BatchHeader:    batchHeader,
 			BlobKey:        blobKey,
 			BlobIndex:      uint32(i),
@@ -466,17 +466,17 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	proofGenerationFinished := time.Now()
 	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchHeaderFinished))
 
-	verificationInfos := make([]*corev2.BlobVerificationInfo, len(verificationInfoMap))
+	inclusionInfos := make([]*corev2.BlobInclusionInfo, len(inclusionInfoMap))
 	i := 0
-	for _, v := range verificationInfoMap {
-		verificationInfos[i] = v
+	for _, v := range inclusionInfoMap {
+		inclusionInfos[i] = v
 		i++
 	}
-	err = d.blobMetadataStore.PutBlobVerificationInfos(ctx, verificationInfos)
-	putBlobVerificationInfosFinished := time.Now()
-	d.metrics.reportPutVerificationInfosLatency(putBlobVerificationInfosFinished.Sub(proofGenerationFinished))
+	err = d.blobMetadataStore.PutBlobInclusionInfos(ctx, inclusionInfos)
+	putBlobInclusionInfosFinished := time.Now()
+	d.metrics.reportPutInclusionInfosLatency(putBlobInclusionInfosFinished.Sub(proofGenerationFinished))
 	if err != nil {
-		return nil, fmt.Errorf("failed to put blob verification infos: %w", err)
+		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
 
 	if cursor != nil {

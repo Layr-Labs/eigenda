@@ -210,6 +210,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				}
 				cert := &corev2.BlobCertificate{
 					BlobHeader: blob.BlobHeader,
+					Signature:  blob.Signature,
 					RelayKeys:  relayKeys,
 				}
 

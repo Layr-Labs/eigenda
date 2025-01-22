@@ -67,9 +67,9 @@ type Server struct {
 
 type Config struct {
 
-	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
+	// RelayKeys contains the keys of the relays that this server is willing to serve data for. If empty, the server will
 	// serve data for any shard it can.
-	RelayIDs []v2.RelayKey
+	RelayKeys []v2.RelayKey
 
 	// GRPCPort is the port that the relay server listens on.
 	GRPCPort int
@@ -153,7 +153,7 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataMaxConcurrency,
-		config.RelayIDs,
+		config.RelayKeys,
 		config.Timeouts.InternalGetMetadataTimeout,
 		v2.NewBlobVersionParameterMap(blobParams),
 		relayMetrics.MetadataCacheMetrics)

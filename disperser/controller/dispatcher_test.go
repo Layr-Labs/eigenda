@@ -104,7 +104,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	require.Equal(t, v2.Certified, bm1.BlobStatus)
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, objs.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objs.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err = vis[0].BatchHeader.Hash()
@@ -182,7 +182,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	}
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, failedObjs.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, failedObjs.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err = vis[0].BatchHeader.Hash()
@@ -254,7 +254,7 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	}
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, objsInBothQuorum.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objsInBothQuorum.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err := vis[0].BatchHeader.Hash()
@@ -325,8 +325,8 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.NotNil(t, bh)
 	require.Equal(t, bh, batch.BatchHeader)
 
-	// Test that blob verification infos are written
-	vi0, err := components.BlobMetadataStore.GetBlobVerificationInfo(ctx, objs.blobKeys[0], bhh)
+	// Test that blob inclusion infos are written
+	vi0, err := components.BlobMetadataStore.GetBlobInclusionInfo(ctx, objs.blobKeys[0], bhh)
 	require.NoError(t, err)
 	require.NotNil(t, vi0)
 	cert := batch.BlobCertificates[vi0.BlobIndex]
@@ -360,8 +360,8 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0},
 		},
 		{
@@ -374,8 +374,8 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0, 1, 2},
 		},
 	}

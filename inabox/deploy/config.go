@@ -369,7 +369,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_GRPC_PORT:                             grpcPort,
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
-		RELAY_RELAY_IDS:                             fmt.Sprint(ind),
+		RELAY_RELAY_KEYS:                            fmt.Sprint(ind),
 		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetreiver,
 		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
 		RELAY_PRIVATE_KEY:                           "123",
