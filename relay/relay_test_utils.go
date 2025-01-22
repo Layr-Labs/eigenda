@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -210,7 +209,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         tu.RandomString(10),
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),

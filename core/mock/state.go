@@ -240,8 +240,14 @@ func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, 
 }
 
 func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
+	quorums := make([]core.QuorumID, 0)
+	for quorumID, stake := range d.Stakes {
+		if _, ok := stake[operator]; ok {
+			quorums = append(quorums, quorumID)
+		}
+	}
 
-	state := d.GetTotalOperatorState(ctx, blockNumber)
+	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil
 

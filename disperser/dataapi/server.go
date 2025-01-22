@@ -180,6 +180,8 @@ type (
 		RetrievalSocket string `json:"retrieval_socket"`
 		DispersalOnline bool   `json:"dispersal_online"`
 		RetrievalOnline bool   `json:"retrieval_online"`
+		DispersalStatus string `json:"dispersal_status"`
+		RetrievalStatus string `json:"retrieval_status"`
 	}
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`
