@@ -11,6 +11,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,10 +26,12 @@ import (
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	t               *testing.T
-	logger          logging.Logger
-	disperserClient clients.DisperserClient
-	relayClient     clients.RelayClient
+	t                 *testing.T
+	logger            logging.Logger
+	disperserClient   clients.DisperserClient
+	relayClient       clients.RelayClient
+	indexedChainState core.IndexedChainState
+	retrievalClient   clients.RetrievalClient
 }
 
 // TODO pass in args from outer scope
@@ -66,12 +72,12 @@ func NewTestClient(t *testing.T) *TestClient {
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
-	client, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
+	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
 	require.NoError(t, err)
 
 	ethReader, err := eth.NewReader(
 		logger,
-		client,
+		ethClient,
 		"0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
 		"0x54A03db2784E3D0aCC08344D05385d0b62d4F432")
 	require.NoError(t, err)
@@ -86,11 +92,49 @@ func NewTestClient(t *testing.T) *TestClient {
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
 
+	// Construct the retrieval client
+
+	chainState := eth.NewChainState(ethReader, ethClient)
+	icsConfig := thegraph.Config{
+		Endpoint:     "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
+		PullInterval: 100 * time.Millisecond,
+		MaxRetries:   5,
+	}
+	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
+
+	//TRAFFIC_GENERATOR_G1_PATH=../../inabox/resources/kzg/g1.point \
+	//TRAFFIC_GENERATOR_G2_PATH=../../inabox/resources/kzg/g2.point \
+	//TRAFFIC_GENERATOR_CACHE_PATH=../../inabox/resources/kzg/SRSTables \
+	//TRAFFIC_GENERATOR_SRS_ORDER=3000 \
+	//TRAFFIC_GENERATOR_SRS_LOAD=3000 \
+
+	kzgConfig := &kzg.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          "/Users/cody/ws/srs/g1.point",
+		G2Path:          "/Users/cody/ws/srs/g2.point",
+		G2PowerOf2Path:  "/Users/cody/ws/srs/g2.point.powerOf2",
+		CacheDir:        "/Users/cody/ws/srs/SRSTables",
+		SRSOrder:        268435456,
+		SRSNumberToLoad: 2097152,
+		NumWorker:       32,
+	}
+	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	require.NoError(t, err)
+
+	retrievalClient := clients.NewRetrievalClient(
+		logger,
+		ethReader,
+		indexedChainState,
+		blobVerifier,
+		20)
+
 	return &TestClient{
-		t:               t,
-		logger:          logger,
-		disperserClient: disperserClient,
-		relayClient:     relayClient,
+		t:                 t,
+		logger:            logger,
+		disperserClient:   disperserClient,
+		relayClient:       relayClient,
+		indexedChainState: indexedChainState,
+		retrievalClient:   retrievalClient,
 	}
 }
 
@@ -174,4 +218,29 @@ func (c *TestClient) DispersePayload(
 		require.Equal(c.t, payload, relayPayload)
 	}
 
+	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
+	require.NoError(c.t, err)
+
+	// Read the blob from the validators from each quorum.
+	for _, quorumID := range quorums {
+		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
+		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
+		require.NoError(c.t, err)
+
+		retrievedBlob, err := c.retrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
+		require.NoError(c.t, err)
+
+		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
+
+		// The payload may have a bunch of 0s appended at the end. Remove them.
+		require.True(c.t, len(retrievedPayload) >= len(payload))
+		truncatedPayload := retrievedPayload[:len(payload)]
+
+		// Only 0s should be appended at the end.
+		for i := len(payload); i < len(retrievedPayload); i++ {
+			require.Equal(c.t, byte(0), retrievedPayload[i])
+		}
+
+		require.Equal(c.t, payload, truncatedPayload)
+	}
 }
