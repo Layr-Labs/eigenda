@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	"sync"
 	"testing"
 	"time"
 )
@@ -21,12 +22,25 @@ var (
 		SRSOrder:                      268435456,
 		SRSNumberToLoad:               2097152,
 	}
+
+	preprodLock   sync.Mutex
+	preprodClient *TestClient
 )
+
+func getPreprodClient(t *testing.T) *TestClient {
+	preprodLock.Lock()
+	defer preprodLock.Unlock()
+
+	if preprodClient == nil {
+		preprodClient = NewTestClient(t, preprodConfig)
+	}
+
+	return preprodClient
+}
 
 func TestSimpleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-
-	client := NewTestClient(t, preprodConfig)
+	client := getPreprodClient(t)
 
 	dataLength := 1024 + rand.Intn(1024)
 	data := rand.Bytes(dataLength)
@@ -35,6 +49,8 @@ func TestSimpleDispersal(t *testing.T) {
 	quorums[0] = core.QuorumID(0)
 	quorums[1] = core.QuorumID(1)
 
-	client.DispersePayload(context.Background(), 10*time.Minute, data, quorums)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
 
+	client.DisperseAndVerify(ctx, data, quorums)
 }

@@ -49,8 +49,6 @@ type TestClientConfig struct {
 	SRSNumberToLoad               uint64
 }
 
-// TODO pass in args from outer scope
-
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
@@ -149,20 +147,24 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	}
 }
 
-// TODO break this into helper functions to make more readable
-
-// DispersePayload sends a payload to the disperser. Waits until the payload is confirmed and then reads
+// DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
 // it back from the relays and the validators.
-func (c *TestClient) DispersePayload(
+func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
-	timeout time.Duration,
 	payload []byte,
 	quorums []core.QuorumID) {
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	key := c.DispersePayload(ctx, payload, quorums)
+	blobCert := c.WaitForCertification(ctx, key)
+	c.ReadBlobFromRelay(ctx, key, blobCert, payload)
+	c.ReadBlobFromValidators(ctx, blobCert, quorums, payload)
+}
 
-	// Disperse the blob.
+// DispersePayload sends a payload to the disperser. Returns the blob key.
+func (c *TestClient) DispersePayload(
+	ctx context.Context,
+	payload []byte,
+	quorums []core.QuorumID) corev2.BlobKey {
 
 	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
 
@@ -170,16 +172,17 @@ func (c *TestClient) DispersePayload(
 	_, key, err := c.disperserClient.DisperseBlob(ctx, padded, 0, quorums, 0)
 	require.NoError(c.t, err)
 	fmt.Printf("Dispersed blob with key %x\n", key)
-	fmt.Printf("Blob Status: %s\n", v2.BlobStatus_QUEUED.String())
 
-	// Wait for the blob to be certified.
+	return key
+}
 
-	status := v2.BlobStatus_QUEUED
+// WaitForCertification waits for a blob to be certified. Returns the blob certificate.
+func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKey) *commonv2.BlobCertificate {
+	var status *v2.BlobStatus = nil
 	ticker := time.NewTicker(time.Second)
 	start := time.Now()
 	statusStart := start
-	var blobCert *commonv2.BlobCertificate = nil
-	for blobCert == nil {
+	for {
 		select {
 		case <-ticker.C:
 			reply, err := c.disperserClient.GetBlobStatus(ctx, key)
@@ -193,17 +196,22 @@ func (c *TestClient) DispersePayload(
 					elapsed.Seconds(),
 					totalElapsed.Seconds())
 
-				blobCert = reply.BlobVerificationInfo.BlobCertificate
+				blobCert := reply.BlobVerificationInfo.BlobCertificate
 				require.NotNil(c.t, blobCert)
 				require.True(c.t, len(blobCert.Relays) >= 1)
-				// TODO additional verifications on blob cert
-			} else if reply.Status != status {
+				return blobCert
+
+			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
 				statusStart = time.Now()
-				fmt.Printf("Blob status: %s (spent %0.1fs in prior status)\n",
-					reply.Status.String(),
-					elapsed.Seconds())
-				status = reply.Status
+				if status == nil {
+					fmt.Printf("Blob status: %s\n", reply.Status.String())
+				} else {
+					fmt.Printf("Blob status: %s (spent %0.1fs in prior status)\n",
+						reply.Status.String(),
+						elapsed.Seconds())
+				}
+				status = &reply.Status
 
 				if reply.Status == v2.BlobStatus_FAILED ||
 					reply.Status == v2.BlobStatus_UNKNOWN ||
@@ -218,8 +226,15 @@ func (c *TestClient) DispersePayload(
 			require.Fail(c.t, "Timed out waiting for blob to be confirmed")
 		}
 	}
+}
 
-	// Read the blob from each relay in custody of the blob.
+// ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.
+func (c *TestClient) ReadBlobFromRelay(
+	ctx context.Context,
+	key corev2.BlobKey,
+	blobCert *commonv2.BlobCertificate,
+	payload []byte) {
+
 	for _, relayID := range blobCert.Relays {
 		fmt.Printf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
@@ -228,11 +243,18 @@ func (c *TestClient) DispersePayload(
 		relayPayload := codec.RemoveEmptyByteFromPaddedBytes(blobFromRelay)
 		require.Equal(c.t, payload, relayPayload)
 	}
+}
+
+// ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
+func (c *TestClient) ReadBlobFromValidators(
+	ctx context.Context,
+	blobCert *commonv2.BlobCertificate,
+	quorums []core.QuorumID,
+	payload []byte) {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
 	require.NoError(c.t, err)
 
-	// Read the blob from the validators from each quorum.
 	for _, quorumID := range quorums {
 		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
