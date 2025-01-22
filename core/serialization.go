@@ -535,6 +535,14 @@ func (s OperatorSocket) GetV1DispersalSocket() string {
 	return fmt.Sprintf("%s:%s", ip, v1DispersalPort)
 }
 
+func (s OperatorSocket) GetV2DispersalSocket() string {
+	ip, _, _, v2DispersalPort, err := ParseOperatorSocket(string(s))
+	if err != nil || v2DispersalPort == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%s", ip, v2DispersalPort)
+}
+
 func (s OperatorSocket) GetRetrievalSocket() string {
 	ip, _, retrievalPort, _, err := ParseOperatorSocket(string(s))
 	if err != nil {
