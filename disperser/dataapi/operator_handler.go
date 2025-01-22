@@ -53,7 +53,7 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
 	}
 
-	dispersalSocket := operatorSocket.GetDispersalSocket()
+	dispersalSocket := operatorSocket.GetV1DispersalSocket()
 	dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
 	dispersalOnline, dispersalStatus := false, fmt.Sprintf("port closed or unreachable for %s", dispersalSocket)
 	if dispersalPortOpen {

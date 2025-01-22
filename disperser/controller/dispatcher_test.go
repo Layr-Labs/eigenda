@@ -75,9 +75,9 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	mockClient0 := clientsmock.NewNodeClient()
 	sig0 := mockChainState.KeyPairs[opId0].SignMessage(bhh)
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(sig0, nil)
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
@@ -150,9 +150,9 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	// only op2 signs - quorum 0 will have 0 signing rate, quorum 1 will have 20%
 	mockClient0 := clientsmock.NewNodeClient()
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
@@ -223,9 +223,9 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	// no operators sign, all blobs will have insufficient signatures
 	mockClient0 := clientsmock.NewNodeClient()
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)

@@ -47,6 +47,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_RETRIEVAL_PORT"),
 	}
+	V2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
+		Usage:    "Port at which node registers to listen for v2 dispersal calls",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -218,7 +224,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolFlag{
+	EnableV2Flag = cli.BoolTFlag{
 		Name:     "enable-v2",
 		Usage:    "Enable V2 features",
 		Required: false,
@@ -237,6 +243,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
 		Value:    20 * time.Second,
+	}
+	GRPCMsgSizeLimitV2Flag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-msg-size-limit-v2"),
+		Usage:    "The maximum message size in bytes the V2 dispersal endpoint can receive from the client. This flag is only relevant in v2 (default: 1MB)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
+		Value:    1024 * 1024,
 	}
 	DisableDispersalAuthenticationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
@@ -416,8 +429,10 @@ var optionalFlags = []cli.Flag{
 	BLSSignerCertFileFlag,
 	BLSSignerAPIKeyFlag,
 	EnableV2Flag,
+	V2DispersalPortFlag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
+	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
 	DisableDispersalAuthenticationFlag,

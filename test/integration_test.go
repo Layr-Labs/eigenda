@@ -357,6 +357,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			RetrievalPort:                       op.RetrievalPort,
 			InternalRetrievalPort:               op.RetrievalPort,
 			InternalDispersalPort:               op.DispersalPort,
+			V2DispersalPort:                     op.V2DispersalPort,
 			EnableMetrics:                       false,
 			Timeout:                             10,
 			ExpirationPollIntervalSec:           10,
@@ -380,7 +381,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
 		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
-		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort)
+		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort)
 		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
 
 		noopMetrics := metrics.NewNoopMetrics()
