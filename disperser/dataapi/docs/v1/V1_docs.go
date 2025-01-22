@@ -941,6 +941,15 @@ const docTemplateV1 = `{
                 },
                 "retrieval_status": {
                     "type": "string"
+                },
+                "v2_dispersal_online": {
+                    "type": "boolean"
+                },
+                "v2_dispersal_socket": {
+                    "type": "string"
+                },
+                "v2_dispersal_status": {
+                    "type": "string"
                 }
             }
         },

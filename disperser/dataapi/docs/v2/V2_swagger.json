@@ -1257,6 +1257,9 @@
                 "dispersal_socket": {
                     "type": "string"
                 },
+                "dispersal_status": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -1264,6 +1267,18 @@
                     "type": "boolean"
                 },
                 "retrieval_socket": {
+                    "type": "string"
+                },
+                "retrieval_status": {
+                    "type": "string"
+                },
+                "v2_dispersal_online": {
+                    "type": "boolean"
+                },
+                "v2_dispersal_socket": {
+                    "type": "string"
+                },
+                "v2_dispersal_status": {
                     "type": "string"
                 }
             }

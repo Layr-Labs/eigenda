@@ -1260,6 +1260,9 @@ const docTemplateV2 = `{
                 "dispersal_socket": {
                     "type": "string"
                 },
+                "dispersal_status": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -1267,6 +1270,18 @@ const docTemplateV2 = `{
                     "type": "boolean"
                 },
                 "retrieval_socket": {
+                    "type": "string"
+                },
+                "retrieval_status": {
+                    "type": "string"
+                },
+                "v2_dispersal_online": {
+                    "type": "boolean"
+                },
+                "v2_dispersal_socket": {
+                    "type": "string"
+                },
+                "v2_dispersal_status": {
                     "type": "string"
                 }
             }
