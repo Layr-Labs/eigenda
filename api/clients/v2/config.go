@@ -17,15 +17,20 @@ type EigenDAClientConfig struct {
 	// The address of the EigenDABlobVerifier contract
 	EigenDABlobVerifierAddr string
 
-	// BlobPolynomialForm is the form that the blob polynomial is commited to and dispersed in, as well as the form the
-	// blob polynomial will be received in from the relay.
+	// PayloadPolynomialForm is the initial form of a Payload after being encoded. The configured form does not imply
+	// any restrictions on the contents of a payload: it merely dictates how payload data is treated after being
+	// encoded.
 	//
-	// The chosen form dictates how the KZG commitment made to the blob can be used. If the polynomial is in Coeff form
-	// when committed to, then it will be possible to open points on the KZG commitment to prove that the field elements
-	// correspond to the commitment. If the polynomial is in Eval form when committed to, then it will not be possible
-	// to create a commitment opening: the blob will need to be supplied in its entirety to perform a verification that
-	// any part of the data matches the KZG commitment.
-	BlobPolynomialForm codecs.PolynomialForm
+	// Since blobs sent to the disperser must be in coefficient form, the initial form of the encoded payload dictates
+	// what data processing must be performed during blob construction.
+	//
+	// The chosen form also dictates how the KZG commitment made to the blob can be used. If the encoded payload starts
+	// in PolynomialFormEval (meaning the data WILL be IFFTed before computing the commitment) then it will be possible
+	// to open points on the KZG commitment to prove that the field elements correspond to the commitment. If the
+	// encoded payload starts in PolynomialFormCoeff (meaning the data will NOT be IFFTed before computing the
+	// commitment) then it will not be possible to create a commitment opening: the blob will need to be supplied in its
+	// entirety to perform a verification that any part of the data matches the KZG commitment.
+	PayloadPolynomialForm codecs.PolynomialForm
 
 	// The timeout duration for relay calls to retrieve blobs.
 	RelayTimeout time.Duration

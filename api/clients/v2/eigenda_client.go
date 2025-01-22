@@ -264,17 +264,16 @@ func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
 		return nil, fmt.Errorf("create low level codec: %w", err)
 	}
 
-	switch config.BlobPolynomialForm {
-	case codecs.Eval:
-		// a blob polynomial is already in Eval form after being encoded. Therefore, we use the NoIFFTCodec, which
-		// doesn't do any further conversion.
+	switch config.PayloadPolynomialForm {
+	case codecs.PolynomialFormCoeff:
+		// Data must NOT be IFFTed during blob construction, since the payload is already in PolynomialFormCoeff after
+		// being encoded.
 		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
-	case codecs.Coeff:
-		// a blob polynomial starts in Eval form after being encoded. Therefore, we use the IFFT codec to transform
-		// the blob into Coeff form after initial encoding. This codec also transforms the Coeff form received from the
-		// relay back into Eval form when decoding.
+	case codecs.PolynomialFormEval:
+		// Data MUST be IFFTed during blob construction, since the payload is in PolynomialFormEval after being encoded,
+		// but must be in PolynomialFormCoeff to produce a valid blob.
 		return codecs.NewIFFTCodec(lowLevelCodec), nil
 	default:
-		return nil, fmt.Errorf("unsupported polynomial form: %d", config.BlobPolynomialForm)
+		return nil, fmt.Errorf("unsupported polynomial form: %d", config.PayloadPolynomialForm)
 	}
 }

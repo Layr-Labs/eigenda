@@ -1,11 +1,13 @@
 package codecs
 
-// PolynomialForm is an enum that represents the different ways that a blob polynomial may be represented
+// PolynomialForm is an enum that describes the different ways a polynomial may be represented.
 type PolynomialForm uint
 
 const (
-	// Eval is short for "evaluation form". The field elements represent the evaluation of the polynomial at roots of unity.
-	Eval PolynomialForm = iota
-	// Coeff is short for "coefficient form". The field elements represent the coefficients of the polynomial
-	Coeff
+	// PolynomialFormEval is short for polynomial "evaluation form".
+	// The field elements represent the evaluation of the polynomial at roots of unity.
+	PolynomialFormEval PolynomialForm = iota
+	// PolynomialFormCoeff is short for polynomial "coefficient form".
+	// The field elements represent the coefficients of the polynomial.
+	PolynomialFormCoeff
 )
