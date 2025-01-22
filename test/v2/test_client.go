@@ -30,10 +30,10 @@ import (
 type TestClient struct {
 	t                 *testing.T
 	logger            logging.Logger
-	disperserClient   clients.DisperserClient
-	relayClient       clients.RelayClient
+	DisperserClient   clients.DisperserClient
+	RelayClient       clients.RelayClient
 	indexedChainState core.IndexedChainState
-	retrievalClient   clients.RetrievalClient
+	RetrievalClient   clients.RetrievalClient
 }
 
 type TestClientConfig struct {
@@ -140,10 +140,10 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	return &TestClient{
 		t:                 t,
 		logger:            logger,
-		disperserClient:   disperserClient,
-		relayClient:       relayClient,
+		DisperserClient:   disperserClient,
+		RelayClient:       relayClient,
 		indexedChainState: indexedChainState,
-		retrievalClient:   retrievalClient,
+		RetrievalClient:   retrievalClient,
 	}
 }
 
@@ -169,7 +169,7 @@ func (c *TestClient) DispersePayload(
 	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
 
 	padded := codec.ConvertByPaddingEmptyByte(payload)
-	_, key, err := c.disperserClient.DisperseBlob(ctx, padded, 0, quorums, 0)
+	_, key, err := c.DisperserClient.DisperseBlob(ctx, padded, 0, quorums, 0)
 	require.NoError(c.t, err)
 	fmt.Printf("Dispersed blob with key %x\n", key)
 
@@ -185,7 +185,7 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 	for {
 		select {
 		case <-ticker.C:
-			reply, err := c.disperserClient.GetBlobStatus(ctx, key)
+			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
 			require.NoError(c.t, err)
 
 			if reply.Status == v2.BlobStatus_CERTIFIED {
@@ -237,7 +237,7 @@ func (c *TestClient) ReadBlobFromRelay(
 
 	for _, relayID := range blobCert.Relays {
 		fmt.Printf("Reading blob from relay %d\n", relayID)
-		blobFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
+		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		require.NoError(c.t, err)
 
 		relayPayload := codec.RemoveEmptyByteFromPaddedBytes(blobFromRelay)
@@ -260,7 +260,7 @@ func (c *TestClient) ReadBlobFromValidators(
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
 		require.NoError(c.t, err)
 
-		retrievedBlob, err := c.retrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
+		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
 		require.NoError(c.t, err)
 
 		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)

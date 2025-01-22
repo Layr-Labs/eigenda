@@ -27,6 +27,8 @@ var (
 	preprodClient *TestClient
 )
 
+// TODO: automatically download KZG points if they are not present
+
 func getPreprodClient(t *testing.T) *TestClient {
 	preprodLock.Lock()
 	defer preprodLock.Unlock()
@@ -38,12 +40,15 @@ func getPreprodClient(t *testing.T) *TestClient {
 	return preprodClient
 }
 
-func TestSimpleDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+// Tests the basic dispersal workflow:
+// - disperse a blob
+// - wait for it to be confirmed
+// - read the blob from the relays
+// - read the blob from the validators
+func testBasicDispersal(t *testing.T, rand *random.TestRandom, payloadSize int) {
 	client := getPreprodClient(t)
 
-	dataLength := 1024 + rand.Intn(1024)
-	data := rand.Bytes(dataLength)
+	data := rand.Bytes(payloadSize)
 
 	quorums := make([]core.QuorumID, 2)
 	quorums[0] = core.QuorumID(0)
@@ -54,3 +59,39 @@ func TestSimpleDispersal(t *testing.T) {
 
 	client.DisperseAndVerify(ctx, data, quorums)
 }
+
+// Disperse a 0 byte payload.
+func TestEmptyBlobDispersal(t *testing.T) {
+	rand := random.NewTestRandom(t)
+	testBasicDispersal(t, rand, 0)
+}
+
+// Disperse a 1 byte payload.
+func TestMicroscopicBlobDispersal(t *testing.T) {
+	rand := random.NewTestRandom(t)
+	testBasicDispersal(t, rand, 1)
+}
+
+// Disperse a small payload (between 1KB and 2KB).
+func TestSmallBlobDispersal(t *testing.T) {
+	rand := random.NewTestRandom(t)
+	dataLength := 1024 + rand.Intn(1024)
+	testBasicDispersal(t, rand, dataLength)
+}
+
+// Disperse a medium payload (between 100KB and 200KB).
+func TestMediumBlobDispersal(t *testing.T) {
+	rand := random.NewTestRandom(t)
+	dataLength := 1024 * (100 + rand.Intn(100))
+	testBasicDispersal(t, rand, dataLength)
+}
+
+// Disperse a medium payload (between 1MB and 16MB).
+func TestLargeBlobDispersal(t *testing.T) {
+	rand := random.NewTestRandom(t)
+	dataLength := 1024 * 1024 * (1 + rand.Intn(16))
+	testBasicDispersal(t, rand, dataLength)
+}
+
+// TODO size 0 blob
+// TODO maximum size blob
