@@ -20,6 +20,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 	"os"
+	"path"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,30 +36,46 @@ type TestClient struct {
 	retrievalClient   clients.RetrievalClient
 }
 
+type TestClientConfig struct {
+	PrivateKeyFile                string
+	DisperserHostname             string
+	DisperserPort                 int
+	EthRPCURLs                    []string
+	BLSOperatorStateRetrieverAddr string
+	EigenDAServiceManagerAddr     string
+	SubgraphURL                   string
+	KZGPath                       string
+	SRSOrder                      uint64
+	SRSNumberToLoad               uint64
+}
+
 // TODO pass in args from outer scope
 
 // NewTestClient creates a new TestClient instance.
-func NewTestClient(t *testing.T) *TestClient {
+func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 
 	// Construct the disperser client
 
-	privateKey := os.Getenv("V2_TEST_PRIVATE_KEY")
-	if privateKey == "" {
-		require.Fail(t, "V2_TEST_PRIVATE_KEY environment variable must be set")
-	}
+	privateKeyFile := config.PrivateKeyFile
+	privateKey, err := os.ReadFile(privateKeyFile)
+	require.NoError(t, err)
 
-	signer := auth.NewLocalBlobRequestSigner(privateKey)
+	privateKeyString := string(privateKey)
+	privateKeyString = strings.Trim(privateKeyString, "\n \t")
+	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
+
+	signer := auth.NewLocalBlobRequestSigner(privateKeyString)
 	signerAccountId, err := signer.GetAccountID()
 	require.NoError(t, err)
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	fmt.Printf("Account ID: %s\n", accountId.String())
 
 	disperserConfig := &clients.DisperserClientConfig{
-		Hostname:          "disperser-preprod-holesky.eigenda.xyz",
-		Port:              "443",
+		Hostname:          config.DisperserHostname,
+		Port:              fmt.Sprintf("%d", config.DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
@@ -65,10 +83,9 @@ func NewTestClient(t *testing.T) *TestClient {
 
 	// Construct the relay client
 
-	rpcURLs := []string{"https://ethereum-holesky-rpc.publicnode.com"}
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          rpcURLs,
-		PrivateKeyString: privateKey, // TODO is this correct?
+		RPCURLs:          config.EthRPCURLs,
+		PrivateKeyString: privateKeyString,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -78,8 +95,8 @@ func NewTestClient(t *testing.T) *TestClient {
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		"0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
-		"0x54A03db2784E3D0aCC08344D05385d0b62d4F432")
+		config.BLSOperatorStateRetrieverAddr,
+		config.EigenDAServiceManagerAddr)
 	require.NoError(t, err)
 
 	relayURLS, err := ethReader.GetRelayURLs(context.Background())
@@ -96,26 +113,20 @@ func NewTestClient(t *testing.T) *TestClient {
 
 	chainState := eth.NewChainState(ethReader, ethClient)
 	icsConfig := thegraph.Config{
-		Endpoint:     "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
+		Endpoint:     config.SubgraphURL,
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
-	//TRAFFIC_GENERATOR_G1_PATH=../../inabox/resources/kzg/g1.point \
-	//TRAFFIC_GENERATOR_G2_PATH=../../inabox/resources/kzg/g2.point \
-	//TRAFFIC_GENERATOR_CACHE_PATH=../../inabox/resources/kzg/SRSTables \
-	//TRAFFIC_GENERATOR_SRS_ORDER=3000 \
-	//TRAFFIC_GENERATOR_SRS_LOAD=3000 \
-
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:          "/Users/cody/ws/srs/g1.point",
-		G2Path:          "/Users/cody/ws/srs/g2.point",
-		G2PowerOf2Path:  "/Users/cody/ws/srs/g2.point.powerOf2",
-		CacheDir:        "/Users/cody/ws/srs/SRSTables",
-		SRSOrder:        268435456,
-		SRSNumberToLoad: 2097152,
+		G1Path:          path.Join(config.KZGPath, "g1.point"),
+		G2Path:          path.Join(config.KZGPath, "g2.point"),
+		G2PowerOf2Path:  path.Join(config.KZGPath, "g2.point.powerOf2"),
+		CacheDir:        path.Join(config.KZGPath, "SRSTables"),
+		SRSOrder:        config.SRSOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
 	}
 	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
