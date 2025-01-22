@@ -144,12 +144,6 @@ func (cursor *BlobFeedCursor) FromCursorKey(encoded string) (*BlobFeedCursor, er
 	if err != nil {
 		return nil, err
 	}
-	if len(blobKey) == 0 {
-		return &BlobFeedCursor{
-			RequestedAt: requestedAt,
-		}, nil
-
-	}
 	return &BlobFeedCursor{
 		RequestedAt: requestedAt,
 		BlobKey:     blobKey,
@@ -387,38 +381,80 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 	return result, lastProcessedCursor, nil
 }
 
-// queryBucketAttestation queries a single bucket for attestations within the given time range.
-func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, startTs, endTs uint64) ([]*corev2.Attestation, error) {
-	items, err := s.dynamoDBClient.QueryIndex(
-		ctx,
-		s.tableName,
-		AttestedAtIndexName,
-		"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
-		commondynamodb.ExpressionValues{
-			":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-			":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTs), 10)},
-			":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(endTs), 10)},
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
-	}
+// queryBucketAttestation returns attestations within a single bucket of time range
+// [start, end]. Results are ordered by AttestedAt in ascending order.
+//
+// The function handles DynamoDB's 1MB response size limitation by performing multiple queries
+// if necessary.
+// If there are more than numToReturn attestations in the bucket, returns numToReturn
+// attestations; otherwise returns all attestations in bucket.
+func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, start, end uint64, numToReturn int) ([]*corev2.Attestation, error) {
+	attestations := make([]*corev2.Attestation, 0)
+	var lastEvaledKey map[string]types.AttributeValue
 
-	attestation := make([]*corev2.Attestation, len(items))
-	for i, item := range items {
-		attestation[i], err = UnmarshalAttestation(item)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+	// Iteratively fetch results from the bucket until we get desired number of items
+	// or exhaust the entire bucket.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		startTime := start
+		if lastEvaledKey != nil {
+			at, err := UnmarshalAttestedAt(lastEvaledKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse the AttestedAt from the LastEvaluatedKey: %w", err)
+			}
+			startTime = at
 		}
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			AttestedAtIndexName,
+			"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTime), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
+			},
+			0, // no limit within a bucket
+			lastEvaledKey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			at, err := UnmarshalAttestation(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+			}
+			attestations = append(attestations, at)
+
+			// Desired number of items collected
+			if len(attestations) >= numToReturn {
+				return attestations, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
 	}
 
-	return attestation, nil
+	return attestations, nil
 }
 
-// GetAttestationByAttestedAt returns batches/attestations that are in AttestedAt timestamp
-// range (start, end]. Returned attestations are in ascending order of this timestamp.
+// GetAttestationByAttestedAt returns attestations within a specified time range (start, end],
+// ordered by their AttestedAt timestamp in ascending order.
 //
-// If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations in the time range.
+// The function splits the time range into buckets and queries each bucket sequentially.
+// Results from all buckets are combined while maintaining the ordering.
+//
+// If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
+// in the time range.
 func (s *BlobMetadataStore) GetAttestationByAttestedAt(
 	ctx context.Context,
 	start uint64,
@@ -437,7 +473,11 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAt(
 			break
 		}
 
-		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, start+1, end)
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
+		}
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, start+1, end, remaining)
 		if err != nil {
 			return nil, err
 		}
@@ -1269,6 +1309,20 @@ func UnmarshalBatchHeaderHash(item commondynamodb.Item) ([32]byte, error) {
 
 	root := strings.TrimPrefix(obj.PK, dispersalKeyPrefix)
 	return hexToHash(root)
+}
+
+func UnmarshalAttestedAt(item commondynamodb.Item) (uint64, error) {
+	type Object struct {
+		AttestedAt uint64
+	}
+
+	obj := Object{}
+	err := attributevalue.UnmarshalMap(item, &obj)
+	if err != nil {
+		return 0, err
+	}
+
+	return obj.AttestedAt, nil
 }
 
 func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {

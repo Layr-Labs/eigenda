@@ -656,6 +656,90 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
+	ctx := context.Background()
+
+	// Use a fixed "now" so all attestations will deterministically fall in just one
+	// bucket.
+	timestamp := "2025-01-21T15:04:05Z"
+	parsedTime, err := time.Parse(time.RFC3339, timestamp)
+	require.NoError(t, err)
+	now := uint64(parsedTime.UnixNano())
+
+	numBatches := 240
+	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Second.Nanoseconds()) // 1 batch per second
+
+	// Create attestations for testing
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		bhh, err := batchHeaders[i].Hash()
+		assert.NoError(t, err)
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		// Create a sizable nonsigners so the attestation message is big
+		nonsigners := make([]*core.G1Point, 0)
+		for i := 0; i < 200; i++ {
+			nonsigners = append(nonsigners, core.NewG1Point(big.NewInt(int64(i)), big.NewInt(int64(i+1))))
+		}
+		attestation := &corev2.Attestation{
+			BatchHeader:      batchHeaders[i],
+			AttestedAt:       attestedAt[i],
+			NonSignerPubKeys: nonsigners,
+			APKG2:            apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	// The total bytes written to the bucket will be greater than 1MB, so if a query tries to
+	// fetch all results in the bucket, it has to use pagination.
+	// Each attestation has 200 nonsigners and the G1 point has 32 bytes, so we have
+	// 32*3200*numBatches bytes just for nonsigners (attestations' size must be greater).
+	assert.True(t, 32*200*numBatches > 1*1024*1024)
+
+	defer deleteItems(t, dynamoKeys)
+
+	// Test the query can fetch all attestations in a bucket
+	t.Run("full range", func(t *testing.T) {
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+
+	// Test the query returns after getting desired num of attestations in a bucket
+	t.Run("return after getting desired num of items", func(t *testing.T) {
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 125)
+		require.NoError(t, err)
+		require.Equal(t, 125, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+}
+
 func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 	ctx := context.Background()
 	numBlobs := 103
