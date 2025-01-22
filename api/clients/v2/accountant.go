@@ -109,7 +109,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
+func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
 	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,6 @@ func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums
 		AccountID:         a.accountID,
 		ReservationPeriod: reservationPeriod,
 		CumulativePayment: cumulativePayment,
-		Salt:              salt,
 	}
 
 	return pm, nil

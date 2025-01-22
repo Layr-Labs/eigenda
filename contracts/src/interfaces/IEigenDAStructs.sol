@@ -81,6 +81,7 @@ struct BlobHeaderV2 {
     uint16 version;
     bytes quorumNumbers;
     BlobCommitment commitment;
+    uint32 salt;
     bytes32 paymentHeaderHash;
 }
 

@@ -14,13 +14,13 @@
 - [common/common.proto](#common_common-proto)
     - [BlobCommitment](#common-BlobCommitment)
     - [G1Commitment](#common-G1Commitment)
-    - [PaymentHeader](#common-PaymentHeader)
   
 - [common/v2/common_v2.proto](#common_v2_common_v2-proto)
     - [Batch](#common-v2-Batch)
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
     - [BlobHeader](#common-v2-BlobHeader)
+    - [PaymentHeader](#common-v2-PaymentHeader)
   
 - [disperser/disperser.proto](#disperser_disperser-proto)
     - [AuthenticatedReply](#disperser-AuthenticatedReply)
@@ -37,7 +37,6 @@
     - [BlobVerificationProof](#disperser-BlobVerificationProof)
     - [DisperseBlobReply](#disperser-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-DisperseBlobRequest)
-    - [DispersePaidBlobRequest](#disperser-DispersePaidBlobRequest)
     - [RetrieveBlobReply](#disperser-RetrieveBlobReply)
     - [RetrieveBlobRequest](#disperser-RetrieveBlobRequest)
   
@@ -277,24 +276,6 @@ A KZG commitment
 
 
 
-
-<a name="common-PaymentHeader"></a>
-
-### PaymentHeader
-PaymentHeader contains payment information for a blob.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
-| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
-| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
-| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
-
-
-
-
-
  
 
  
@@ -376,8 +357,31 @@ BlobHeader contains the information describing a blob and the way it is to be di
 
 The following quorums are currently required: - 0: ETH - 1: EIGEN |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
+| payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
+| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
+
+
+
+
+
+
+<a name="common-v2-PaymentHeader"></a>
+
+### PaymentHeader
+PaymentHeader contains payment information for a blob.
+At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+is always considered before cumulative_payment. If reservation_period is set but not valid, 
+the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer. |
 
 
 
@@ -634,24 +638,6 @@ BlobStatusRequest is used to query the status of a blob.
 | data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617 If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
 | custom_quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob will be sent, in addition to the required quorums which are configured on the EigenDA smart contract. If required quorums are included here, an error will be returned. The disperser will ensure that the encoded blobs for each quorum are all processed within the same batch. |
 | account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
-
-
-
-
-
-
-<a name="disperser-DispersePaidBlobRequest"></a>
-
-### DispersePaidBlobRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
-| quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains account_id, reservation_period, cumulative_payment, and salt |
-| payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 
 

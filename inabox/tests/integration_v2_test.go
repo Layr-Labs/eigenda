@@ -307,6 +307,7 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 					DataLength: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
+				Salt:              blobCertificate.BlobHeader.Salt,
 			},
 			RelayKeys: blobCertificate.RelayKeys,
 		},

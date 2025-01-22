@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"strconv"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -492,11 +492,8 @@ type PaymentMetadata struct {
 
 	// ReservationPeriod represents the range of time at which the dispersal is made
 	ReservationPeriod uint32 `json:"reservation_period"`
-	// TODO: we are thinking the contract can use uint128 for cumulative payment,
-	// but the definition on v2 uses uint64. Double check with team.
+	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
-	// Allow same blob to be dispersed multiple times within the same reservation period
-	Salt uint32 `json:"salt"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -516,10 +513,6 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		{
 			Name: "cumulativePayment",
 			Type: "uint256",
-		},
-		{
-			Name: "salt",
-			Type: "uint32",
 		},
 	})
 	if err != nil {
@@ -557,7 +550,6 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
-			"Salt": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Salt)},
 		},
 	}, nil
 }
@@ -574,28 +566,22 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	}
 	pm.ReservationPeriod = uint32(reservationPeriod)
 	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
-	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to parse Salt: %w", err)
-	}
-	pm.Salt = uint32(salt)
 	return nil
 }
 
-func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 	if pm == nil {
 		return nil
 	}
-	return &commonpb.PaymentHeader{
+	return &commonpbv2.PaymentHeader{
 		AccountId:         pm.AccountID,
 		ReservationPeriod: pm.ReservationPeriod,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
-		Salt:              pm.Salt,
 	}
 }
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
 	if ph == nil {
 		return nil
 	}
@@ -604,7 +590,6 @@ func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
 		AccountID:         ph.AccountId,
 		ReservationPeriod: ph.ReservationPeriod,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
-		Salt:              ph.Salt,
 	}
 }
 
