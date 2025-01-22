@@ -64,6 +64,20 @@ func DefaultLoggerConfig() LoggerConfig {
 	}
 }
 
+// DefaultTextLoggerConfig returns a LoggerConfig with the default settings for a text logger.
+// For use in tests or other scenarios where the logs are consumed by humans.
+func DefaultTextLoggerConfig() LoggerConfig {
+	return LoggerConfig{
+		Format:       TextLogFormat,
+		OutputWriter: os.Stdout,
+		HandlerOpts: logging.SLoggerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+			NoColor:   true, // color is nice in the console, but not nice when written to a file
+		},
+	}
+}
+
 func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, error) {
 	cfg := DefaultLoggerConfig()
 	format := ctx.GlobalString(PrefixFlag(flagPrefix, FormatFlagName))
