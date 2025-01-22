@@ -381,13 +381,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 	return result, lastProcessedCursor, nil
 }
 
-// queryBucketAttestation returns attestations within a single bucket of time range
-// [start, end]. Results are ordered by AttestedAt in ascending order.
+// queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
+// ascending order.
 //
-// The function handles DynamoDB's 1MB response size limitation by performing multiple queries
-// if necessary.
-// If there are more than numToReturn attestations in the bucket, returns numToReturn
-// attestations; otherwise returns all attestations in bucket.
+// The function handles DynamoDB's 1MB response size limitation by performing multiple queries  if necessary.
+// If there are more than numToReturn attestations in the bucket, returns numToReturn attestations; otherwise returns all attestations in bucket.
 func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, start, end uint64, numToReturn int) ([]*corev2.Attestation, error) {
 	attestations := make([]*corev2.Attestation, 0)
 	var lastEvaledKey map[string]types.AttributeValue
