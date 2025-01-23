@@ -203,6 +203,11 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
+	signatureType, err := abi.NewType("bytes", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
 	relayKeysType, err := abi.NewType("uint32[]", "", nil)
 	if err != nil {
 		return [32]byte{}, err
@@ -211,6 +216,9 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 	arguments := abi.Arguments{
 		{
 			Type: blobKeyType,
+		},
+		{
+			Type: signatureType,
 		},
 		{
 			Type: relayKeysType,
@@ -222,7 +230,7 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	bytes, err := arguments.Pack(blobKey, c.RelayKeys)
+	bytes, err := arguments.Pack(blobKey, c.Signature, c.RelayKeys)
 	if err != nil {
 		return [32]byte{}, err
 	}

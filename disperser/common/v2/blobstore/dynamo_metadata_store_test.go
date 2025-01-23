@@ -192,6 +192,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	now := time.Now()
 	metadata1 := &v2.BlobMetadata{
 		BlobHeader: blobHeader1,
+		Signature:  []byte{1, 2, 3},
 		BlobStatus: v2.Queued,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -199,6 +200,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	}
 	metadata2 := &v2.BlobMetadata{
 		BlobHeader: blobHeader2,
+		Signature:  []byte{4, 5, 6},
 		BlobStatus: v2.Certified,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -266,6 +268,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 		}
 		metadata := &v2.BlobMetadata{
 			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
 			BlobStatus:  v2.Encoded,
 			Expiry:      uint64(time.Now().Add(time.Hour).Unix()),
 			NumRetries:  0,
@@ -374,6 +377,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		now := time.Now()
 		metadata := &v2.BlobMetadata{
 			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
 			BlobStatus:  v2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
@@ -823,6 +827,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	blobKey, blobHeader := newBlob(t)
 	blobCert := &corev2.BlobCertificate{
 		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
 		RelayKeys:  []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
@@ -859,8 +864,8 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 					ReservationPeriod: uint32(i),
 					CumulativePayment: big.NewInt(321),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0},
 		}
 		blobKey, err := blobCert.BlobHeader.BlobKey()
@@ -899,6 +904,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	now := time.Now()
 	metadata := &v2.BlobMetadata{
 		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
 		BlobStatus: v2.Queued,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -1036,7 +1042,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
+func TestBlobMetadataStoreInclusionInfo(t *testing.T) {
 	ctx := context.Background()
 	blobKey := corev2.BlobKey{1, 1, 1}
 	batchHeader := &corev2.BatchHeader{
@@ -1045,46 +1051,46 @@ func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
-	verificationInfo := &corev2.BlobVerificationInfo{
+	inclusionInfo := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey,
 		BlobIndex:      10,
 		InclusionProof: []byte("proof"),
 	}
 
-	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	assert.NoError(t, err)
 
-	fetchedInfo, err := blobMetadataStore.GetBlobVerificationInfo(ctx, blobKey, bhh)
+	fetchedInfo, err := blobMetadataStore.GetBlobInclusionInfo(ctx, blobKey, bhh)
 	assert.NoError(t, err)
-	assert.Equal(t, verificationInfo, fetchedInfo)
+	assert.Equal(t, inclusionInfo, fetchedInfo)
 
-	// attempt to put verification info with the same key should fail
-	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	// attempt to put inclusion info with the same key should fail
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
-	// put multiple verification infos
+	// put multiple inclusion infos
 	blobKey1 := corev2.BlobKey{2, 2, 2}
-	verificationInfo1 := &corev2.BlobVerificationInfo{
+	inclusionInfo1 := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey1,
 		BlobIndex:      12,
 		InclusionProof: []byte("proof 1"),
 	}
 	blobKey2 := corev2.BlobKey{3, 3, 3}
-	verificationInfo2 := &corev2.BlobVerificationInfo{
+	inclusionInfo2 := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey2,
 		BlobIndex:      14,
 		InclusionProof: []byte("proof 2"),
 	}
-	err = blobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = blobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.NoError(t, err)
 
 	// test retries
 	nonTransientError := errors.New("non transient error")
 	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return(nil, nonTransientError).Once()
-	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = mockedBlobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.ErrorIs(t, err, nonTransientError)
 
 	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return([]dynamodb.Item{
@@ -1103,7 +1109,7 @@ func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
 			assert.Len(t, items, 1)
 		}).
 		Once()
-	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = mockedBlobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.NoError(t, err)
 	mockDynamoClient.AssertNumberOfCalls(t, "PutItems", 3)
 }
@@ -1210,7 +1216,6 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
-		Signature: sig,
 	}
 	bk, err := bh.BlobKey()
 	require.NoError(t, err)
