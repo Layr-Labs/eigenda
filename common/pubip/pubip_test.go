@@ -140,6 +140,7 @@ func TestMultiProvider(t *testing.T) {
 	require.Equal(t, 4, provider1.count)
 	require.Equal(t, 3, provider2.count)
 	require.Equal(t, 2, provider3.count)
+	require.Equal(t, "", ip)
 }
 
 func TestSimpleProvider_PublicIPAddress(t *testing.T) {
