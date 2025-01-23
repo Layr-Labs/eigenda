@@ -210,7 +210,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		blob, err := s.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
-			s.logger.Errorf("failed to get blob metadata for key %s: %v", blobKey.Hex(), err)
+			return fmt.Errorf("failed to get blob metadata for key %s: %v", blobKey.Hex(), err)
 		}
 
 		if blob.BlobStatus == status {
@@ -567,7 +567,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	lastEvaludatedKey := res.LastEvaluatedKey
 	if lastEvaludatedKey == nil {
 		lastItem := res.Items[len(res.Items)-1]
-		updatedAt, err := strconv.ParseUint(lastItem["UpdatedAt"].(*types.AttributeValueMemberN).Value, 10, 64)
+		u, ok := lastItem["UpdatedAt"].(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected *types.AttributeValueMemberN for UpdatedAt, got %T", u)
+		}
+		updatedAt, err := strconv.ParseUint(u.Value, 10, 64)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1018,12 +1022,16 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	var header *corev2.BatchHeader
 	var attestation *corev2.Attestation
 	for _, item := range items {
-		if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, batchHeaderSK) {
+		sk, ok := item["SK"].(*types.AttributeValueMemberS)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected *types.AttributeValueMemberS for SK, got %T", item["SK"])
+		}
+		if strings.HasPrefix(sk.Value, batchHeaderSK) {
 			header, err = UnmarshalBatchHeader(item)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to unmarshal batch header: %w", err)
 			}
-		} else if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, attestationSK) {
+		} else if strings.HasPrefix(sk.Value, attestationSK) {
 			attestation, err = UnmarshalAttestation(item)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to unmarshal attestation: %w", err)

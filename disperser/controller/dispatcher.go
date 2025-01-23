@@ -157,6 +157,13 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 		if err != nil {
 			d.logger.Error("failed to get node client", "operator", opID.Hex(), "err", err)
+			sigChan <- core.SigningMessage{
+				Signature:            nil,
+				Operator:             opID,
+				BatchHeaderHash:      batchData.BatchHeaderHash,
+				AttestationLatencyMs: 0,
+				Err:                  err,
+			}
 			continue
 		}
 
