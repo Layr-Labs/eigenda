@@ -60,6 +60,6 @@ type Config struct {
 	GetChunkBytesBurstinessClient int
 
 	// MaxConcurrentGetChunkOpsClient is the maximum number of concurrent GetChunk operations that are permitted.
-	// Default is 1.
+	// Default is 2.
 	MaxConcurrentGetChunkOpsClient int
 }

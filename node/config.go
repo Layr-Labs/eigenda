@@ -76,6 +76,8 @@ type Config struct {
 	UseSecureGrpc                  bool
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
+	// The maximum number of concurrent requests to any particular relay server.
+	RelayConcurrency uint
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -256,6 +258,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		RelayConcurrency:                    ctx.GlobalUint(flags.RelayConcurrencyFlag.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            ctx.GlobalBool(flags.EnableV2Flag.Name),

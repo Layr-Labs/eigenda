@@ -199,7 +199,7 @@ var (
 		Usage:    "Max number of concurrent GetChunk operations per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
-		Value:    1,
+		Value:    2, // default value should stay in sync with the default value of node.Config.RelayConcurrency
 	}
 	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),

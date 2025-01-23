@@ -23,6 +23,8 @@ type RelayClientConfig struct {
 	UseSecureGrpcFlag bool
 	OperatorID        *core.OperatorID
 	MessageSigner     MessageSigner
+	// MaxConcurrentRequests is the maximum number of concurrent requests to a particular relay server.
+	MaxConcurrentRequests uint
 }
 
 type ChunkRequestByRange struct {
@@ -52,6 +54,17 @@ type RelayClient interface {
 	Close() error
 }
 
+// grpcClient encapsulates a gRPC client and a channel for limiting concurrent requests to that client.
+type grpcClient struct {
+	// client is the gRPC client used for sending gRPC requests.
+	client relaygrpc.RelayClient
+	// permits is a channel for limiting the number of concurrent requests to the client.
+	// when a request is initiated, a value is sent to the channel, and when the request is completed,
+	// the value is received. The channel has a buffer size of `MaxConcurrentRequests`, and will block
+	// if the number of concurrent requests exceeds this limit.
+	permits chan struct{}
+}
+
 type relayClient struct {
 	config *RelayClientConfig
 
@@ -62,7 +75,7 @@ type relayClient struct {
 	conns  sync.Map
 	logger logging.Logger
 
-	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
+	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]*grpcClient`
 	grpcClients sync.Map
 }
 
@@ -95,7 +108,17 @@ func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blo
 		return nil, err
 	}
 
-	res, err := client.GetBlob(ctx, &relaygrpc.GetBlobRequest{
+	select {
+	case client.permits <- struct{}{}:
+		// permit acquired
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
+	}
+	defer func() {
+		<-client.permits
+	}()
+
+	res, err := client.client.GetBlob(ctx, &relaygrpc.GetBlobRequest{
 		BlobKey: blobKey[:],
 	})
 	if err != nil {
@@ -162,7 +185,17 @@ func (c *relayClient) GetChunksByRange(
 		return nil, err
 	}
 
-	res, err := client.GetChunks(ctx, request)
+	select {
+	case client.permits <- struct{}{}:
+		// permit acquired
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
+	}
+	defer func() {
+		<-client.permits
+	}()
+
+	res, err := client.client.GetChunks(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +238,17 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, err
 	}
 
-	res, err := client.GetChunks(ctx, request)
+	select {
+	case client.permits <- struct{}{}:
+		// permit acquired
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
+	}
+	defer func() {
+		<-client.permits
+	}()
+
+	res, err := client.client.GetChunks(ctx, request)
 
 	if err != nil {
 		return nil, err
@@ -214,7 +257,7 @@ func (c *relayClient) GetChunksByIndex(
 	return res.GetData(), nil
 }
 
-func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, error) {
+func (c *relayClient) getClient(key corev2.RelayKey) (*grpcClient, error) {
 	if err := c.initOnceGrpcConnection(key); err != nil {
 		return nil, err
 	}
@@ -222,7 +265,7 @@ func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, err
 	if !ok {
 		return nil, fmt.Errorf("no grpc client for relay key: %v", key)
 	}
-	client, ok := maybeClient.(relaygrpc.RelayClient)
+	client, ok := maybeClient.(*grpcClient)
 	if !ok {
 		return nil, fmt.Errorf("invalid grpc client for relay key: %v", key)
 	}
@@ -248,7 +291,12 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 			return
 		}
 		c.conns.Store(key, conn)
-		c.grpcClients.Store(key, relaygrpc.NewRelayClient(conn))
+
+		wrappedClient := &grpcClient{
+			client:  relaygrpc.NewRelayClient(conn),
+			permits: make(chan struct{}, c.config.MaxConcurrentRequests),
+		}
+		c.grpcClients.Store(key, wrappedClient)
 	})
 	return initErr
 }

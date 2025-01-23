@@ -148,6 +148,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
+	RelayConcurrencyFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-concurrency"),
+		Usage:    "The maximum number of concurrent relay requests to any particular relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_CONCURRENCY"),
+		// default value should stay in sync with default value in relay.limiter.Config.MaxConcurrentGetChunkOpsClient
+		Value: 2,
+	}
 	PubIPProviderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
 		Usage:    "The ip provider service used to obtain a node's public IP [seeip (default), ipify)",
@@ -415,6 +423,7 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
+	RelayConcurrencyFlag,
 }
 
 func init() {

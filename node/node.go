@@ -241,10 +241,11 @@ func NewNode(
 
 		logger.Info("Creating relay client", "relayURLs", relayURLs)
 		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:           relayURLs,
-			UseSecureGrpcFlag: config.UseSecureGrpc,
-			OperatorID:        &config.ID,
-			MessageSigner:     n.SignMessage,
+			Sockets:               relayURLs,
+			UseSecureGrpcFlag:     config.UseSecureGrpc,
+			OperatorID:            &config.ID,
+			MessageSigner:         n.SignMessage,
+			MaxConcurrentRequests: config.RelayConcurrency,
 		}, logger)
 
 		if err != nil {
