@@ -37,7 +37,7 @@ runs:
         go-version: ${{inputs.go-version}}
 
     - name: Download coverage artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
       with:
         name: coverage
         path: .
