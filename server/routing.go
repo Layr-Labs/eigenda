@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	routingVarNameRawCommitmentHex  = "raw_commitment_hex"
+	routingVarNamePayloadHex        = "payload_hex"
 	routingVarNameVersionByteHex    = "version_byte_hex"
 	routingVarNameCommitTypeByteHex = "commit_type_byte_hex"
 )
@@ -20,7 +20,7 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 	subrouterGET.HandleFunc("/"+
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 		"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-		"{"+routingVarNameRawCommitmentHex+":[0-9a-fA-F]*}",
+		"{"+routingVarNamePayloadHex+":[0-9a-fA-F]*}",
 		withLogging(withMetrics(svr.handleGetStdCommitment, svr.m, commitments.Standard), svr.log),
 	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
@@ -30,7 +30,7 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 		// we don't use version_byte for keccak commitments, because not expecting keccak commitments to change,
 		// but perhaps we should (in case we want a v2 to use another hash for eg?)
 		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-		"{"+routingVarNameRawCommitmentHex+"}",
+		"{"+routingVarNamePayloadHex+"}",
 		withLogging(withMetrics(svr.handleGetOPKeccakCommitment, svr.m, commitments.OptimismKeccak), svr.log),
 	)
 	// op generic commitments (write to EigenDA)
@@ -39,7 +39,7 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 		"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
 		"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
 		"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-		"{"+routingVarNameRawCommitmentHex+"}",
+		"{"+routingVarNamePayloadHex+"}",
 		withLogging(withMetrics(svr.handleGetOPGenericCommitment, svr.m, commitments.OptimismGeneric), svr.log),
 	)
 	// unrecognized op commitment type (not 00 or 01)
@@ -66,7 +66,7 @@ func (svr *Server) registerRoutes(r *mux.Router) {
 		// we don't use version_byte for keccak commitments, because not expecting keccak commitments to change,
 		// but perhaps we should (in case we want a v2 to use another hash for eg?)
 		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-		"{"+routingVarNameRawCommitmentHex+"}",
+		"{"+routingVarNamePayloadHex+"}",
 		withLogging(withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccak), svr.log),
 	)
 	// op generic commitments (write to EigenDA)

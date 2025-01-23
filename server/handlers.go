@@ -37,7 +37,7 @@ func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request
 		CertVersion: versionByte,
 	}
 
-	rawCommitmentHex, ok := mux.Vars(r)[routingVarNameRawCommitmentHex]
+	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
 		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
 	}
@@ -63,7 +63,7 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 		CertVersion: byte(commitments.CertV0),
 	}
 
-	rawCommitmentHex, ok := mux.Vars(r)[routingVarNameRawCommitmentHex]
+	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
 		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
 	}
@@ -86,7 +86,7 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 		CertVersion: versionByte,
 	}
 
-	rawCommitmentHex, ok := mux.Vars(r)[routingVarNameRawCommitmentHex]
+	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
 		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
 	}
@@ -146,7 +146,7 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 		CertVersion: byte(commitments.CertV0),
 	}
 
-	rawCommitmentHex, ok := mux.Vars(r)[routingVarNameRawCommitmentHex]
+	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
 		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
 	}
