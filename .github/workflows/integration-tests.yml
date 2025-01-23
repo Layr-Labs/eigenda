@@ -87,7 +87,7 @@ jobs:
 
       - name: Save logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
           name: inabox-logs
           path: |
