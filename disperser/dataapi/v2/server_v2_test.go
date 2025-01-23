@@ -408,7 +408,9 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 			"/v2/blobs/feed?pagination_token=abc",
 			"/v2/blobs/feed?limit=abc",
 			"/v2/blobs/feed?interval=abc",
+			"/v2/blobs/feed?interval=-1",
 			"/v2/blobs/feed?end=2006-01-02T15:04:05",
+			"/v2/blobs/feed?end=2006-01-02T15:04:05Z",
 		}
 		for _, url := range reqUrls {
 			w := httptest.NewRecorder()
@@ -632,6 +634,122 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
 	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+}
+
+func TestFetchBatchFeedHandler(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	// Create a timeline of test batches
+	numBatches := 72
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64(72*time.Minute.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		attestation := &corev2.Attestation{
+			BatchHeader: batchHeaders[i],
+			AttestedAt:  attestedAt[i],
+			NonSignerPubKeys: []*core.G1Point{
+				core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+				core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+			},
+			APKG2: apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+	}
+
+	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeedHandler)
+
+	t.Run("invalid params", func(t *testing.T) {
+		reqUrls := []string{
+			"/v2/batches/feed?limit=abc",
+			"/v2/batches/feed?interval=abc",
+			"/v2/batches/feed?interval=-1",
+			"/v2/batches/feed?end=2006-01-02T15:04:05",
+			"/v2/batches/feed?end=2006-01-02T15:04:05Z",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of batches attested (batch[13], ..., batch[71])
+		// - Limited to 20 results (the default "limit")
+		// - Result will first 20 batches: batch[13], ..., batch[42]
+		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed")
+		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Batches))
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+	})
+
+	t.Run("various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves batch[13] through batch[71] (59 batches)
+		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=0")
+		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, attestedAt[13+i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[13+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[13+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 2: 2-hour window captures all test batches
+		w = executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=-1&interval=7200")
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 72, len(response.Batches))
+		for i := 0; i < 72; i++ {
+			assert.Equal(t, attestedAt[i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 3: Custom end time with 1-hour window
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[66] (60 batches)
+		tm := time.Unix(0, int64(attestedAt[66])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Batches))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+	})
 }
 
 func TestCheckOperatorsReachability(t *testing.T) {
