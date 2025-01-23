@@ -408,7 +408,9 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 			"/v2/blobs/feed?pagination_token=abc",
 			"/v2/blobs/feed?limit=abc",
 			"/v2/blobs/feed?interval=abc",
+			"/v2/blobs/feed?interval=-1",
 			"/v2/blobs/feed?end=2006-01-02T15:04:05",
+			"/v2/blobs/feed?end=2006-01-02T15:04:05Z",
 		}
 		for _, url := range reqUrls {
 			w := httptest.NewRecorder()
@@ -685,7 +687,9 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 		reqUrls := []string{
 			"/v2/batches/feed?limit=abc",
 			"/v2/batches/feed?interval=abc",
+			"/v2/batches/feed?interval=-1",
 			"/v2/batches/feed?end=2006-01-02T15:04:05",
+			"/v2/batches/feed?end=2006-01-02T15:04:05Z",
 		}
 		for _, url := range reqUrls {
 			w := httptest.NewRecorder()

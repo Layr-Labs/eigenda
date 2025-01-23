@@ -33,9 +33,11 @@ import (
 var errNotFound = errors.New("not found")
 
 const (
+	maxBlobAge = 14 * 24 * time.Hour
+
 	// The max number of blobs to return from blob feed API, regardless of the time
 	// range or "limit" param.
-	maxNumBlobsPerBlobfFeedResponse = 1000
+	maxNumBlobsPerBlobFeedResponse = 1000
 
 	// The max number of batches to return from batch feed API, regardless of the time
 	// range or "limit" param.
@@ -350,12 +352,20 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 
 	var err error
 
-	endTime := time.Now()
+	now := time.Now()
+	oldestTime := now.Add(-maxBlobAge)
+
+	endTime := now
 	if c.Query("end") != "" {
 		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+		if endTime.Before(oldestTime) {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days ago from now, found: %s", c.Query("end")))
 			return
 		}
 	}
@@ -368,6 +378,11 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
 			return
 		}
+		if interval <= 0 {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("interval must be greater than 0, found: %d", interval))
+			return
+		}
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -376,8 +391,8 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
 		return
 	}
-	if limit <= 0 || limit > maxNumBlobsPerBlobfFeedResponse {
-		limit = maxNumBlobsPerBlobfFeedResponse
+	if limit <= 0 || limit > maxNumBlobsPerBlobFeedResponse {
+		limit = maxNumBlobsPerBlobFeedResponse
 	}
 
 	paginationCursor := blobstore.BlobFeedCursor{
@@ -566,12 +581,20 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 
 	var err error
 
-	endTime := time.Now()
+	now := time.Now()
+	oldestTime := now.Add(-maxBlobAge)
+
+	endTime := now
 	if c.Query("end") != "" {
 		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+		if endTime.Before(oldestTime) {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days ago from now, found: %s", c.Query("end")))
 			return
 		}
 	}
@@ -582,6 +605,11 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			return
+		}
+		if interval <= 0 {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("interval must be greater than 0, found: %d", interval))
 			return
 		}
 	}
