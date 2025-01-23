@@ -238,11 +238,6 @@ func (c *EigenDAClient) verifyCertWithTimeout(
 	return c.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
 }
 
-// GetCodec returns the codec the client uses for encoding and decoding blobs
-func (c *EigenDAClient) GetCodec() codecs.BlobCodec {
-	return c.codec
-}
-
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
 // clients, even if some closes fail.
 //

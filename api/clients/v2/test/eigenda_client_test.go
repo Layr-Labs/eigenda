@@ -550,12 +550,3 @@ func TestErrorClose(t *testing.T) {
 
 	tester.MockRelayClient.AssertExpectations(t)
 }
-
-// TestGetCodec checks that the codec used in construction is returned by GetCodec
-func TestGetCodec(t *testing.T) {
-	tester := buildClientTester(t)
-
-	require.Equal(t, tester.Codec, tester.Client.GetCodec())
-
-	tester.MockRelayClient.AssertExpectations(t)
-}
