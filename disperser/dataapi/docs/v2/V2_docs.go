@@ -562,7 +562,7 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "cumulative_payment": {
-                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
+                    "description": "CumulativePayment represents the total amount of payment (in wei) made by the user up to this point",
                     "allOf": [
                         {
                             "$ref": "#/definitions/big.Int"
@@ -571,10 +571,6 @@ const docTemplateV2 = `{
                 },
                 "reservation_period": {
                     "description": "ReservationPeriod represents the range of time at which the dispersal is made",
-                    "type": "integer"
-                },
-                "salt": {
-                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
                     "type": "integer"
                 }
             }
@@ -646,7 +642,7 @@ const docTemplateV2 = `{
                     ]
                 },
                 "attestedAt": {
-                    "description": "AttestedAt is the time the attestation was made",
+                    "description": "AttestedAt is the time the attestation was made in nanoseconds",
                     "type": "integer"
                 },
                 "batchRoot": {
@@ -678,7 +674,7 @@ const docTemplateV2 = `{
                     }
                 },
                 "quorumResults": {
-                    "description": "QuorumResults contains the results of the quorum verification",
+                    "description": "QuorumResults contains the operators' total signing percentage of the quorum",
                     "type": "object",
                     "additionalProperties": {
                         "type": "integer"
@@ -753,8 +749,12 @@ const docTemplateV2 = `{
                         "type": "integer"
                     }
                 },
+                "salt": {
+                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
+                    "type": "integer"
+                },
                 "signature": {
-                    "description": "Signature is the signature of the blob header by the account ID",
+                    "description": "Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,\nwhich is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -925,7 +925,7 @@ const docTemplateV2 = `{
                     "type": "integer"
                 },
                 "requestedAt": {
-                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in seconds",
+                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds",
                     "type": "integer"
                 },
                 "totalChunkSizeBytes": {

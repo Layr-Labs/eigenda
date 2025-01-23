@@ -927,6 +927,9 @@ const docTemplateV1 = `{
                 "dispersal_socket": {
                     "type": "string"
                 },
+                "dispersal_status": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -934,6 +937,9 @@ const docTemplateV1 = `{
                     "type": "boolean"
                 },
                 "retrieval_socket": {
+                    "type": "string"
+                },
+                "retrieval_status": {
                     "type": "string"
                 }
             }

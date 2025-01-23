@@ -65,16 +65,11 @@ definitions:
       cumulative_payment:
         allOf:
         - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
+        description: CumulativePayment represents the total amount of payment (in
+          wei) made by the user up to this point
       reservation_period:
         description: ReservationPeriod represents the range of time at which the dispersal
           is made
-        type: integer
-      salt:
-        description: Allow same blob to be dispersed multiple times within the same
-          reservation period
         type: integer
     type: object
   core.Signature:
@@ -119,7 +114,7 @@ definitions:
         - $ref: '#/definitions/core.G2Point'
         description: APKG2 is the aggregate public key of all signers
       attestedAt:
-        description: AttestedAt is the time the attestation was made
+        description: AttestedAt is the time the attestation was made in nanoseconds
         type: integer
       batchRoot:
         description: BatchRoot is the root of a Merkle tree whose leaves are the keys
@@ -147,7 +142,8 @@ definitions:
       quorumResults:
         additionalProperties:
           type: integer
-        description: QuorumResults contains the results of the quorum verification
+        description: QuorumResults contains the operators' total signing percentage
+          of the quorum
         type: object
       referenceBlockNumber:
         description: ReferenceBlockNumber is the block number at which all operator
@@ -196,9 +192,14 @@ definitions:
         items:
           type: integer
         type: array
+      salt:
+        description: Salt is used to make blob intentionally unique when everything
+          else is the same
+        type: integer
       signature:
-        description: Signature is the signature of the blob header by the account
-          ID
+        description: |-
+          Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
+          which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
         items:
           type: integer
         type: array
@@ -317,7 +318,7 @@ definitions:
         type: integer
       requestedAt:
         description: RequestedAt is the Unix timestamp of when the blob was requested
-          in seconds
+          in nanoseconds
         type: integer
       totalChunkSizeBytes:
         description: TotalChunkSizeBytes is the total size of the file containing
