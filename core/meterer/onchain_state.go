@@ -67,7 +67,11 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (*OnchainPaymen
 }
 
 func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*PaymentVaultParams, error) {
-	quorumNumbers, err := pcs.GetOnDemandQuorumNumbers(ctx)
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+	quorumNumbers, err := pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +196,13 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 	if err != nil {
 		return nil, err
 	}
-	return pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	quorumNumbers, err := pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	if err != nil {
+		// On demand required quorum is unlikely to change, so we are comfortable using the cached value
+		// in case the contract read fails
+		return pcs.PaymentVaultParams.Load().OnDemandQuorumNumbers, nil
+	}
+	return quorumNumbers, nil
 }
 
 func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
