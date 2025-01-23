@@ -41,7 +41,7 @@ jobs:
         run: ./test.sh -coverprofile=coverage.out
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
         with:
           name: coverage
           path: coverage.out
