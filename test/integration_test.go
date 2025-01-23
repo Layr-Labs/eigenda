@@ -396,15 +396,12 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		mockSocketChan := make(chan string)
 		mockOperatorSocketsFilterer.On("WatchOperatorSocketUpdate").Return(mockSocketChan, nil)
 
-		pubIPProvider := &pubip.SimpleProvider{
-			RequestDoer: pubip.RequestDoerFunc(func(req *http.Request) (*http.Response, error) {
+		pubIPProvider := pubip.CustomProvider(
+			pubip.RequestDoerFunc(func(req *http.Request) (*http.Response, error) {
 				w := httptest.NewRecorder()
 				_, _ = w.WriteString("8.8.8.8")
 				return w.Result(), nil
-			}),
-			Name: "",
-			URL:  "",
-		}
+			}), "custom", "")
 
 		n := &node.Node{
 			Config:                  config,
