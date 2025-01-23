@@ -143,7 +143,7 @@ func pluginOps(ctx *cli.Context) {
 
 	socket := config.Socket
 	if isLocalhost(socket) {
-		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
+		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
 		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to get socket address from ip provider: %v", err)

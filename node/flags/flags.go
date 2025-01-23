@@ -150,7 +150,7 @@ var (
 	}
 	PubIPProviderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
-		Usage:    "The ip provider service used to obtain a node's public IP [seeip (default), ipify)",
+		Usage:    "The ip provider service used to obtain a node's public IP. 'seeip', 'ipify', or comma separated list)",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
 	}

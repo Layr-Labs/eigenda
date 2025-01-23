@@ -1,38 +1,20 @@
 package pubip
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"strings"
 )
 
 const (
 	SeepIPProvider = "seeip"
-	IpifyProvider  = "ipify"
+	SeeIPURL       = "https://api.seeip.org"
+
+	IpifyProvider = "ipify"
+	IpifyURL      = "https://api.ipify.org"
+
 	MockIpProvider = "mockip"
 )
-
-var (
-	SeeIP  = &SimpleProvider{name: "seeip", URL: "https://api.seeip.org"}
-	Ipify  = &SimpleProvider{name: "ipify", URL: "https://api.ipify.org"}
-	MockIp = &SimpleProvider{name: "mockip", URL: ""}
-)
-
-type RequestDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-type RequestDoerFunc func(req *http.Request) (*http.Response, error)
-
-var _ RequestDoer = (RequestDoerFunc)(nil)
-
-func (f RequestDoerFunc) Do(req *http.Request) (*http.Response, error) {
-	return f(req)
-}
 
 // Provider is an interface for getting a machine's public IP address.
 type Provider interface {
@@ -42,64 +24,58 @@ type Provider interface {
 	PublicIPAddress(ctx context.Context) (string, error)
 }
 
-type SimpleProvider struct {
-	RequestDoer RequestDoer
-	name        string
-	URL         string
+// buildSimpleProviderByName returns a simple provider with the given name.
+// Returns nil if the name is not recognized.
+func buildSimpleProviderByName(name string) Provider {
+	if name == SeepIPProvider {
+		return NewSimpleProvider(SeepIPProvider, SeeIPURL)
+	} else if name == IpifyProvider {
+		return NewSimpleProvider(IpifyProvider, IpifyURL)
+	} else if name == MockIpProvider {
+		return &mockProvider{}
+	}
+	return nil
 }
 
-func (s *SimpleProvider) Name() string {
-	return s.name
+// buildDefaultProviders returns a default provider.
+func buildDefaultProvider(logger logging.Logger) Provider {
+	return NewMultiProvider(logger, buildSimpleProviderByName(SeepIPProvider), buildSimpleProviderByName(IpifyProvider))
 }
 
-var _ Provider = (*SimpleProvider)(nil)
+func providerOrDefault(logger logging.Logger, name string) Provider {
+	name = strings.ToLower(name)
 
-func (s *SimpleProvider) PublicIPAddress(ctx context.Context) (string, error) {
-	if s.name == MockIpProvider {
-		return "localhost", nil
+	if strings.Contains(name, ",") {
+		split := strings.Split(name, ",")
+		for i := range split {
+			split[i] = strings.TrimSpace(split[i])
+		}
+
+		providers := make([]Provider, len(split))
+		for i, subProvider := range split {
+			providers[i] = buildSimpleProviderByName(subProvider)
+			if providers[i] == nil {
+				logger.Warnf("Unknown IP provider '%s'", subProvider)
+				return buildDefaultProvider(logger)
+			}
+		}
+
+		return NewMultiProvider(logger, providers...)
+	} else {
+		provider := buildSimpleProviderByName(name)
+		if provider == nil {
+			logger.Warnf("Unknown IP provider '%s'", name)
+			return buildDefaultProvider(logger)
+		}
+		return provider
 	}
-	ip, err := s.doRequest(ctx, s.URL)
-	if err != nil {
-		return "", fmt.Errorf("%s: failed to retrieve public ip address: %w", s.Name, err)
-	}
-	return ip, nil
 }
 
-func (s *SimpleProvider) doRequest(ctx context.Context, url string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	if s.RequestDoer == nil {
-		s.RequestDoer = http.DefaultClient
-	}
-	resp, err := s.RequestDoer.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return "", errors.New(resp.Status)
-	}
-
-	var b bytes.Buffer
-	_, err = io.Copy(&b, resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(b.String()), nil
-}
-
-func ProviderOrDefault(name string) Provider {
-	p := map[string]Provider{
-		SeepIPProvider: SeeIP,
-		IpifyProvider:  Ipify,
-		MockIpProvider: MockIp,
-	}[name]
-	if p == nil {
-		p = SeeIP
-	}
-	return p
+// ProviderOrDefault returns a provider with the provided name, or a default provider if the name is not recognized.
+// If a comma separated list of providers is provided, a multi provider is returned. Supported providers strings are
+// "seeip", "ipify", and "mockip". Provider strings are not case-sensitive.
+func ProviderOrDefault(logger logging.Logger, name string) Provider {
+	provider := providerOrDefault(logger, name)
+	logger.Info("Using IP provider '%s'", provider.Name())
+	return provider
 }
