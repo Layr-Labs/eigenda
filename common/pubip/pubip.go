@@ -42,40 +42,39 @@ func buildDefaultProvider(logger logging.Logger) Provider {
 	return NewMultiProvider(logger, buildSimpleProviderByName(SeepIPProvider), buildSimpleProviderByName(IpifyProvider))
 }
 
-func providerOrDefault(logger logging.Logger, name string) Provider {
-	name = strings.ToLower(name)
+func providerOrDefault(logger logging.Logger, names ...string) Provider {
 
-	if strings.Contains(name, ",") {
-		split := strings.Split(name, ",")
-		for i := range split {
-			split[i] = strings.TrimSpace(split[i])
+	for i, name := range names {
+		names[i] = strings.ToLower(strings.TrimSpace(name))
+	}
+
+	if len(names) == 0 {
+		return buildDefaultProvider(logger)
+	} else if len(names) == 1 {
+		provider := buildSimpleProviderByName(names[0])
+		if provider == nil {
+			logger.Warnf("Unknown IP provider '%s'", names[0])
+			return buildDefaultProvider(logger)
 		}
-
-		providers := make([]Provider, len(split))
-		for i, subProvider := range split {
-			providers[i] = buildSimpleProviderByName(subProvider)
+		return provider
+	} else {
+		providers := make([]Provider, len(names))
+		for i, name := range names {
+			providers[i] = buildSimpleProviderByName(name)
 			if providers[i] == nil {
-				logger.Warnf("Unknown IP provider '%s'", subProvider)
+				logger.Warnf("Unknown IP provider '%s'", name)
 				return buildDefaultProvider(logger)
 			}
 		}
 
 		return NewMultiProvider(logger, providers...)
-	} else {
-		provider := buildSimpleProviderByName(name)
-		if provider == nil {
-			logger.Warnf("Unknown IP provider '%s'", name)
-			return buildDefaultProvider(logger)
-		}
-		return provider
 	}
 }
 
 // ProviderOrDefault returns a provider with the provided name, or a default provider if the name is not recognized.
-// If a comma separated list of providers is provided, a multi provider is returned. Supported providers strings are
-// "seeip", "ipify", and "mockip". Provider strings are not case-sensitive.
-func ProviderOrDefault(logger logging.Logger, name string) Provider {
-	provider := providerOrDefault(logger, name)
+// Provider strings are not case-sensitive.
+func ProviderOrDefault(logger logging.Logger, names ...string) Provider {
+	provider := providerOrDefault(logger, names...)
 	logger.Infof("Using IP provider '%s'", provider.Name())
 	return provider
 }

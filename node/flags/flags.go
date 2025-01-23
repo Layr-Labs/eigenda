@@ -148,9 +148,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
-	PubIPProviderFlag = cli.StringFlag{
+	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
-		Usage:    "The ip provider service used to obtain a node's public IP. 'seeip', 'ipify', or comma separated list)",
+		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
 	}

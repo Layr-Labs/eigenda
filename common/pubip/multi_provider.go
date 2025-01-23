@@ -45,7 +45,7 @@ func (m *multiProvider) PublicIPAddress(ctx context.Context) (string, error) {
 		if err == nil {
 			return ip, nil
 		}
-		m.logger.Errorf("failed to get public IP address from %s: %v", provider, err)
+		m.logger.Warnf("failed to get public IP address from %s: %v", provider, err)
 	}
 
 	return "", fmt.Errorf("failed to get public IP address from any provider")

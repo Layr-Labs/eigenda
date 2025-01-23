@@ -58,7 +58,7 @@ func NodeMain(ctx *cli.Context) error {
 		return err
 	}
 
-	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
+	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProviders...)
 
 	// Rate limiter
 	reg := prometheus.NewRegistry()
