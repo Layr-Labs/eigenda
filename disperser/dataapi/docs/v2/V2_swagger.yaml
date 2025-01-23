@@ -65,16 +65,11 @@ definitions:
       cumulative_payment:
         allOf:
         - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
+        description: CumulativePayment represents the total amount of payment (in
+          wei) made by the user up to this point
       reservation_period:
         description: ReservationPeriod represents the range of time at which the dispersal
           is made
-        type: integer
-      salt:
-        description: Allow same blob to be dispersed multiple times within the same
-          reservation period
         type: integer
     type: object
   core.Signature:
@@ -196,9 +191,14 @@ definitions:
         items:
           type: integer
         type: array
+      salt:
+        description: Salt is used to make blob intentionally unique when everything
+          else is the same
+        type: integer
       signature:
-        description: Signature is the signature of the blob header by the account
-          ID
+        description: |-
+          Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
+          which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
         items:
           type: integer
         type: array
@@ -267,6 +267,32 @@ definitions:
       stake_percentage:
         additionalProperties:
           type: number
+        type: object
+    type: object
+  v2.BatchFeedResponse:
+    properties:
+      batches:
+        items:
+          $ref: '#/definitions/v2.BatchInfo'
+        type: array
+    type: object
+  v2.BatchInfo:
+    properties:
+      aggregated_signature:
+        $ref: '#/definitions/core.Signature'
+      attested_at:
+        type: integer
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+      batch_header_hash:
+        type: string
+      quorum_numbers:
+        items:
+          type: integer
+        type: array
+      quorum_signed_percentages:
+        additionalProperties:
+          type: integer
         type: object
     type: object
   v2.BatchResponse:
@@ -492,6 +518,46 @@ paths:
       summary: Fetch batch by the batch header hash
       tags:
       - Batch
+  /batches/feed:
+    get:
+      parameters:
+      - description: 'Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
+          [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch batches starting from an interval (in seconds) before
+          the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'The maximum number of batches to fetch. System max (1000) if
+          limit <= 0 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BatchFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch batch feed
+      tags:
+      - Blob
   /blobs/{blob_key}:
     get:
       parameters:
@@ -585,6 +651,51 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch blob verification info by blob key and batch header hash
+      tags:
+      - Blob
+  /blobs/feed:
+    get:
+      parameters:
+      - description: 'Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
+          [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch blobs starting from an interval (in seconds) before the
+          end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Fetch blobs starting from the pagination token (exclusively).
+          Overrides the interval param if specified [default: empty]'
+        in: query
+        name: pagination_token
+        type: string
+      - description: 'The maximum number of blobs to fetch. System max (1000) if limit
+          <= 0 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob feed
       tags:
       - Blob
   /metrics/summary:

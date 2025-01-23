@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -32,9 +33,13 @@ import (
 var errNotFound = errors.New("not found")
 
 const (
-	// The max number of blobs to return from blob Feed API, regardless of the time
+	// The max number of blobs to return from blob feed API, regardless of the time
 	// range or "limit" param.
-	maxBlobFeedNumBlobs = 1000
+	maxNumBlobsPerBlobfFeedResponse = 1000
+
+	// The max number of batches to return from batch feed API, regardless of the time
+	// range or "limit" param.
+	maxNumBatchesPerBatchFeedResponse = 1000
 
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
@@ -80,6 +85,18 @@ type (
 		BatchHeaderHash       string                         `json:"batch_header_hash"`
 		SignedBatch           *SignedBatch                   `json:"signed_batch"`
 		BlobVerificationInfos []*corev2.BlobVerificationInfo `json:"blob_verification_infos"`
+	}
+
+	BatchInfo struct {
+		BatchHeaderHash         string                  `json:"batch_header_hash"`
+		BatchHeader             *corev2.BatchHeader     `json:"batch_header"`
+		AttestedAt              uint64                  `json:"attested_at"`
+		AggregatedSignature     *core.Signature         `json:"aggregated_signature"`
+		QuorumNumbers           []core.QuorumID         `json:"quorum_numbers"`
+		QuorumSignedPercentages map[core.QuorumID]uint8 `json:"quorum_signed_percentages"`
+	}
+	BatchFeedResponse struct {
+		Batches []*BatchInfo `json:"batches"`
 	}
 
 	MetricSummary struct {
@@ -324,6 +341,7 @@ func (s *ServerV2) Shutdown() error {
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/feed [get]
 func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
 		s.metrics.ObserveLatency("FetchBlobFeedHandler", f*1000) // make milliseconds
@@ -358,8 +376,8 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
 		return
 	}
-	if limit <= 0 || limit > maxBlobFeedNumBlobs {
-		limit = maxBlobFeedNumBlobs
+	if limit <= 0 || limit > maxNumBlobsPerBlobfFeedResponse {
+		limit = maxNumBlobsPerBlobfFeedResponse
 	}
 
 	paginationCursor := blobstore.BlobFeedCursor{
@@ -390,6 +408,7 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobFeedHandler")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
+		return
 	}
 
 	token := ""
@@ -526,8 +545,88 @@ func (s *ServerV2) FetchBlobVerificationInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// FetchBatchFeedHandler godoc
+//
+//	@Summary	Fetch batch feed
+//	@Tags		Blob
+//	@Produce	json
+//	@Param		end			query		string	false	"Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval	query		int		false	"Fetch batches starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		limit		query		int		false	"The maximum number of batches to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
+//	@Success	200			{object}	BatchFeedResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/batches/feed [get]
 func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
-	errorResponse(c, errors.New("FetchBatchFeedHandler unimplemented"))
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchBatchFeedHandler", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	var err error
+
+	endTime := time.Now()
+	if c.Query("end") != "" {
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+	}
+
+	interval := 3600
+	if c.Query("interval") != "" {
+		interval, err = strconv.Atoi(c.Query("interval"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			return
+		}
+	}
+
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		return
+	}
+	if limit <= 0 || limit > maxNumBatchesPerBatchFeedResponse {
+		limit = maxNumBatchesPerBatchFeedResponse
+	}
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), limit)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBatchFeedHandler")
+		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
+		return
+	}
+
+	batches := make([]*BatchInfo, len(attestations))
+	for i, at := range attestations {
+		batchHeaderHash, err := at.BatchHeader.Hash()
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatchFeedHandler")
+			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
+			return
+		}
+
+		batches[i] = &BatchInfo{
+			BatchHeaderHash:         hex.EncodeToString(batchHeaderHash[:]),
+			BatchHeader:             at.BatchHeader,
+			AttestedAt:              at.AttestedAt,
+			AggregatedSignature:     at.Sigma,
+			QuorumNumbers:           at.QuorumNumbers,
+			QuorumSignedPercentages: at.QuorumResults,
+		}
+	}
+	response := &BatchFeedResponse{
+		Batches: batches,
+	}
+	s.metrics.IncrementSuccessfulRequestNum("FetchBatchFeedHandler")
+	c.JSON(http.StatusOK, response)
 }
 
 // FetchBatchHandler godoc
