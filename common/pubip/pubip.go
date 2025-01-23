@@ -17,9 +17,9 @@ const (
 )
 
 var (
-	SeeIP  = &SimpleProvider{Name: "seeip", URL: "https://api.seeip.org"}
-	Ipify  = &SimpleProvider{Name: "ipify", URL: "https://api.ipify.org"}
-	MockIp = &SimpleProvider{Name: "mockip", URL: ""}
+	SeeIP  = &SimpleProvider{name: "seeip", URL: "https://api.seeip.org"}
+	Ipify  = &SimpleProvider{name: "ipify", URL: "https://api.ipify.org"}
+	MockIp = &SimpleProvider{name: "mockip", URL: ""}
 )
 
 type RequestDoer interface {
@@ -34,20 +34,28 @@ func (f RequestDoerFunc) Do(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
+// Provider is an interface for getting a machine's public IP address.
 type Provider interface {
+	// Name returns the name of the provider
+	Name() string
+	// PublicIPAddress returns the public IP address of the node
 	PublicIPAddress(ctx context.Context) (string, error)
 }
 
 type SimpleProvider struct {
 	RequestDoer RequestDoer
-	Name        string
+	name        string
 	URL         string
+}
+
+func (s *SimpleProvider) Name() string {
+	return s.name
 }
 
 var _ Provider = (*SimpleProvider)(nil)
 
 func (s *SimpleProvider) PublicIPAddress(ctx context.Context) (string, error) {
-	if s.Name == MockIpProvider {
+	if s.name == MockIpProvider {
 		return "localhost", nil
 	}
 	ip, err := s.doRequest(ctx, s.URL)
