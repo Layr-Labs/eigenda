@@ -88,8 +88,8 @@ func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation
 	return convertedAttestation, nil
 }
 
-func ConvertVerificationProof(inputVerificationInfo *disperserv2.BlobVerificationInfo) (*BlobVerificationProofV2, error) {
-	convertedBlobCertificate, err := convertBlobCertificate(inputVerificationInfo.GetBlobCertificate())
+func ConvertVerificationProof(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*BlobVerificationProofV2, error) {
+	convertedBlobCertificate, err := convertBlobCertificate(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {
 		return nil, fmt.Errorf("convert blob certificate: %s", err)
@@ -97,8 +97,8 @@ func ConvertVerificationProof(inputVerificationInfo *disperserv2.BlobVerificatio
 
 	return &BlobVerificationProofV2{
 		BlobCertificate: *convertedBlobCertificate,
-		BlobIndex:       inputVerificationInfo.GetBlobIndex(),
-		InclusionProof:  inputVerificationInfo.GetInclusionProof(),
+		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
+		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
 	}, nil
 }
 
@@ -110,7 +110,8 @@ func convertBlobCertificate(inputCertificate *commonv2.BlobCertificate) (*BlobCe
 
 	return &BlobCertificate{
 		BlobHeader: *convertedBlobHeader,
-		RelayKeys:  inputCertificate.GetRelays(),
+		Signature:  inputCertificate.GetSignature(),
+		RelayKeys:  inputCertificate.GetRelayKeys(),
 	}, nil
 }
 

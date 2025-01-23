@@ -418,6 +418,8 @@ type OperatorVars struct {
 
 	NODE_BLS_SIGNER_CERT_FILE string
 
+	NODE_BLS_SIGNER_API_KEY string
+
 	NODE_ENABLE_V2 string
 
 	NODE_ONCHAIN_STATE_REFRESH_INTERVAL string
@@ -714,7 +716,7 @@ type RelayVars struct {
 
 	RELAY_METADATA_TABLE_NAME string
 
-	RELAY_RELAY_IDS string
+	RELAY_RELAY_KEYS string
 
 	RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR string
 

@@ -899,8 +899,8 @@ func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash 
 	return attestation, nil
 }
 
-func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verificationInfo *corev2.BlobVerificationInfo) error {
-	item, err := MarshalBlobVerificationInfo(verificationInfo)
+func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionInfo *corev2.BlobInclusionInfo) error {
+	item, err := MarshalBlobInclusionInfo(inclusionInfo)
 	if err != nil {
 		return err
 	}
@@ -913,12 +913,12 @@ func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verific
 	return err
 }
 
-// PutBlobVerificationInfos puts multiple verification infos into the store
+// PutBlobInclusionInfos puts multiple inclusion infos into the store
 // It retries failed items up to 2 times
-func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verificationInfos []*corev2.BlobVerificationInfo) error {
-	items := make([]commondynamodb.Item, len(verificationInfos))
-	for i, info := range verificationInfos {
-		item, err := MarshalBlobVerificationInfo(info)
+func (s *BlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, inclusionInfos []*corev2.BlobInclusionInfo) error {
+	items := make([]commondynamodb.Item, len(inclusionInfos))
+	for i, info := range inclusionInfos {
+		item, err := MarshalBlobInclusionInfo(info)
 		if err != nil {
 			return err
 		}
@@ -933,7 +933,7 @@ func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verifi
 		}
 
 		if len(failedItems) > 0 {
-			s.logger.Warnf("failed to put verification infos, retrying: %v", failedItems)
+			s.logger.Warnf("failed to put inclusion infos, retrying: %v", failedItems)
 			items = failedItems
 			time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
 		} else {
@@ -944,7 +944,7 @@ func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verifi
 	return nil
 }
 
-func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobVerificationInfo, error) {
+func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobInclusionInfo, error) {
 	bhh := hex.EncodeToString(batchHeaderHash[:])
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
@@ -960,10 +960,10 @@ func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
-	info, err := UnmarshalBlobVerificationInfo(item)
+	info, err := UnmarshalBlobInclusionInfo(item)
 	if err != nil {
 		return nil, err
 	}
@@ -971,7 +971,7 @@ func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey
 	return info, nil
 }
 
-func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobVerificationInfo, error) {
+func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
 	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -986,14 +986,14 @@ func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKe
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
-	responses := make([]*corev2.BlobVerificationInfo, len(items))
+	responses := make([]*corev2.BlobInclusionInfo, len(items))
 	for i, item := range items {
-		responses[i], err = UnmarshalBlobVerificationInfo(item)
+		responses[i], err = UnmarshalBlobInclusionInfo(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal verification info: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal inclusion info: %w", err)
 		}
 	}
 
@@ -1440,32 +1440,32 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	return &header, nil
 }
 
-func MarshalBlobVerificationInfo(verificationInfo *corev2.BlobVerificationInfo) (commondynamodb.Item, error) {
-	fields, err := attributevalue.MarshalMap(verificationInfo)
+func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(inclusionInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal blob verification info: %w", err)
+		return nil, fmt.Errorf("failed to marshal blob inclusion info: %w", err)
 	}
 
-	bhh, err := verificationInfo.BatchHeader.Hash()
+	bhh, err := inclusionInfo.BatchHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
 	hashstr := hex.EncodeToString(bhh[:])
 
-	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + verificationInfo.BlobKey.Hex()}
+	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + inclusionInfo.BlobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
 
 	return fields, nil
 }
 
-func UnmarshalBlobVerificationInfo(item commondynamodb.Item) (*corev2.BlobVerificationInfo, error) {
-	verificationInfo := corev2.BlobVerificationInfo{}
-	err := attributevalue.UnmarshalMap(item, &verificationInfo)
+func UnmarshalBlobInclusionInfo(item commondynamodb.Item) (*corev2.BlobInclusionInfo, error) {
+	inclusionInfo := corev2.BlobInclusionInfo{}
+	err := attributevalue.UnmarshalMap(item, &inclusionInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal blob verification info: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal blob inclusion info: %w", err)
 	}
 
-	return &verificationInfo, nil
+	return &inclusionInfo, nil
 }
 
 func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, error) {

@@ -253,8 +253,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
-		Signature: sig,
-		Salt:      uint32(salt.Int64()),
+		Salt: uint32(salt.Int64()),
 	}
 }
 
@@ -320,7 +319,6 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
-	assert.Equal(t, blobHeader.Signature, response.BlobHeader.Signature)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
 	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
@@ -335,6 +333,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	require.NoError(t, err)
 	blobCert := &corev2.BlobCertificate{
 		BlobHeader: blobHeader,
+		Signature:  []byte{0, 1, 2, 3, 4},
 		RelayKeys:  []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
@@ -351,7 +350,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 
 	assert.Equal(t, blobCert.RelayKeys, response.Certificate.RelayKeys)
 	assert.Equal(t, uint16(0), response.Certificate.BlobHeader.BlobVersion)
-	assert.Equal(t, blobHeader.Signature, response.Certificate.BlobHeader.Signature)
+	assert.Equal(t, blobCert.Signature, response.Certificate.Signature)
 }
 
 func TestFetchBlobFeedHandler(t *testing.T) {
@@ -388,6 +387,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		now := time.Now()
 		metadata := &v2.BlobMetadata{
 			BlobHeader:  blobHeader,
+			Signature:   []byte{0, 1, 2, 3, 4},
 			BlobStatus:  v2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
@@ -553,10 +553,10 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchBlobVerificationInfoHandler(t *testing.T) {
+func TestFetchBlobInclusionInfoHandler(t *testing.T) {
 	r := setUpRouter()
 
-	// Set up blob verification info in metadata store
+	// Set up blob inclusion info in metadata store
 	blobHeader := makeBlobHeaderV2(t)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
@@ -571,22 +571,22 @@ func TestFetchBlobVerificationInfoHandler(t *testing.T) {
 	ctx := context.Background()
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
-	verificationInfo := &corev2.BlobVerificationInfo{
+	inclusionInfo := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey,
 		BlobIndex:      123,
 		InclusionProof: []byte("inclusion proof"),
 	}
-	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/verification-info", testDataApiServerV2.FetchBlobVerificationInfoHandler)
+	r.GET("/v2/blobs/:blob_key/inclusion-info", testDataApiServerV2.FetchBlobInclusionInfoHandler)
 
-	reqStr := fmt.Sprintf("/v2/blobs/%s/verification-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
+	reqStr := fmt.Sprintf("/v2/blobs/%s/inclusion-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.BlobVerificationInfoResponse](t, w)
+	response := decodeResponseBody[serverv2.BlobInclusionInfoResponse](t, w)
 
-	assert.Equal(t, verificationInfo.InclusionProof, response.VerificationInfo.InclusionProof)
+	assert.Equal(t, inclusionInfo.InclusionProof, response.InclusionInfo.InclusionProof)
 }
 
 func TestFetchBatchHandlerV2(t *testing.T) {

@@ -24,7 +24,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
-		Signature: []byte{1, 2, 3},
 	}
 	bh1 := &v2.BlobHeader{
 		BlobVersion:     0,
@@ -35,7 +34,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 			ReservationPeriod: 6,
 			CumulativePayment: big.NewInt(200),
 		},
-		Signature: []byte{1, 2, 3},
 	}
 	bh2 := &v2.BlobHeader{
 		BlobVersion:     0,
@@ -46,7 +44,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 			ReservationPeriod: 7,
 			CumulativePayment: big.NewInt(300),
 		},
-		Signature: []byte{1, 2, 3},
 	}
 	blobKey0, err := bh0.BlobKey()
 	require.NoError(t, err)
@@ -59,14 +56,17 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 	// blobCert 1 will be downloaded from relay 1
 	blobCert0 := &v2.BlobCertificate{
 		BlobHeader: bh0,
+		Signature:  []byte{1, 2, 3},
 		RelayKeys:  []v2.RelayKey{0},
 	}
 	blobCert1 := &v2.BlobCertificate{
 		BlobHeader: bh1,
+		Signature:  []byte{1, 2, 3},
 		RelayKeys:  []v2.RelayKey{1},
 	}
 	blobCert2 := &v2.BlobCertificate{
 		BlobHeader: bh2,
+		Signature:  []byte{1, 2, 3},
 		RelayKeys:  []v2.RelayKey{0},
 	}
 

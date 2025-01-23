@@ -29,9 +29,15 @@ var (
 	_ = abi.ConvertType
 )
 
+// RelayInfo is an auto generated low-level Go binding around an user-defined struct.
+type RelayInfo struct {
+	RelayAddress common.Address
+	RelayURL     string
+}
+
 // ContractIEigenDARelayRegistryMetaData contains all meta data concerning the ContractIEigenDARelayRegistry contract.
 var ContractIEigenDARelayRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"getRelayAddress\",\"inputs\":[{\"name\":\"id\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRelayId\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRelayURL\",\"inputs\":[{\"name\":\"id\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setRelayURL\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"id\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"relayURL\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"RelayAdded\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"id\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"relayURL\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"}],\"anonymous\":false}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addRelayInfo\",\"inputs\":[{\"name\":\"relayInfo\",\"type\":\"tuple\",\"internalType\":\"structRelayInfo\",\"components\":[{\"name\":\"relayAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"relayURL\",\"type\":\"string\",\"internalType\":\"string\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"relayKeyToAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"relayKeyToUrl\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"RelayAdded\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"key\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"relayURL\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"}],\"anonymous\":false}]",
 }
 
 // ContractIEigenDARelayRegistryABI is the input ABI used to generate the binding from.
@@ -180,12 +186,12 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactorRaw
 	return _ContractIEigenDARelayRegistry.Contract.contract.Transact(opts, method, params...)
 }
 
-// GetRelayAddress is a free data retrieval call binding the contract method 0x8050a899.
+// RelayKeyToAddress is a free data retrieval call binding the contract method 0xb5a872da.
 //
-// Solidity: function getRelayAddress(uint32 id) view returns(address)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) GetRelayAddress(opts *bind.CallOpts, id uint32) (common.Address, error) {
+// Solidity: function relayKeyToAddress(uint32 key) view returns(address)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) RelayKeyToAddress(opts *bind.CallOpts, key uint32) (common.Address, error) {
 	var out []interface{}
-	err := _ContractIEigenDARelayRegistry.contract.Call(opts, &out, "getRelayAddress", id)
+	err := _ContractIEigenDARelayRegistry.contract.Call(opts, &out, "relayKeyToAddress", key)
 
 	if err != nil {
 		return *new(common.Address), err
@@ -197,57 +203,26 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) GetRe
 
 }
 
-// GetRelayAddress is a free data retrieval call binding the contract method 0x8050a899.
+// RelayKeyToAddress is a free data retrieval call binding the contract method 0xb5a872da.
 //
-// Solidity: function getRelayAddress(uint32 id) view returns(address)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) GetRelayAddress(id uint32) (common.Address, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayAddress(&_ContractIEigenDARelayRegistry.CallOpts, id)
+// Solidity: function relayKeyToAddress(uint32 key) view returns(address)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) RelayKeyToAddress(key uint32) (common.Address, error) {
+	return _ContractIEigenDARelayRegistry.Contract.RelayKeyToAddress(&_ContractIEigenDARelayRegistry.CallOpts, key)
 }
 
-// GetRelayAddress is a free data retrieval call binding the contract method 0x8050a899.
+// RelayKeyToAddress is a free data retrieval call binding the contract method 0xb5a872da.
 //
-// Solidity: function getRelayAddress(uint32 id) view returns(address)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession) GetRelayAddress(id uint32) (common.Address, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayAddress(&_ContractIEigenDARelayRegistry.CallOpts, id)
+// Solidity: function relayKeyToAddress(uint32 key) view returns(address)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession) RelayKeyToAddress(key uint32) (common.Address, error) {
+	return _ContractIEigenDARelayRegistry.Contract.RelayKeyToAddress(&_ContractIEigenDARelayRegistry.CallOpts, key)
 }
 
-// GetRelayId is a free data retrieval call binding the contract method 0x371e5d99.
+// RelayKeyToUrl is a free data retrieval call binding the contract method 0x631eabb8.
 //
-// Solidity: function getRelayId(address relay) view returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) GetRelayId(opts *bind.CallOpts, relay common.Address) (uint32, error) {
+// Solidity: function relayKeyToUrl(uint32 key) view returns(string)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) RelayKeyToUrl(opts *bind.CallOpts, key uint32) (string, error) {
 	var out []interface{}
-	err := _ContractIEigenDARelayRegistry.contract.Call(opts, &out, "getRelayId", relay)
-
-	if err != nil {
-		return *new(uint32), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint32)).(*uint32)
-
-	return out0, err
-
-}
-
-// GetRelayId is a free data retrieval call binding the contract method 0x371e5d99.
-//
-// Solidity: function getRelayId(address relay) view returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) GetRelayId(relay common.Address) (uint32, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayId(&_ContractIEigenDARelayRegistry.CallOpts, relay)
-}
-
-// GetRelayId is a free data retrieval call binding the contract method 0x371e5d99.
-//
-// Solidity: function getRelayId(address relay) view returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession) GetRelayId(relay common.Address) (uint32, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayId(&_ContractIEigenDARelayRegistry.CallOpts, relay)
-}
-
-// GetRelayURL is a free data retrieval call binding the contract method 0x8898cf74.
-//
-// Solidity: function getRelayURL(uint32 id) view returns(string)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) GetRelayURL(opts *bind.CallOpts, id uint32) (string, error) {
-	var out []interface{}
-	err := _ContractIEigenDARelayRegistry.contract.Call(opts, &out, "getRelayURL", id)
+	err := _ContractIEigenDARelayRegistry.contract.Call(opts, &out, "relayKeyToUrl", key)
 
 	if err != nil {
 		return *new(string), err
@@ -259,39 +234,39 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCaller) GetRe
 
 }
 
-// GetRelayURL is a free data retrieval call binding the contract method 0x8898cf74.
+// RelayKeyToUrl is a free data retrieval call binding the contract method 0x631eabb8.
 //
-// Solidity: function getRelayURL(uint32 id) view returns(string)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) GetRelayURL(id uint32) (string, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayURL(&_ContractIEigenDARelayRegistry.CallOpts, id)
+// Solidity: function relayKeyToUrl(uint32 key) view returns(string)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) RelayKeyToUrl(key uint32) (string, error) {
+	return _ContractIEigenDARelayRegistry.Contract.RelayKeyToUrl(&_ContractIEigenDARelayRegistry.CallOpts, key)
 }
 
-// GetRelayURL is a free data retrieval call binding the contract method 0x8898cf74.
+// RelayKeyToUrl is a free data retrieval call binding the contract method 0x631eabb8.
 //
-// Solidity: function getRelayURL(uint32 id) view returns(string)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession) GetRelayURL(id uint32) (string, error) {
-	return _ContractIEigenDARelayRegistry.Contract.GetRelayURL(&_ContractIEigenDARelayRegistry.CallOpts, id)
+// Solidity: function relayKeyToUrl(uint32 key) view returns(string)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession) RelayKeyToUrl(key uint32) (string, error) {
+	return _ContractIEigenDARelayRegistry.Contract.RelayKeyToUrl(&_ContractIEigenDARelayRegistry.CallOpts, key)
 }
 
-// SetRelayURL is a paid mutator transaction binding the contract method 0xbb8a5345.
+// AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
-// Solidity: function setRelayURL(address relay, uint32 id, string relayURL) returns()
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactor) SetRelayURL(opts *bind.TransactOpts, relay common.Address, id uint32, relayURL string) (*types.Transaction, error) {
-	return _ContractIEigenDARelayRegistry.contract.Transact(opts, "setRelayURL", relay, id, relayURL)
+// Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactor) AddRelayInfo(opts *bind.TransactOpts, relayInfo RelayInfo) (*types.Transaction, error) {
+	return _ContractIEigenDARelayRegistry.contract.Transact(opts, "addRelayInfo", relayInfo)
 }
 
-// SetRelayURL is a paid mutator transaction binding the contract method 0xbb8a5345.
+// AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
-// Solidity: function setRelayURL(address relay, uint32 id, string relayURL) returns()
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) SetRelayURL(relay common.Address, id uint32, relayURL string) (*types.Transaction, error) {
-	return _ContractIEigenDARelayRegistry.Contract.SetRelayURL(&_ContractIEigenDARelayRegistry.TransactOpts, relay, id, relayURL)
+// Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) AddRelayInfo(relayInfo RelayInfo) (*types.Transaction, error) {
+	return _ContractIEigenDARelayRegistry.Contract.AddRelayInfo(&_ContractIEigenDARelayRegistry.TransactOpts, relayInfo)
 }
 
-// SetRelayURL is a paid mutator transaction binding the contract method 0xbb8a5345.
+// AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
-// Solidity: function setRelayURL(address relay, uint32 id, string relayURL) returns()
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactorSession) SetRelayURL(relay common.Address, id uint32, relayURL string) (*types.Transaction, error) {
-	return _ContractIEigenDARelayRegistry.Contract.SetRelayURL(&_ContractIEigenDARelayRegistry.TransactOpts, relay, id, relayURL)
+// Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactorSession) AddRelayInfo(relayInfo RelayInfo) (*types.Transaction, error) {
+	return _ContractIEigenDARelayRegistry.Contract.AddRelayInfo(&_ContractIEigenDARelayRegistry.TransactOpts, relayInfo)
 }
 
 // ContractIEigenDARelayRegistryRelayAddedIterator is returned from FilterRelayAdded and is used to iterate over the raw logs and unpacked data for RelayAdded events raised by the ContractIEigenDARelayRegistry contract.
@@ -364,26 +339,26 @@ func (it *ContractIEigenDARelayRegistryRelayAddedIterator) Close() error {
 // ContractIEigenDARelayRegistryRelayAdded represents a RelayAdded event raised by the ContractIEigenDARelayRegistry contract.
 type ContractIEigenDARelayRegistryRelayAdded struct {
 	Relay    common.Address
-	Id       uint32
+	Key      uint32
 	RelayURL string
 	Raw      types.Log // Blockchain specific contextual infos
 }
 
 // FilterRelayAdded is a free log retrieval operation binding the contract event 0x01c289e409d41a712a615bf286126433da55c193bbe64fc8e77af5f1ff13db99.
 //
-// Solidity: event RelayAdded(address indexed relay, uint32 indexed id, string relayURL)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) FilterRelayAdded(opts *bind.FilterOpts, relay []common.Address, id []uint32) (*ContractIEigenDARelayRegistryRelayAddedIterator, error) {
+// Solidity: event RelayAdded(address indexed relay, uint32 indexed key, string relayURL)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) FilterRelayAdded(opts *bind.FilterOpts, relay []common.Address, key []uint32) (*ContractIEigenDARelayRegistryRelayAddedIterator, error) {
 
 	var relayRule []interface{}
 	for _, relayItem := range relay {
 		relayRule = append(relayRule, relayItem)
 	}
-	var idRule []interface{}
-	for _, idItem := range id {
-		idRule = append(idRule, idItem)
+	var keyRule []interface{}
+	for _, keyItem := range key {
+		keyRule = append(keyRule, keyItem)
 	}
 
-	logs, sub, err := _ContractIEigenDARelayRegistry.contract.FilterLogs(opts, "RelayAdded", relayRule, idRule)
+	logs, sub, err := _ContractIEigenDARelayRegistry.contract.FilterLogs(opts, "RelayAdded", relayRule, keyRule)
 	if err != nil {
 		return nil, err
 	}
@@ -392,19 +367,19 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) Fil
 
 // WatchRelayAdded is a free log subscription operation binding the contract event 0x01c289e409d41a712a615bf286126433da55c193bbe64fc8e77af5f1ff13db99.
 //
-// Solidity: event RelayAdded(address indexed relay, uint32 indexed id, string relayURL)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) WatchRelayAdded(opts *bind.WatchOpts, sink chan<- *ContractIEigenDARelayRegistryRelayAdded, relay []common.Address, id []uint32) (event.Subscription, error) {
+// Solidity: event RelayAdded(address indexed relay, uint32 indexed key, string relayURL)
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) WatchRelayAdded(opts *bind.WatchOpts, sink chan<- *ContractIEigenDARelayRegistryRelayAdded, relay []common.Address, key []uint32) (event.Subscription, error) {
 
 	var relayRule []interface{}
 	for _, relayItem := range relay {
 		relayRule = append(relayRule, relayItem)
 	}
-	var idRule []interface{}
-	for _, idItem := range id {
-		idRule = append(idRule, idItem)
+	var keyRule []interface{}
+	for _, keyItem := range key {
+		keyRule = append(keyRule, keyItem)
 	}
 
-	logs, sub, err := _ContractIEigenDARelayRegistry.contract.WatchLogs(opts, "RelayAdded", relayRule, idRule)
+	logs, sub, err := _ContractIEigenDARelayRegistry.contract.WatchLogs(opts, "RelayAdded", relayRule, keyRule)
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +413,7 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) Wat
 
 // ParseRelayAdded is a log parse operation binding the contract event 0x01c289e409d41a712a615bf286126433da55c193bbe64fc8e77af5f1ff13db99.
 //
-// Solidity: event RelayAdded(address indexed relay, uint32 indexed id, string relayURL)
+// Solidity: event RelayAdded(address indexed relay, uint32 indexed key, string relayURL)
 func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryFilterer) ParseRelayAdded(log types.Log) (*ContractIEigenDARelayRegistryRelayAdded, error) {
 	event := new(ContractIEigenDARelayRegistryRelayAdded)
 	if err := _ContractIEigenDARelayRegistry.contract.UnpackLog(event, "RelayAdded", log); err != nil {

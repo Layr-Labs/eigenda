@@ -50,7 +50,7 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	// to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
 	// Contains all necessary information about the blob, so that it can be verified.
-	blobVerificationProof *disperser.BlobVerificationInfo,
+	blobVerificationProof *disperser.BlobInclusionInfo,
 ) error {
 	convertedSignedBatch, err := verifierBindings.ConvertSignedBatch(signedBatch)
 	if err != nil {
@@ -82,7 +82,7 @@ func (v *BlobVerifier) VerifyBlobV2(
 	// The header of the batch that the blob is contained in
 	batchHeader *commonv2.BatchHeader,
 	// Contains data pertaining to the blob's inclusion in the batch
-	blobVerificationProof *disperser.BlobVerificationInfo,
+	blobVerificationProof *disperser.BlobInclusionInfo,
 	// Contains data that can be used to verify that the blob actually exists in the claimed batch
 	nonSignerStakesAndSignature verifierBindings.NonSignerStakesAndSignature,
 ) error {

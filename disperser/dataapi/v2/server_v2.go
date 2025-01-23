@@ -74,8 +74,8 @@ type (
 		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
 	}
 
-	BlobVerificationInfoResponse struct {
-		VerificationInfo *corev2.BlobVerificationInfo `json:"blob_verification_info"`
+	BlobInclusionInfoResponse struct {
+		InclusionInfo *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
 	}
 
 	BlobFeedResponse struct {
@@ -84,9 +84,9 @@ type (
 	}
 
 	BatchResponse struct {
-		BatchHeaderHash       string                         `json:"batch_header_hash"`
-		SignedBatch           *SignedBatch                   `json:"signed_batch"`
-		BlobVerificationInfos []*corev2.BlobVerificationInfo `json:"blob_verification_infos"`
+		BatchHeaderHash    string                      `json:"batch_header_hash"`
+		SignedBatch        *SignedBatch                `json:"signed_batch"`
+		BlobInclusionInfos []*corev2.BlobInclusionInfo `json:"blob_inclusion_infos"`
 	}
 
 	BatchInfo struct {
@@ -212,7 +212,7 @@ func (s *ServerV2) Start() error {
 			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
 			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
 			blob.GET("/blobs/:blob_key/certificate", s.FetchBlobCertificateHandler)
-			blob.GET("/blobs/:blob_key/verification-info", s.FetchBlobVerificationInfoHandler)
+			blob.GET("/blobs/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
 		}
 		batch := v2.Group("/batch")
 		{
@@ -517,45 +517,45 @@ func (s *ServerV2) FetchBlobCertificateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// FetchBlobVerificationInfoHandler godoc
+// FetchBlobInclusionInfoHandler godoc
 //
-//	@Summary	Fetch blob verification info by blob key and batch header hash
+//	@Summary	Fetch blob inclusion info by blob key and batch header hash
 //	@Tags		Blob
 //	@Produce	json
 //	@Param		blob_key			path		string	true	"Blob key in hex string"
 //	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
 //
-//	@Success	200					{object}	BlobVerificationInfoResponse
+//	@Success	200					{object}	BlobInclusionInfoResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/{blob_key}/verification-info [get]
-func (s *ServerV2) FetchBlobVerificationInfoHandler(c *gin.Context) {
+//	@Router		/blobs/{blob_key}/inclusion-info [get]
+func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 	start := time.Now()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobInclusionInfo")
 		errorResponse(c, err)
 		return
 	}
 	batchHeaderHashHex := c.Query("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobVerificationInfo")
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobInclusionInfo")
 		errorResponse(c, err)
 		return
 	}
-	bvi, err := s.blobMetadataStore.GetBlobVerificationInfo(c.Request.Context(), blobKey, batchHeaderHash)
+	bvi, err := s.blobMetadataStore.GetBlobInclusionInfo(c.Request.Context(), blobKey, batchHeaderHash)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobVerificationInfo")
+		s.metrics.IncrementFailedRequestNum("FetchBlobInclusionInfo")
 		errorResponse(c, err)
 		return
 	}
-	response := &BlobVerificationInfoResponse{
-		VerificationInfo: bvi,
+	response := &BlobInclusionInfoResponse{
+		InclusionInfo: bvi,
 	}
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobVerificationInfo")
-	s.metrics.ObserveLatency("FetchBlobVerificationInfo", float64(time.Since(start).Milliseconds()))
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobInclusionInfo")
+	s.metrics.ObserveLatency("FetchBlobInclusionInfo", float64(time.Since(start).Milliseconds()))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -683,7 +683,7 @@ func (s *ServerV2) FetchBatchHandler(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	// TODO: support fetch of blob verification info
+	// TODO: support fetch of blob inclusion info
 	batchResponse := &BatchResponse{
 		BatchHeaderHash: batchHeaderHashHex,
 		SignedBatch: &SignedBatch{
