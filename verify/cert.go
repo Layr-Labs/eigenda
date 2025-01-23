@@ -67,7 +67,7 @@ func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 	confirmationBlockNumberBigInt := big.NewInt(0).SetInt64(int64(confirmationBlockNumber))
 	_, err := cv.retrieveBatchMetadataHash(ctx, batchID, confirmationBlockNumberBigInt)
 	if err != nil {
-		return fmt.Errorf("batch not found onchain at supposedly confirmed block %d: %w", confirmationBlockNumber, err)
+		return fmt.Errorf("failed to reference batch from service manager @ block %d: %w", confirmationBlockNumber, err)
 	}
 
 	// 2. Verify that the confirmation status has been reached.
