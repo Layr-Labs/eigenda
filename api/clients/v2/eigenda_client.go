@@ -284,7 +284,7 @@ func blobCommitmentsBindingToInternal(
 ) (*encoding.BlobCommitments, error) {
 
 	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(
-		contractEigenDABlobVerifier.BlobCommitmentBindingToProto(blobCommitmentBinding))
+		verification.BlobCommitmentBindingToProto(blobCommitmentBinding))
 
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
