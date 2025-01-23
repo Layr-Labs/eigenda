@@ -111,18 +111,18 @@ func (c *EigenDAClient) GetPayload(
 		return nil, errors.New("relay key count is zero")
 	}
 
-	blobCommitmentProto := contractEigenDABlobVerifier.BlobCommitmentBindingToProto(
+	blobCommitments, err := blobCommitmentsBindingToInternal(
 		&eigenDACert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment)
-	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(blobCommitmentProto)
 
 	if err != nil {
-		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
+		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
 	indices := c.random.Perm(relayKeyCount)
 
-	// TODO (litt3): consider creating a utility which can deprioritize relays that fail to respond (or respond maliciously)
+	// TODO (litt3): consider creating a utility which deprioritizes relays that fail to respond (or respond maliciously),
+	//  and prioritizes relays with lower latencies.
 
 	// iterate over relays in random order, until we are able to get the blob from someone
 	for _, val := range indices {
@@ -135,7 +135,7 @@ func (c *EigenDAClient) GetPayload(
 			continue
 		}
 
-		err = c.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitment.Commitment, blobCommitment.Length)
+		err = c.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitments.Commitment, blobCommitments.Length)
 
 		// An honest relay should never send a blob which doesn't verify
 		if err != nil {
@@ -162,12 +162,11 @@ func (c *EigenDAClient) GetPayload(
 }
 
 // verifyBlobAgainstCert verifies the blob received from a relay against the certificate.
-// This method does NOT verify the blob with an eth_call to verifyBlobV2, that must be done separately.
 //
 // The following verifications are performed in this method:
-// 1. Verify that blob isn't empty
-// 2. Verify the blob kzg commitment
-// 3. Verify that the blob length is less than or equal to the claimed blob length
+// 1. Verify that the blob isn't empty
+// 2. Verify the blob against the cert's kzg commitment
+// 3. Verify that the blob length is less than or equal to the cert's blob length
 //
 // If all verifications succeed, the method returns nil. Otherwise, it returns an error.
 func (c *EigenDAClient) verifyBlobAgainstCert(
@@ -276,4 +275,20 @@ func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
 	default:
 		return nil, fmt.Errorf("unsupported polynomial form: %d", config.PayloadPolynomialForm)
 	}
+}
+
+// blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
+// encoding.BlobCommitments type
+func blobCommitmentsBindingToInternal(
+	blobCommitmentBinding *contractEigenDABlobVerifier.BlobCommitment,
+) (*encoding.BlobCommitments, error) {
+
+	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(
+		contractEigenDABlobVerifier.BlobCommitmentBindingToProto(blobCommitmentBinding))
+
+	if err != nil {
+		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
+	}
+
+	return blobCommitment, nil
 }
