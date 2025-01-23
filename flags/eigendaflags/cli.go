@@ -2,10 +2,10 @@ package eigendaflags
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/urfave/cli/v2"
@@ -118,6 +118,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.BoolFlag{
+			// This flag is DEPRECATED. Use ConfirmationDepthFlagName, which accept "finalization" or a number <64.
 			Name:     WaitForFinalizationFlagName,
 			Usage:    "Wait for blob finalization before returning from PutBlob.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "WAIT_FOR_FINALIZATION")},
@@ -209,8 +210,12 @@ func validateConfirmationFlag(val string) error {
 		return fmt.Errorf("confirmation-depth must be either 'finalized' or a number, got: %s", val)
 	}
 
-	if depth >= 64 {
-		log.Printf("Warning: confirmation depth set to %d, which is > 2 epochs (64). Consider using 'finalized' instead.\n", depth)
+	if depth >= uint64(consts.EthHappyPathFinalizationDepthBlocks) {
+		// We keep this low (<128) to avoid requiring an archive node (see how this is used in CertVerifier).
+		// Note: assuming here that no sane person would ever need to set this to a number >64.
+		// But perhaps someone testing crazy reorg scenarios where finalization takes >2 epochs might want to set this to a higher number.
+		// Do keep in mind if you ever change this that it might affect a LOT of validators on your rollup who would now need an archival node.
+		return fmt.Errorf("confirmation depth set to %d, which is > 2 epochs (64). Use 'finalized' instead", depth)
 	}
 
 	return nil

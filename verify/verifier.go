@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -22,7 +20,7 @@ import (
 type Config struct {
 	KzgConfig   *kzg.KzgConfig
 	VerifyCerts bool
-	// below 3 fields are only required if VerifyCerts is true
+	// below fields are only required if VerifyCerts is true
 	RPCURL               string
 	SvcManagerAddr       string
 	EthConfirmationDepth uint64
@@ -170,12 +168,10 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 		// we get the quorum adversary threshold at the batch's reference block number. This is not strictly needed right now
 		// since this threshold is hardcoded into the contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDAServiceManagerStorage.sol
 		// but it is good practice in case the contract changes in the future
-		quorumAdversaryThreshold, err := v.getQuorumAdversaryThreshold(blobHeader.QuorumBlobParams[i].QuorumNumber, int64(batchHeader.ReferenceBlockNumber))
-		if err != nil {
-			log.Warn("failed to get quorum adversary threshold", "err", err)
-		}
-
-		if quorumAdversaryThreshold > 0 && blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage < quorumAdversaryThreshold {
+		quorumAdversaryThreshold, ok := v.cv.quorumAdversaryThresholds[blobHeader.QuorumBlobParams[i].QuorumNumber]
+		if !ok {
+			log.Warn("CertVerifier.quorumAdversaryThresholds map does not contain quorum number", "quorumNumber", blobHeader.QuorumBlobParams[i].QuorumNumber)
+		} else if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage < quorumAdversaryThreshold {
 			return fmt.Errorf("adversary threshold percentage must be greater than or equal to quorum adversary threshold percentage")
 		}
 
@@ -186,32 +182,12 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 		confirmedQuorums[blobHeader.QuorumBlobParams[i].QuorumNumber] = true
 	}
 
-	requiredQuorums, err := v.cv.manager.QuorumNumbersRequired(&bind.CallOpts{BlockNumber: big.NewInt(int64(batchHeader.ReferenceBlockNumber))})
-	if err != nil {
-		log.Warn("failed to get required quorum numbers at block number", "err", err, "referenceBlockNumber", batchHeader.ReferenceBlockNumber)
-	}
-
 	// ensure that required quorums are present in the confirmed ones
-	for _, quorum := range requiredQuorums {
+	for _, quorum := range v.cv.quorumsRequired {
 		if !confirmedQuorums[quorum] {
 			return fmt.Errorf("quorum %d is required but not present in confirmed quorums", quorum)
 		}
 	}
 
 	return nil
-}
-
-// getQuorumAdversaryThreshold reads the adversarial threshold percentage for a given quorum number,
-// at a given block number. If the quorum number does not exist, it returns 0.
-func (v *Verifier) getQuorumAdversaryThreshold(quorumNum uint8, blockNumber int64) (uint8, error) {
-	percentages, err := v.cv.manager.QuorumAdversaryThresholdPercentages(&bind.CallOpts{BlockNumber: big.NewInt(blockNumber)})
-	if err != nil {
-		return 0, err
-	}
-
-	if len(percentages) > int(quorumNum) {
-		return percentages[quorumNum], nil
-	}
-
-	return 0, nil
 }
