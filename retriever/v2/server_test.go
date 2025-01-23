@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/common/testutils"
@@ -122,7 +121,7 @@ func TestRetrieveBlob(t *testing.T) {
 			Version:       0,
 			QuorumNumbers: []uint32{0},
 			Commitment:    c,
-			PaymentHeader: &commonpb.PaymentHeader{
+			PaymentHeader: &commonpbv2.PaymentHeader{
 				AccountId: "account_id",
 			},
 		},

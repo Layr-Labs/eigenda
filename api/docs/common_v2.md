@@ -8,6 +8,7 @@
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
     - [BlobHeader](#common-v2-BlobHeader)
+    - [PaymentHeader](#common-v2-PaymentHeader)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -84,8 +85,31 @@ BlobHeader contains the information describing a blob and the way it is to be di
 
 The following quorums are currently required: - 0: ETH - 1: EIGEN |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
+| payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
+| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
 | signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
+
+
+
+
+
+
+<a name="common-v2-PaymentHeader"></a>
+
+### PaymentHeader
+PaymentHeader contains payment information for a blob.
+At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+is always considered before cumulative_payment. If reservation_period is set but not valid, 
+the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer. |
 
 
 

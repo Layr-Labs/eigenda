@@ -252,9 +252,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 			AccountID:         accountID,
 			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
-			Salt:              uint32(salt.Int64()),
 		},
 		Signature: sig,
+		Salt:      uint32(salt.Int64()),
 	}
 }
 

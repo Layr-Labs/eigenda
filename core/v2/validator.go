@@ -102,6 +102,17 @@ func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchH
 	return nil
 }
 
+func filterOperatorStateQuorums(operatorState *core.OperatorState, quorums []core.QuorumID) map[core.QuorumID]struct{} {
+	filtered := make(map[core.QuorumID]struct{})
+	for _, quorum := range quorums {
+		if _, ok := operatorState.Operators[quorum]; ok {
+			filtered[quorum] = struct{}{}
+		}
+	}
+
+	return filtered
+}
+
 func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, blobVersionParams *BlobVersionParameterMap, pool common.WorkerPool, state *core.OperatorState) error {
 	if len(blobs) == 0 {
 		return fmt.Errorf("no blobs")
@@ -116,8 +127,9 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 	blobCommitmentList := make([]encoding.BlobCommitments, len(blobs))
 
 	for k, blob := range blobs {
-		if len(blob.Bundles) != len(blob.BlobHeader.QuorumNumbers) {
-			return fmt.Errorf("number of bundles (%d) does not match number of quorums (%d)", len(blob.Bundles), len(blob.BlobHeader.QuorumNumbers))
+		relevantQuorums := filterOperatorStateQuorums(state, blob.BlobHeader.QuorumNumbers)
+		if len(blob.Bundles) != len(relevantQuorums) {
+			return fmt.Errorf("number of bundles (%d) does not match number of relevant quorums (%d)", len(blob.Bundles), len(relevantQuorums))
 		}
 
 		// Saved for the blob length validation

@@ -180,12 +180,17 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		blsPublicKeyHex := ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name)
 		blsKeyFilePath := ctx.GlobalString(flags.BlsKeyFileFlag.Name)
 		blsKeyPassword := ctx.GlobalString(flags.BlsKeyPasswordFlag.Name)
+		blsSignerAPIKey := ctx.GlobalString(flags.BLSSignerAPIKeyFlag.Name)
 
 		if blsRemoteSignerEnabled && (blsRemoteSignerUrl == "" || blsPublicKeyHex == "") {
 			return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
 		}
 		if !blsRemoteSignerEnabled && (blsKeyFilePath == "" || blsKeyPassword == "") {
 			return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+		}
+
+		if blsRemoteSignerEnabled && blsSignerAPIKey == "" {
+			return nil, fmt.Errorf("BLS signer API key is required if BLS remote signer is enabled")
 		}
 
 		if blsRemoteSignerEnabled {
@@ -201,6 +206,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			CerberusPassword: blsKeyPassword,
 			EnableTLS:        enableTLS,
 			TLSCertFilePath:  ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
+			CerberusAPIKey:   blsSignerAPIKey,
 		}
 	} else {
 		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)

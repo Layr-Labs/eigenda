@@ -70,7 +70,11 @@ type BlobHeader struct {
 	// PaymentMetadata contains the payment information for the blob
 	PaymentMetadata core.PaymentMetadata
 
-	// Signature is the signature of the blob header by the account ID
+	// Salt is used to make blob intentionally unique when everything else is the same
+	Salt uint32
+
+	// Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
+	// which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
 	Signature []byte
 }
 
@@ -124,6 +128,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
 		Signature:       proto.GetSignature(),
+		Salt:            proto.GetSalt(),
 	}, nil
 }
 
@@ -144,6 +149,7 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
 		Signature:     b.Signature,
+		Salt:          b.Salt,
 	}, nil
 }
 

@@ -29,7 +29,6 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"google.golang.org/grpc/peer"
 
-	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -65,7 +64,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -132,7 +131,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	invalidReqProto := &pbcommonv2.BlobHeader{
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -151,7 +150,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1, 2, 3},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -168,7 +167,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{2, 54},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -185,7 +184,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       2,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -202,7 +201,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -220,7 +219,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 0,
 			CumulativePayment: big.NewInt(0).Bytes(),
@@ -245,7 +244,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    invalidCommitment,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -275,7 +274,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -570,7 +569,7 @@ func TestInvalidLength(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
-		PaymentHeader: &pbcommon.PaymentHeader{
+		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100).Bytes(),
@@ -588,7 +587,7 @@ func TestInvalidLength(t *testing.T) {
 		Data:       data,
 		BlobHeader: blobHeaderProto,
 	})
-	
+
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
 }

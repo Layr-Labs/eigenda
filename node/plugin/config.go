@@ -84,6 +84,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
 	}
 
+	BLSSignerAPIKeyFlag = cli.StringFlag{
+		Name:     "bls-signer-api-key",
+		Usage:    "The API key for the BLS signer. Only required if BLSRemoteSignerEnabled is true",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "BLS_SIGNER_API_KEY"),
+	}
+
 	// The socket and the quorums to register.
 	SocketFlag = cli.StringFlag{
 		Name:     "socket",
@@ -149,6 +156,7 @@ type Config struct {
 	EigenDAServiceManagerAddr     string
 	ChurnerUrl                    string
 	NumConfirmations              int
+	BLSSignerAPIKey               string
 }
 
 func NewConfig(ctx *cli.Context) (*Config, error) {
@@ -190,5 +198,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
 		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
 		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
+		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil
 }

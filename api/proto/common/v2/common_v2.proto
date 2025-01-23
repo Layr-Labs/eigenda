@@ -20,9 +20,13 @@ message BlobHeader {
   // commitment is the KZG commitment to the blob
   common.BlobCommitment commitment = 3;
   // payment_header contains payment information for the blob
-  common.PaymentHeader payment_header = 4;
+  PaymentHeader payment_header = 4;
+  // salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
+  // reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
+  // payments already have unique cumulative_payment values for intentionally unique dispersal requests.
+  uint32 salt = 5;
   // signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-  bytes signature = 5;
+  bytes signature = 6;
 }
 
 // BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
@@ -54,4 +58,20 @@ message Batch {
   BatchHeader header = 1;
   // blob_certificates is the list of blob certificates in the batch
   repeated BlobCertificate blob_certificates = 2;
+}
+
+// PaymentHeader contains payment information for a blob.
+// At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+// is always considered before cumulative_payment. If reservation_period is set but not valid, 
+// the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+// and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+// Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+message PaymentHeader {
+  // The account ID of the disperser client. This account ID is an eth wallet address of the user,
+  // corresponding to the key used by the client to sign the BlobHeader.
+  string account_id = 1;
+  // The reservation period of the dispersal request. 
+  uint32 reservation_period = 2;
+  // The cumulative payment of the dispersal request. This field will be parsed as a big integer.
+  bytes cumulative_payment = 3;
 }
