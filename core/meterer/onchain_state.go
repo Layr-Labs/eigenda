@@ -2,6 +2,8 @@ package meterer
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 
@@ -196,11 +198,19 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 	if err != nil {
 		return nil, err
 	}
+
 	quorumNumbers, err := pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
 	if err != nil {
 		// On demand required quorum is unlikely to change, so we are comfortable using the cached value
 		// in case the contract read fails
-		return pcs.PaymentVaultParams.Load().OnDemandQuorumNumbers, nil
+		log.Println("Failed to get required quorum numbers, read from cache", "error", err)
+		params := pcs.PaymentVaultParams.Load()
+		if params == nil {
+			log.Println("Failed to get required quorum numbers and no cached params")
+			return nil, fmt.Errorf("failed to get required quorum numbers and no cached params")
+		}
+		// params.OnDemandQuorumNumbers could be empty if set by the protocol
+		return params.OnDemandQuorumNumbers, nil
 	}
 	return quorumNumbers, nil
 }
