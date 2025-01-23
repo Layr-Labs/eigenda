@@ -76,6 +76,6 @@ func providerOrDefault(logger logging.Logger, name string) Provider {
 // "seeip", "ipify", and "mockip". Provider strings are not case-sensitive.
 func ProviderOrDefault(logger logging.Logger, name string) Provider {
 	provider := providerOrDefault(logger, name)
-	logger.Info("Using IP provider '%s'", provider.Name())
+	logger.Infof("Using IP provider '%s'", provider.Name())
 	return provider
 }
