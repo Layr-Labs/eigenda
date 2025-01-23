@@ -26,11 +26,12 @@ var _ core.IndexedChainState = (*ChainDataMock)(nil)
 
 type PrivateOperatorInfo struct {
 	*core.IndexedOperatorInfo
-	KeyPair       *core.KeyPair
-	Signer        blssigner.Signer
-	Host          string
-	DispersalPort string
-	RetrievalPort string
+	KeyPair         *core.KeyPair
+	Signer          blssigner.Signer
+	Host            string
+	DispersalPort   string
+	RetrievalPort   string
+	V2DispersalPort string
 }
 
 type PrivateOperatorState struct {
@@ -138,7 +139,8 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", 2*i)
 		retrievalPort := fmt.Sprintf("3%03v", 2*i+1)
-		socket := core.MakeOperatorSocket(host, dispersalPort, retrievalPort)
+		v2DispersalPort := fmt.Sprintf("3%03v", 2*i+2)
+		socket := core.MakeOperatorSocket(host, dispersalPort, retrievalPort, v2DispersalPort)
 
 		indexed := &core.IndexedOperatorInfo{
 			Socket:   string(socket),
@@ -158,6 +160,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			Host:                host,
 			DispersalPort:       dispersalPort,
 			RetrievalPort:       retrievalPort,
+			V2DispersalPort:     v2DispersalPort,
 		}
 
 		indexedOperators[id] = indexed

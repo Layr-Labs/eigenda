@@ -385,7 +385,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 }
 
 // Generates DA node .env
-func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, metricsPort, nodeApiPort string) OperatorVars {
+func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, metricsPort, nodeApiPort string) OperatorVars {
 
 	max, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	// max.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(max, big.NewInt(1))
@@ -411,6 +411,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_RETRIEVAL_PORT:                   retrievalPort,
 		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
 		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
+		NODE_V2_DISPERSAL_PORT:                v2DispersalPort,
 		NODE_ENABLE_METRICS:                   "true",
 		NODE_METRICS_PORT:                     metricsPort,
 		NODE_ENABLE_NODE_API:                  "true",
@@ -651,8 +652,9 @@ func (env *Config) GenerateAllVariables() {
 		metricsPort := fmt.Sprint(port + 1) // port
 		dispersalPort := fmt.Sprint(port + 2)
 		retrievalPort := fmt.Sprint(port + 3)
-		nodeApiPort := fmt.Sprint(port + 4)
-		port += 5
+		v2DispersalPort := fmt.Sprint(port + 4)
+		nodeApiPort := fmt.Sprint(port + 5)
+		port += 6
 
 		name := fmt.Sprintf("opr%v", i)
 		logPath, dbPath, filename, envFile := env.getPaths(name)
@@ -660,7 +662,7 @@ func (env *Config) GenerateAllVariables() {
 
 		// Convert key to address
 
-		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
+		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, fmt.Sprint(metricsPort), nodeApiPort)
 		writeEnv(operatorConfig.getEnvMap(), envFile)
 		env.Operators = append(env.Operators, operatorConfig)
 
