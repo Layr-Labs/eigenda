@@ -65,6 +65,9 @@ type grpcClient struct {
 	permits chan struct{}
 }
 
+// TODO (cody-littley / litt3): when randomly selecting a relay client to use, we should avoid selecting a
+// client that currently has exhausted its concurrency permits.
+
 type relayClient struct {
 	config *RelayClientConfig
 
