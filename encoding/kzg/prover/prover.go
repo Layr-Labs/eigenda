@@ -212,6 +212,9 @@ func (e *Prover) GetFrames(data []byte, params encoding.EncodingParams) ([]*enco
 	return chunks, nil
 }
 
+// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254
+// field elements (32 bytes each, except potentially the last element),
+// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
 func (e *Prover) GetCommitmentsForPaddedLength(data []byte) (encoding.BlobCommitments, error) {
 	symbols, err := rs.ToFrArray(data)
 	if err != nil {

@@ -27,6 +27,9 @@ type abiBlobCommitments struct {
 	DataLength       uint32
 }
 
+// BlobKey serializes the BlobHeader into a 32-byte unique identifier.
+// This serialization must ALWAYS match the serialization that we perform onchain:
+// https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/libraries/EigenDAHasher.sol#L119
 func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {

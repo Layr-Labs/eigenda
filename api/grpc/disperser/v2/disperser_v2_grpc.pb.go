@@ -37,8 +37,20 @@ type DisperserClient interface {
 	// GetBlobStatus is meant to be polled for the blob status.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+	// and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+	//
+	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
+	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
-	// GetPaymentState is a utility method to get the payment state of a given account.
+	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+	//
+	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 }
 
@@ -98,8 +110,20 @@ type DisperserServer interface {
 	// GetBlobStatus is meant to be polled for the blob status.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+	// and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+	//
+	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
+	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
-	// GetPaymentState is a utility method to get the payment state of a given account.
+	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+	//
+	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }

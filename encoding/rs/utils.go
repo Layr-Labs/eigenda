@@ -10,6 +10,15 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+// ToFrArray deserializes a byte array into a list of bn254 field elements.,
+// where each 32-byte chunk needs to be a big-endian serialized bn254 field element.
+// The last chunk is allowed to not have 32-bytes, and will be padded with zeroes
+// on the right (so make sure that the last partial chunk represents a valid field element
+// when padded with zeroes on the right and interpreted as big-endian).
+//
+// TODO: we should probably just force the data to be a multiple of 32 bytes.
+// This would make the API and code simpler to read, and also allow the code
+// to be auto-vectorized by the compiler (it probably isn't right now given the if inside the for loop).
 func ToFrArray(data []byte) ([]fr.Element, error) {
 	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_SYMBOL)
 	eles := make([]fr.Element, numEle)
@@ -35,7 +44,9 @@ func ToFrArray(data []byte) ([]fr.Element, error) {
 	return eles, nil
 }
 
-// ToByteArray converts a list of Fr to a byte array
+// ToByteArray serializes a slice of fields elements to a slice of bytes.
+// The byte array is created by serializing each Fr element in big-endian format.
+// It is the reverse operation of ToFrArray.
 func ToByteArray(dataFr []fr.Element, maxDataSize uint64) []byte {
 	n := len(dataFr)
 	dataSize := int(math.Min(
