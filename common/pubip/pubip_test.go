@@ -42,7 +42,7 @@ func TestProviderOrDefault(t *testing.T) {
 	require.Equal(t, SeepIPProvider, multi.providers[0].Name())
 	require.Equal(t, IpifyProvider, multi.providers[1].Name())
 
-	provider = providerOrDefault(logger, fmt.Sprintf("%s,%s", SeepIPProvider, IpifyProvider))
+	provider = providerOrDefault(logger, SeepIPProvider, IpifyProvider)
 	require.Equal(t, fmt.Sprintf("multiProvider(%s, %s)", SeepIPProvider, IpifyProvider), provider.Name())
 	multi, ok = provider.(*multiProvider)
 	require.True(t, ok)
@@ -50,7 +50,7 @@ func TestProviderOrDefault(t *testing.T) {
 	require.Equal(t, SeepIPProvider, multi.providers[0].Name())
 	require.Equal(t, IpifyProvider, multi.providers[1].Name())
 
-	provider = providerOrDefault(logger, fmt.Sprintf("%s,%s,%s", IpifyProvider, SeepIPProvider, MockIpProvider))
+	provider = providerOrDefault(logger, IpifyProvider, SeepIPProvider, MockIpProvider)
 	require.Equal(t, fmt.Sprintf("multiProvider(%s, %s, %s)",
 		IpifyProvider, SeepIPProvider, MockIpProvider), provider.Name())
 	multi, ok = provider.(*multiProvider)
@@ -61,7 +61,7 @@ func TestProviderOrDefault(t *testing.T) {
 	require.Equal(t, MockIpProvider, multi.providers[2].Name())
 
 	// invalid provider, should yield default
-	provider = providerOrDefault(logger, fmt.Sprintf("%s,not a real provider,%s", IpifyProvider, MockIpProvider))
+	provider = providerOrDefault(logger, IpifyProvider, "not a real provider", MockIpProvider)
 	require.Equal(t, fmt.Sprintf("multiProvider(%s, %s)", SeepIPProvider, IpifyProvider), provider.Name())
 	multi, ok = provider.(*multiProvider)
 	require.True(t, ok)
