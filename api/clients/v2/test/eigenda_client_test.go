@@ -123,15 +123,15 @@ func buildBlobAndCert(
 	}
 
 	blobCertificate := &commonv2.BlobCertificate{
-		Relays:     relayKeys,
+		RelayKeys:  relayKeys,
 		BlobHeader: blobHeader,
 	}
 
-	verificationInfo := &disperserv2.BlobVerificationInfo{
+	inclusionInfo := &disperserv2.BlobInclusionInfo{
 		BlobCertificate: blobCertificate,
 	}
 
-	verificationProof, err := verification.VerificationProofProtoToBinding(verificationInfo)
+	verificationProof, err := verification.VerificationProofProtoToBinding(inclusionInfo)
 	require.NoError(t, err)
 
 	return blobKey, blobBytes, &verification.EigenDACert{

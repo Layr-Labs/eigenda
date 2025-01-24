@@ -37,22 +37,22 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].Relays[0] = request.Batch.BlobCertificates[0].Relays[0] + 1
+	request.Batch.BlobCertificates[0].RelayKeys[0] = request.Batch.BlobCertificates[0].RelayKeys[0] + 1
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, remove a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].Relays =
-		request.Batch.BlobCertificates[0].Relays[:len(request.Batch.BlobCertificates[0].Relays)-1]
+	request.Batch.BlobCertificates[0].RelayKeys =
+		request.Batch.BlobCertificates[0].RelayKeys[:len(request.Batch.BlobCertificates[0].RelayKeys)-1]
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, add a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].Relays = append(request.Batch.BlobCertificates[0].Relays, rand.Uint32())
+	request.Batch.BlobCertificates[0].RelayKeys = append(request.Batch.BlobCertificates[0].RelayKeys, rand.Uint32())
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -140,7 +140,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the Signature
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Signature = rand.Bytes(32)
+	request.Batch.BlobCertificates[0].Signature = rand.Bytes(32)
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 }

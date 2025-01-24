@@ -33,7 +33,7 @@ type BlobVerifier struct {
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-	ethClient *geth.EthClient,  // the eth client, which should already be set up
+	ethClient *geth.EthClient, // the eth client, which should already be set up
 	blobVerifierAddress string, // the hex address of the EigenDABlobVerifier contract
 ) (*BlobVerifier, error) {
 
@@ -59,7 +59,7 @@ func (v *BlobVerifier) VerifyBlobV2FromSignedBatch(
 	// to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
 	// Contains all necessary information about the blob, so that it can be verified.
-	blobVerificationProof *disperser.BlobVerificationInfo,
+	blobVerificationProof *disperser.BlobInclusionInfo,
 ) error {
 	convertedSignedBatch, err := SignedBatchProtoToBinding(signedBatch)
 	if err != nil {

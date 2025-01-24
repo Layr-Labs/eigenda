@@ -15,6 +15,63 @@ const docTemplateV2 = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/batches/feed": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch batch feed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch batches starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "The maximum number of batches to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BatchFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
@@ -38,6 +95,69 @@ const docTemplateV2 = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/v2.BatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/feed": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blob"
+                ],
+                "summary": "Fetch blob feed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]",
+                        "name": "pagination_token",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "The maximum number of blobs to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobFeedResponse"
                         }
                     },
                     "400": {
@@ -543,6 +663,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -550,6 +676,9 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -562,7 +691,7 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "cumulative_payment": {
-                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
+                    "description": "CumulativePayment represents the total amount of payment (in wei) made by the user up to this point",
                     "allOf": [
                         {
                             "$ref": "#/definitions/big.Int"
@@ -572,10 +701,6 @@ const docTemplateV2 = `{
                 "reservation_period": {
                     "description": "ReservationPeriod represents the range of time at which the dispersal is made",
                     "type": "integer"
-                },
-                "salt": {
-                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
-                    "type": "integer"
                 }
             }
         },
@@ -583,6 +708,12 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "y": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -615,6 +746,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -623,6 +760,9 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -630,6 +770,9 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -753,8 +896,12 @@ const docTemplateV2 = `{
                         "type": "integer"
                     }
                 },
+                "salt": {
+                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
+                    "type": "integer"
+                },
                 "signature": {
-                    "description": "Signature is the signature of the blob header by the account ID",
+                    "description": "Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,\nwhich is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID",
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -829,6 +976,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "a1": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -851,6 +1004,46 @@ const docTemplateV2 = `{
                     "type": "object",
                     "additionalProperties": {
                         "type": "number"
+                    }
+                }
+            }
+        },
+        "v2.BatchFeedResponse": {
+            "type": "object",
+            "properties": {
+                "batches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.BatchInfo"
+                    }
+                }
+            }
+        },
+        "v2.BatchInfo": {
+            "type": "object",
+            "properties": {
+                "aggregated_signature": {
+                    "$ref": "#/definitions/core.Signature"
+                },
+                "attested_at": {
+                    "type": "integer"
+                },
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "quorum_numbers": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorum_signed_percentages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
                     }
                 }
             }
@@ -1067,6 +1260,9 @@ const docTemplateV2 = `{
                 "dispersal_socket": {
                     "type": "string"
                 },
+                "dispersal_status": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -1074,6 +1270,18 @@ const docTemplateV2 = `{
                     "type": "boolean"
                 },
                 "retrieval_socket": {
+                    "type": "string"
+                },
+                "retrieval_status": {
+                    "type": "string"
+                },
+                "v2_dispersal_online": {
+                    "type": "boolean"
+                },
+                "v2_dispersal_socket": {
+                    "type": "string"
+                },
+                "v2_dispersal_status": {
                     "type": "string"
                 }
             }

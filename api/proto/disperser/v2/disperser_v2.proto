@@ -26,7 +26,7 @@ service Disperser {
 
 // A request to disperse a blob.
 message DisperseBlobRequest {
-  // The data to be dispersed.
+  // The blob to be dispersed.
   //
   // The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
   // (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
@@ -35,7 +35,7 @@ message DisperseBlobRequest {
   // significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
   // The valid range is 0 <= x < 21888242871839275222246405745257275088548364400416034343698204186575808495617.
   // If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected.
-  bytes data = 1;
+  bytes blob = 1;
   // The header contains metadata about the blob.
   //
   // This header can be thought of as an "eigenDA tx", in that it plays a purpose similar to an eth_tx to disperse a
@@ -43,6 +43,8 @@ message DisperseBlobRequest {
   // dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
   // which is dispersed separately.
   common.v2.BlobHeader blob_header = 2;
+  // signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id
+  bytes signature = 3;
 }
 
 // A reply to a DisperseBlob request.
@@ -73,16 +75,16 @@ message BlobStatusReply {
   BlobStatus status = 1;
   // The signed batch. Unset if the status is not CERTIFIED.
   SignedBatch signed_batch = 2;
-  // BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+  // BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
   // Unset if the status is not CERTIFIED.
-  BlobVerificationInfo blob_verification_info = 3;
+  BlobInclusionInfo blob_inclusion_info = 3;
 }
 
 // The input for a BlobCommitmentRequest().
 // This can be used to construct a BlobHeader.commitment.
 message BlobCommitmentRequest {
   // The blob data to compute the commitment for.
-  bytes data = 1;
+  bytes blob = 1;
 }
 
 // The result of a BlobCommitmentRequest().
@@ -164,8 +166,8 @@ message SignedBatch {
   Attestation attestation = 2;
 }
 
-// BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
-message BlobVerificationInfo {
+// BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
+message BlobInclusionInfo {
   common.v2.BlobCertificate blob_certificate = 1;
   // blob_index is the index of the blob in the batch
   uint32 blob_index = 2;

@@ -114,11 +114,13 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
 
         BlobCertificate memory blobCertificate1 = BlobCertificate({
             blobHeader: blobHeader1,
+            signature: hex"00",
             relayKeys: relayKeys
         });
 
         BlobCertificate memory blobCertificate2 = BlobCertificate({
             blobHeader: blobHeader2,
+            signature: hex"0001",
             relayKeys: relayKeys
         });
 

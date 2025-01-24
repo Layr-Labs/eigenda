@@ -140,6 +140,7 @@ library EigenDAHasher {
         return keccak256(
             abi.encode(
                 hashBlobHeaderV2(blobCertificate.blobHeader),
+                blobCertificate.signature,
                 blobCertificate.relayKeys
             )
         );

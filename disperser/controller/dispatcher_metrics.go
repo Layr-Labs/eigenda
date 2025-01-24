@@ -23,7 +23,7 @@ type dispatcherMetrics struct {
 	buildMerkleTreeLatency      *prometheus.SummaryVec
 	putBatchHeaderLatency       *prometheus.SummaryVec
 	proofLatency                *prometheus.SummaryVec
-	putVerificationInfosLatency *prometheus.SummaryVec
+	putInclusionInfosLatency    *prometheus.SummaryVec
 	poolSubmissionLatency       *prometheus.SummaryVec
 	putDispersalRequestLatency  *prometheus.SummaryVec
 	sendChunksLatency           *prometheus.SummaryVec
@@ -132,11 +132,11 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putVerificationInfosLatency := promauto.With(registry).NewSummaryVec(
+	putInclusionInfosLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "put_verification_infos_latency_ms",
-			Help:       "The time required to put the verification infos (part of NewBatch()).",
+			Help:       "The time required to put the inclusion infos (part of NewBatch()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -269,7 +269,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		buildMerkleTreeLatency:      buildMerkleTreeLatency,
 		putBatchHeaderLatency:       putBatchHeaderLatency,
 		proofLatency:                proofLatency,
-		putVerificationInfosLatency: putVerificationInfosLatency,
+		putInclusionInfosLatency:    putInclusionInfosLatency,
 		poolSubmissionLatency:       poolSubmissionLatency,
 		putDispersalRequestLatency:  putDispersalRequestLatency,
 		sendChunksLatency:           sendChunksLatency,
@@ -318,8 +318,8 @@ func (m *dispatcherMetrics) reportProofLatency(duration time.Duration) {
 	m.proofLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportPutVerificationInfosLatency(duration time.Duration) {
-	m.putVerificationInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+func (m *dispatcherMetrics) reportPutInclusionInfosLatency(duration time.Duration) {
+	m.putInclusionInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportPoolSubmissionLatency(duration time.Duration) {

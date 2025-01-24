@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -90,8 +90,8 @@ func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*cont
 	return convertedAttestation, nil
 }
 
-func VerificationProofProtoToBinding(inputVerificationInfo *disperserv2.BlobVerificationInfo) (*contractEigenDABlobVerifier.BlobVerificationProofV2, error) {
-	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputVerificationInfo.GetBlobCertificate())
+func VerificationProofProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDABlobVerifier.BlobVerificationProofV2, error) {
+	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {
 		return nil, fmt.Errorf("convert blob certificate: %s", err)
@@ -99,8 +99,8 @@ func VerificationProofProtoToBinding(inputVerificationInfo *disperserv2.BlobVeri
 
 	return &contractEigenDABlobVerifier.BlobVerificationProofV2{
 		BlobCertificate: *convertedBlobCertificate,
-		BlobIndex:       inputVerificationInfo.GetBlobIndex(),
-		InclusionProof:  inputVerificationInfo.GetInclusionProof(),
+		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
+		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
 	}, nil
 }
 
@@ -112,7 +112,8 @@ func blobCertificateProtoToBinding(inputCertificate *commonv2.BlobCertificate) (
 
 	return &contractEigenDABlobVerifier.BlobCertificate{
 		BlobHeader: *convertedBlobHeader,
-		RelayKeys:  inputCertificate.GetRelays(),
+		Signature:  inputCertificate.GetSignature(),
+		RelayKeys:  inputCertificate.GetRelayKeys(),
 	}, nil
 }
 
@@ -242,7 +243,7 @@ func bytesToBN254G2Point(bytes []byte) (*contractEigenDABlobVerifier.BN254G2Poin
 
 func bn254G2PointToBytes(inputPoint *contractEigenDABlobVerifier.BN254G2Point) []byte {
 	var g2Point bn254.G2Affine
-	
+
 	// Order is intentionally reversed when converting here
 	// (see https://github.com/Layr-Labs/eigenlayer-middleware/blob/512ce7326f35e8060b9d46e23f9c159c0000b546/src/libraries/BN254.sol#L43)
 

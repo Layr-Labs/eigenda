@@ -39,10 +39,10 @@ func RandomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 					ReservationPeriod: rand.Uint32(),
 					CumulativePayment: rand.Bytes(32),
 				},
-				Salt:      rand.Uint32(),
-				Signature: rand.Bytes(32),
+				Salt: rand.Uint32(),
 			},
-			Relays: relays,
+			Signature: rand.Bytes(32),
+			RelayKeys: relays,
 		}
 	}
 

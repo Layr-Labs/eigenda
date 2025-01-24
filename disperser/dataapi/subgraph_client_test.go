@@ -330,7 +330,7 @@ var (
 		},
 		SocketUpdates: []subgraph.SocketUpdates{
 			{
-				Socket: "localhost:32008;32009",
+				Socket: "localhost:32008;32009;32010",
 			},
 		},
 	}

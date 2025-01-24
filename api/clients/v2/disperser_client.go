@@ -194,13 +194,13 @@ func (c *disperserClient) DisperseBlob(
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
 	}
-	blobHeader.Signature = sig
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:       data,
+		Blob:       data,
+		Signature:  sig,
 		BlobHeader: blobHeaderProto,
 	}
 
@@ -265,7 +265,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	}
 
 	request := &disperser_rpc.BlobCommitmentRequest{
-		Data: data,
+		Blob: data,
 	}
 	return c.client.GetBlobCommitment(ctx, request)
 }
