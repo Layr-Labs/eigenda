@@ -250,9 +250,12 @@ func (pr *PayloadRetriever) verifyCertWithTimeout(
 //
 // This method should only be called once.
 func (pr *PayloadRetriever) Close() error {
-	relayClientErr := pr.relayClient.Close()
+	err := pr.relayClient.Close()
+	if err != nil {
+		return fmt.Errorf("close relay client: %w", err)
+	}
 
-	return fmt.Errorf("close relay client: %w", relayClientErr)
+	return nil
 }
 
 // createCodec creates the codec based on client config values
