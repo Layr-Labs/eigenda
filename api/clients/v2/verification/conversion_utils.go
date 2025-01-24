@@ -90,7 +90,7 @@ func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*cont
 	return convertedAttestation, nil
 }
 
-func VerificationProofProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDABlobVerifier.BlobVerificationProofV2, error) {
+func InclusionInfoProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDABlobVerifier.BlobVerificationProofV2, error) {
 	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {
