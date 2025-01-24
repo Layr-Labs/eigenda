@@ -44,7 +44,7 @@ func NewCertVerifier(
 		ethClient)
 
 	if err != nil {
-		return nil, fmt.Errorf("bind to verifier contract at %s: %s", certVerifierAddress, err)
+		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}
 
 	return &CertVerifier{
@@ -65,12 +65,12 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 ) error {
 	convertedSignedBatch, err := SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
-		return fmt.Errorf("convert signed batch: %s", err)
+		return fmt.Errorf("convert signed batch: %w", err)
 	}
 
 	convertedBlobInclusionInfo, err := InclusionInfoProtoToBinding(blobInclusionInfo)
 	if err != nil {
-		return fmt.Errorf("convert blob inclusion info: %s", err)
+		return fmt.Errorf("convert blob inclusion info: %w", err)
 	}
 
 	err = cv.certVerifierCaller.VerifyBlobV2FromSignedBatch(
@@ -79,7 +79,7 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		*convertedBlobInclusionInfo)
 
 	if err != nil {
-		return fmt.Errorf("verify cert v2 from signed batch: %s", err)
+		return fmt.Errorf("verify cert v2 from signed batch: %w", err)
 	}
 
 	return nil
@@ -99,7 +99,7 @@ func (cv *CertVerifier) VerifyCertV2(
 		eigenDACert.NonSignerStakesAndSignature)
 
 	if err != nil {
-		return fmt.Errorf("verify cert v2: %s", err)
+		return fmt.Errorf("verify cert v2: %w", err)
 	}
 
 	return nil

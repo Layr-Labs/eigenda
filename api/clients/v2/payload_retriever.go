@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierContract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifiercontract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -282,7 +282,7 @@ func createCodec(config *PayloadRetrieverConfig) (codecs.BlobCodec, error) {
 // blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
 // encoding.BlobCommitments type
 func blobCommitmentsBindingToInternal(
-	blobCommitmentBinding *verifierContract.BlobCommitment,
+	blobCommitmentBinding *verifiercontract.BlobCommitment,
 ) (*encoding.BlobCommitments, error) {
 
 	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(
