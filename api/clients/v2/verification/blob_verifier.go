@@ -33,13 +33,13 @@ type BlobVerifier struct {
 
 // NewBlobVerifier constructs a BlobVerifier
 func NewBlobVerifier(
-	ethClient *geth.EthClient, // the eth client, which should already be set up
+	ethClient geth.EthClient, // the eth client, which should already be set up
 	blobVerifierAddress string, // the hex address of the EigenDABlobVerifier contract
 ) (*BlobVerifier, error) {
 
 	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
 		gethcommon.HexToAddress(blobVerifierAddress),
-		*ethClient)
+		ethClient)
 
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %s", blobVerifierAddress, err)
