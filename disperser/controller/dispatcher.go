@@ -114,7 +114,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 						d.logger.Error("failed to handle signatures", "err", err)
 					}
 					close(sigChan)
-					// TODO(ian-shim): handle errors and mark failed
 				}()
 			}
 		}
@@ -156,7 +155,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 
 		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 		if err != nil {
-			d.logger.Error("failed to get node client", "operator", opID.Hex(), "err", err)
+			d.logger.Warn("failed to get node client; node may not be reachable", "operator", opID.Hex(), "host", host, "v2DispersalPort", v2DispersalPort, "err", err)
 			sigChan <- core.SigningMessage{
 				Signature:            nil,
 				Operator:             opID,
@@ -231,7 +230,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 			}
 
 			if lastErr != nil {
-				d.logger.Error("failed to send chunks", "operator", opID.Hex(), "NumAttempts", i, "batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]), "err", lastErr)
+				d.logger.Warn("failed to send chunks", "operator", opID.Hex(), "NumAttempts", i, "batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]), "err", lastErr)
 				sigChan <- core.SigningMessage{
 					Signature:            nil,
 					Operator:             opID,
@@ -554,7 +553,7 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 		failed := false
 		for _, q := range cert.BlobHeader.QuorumNumbers {
 			if res, ok := quorumResults[q]; !ok || res == 0 {
-				d.logger.Error("quorum result not found", "quorumID", q, "blobKey", blobKey.Hex())
+				d.logger.Warn("quorum result not found", "quorumID", q, "blobKey", blobKey.Hex())
 				failed = true
 				break
 			}
