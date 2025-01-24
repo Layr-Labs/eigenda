@@ -336,7 +336,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		if strings.Contains(err.Error(), "internal error") {
 			return nil, api.NewErrorInternal(err.Error())
 		}
-		return nil, buildInsufficientGetChunksBandwidthError(request, mMap, err)
+		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
 	s.metrics.ReportChunkDataSize(requiredBandwidth)
 
@@ -473,31 +473,22 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 // bandwidth to serve a GetChunks() request.
 func buildInsufficientGetChunksBandwidthError(
 	request *pb.GetChunksRequest,
-	mMap metadataMap,
+	requiredBandwidth int,
 	originalError error) error {
 
-	sb := strings.Builder{}
-	sb.WriteString("unable to serve chunks ")
-	for i, chunkRequest := range request.ChunkRequests {
-		var prefix string
-		var chunkCount int
-
+	chunkCount := 0
+	for _, chunkRequest := range request.ChunkRequests {
 		if chunkRequest.GetByIndex() != nil {
-			prefix = "i"
-			chunkCount = len(chunkRequest.GetByIndex().ChunkIndices)
+			chunkCount += len(chunkRequest.GetByIndex().ChunkIndices)
 		} else {
-			prefix = "r"
-			chunkCount = int(chunkRequest.GetByRange().EndIndex - chunkRequest.GetByRange().StartIndex)
-		}
-		chunkSize := int(mMap[v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())].chunkSizeBytes)
-
-		sb.WriteString(fmt.Sprintf("%s(%d*%dbytes)", prefix, chunkCount, chunkSize))
-		if i < len(request.ChunkRequests)-1 {
-			sb.WriteString(", ")
+			chunkCount += int(chunkRequest.GetByRange().EndIndex - chunkRequest.GetByRange().StartIndex)
 		}
 	}
 
-	return api.NewErrorResourceExhausted(fmt.Sprintf("%s: %v", sb.String(), originalError))
+	blobCount := len(request.ChunkRequests)
+
+	return api.NewErrorResourceExhausted(fmt.Sprintf("unable to serve data (%d blobs, %d chunks, %d bytes): %v",
+		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
