@@ -2,6 +2,7 @@ syntax = "proto3";
 package common;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 
+// A KZG commitment
 message G1Commitment {
   // The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
   bytes x = 1;
@@ -12,20 +13,16 @@ message G1Commitment {
 // BlobCommitment represents commitment of a specific blob, containing its
 // KZG commitment, degree proof, the actual degree, and data length in number of symbols.
 message BlobCommitment {
+  // A commitment to the blob data.
   bytes commitment = 1;
+  // A commitment to the blob data with G2 SRS, used to work with length_proof
+  // such that the claimed length below is verifiable.
   bytes length_commitment = 2;
+  // A proof that the degree of the polynomial used to generate the blob commitment is valid.
+  // It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+  // at the end of the highest order.
   bytes length_proof = 3;
+  // The length specifies the degree of the polynomial used to generate the blob commitment. The length
+  // must equal to the degree + 1, and it must be a power of 2.
   uint32 length = 4;
-}
-
-message PaymentHeader {
-  // The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
-  // corresponding to the key used by the client to sign the BlobHeader.
-  string account_id = 1;
-  // The reservation period of the dispersal request.
-  uint32 reservation_period = 2;
-  // The cumulative payment of the dispersal request. 
-  bytes cumulative_payment = 3;
-  // The salt of the disperser request. This is used to ensure that the payment header is intentionally unique.
-  uint32 salt = 4;
 }

@@ -48,6 +48,7 @@ type Config struct {
 	DispersalPort                  string
 	InternalRetrievalPort          string
 	InternalDispersalPort          string
+	V2DispersalPort                string
 	EnableNodeApi                  bool
 	NodeApiPort                    string
 	EnableMetrics                  bool
@@ -65,7 +66,7 @@ type Config struct {
 	ID                             core.OperatorID
 	BLSOperatorStateRetrieverAddr  string
 	EigenDAServiceManagerAddr      string
-	PubIPProvider                  string
+	PubIPProviders                 []string
 	PubIPCheckInterval             time.Duration
 	ChurnerUrl                     string
 	DataApiUrl                     string
@@ -86,6 +87,7 @@ type Config struct {
 	EnableV2                    bool
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
+	GRPCMsgSizeLimitV2          int
 
 	PprofHttpPort string
 	EnablePprof   bool
@@ -178,12 +180,17 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		blsPublicKeyHex := ctx.GlobalString(flags.BLSPublicKeyHexFlag.Name)
 		blsKeyFilePath := ctx.GlobalString(flags.BlsKeyFileFlag.Name)
 		blsKeyPassword := ctx.GlobalString(flags.BlsKeyPasswordFlag.Name)
+		blsSignerAPIKey := ctx.GlobalString(flags.BLSSignerAPIKeyFlag.Name)
 
 		if blsRemoteSignerEnabled && (blsRemoteSignerUrl == "" || blsPublicKeyHex == "") {
 			return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
 		}
 		if !blsRemoteSignerEnabled && (blsKeyFilePath == "" || blsKeyPassword == "") {
 			return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+		}
+
+		if blsRemoteSignerEnabled && blsSignerAPIKey == "" {
+			return nil, fmt.Errorf("BLS signer API key is required if BLS remote signer is enabled")
 		}
 
 		if blsRemoteSignerEnabled {
@@ -199,6 +206,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			CerberusPassword: blsKeyPassword,
 			EnableTLS:        enableTLS,
 			TLSCertFilePath:  ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
+			CerberusAPIKey:   blsSignerAPIKey,
 		}
 	} else {
 		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
@@ -222,12 +230,40 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
+	// check if the ports are valid integers
+	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
+	_, err = strconv.Atoi(dispersalPort)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dispersal port: %s", dispersalPort)
+	}
+
+	retrievalPort := ctx.GlobalString(flags.RetrievalPortFlag.Name)
+	_, err = strconv.Atoi(retrievalPort)
+	if err != nil {
+		return nil, fmt.Errorf("invalid retrieval port: %s", retrievalPort)
+	}
+
+	v2Enabled := ctx.GlobalBool(flags.EnableV2Flag.Name)
+
+	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
+	if v2DispersalPort == "" {
+		if v2Enabled {
+			return nil, fmt.Errorf("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be specified if v2 is enabled")
+		}
+	} else {
+		_, err = strconv.Atoi(v2DispersalPort)
+		if err != nil {
+			return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
+		}
+	}
+
 	return &Config{
 		Hostname:                            ctx.GlobalString(flags.HostnameFlag.Name),
-		DispersalPort:                       ctx.GlobalString(flags.DispersalPortFlag.Name),
-		RetrievalPort:                       ctx.GlobalString(flags.RetrievalPortFlag.Name),
+		DispersalPort:                       dispersalPort,
+		RetrievalPort:                       retrievalPort,
 		InternalDispersalPort:               internalDispersalFlag,
 		InternalRetrievalPort:               internalRetrievalFlag,
+		V2DispersalPort:                     v2DispersalPort,
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
@@ -247,7 +283,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LoggerConfig:                        *loggerConfig,
 		BLSOperatorStateRetrieverAddr:       ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:           ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		PubIPProvider:                       ctx.GlobalString(flags.PubIPProviderFlag.Name),
+		PubIPProviders:                      ctx.GlobalStringSlice(flags.PubIPProviderFlag.Name),
 		PubIPCheckInterval:                  pubIPCheckInterval,
 		ChurnerUrl:                          ctx.GlobalString(flags.ChurnerUrlFlag.Name),
 		DataApiUrl:                          ctx.GlobalString(flags.DataApiUrlFlag.Name),
@@ -258,9 +294,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
-		EnableV2:                            ctx.GlobalBool(flags.EnableV2Flag.Name),
+		EnableV2:                            v2Enabled,
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
+		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
 		PprofHttpPort:                       ctx.GlobalString(flags.PprofHttpPort.Name),
 		EnablePprof:                         ctx.GlobalBool(flags.EnablePprof.Name),
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),

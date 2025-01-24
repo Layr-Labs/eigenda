@@ -3,22 +3,46 @@ package common.v2;
 import "common/common.proto";
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common/v2";
 
-
+// BlobHeader contains the information describing a blob and the way it is to be dispersed.
 message BlobHeader {
-  // Blob version
+  // The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
+  // maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
+  // are checked against supplied or default security thresholds to validate the security assumptions of the
+  // blob's availability.
   uint32 version = 1;
+  // quorum_numbers is the list of quorum numbers that the blob is part of.
+  // All quorums must be specified (including required quorums).
+  //
+  // The following quorums are currently required:
+  // - 0: ETH
+  // - 1: EIGEN
   repeated uint32 quorum_numbers = 2;
+  // commitment is the KZG commitment to the blob
   common.BlobCommitment commitment = 3;
-  common.PaymentHeader payment_header = 4;
-
-  // signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-  bytes signature = 5;
+  // payment_header contains payment information for the blob
+  PaymentHeader payment_header = 4;
+  // salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
+  // reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
+  // payments already have unique cumulative_payment values for intentionally unique dispersal requests.
+  uint32 salt = 5;
 }
 
-// BlobCertificate is what gets attested by the network
+// BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
+// is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).
+// Validator nodes eventually sign the blob certificate once they are in custody of the required chunks
+// (note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).
 message BlobCertificate {
+  // blob_header contains data about the blob.
   BlobHeader blob_header = 1;
-  repeated uint32 relays = 2;
+  // signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
+  // which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+  bytes signature = 2;
+  // relay_keys is the list of relay keys that are in custody of the blob.
+  // The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
+  // It needs to contain at least 1 relay number.
+  // To retrieve a blob from the relay, one can find that relay's URL in the EigenDARelayRegistry contract:
+  // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol
+  repeated uint32 relay_keys = 3;
 }
 
 // BatchHeader is the header of a batch of blobs
@@ -35,4 +59,20 @@ message Batch {
   BatchHeader header = 1;
   // blob_certificates is the list of blob certificates in the batch
   repeated BlobCertificate blob_certificates = 2;
+}
+
+// PaymentHeader contains payment information for a blob.
+// At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+// is always considered before cumulative_payment. If reservation_period is set but not valid, 
+// the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+// and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+// Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+message PaymentHeader {
+  // The account ID of the disperser client. This account ID is an eth wallet address of the user,
+  // corresponding to the key used by the client to sign the BlobHeader.
+  string account_id = 1;
+  // The reservation period of the dispersal request. 
+  uint32 reservation_period = 2;
+  // The cumulative payment of the dispersal request. This field will be parsed as a big integer.
+  bytes cumulative_payment = 3;
 }

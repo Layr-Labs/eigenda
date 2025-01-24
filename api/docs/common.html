@@ -186,10 +186,6 @@
                   <a href="#common.G1Commitment"><span class="badge">M</span>G1Commitment</a>
                 </li>
               
-                <li>
-                  <a href="#common.PaymentHeader"><span class="badge">M</span>PaymentHeader</a>
-                </li>
-              
               
               
               
@@ -222,28 +218,32 @@
                   <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A commitment to the blob data. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A commitment to the blob data with G2 SRS, used to work with length_proof
+such that the claimed length below is verifiable. </p></td>
                 </tr>
               
                 <tr>
                   <td>length_proof</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
+It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+at the end of the highest order. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The length specifies the degree of the polynomial used to generate the blob commitment. The length
+must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                 </tr>
               
             </tbody>
@@ -254,7 +254,7 @@
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p></p>
+        <p>A KZG commitment</p>
 
         
           <table class="field-table">
@@ -275,52 +275,6 @@
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="common.PaymentHeader">PaymentHeader</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>account_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
-corresponding to the key used by the client to sign the BlobHeader. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>reservation_period</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>The reservation period of the dispersal request. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>cumulative_payment</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>The cumulative payment of the dispersal request. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>salt</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. </p></td>
                 </tr>
               
             </tbody>

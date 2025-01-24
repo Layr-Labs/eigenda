@@ -31,6 +31,14 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
+func checkAttestationsOrdered(t *testing.T, at []*corev2.Attestation) {
+	if len(at) > 1 {
+		for i := 1; i < len(at); i++ {
+			assert.True(t, at[i-1].AttestedAt < at[i].AttestedAt)
+		}
+	}
+}
+
 func TestBlobFeedCursor_Equal(t *testing.T) {
 	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
 	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
@@ -184,6 +192,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	now := time.Now()
 	metadata1 := &v2.BlobMetadata{
 		BlobHeader: blobHeader1,
+		Signature:  []byte{1, 2, 3},
 		BlobStatus: v2.Queued,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -191,6 +200,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	}
 	metadata2 := &v2.BlobMetadata{
 		BlobHeader: blobHeader2,
+		Signature:  []byte{4, 5, 6},
 		BlobStatus: v2.Certified,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -258,6 +268,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 		}
 		metadata := &v2.BlobMetadata{
 			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
 			BlobStatus:  v2.Encoded,
 			Expiry:      uint64(time.Now().Add(time.Hour).Unix()),
 			NumRetries:  0,
@@ -366,6 +377,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		now := time.Now()
 		metadata := &v2.BlobMetadata{
 			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
 			BlobStatus:  v2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
@@ -523,6 +535,215 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
+	ctx := context.Background()
+	numBatches := 72
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64((72+2)*time.Hour.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Hour.Nanoseconds()) // 1 batch per hour
+
+	// Create attestations for testing
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		bhh, err := batchHeaders[i].Hash()
+		assert.NoError(t, err)
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		attestation := &corev2.Attestation{
+			BatchHeader: batchHeaders[i],
+			AttestedAt:  attestedAt[i],
+			NonSignerPubKeys: []*core.G1Point{
+				core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+				core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+			},
+			APKG2: apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, 1, 1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "start must be less than end", err.Error())
+
+		// Test empty range
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, now, now+uint64(240*time.Hour.Nanoseconds()), 0)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(attestations))
+	})
+
+	// Test full range query
+	t.Run("full range", func(t *testing.T) {
+		// Test without limit
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+
+		// Test with limit
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 10)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+
+		// Test min/max timestamp range
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, 0, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, math.MaxInt64, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+
+	// Test range boundaries
+	t.Run("range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches-1, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		assert.Equal(t, attestedAt[1], attestations[0].AttestedAt)
+		assert.Equal(t, batchHeaders[1].BatchRoot, attestations[0].BatchRoot)
+		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
+		assert.Equal(t, batchHeaders[numBatches-1].BatchRoot, attestations[numBatches-2].BatchRoot)
+
+		// Test inclusive end
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, attestedAt[4], 0)
+		require.NoError(t, err)
+		require.Equal(t, 5, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
+		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
+		assert.Equal(t, attestedAt[4], attestations[4].AttestedAt)
+		assert.Equal(t, batchHeaders[4].BatchRoot, attestations[4].BatchRoot)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numBatches; i++ {
+			attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, attestedAt[i-1], attestedAt[i], 1)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(attestations))
+			assert.Equal(t, attestedAt[i], attestations[0].AttestedAt)
+			assert.Equal(t, batchHeaders[i].BatchRoot, attestations[0].BatchRoot)
+		}
+	})
+}
+
+func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
+	ctx := context.Background()
+
+	// Use a fixed "now" so all attestations will deterministically fall in just one
+	// bucket.
+	timestamp := "2025-01-21T15:04:05Z"
+	parsedTime, err := time.Parse(time.RFC3339, timestamp)
+	require.NoError(t, err)
+	now := uint64(parsedTime.UnixNano())
+
+	numBatches := 240
+	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Second.Nanoseconds()) // 1 batch per second
+
+	// Create attestations for testing
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		bhh, err := batchHeaders[i].Hash()
+		assert.NoError(t, err)
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		// Create a sizable nonsigners so the attestation message is big
+		nonsigners := make([]*core.G1Point, 0)
+		for i := 0; i < 200; i++ {
+			nonsigners = append(nonsigners, core.NewG1Point(big.NewInt(int64(i)), big.NewInt(int64(i+1))))
+		}
+		attestation := &corev2.Attestation{
+			BatchHeader:      batchHeaders[i],
+			AttestedAt:       attestedAt[i],
+			NonSignerPubKeys: nonsigners,
+			APKG2:            apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	// The total bytes written to the bucket will be greater than 1MB, so if a query tries to
+	// fetch all results in the bucket, it has to use pagination.
+	// Each attestation has 200 nonsigners and the G1 point has 32 bytes, so we have
+	// 32*3200*numBatches bytes just for nonsigners (attestations' size must be greater).
+	assert.True(t, 32*200*numBatches > 1*1024*1024)
+
+	defer deleteItems(t, dynamoKeys)
+
+	// Test the query can fetch all attestations in a bucket
+	t.Run("full range", func(t *testing.T) {
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+
+	// Test the query returns after getting desired num of attestations in a bucket
+	t.Run("return after getting desired num of items", func(t *testing.T) {
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 125)
+		require.NoError(t, err)
+		require.Equal(t, 125, len(attestations))
+		checkAttestationsOrdered(t, attestations)
+	})
+}
+
 func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 	ctx := context.Background()
 	numBlobs := 103
@@ -606,6 +827,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	blobKey, blobHeader := newBlob(t)
 	blobCert := &corev2.BlobCertificate{
 		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
 		RelayKeys:  []corev2.RelayKey{0, 2, 4},
 	}
 	fragmentInfo := &encoding.FragmentInfo{
@@ -642,8 +864,8 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 					ReservationPeriod: uint32(i),
 					CumulativePayment: big.NewInt(321),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0},
 		}
 		blobKey, err := blobCert.BlobHeader.BlobKey()
@@ -682,6 +904,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	now := time.Now()
 	metadata := &v2.BlobMetadata{
 		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
 		BlobStatus: v2.Queued,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
@@ -819,7 +1042,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
+func TestBlobMetadataStoreInclusionInfo(t *testing.T) {
 	ctx := context.Background()
 	blobKey := corev2.BlobKey{1, 1, 1}
 	batchHeader := &corev2.BatchHeader{
@@ -828,46 +1051,46 @@ func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
-	verificationInfo := &corev2.BlobVerificationInfo{
+	inclusionInfo := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey,
 		BlobIndex:      10,
 		InclusionProof: []byte("proof"),
 	}
 
-	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	assert.NoError(t, err)
 
-	fetchedInfo, err := blobMetadataStore.GetBlobVerificationInfo(ctx, blobKey, bhh)
+	fetchedInfo, err := blobMetadataStore.GetBlobInclusionInfo(ctx, blobKey, bhh)
 	assert.NoError(t, err)
-	assert.Equal(t, verificationInfo, fetchedInfo)
+	assert.Equal(t, inclusionInfo, fetchedInfo)
 
-	// attempt to put verification info with the same key should fail
-	err = blobMetadataStore.PutBlobVerificationInfo(ctx, verificationInfo)
+	// attempt to put inclusion info with the same key should fail
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	assert.ErrorIs(t, err, common.ErrAlreadyExists)
 
-	// put multiple verification infos
+	// put multiple inclusion infos
 	blobKey1 := corev2.BlobKey{2, 2, 2}
-	verificationInfo1 := &corev2.BlobVerificationInfo{
+	inclusionInfo1 := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey1,
 		BlobIndex:      12,
 		InclusionProof: []byte("proof 1"),
 	}
 	blobKey2 := corev2.BlobKey{3, 3, 3}
-	verificationInfo2 := &corev2.BlobVerificationInfo{
+	inclusionInfo2 := &corev2.BlobInclusionInfo{
 		BatchHeader:    batchHeader,
 		BlobKey:        blobKey2,
 		BlobIndex:      14,
 		InclusionProof: []byte("proof 2"),
 	}
-	err = blobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = blobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.NoError(t, err)
 
 	// test retries
 	nonTransientError := errors.New("non transient error")
 	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return(nil, nonTransientError).Once()
-	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = mockedBlobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.ErrorIs(t, err, nonTransientError)
 
 	mockDynamoClient.On("PutItems", mock.Anything, mock.Anything, mock.Anything).Return([]dynamodb.Item{
@@ -886,7 +1109,7 @@ func TestBlobMetadataStoreVerificationInfo(t *testing.T) {
 			assert.Len(t, items, 1)
 		}).
 		Once()
-	err = mockedBlobMetadataStore.PutBlobVerificationInfos(ctx, []*corev2.BlobVerificationInfo{verificationInfo1, verificationInfo2})
+	err = mockedBlobMetadataStore.PutBlobInclusionInfos(ctx, []*corev2.BlobInclusionInfo{inclusionInfo1, inclusionInfo2})
 	assert.NoError(t, err)
 	mockDynamoClient.AssertNumberOfCalls(t, "PutItems", 3)
 }
@@ -993,7 +1216,6 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
-		Signature: sig,
 	}
 	bk, err := bh.BlobKey()
 	require.NoError(t, err)
