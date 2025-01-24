@@ -26,7 +26,6 @@ func TestVerifyReceivedBlobKey(t *testing.T) {
 		AccountID: "asdf",
 		ReservationPeriod: 5,
 		CumulativePayment: big.NewInt(6),
-		Salt: 9,
 	}
 
 	blobHeader := &corev2.BlobHeader{
@@ -34,6 +33,7 @@ func TestVerifyReceivedBlobKey(t *testing.T) {
 		BlobCommitments: blobCommitments,
 		QuorumNumbers: quorumNumbers,
 		PaymentMetadata: paymentMetadata,
+		Salt: 9,
 	}
 
 	realKey, err := blobHeader.BlobKey()
