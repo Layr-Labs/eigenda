@@ -249,6 +249,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportBlobMetadataLatency(finishedFetchingMetadata.Sub(start))
 
+	s.metrics.ReportBlobRequestedBandwidthUsage(int(metadata.blobSizeBytes))
 	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
@@ -259,7 +260,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob %s: %v", key.Hex(), err))
 	}
 
-	s.metrics.ReportBlobDataSize(len(data))
+	s.metrics.ReportBlobBandwidthUsage(len(data))
 	s.metrics.ReportBlobDataLatency(time.Since(finishedFetchingMetadata))
 	s.metrics.ReportBlobLatency(time.Since(start))
 
@@ -335,6 +336,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
+	operatorID := fmt.Sprintf("%x", request.OperatorId)
+	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth, operatorID)
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		if strings.Contains(err.Error(), "internal error") {
@@ -342,7 +345,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
-	s.metrics.ReportChunkDataSize(requiredBandwidth)
+	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth, operatorID)
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
