@@ -59,7 +59,7 @@ func BuildPayloadRetriever(
 		return nil, fmt.Errorf("new blob verifier: %w", err)
 	}
 
-	codec, err := createCodec(payloadRetrieverConfig)
+	codec, err := codecs.CreateCodec(payloadRetrieverConfig.PayloadPolynomialForm, payloadRetrieverConfig.BlobEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +181,8 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	kzgCommitment *encoding.G1Commitment,
 	blobLength uint) error {
 
+	rand.Int63()
+
 	// An honest relay should never send an empty blob
 	if len(blob) == 0 {
 		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey, relayKey)
@@ -256,27 +258,6 @@ func (pr *PayloadRetriever) Close() error {
 	}
 
 	return nil
-}
-
-// createCodec creates the codec based on client config values
-func createCodec(config *PayloadRetrieverConfig) (codecs.BlobCodec, error) {
-	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.BlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create low level codec: %w", err)
-	}
-
-	switch config.PayloadPolynomialForm {
-	case codecs.PolynomialFormCoeff:
-		// Data must NOT be IFFTed during blob construction, since the payload is already in PolynomialFormCoeff after
-		// being encoded.
-		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
-	case codecs.PolynomialFormEval:
-		// Data MUST be IFFTed during blob construction, since the payload is in PolynomialFormEval after being encoded,
-		// but must be in PolynomialFormCoeff to produce a valid blob.
-		return codecs.NewIFFTCodec(lowLevelCodec), nil
-	default:
-		return nil, fmt.Errorf("unsupported polynomial form: %d", config.PayloadPolynomialForm)
-	}
 }
 
 // blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal

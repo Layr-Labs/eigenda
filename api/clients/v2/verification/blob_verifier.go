@@ -20,7 +20,14 @@ type IBlobVerifier interface {
 		ctx context.Context,
 		eigenDACert *EigenDACert,
 	) error
+
+	GetNonSignerStakesAndSignature(
+		ctx context.Context,
+		signedBatch *disperser.SignedBatch,
+	) (*verifierBindings.NonSignerStakesAndSignature, error)
 }
+
+var _ IBlobVerifier = &BlobVerifier{}
 
 // BlobVerifier is responsible for making eth calls against the BlobVerifier contract to ensure cryptographic and
 // structural integrity of V2 certificates
@@ -101,4 +108,27 @@ func (v *BlobVerifier) VerifyBlobV2(
 	}
 
 	return nil
+}
+
+// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDABlobVerifier
+// contract, and returns the resulting NonSignerStakesAndSignature object.
+func (v *BlobVerifier) GetNonSignerStakesAndSignature(
+	ctx context.Context,
+	signedBatch *disperser.SignedBatch,
+) (*verifierBindings.NonSignerStakesAndSignature, error) {
+
+	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
+	if err != nil {
+		return nil, fmt.Errorf("convert signed batch: %s", err)
+	}
+
+	nonSignerStakesAndSignature, err := v.blobVerifierCaller.GetNonSignerStakesAndSignature(
+		&bind.CallOpts{Context: ctx},
+		*signedBatchBinding)
+
+	if err != nil {
+		return nil, fmt.Errorf("get non signer stakes and signature: %s", err)
+	}
+
+	return &nonSignerStakesAndSignature, nil
 }
