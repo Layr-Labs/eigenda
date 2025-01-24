@@ -559,13 +559,25 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
 	}
-	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
-	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
+	accountID, ok := m.Value["AccountID"].(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
+	}
+	pm.AccountID = accountID.Value
+	rp, ok := m.Value["ReservationPeriod"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for ReservationPeriod, got %T", m.Value["ReservationPeriod"])
+	}
+	reservationPeriod, err := strconv.ParseUint(rp.Value, 10, 32)
 	if err != nil {
 		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
 	pm.ReservationPeriod = uint32(reservationPeriod)
-	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
+	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
+	}
+	pm.CumulativePayment, _ = new(big.Int).SetString(cp.Value, 10)
 	return nil
 }
 

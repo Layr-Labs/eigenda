@@ -175,7 +175,6 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 			ReservationPeriod: uint32(reservationPeriod.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
-		Signature: sig,
 	}
 	bk, err := bh.BlobKey()
 	require.NoError(t, err)

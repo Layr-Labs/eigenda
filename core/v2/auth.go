@@ -1,7 +1,7 @@
 package v2
 
 type BlobRequestAuthenticator interface {
-	AuthenticateBlobRequest(header *BlobHeader) error
+	AuthenticateBlobRequest(header *BlobHeader, signature []byte) error
 	AuthenticatePaymentStateRequest(signature []byte, accountId string) error
 }
 

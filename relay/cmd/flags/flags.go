@@ -34,11 +34,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_TABLE_NAME"),
 	}
-	RelayIDsFlag = cli.IntSliceFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "relay-ids"),
-		Usage:    "Relay IDs to use",
+	RelayKeysFlag = cli.IntSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-keys"),
+		Usage:    "Relay keys to use",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_IDS"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_KEYS"),
 	}
 	MaxGRPCMessageSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-grpc-message-size"),
@@ -199,7 +199,7 @@ var (
 		Usage:    "Max number of concurrent GetChunk operations per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT"),
-		Value:    2, // default value should stay in sync with the default value of node.Config.RelayConcurrency
+		Value:    8, // default value should stay in sync with the default value of node.Config.RelayConcurrency
 	}
 	BlsOperatorStateRetrieverAddrFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "bls-operator-state-retriever-addr"),
@@ -295,7 +295,7 @@ var requiredFlags = []cli.Flag{
 	GRPCPortFlag,
 	BucketNameFlag,
 	MetadataTableNameFlag,
-	RelayIDsFlag,
+	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
 }

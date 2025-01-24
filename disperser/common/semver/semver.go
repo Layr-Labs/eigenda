@@ -33,7 +33,7 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, oper
 			if useRetrievalSocket {
 				socket = operatorSocket.GetRetrievalSocket()
 			} else {
-				socket = operatorSocket.GetDispersalSocket()
+				socket = operatorSocket.GetV1DispersalSocket()
 			}
 			semver := GetSemverInfo(context.Background(), socket, useRetrievalSocket, operatorId, logger, nodeInfoTimeout)
 

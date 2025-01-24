@@ -39,6 +39,7 @@ contracts="PaymentVault \
   EigenDABlobVerifier \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
+  IEigenDARelayRegistry \
   EigenDADisperserRegistry"
 
 for contract in $contracts; do

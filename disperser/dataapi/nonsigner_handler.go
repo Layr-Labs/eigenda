@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 )
 
 func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTime int64, liveOnly bool) (*OperatorsNonsigningPercentage, error) {
@@ -59,7 +58,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, quorumIDs, err := s.createOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
+	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -138,69 +137,6 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 		},
 		Data: nonsignerMetrics,
 	}, nil
-}
-
-func (s *server) createOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, []uint8, error) {
-	// Get operators' initial quorums (at startBlock).
-	quorumSeen := make(map[uint8]struct{}, 0)
-
-	bitmaps, err := s.transactor.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, nonsigners, startBlock)
-	if err != nil {
-		return nil, nil, err
-	}
-	operatorInitialQuorum := make(map[string][]uint8)
-	for i := range bitmaps {
-		opQuorumIDs := eth.BitmapToQuorumIds(bitmaps[i])
-		operatorInitialQuorum[nonsigners[i].Hex()] = opQuorumIDs
-		for _, q := range opQuorumIDs {
-			quorumSeen[q] = struct{}{}
-		}
-	}
-
-	// Get all quorums.
-	allQuorums := make([]uint8, 0)
-	for q := range quorumSeen {
-		allQuorums = append(allQuorums, q)
-	}
-
-	// Get operators' quorum change events from [startBlock+1, endBlock].
-	addedToQuorum, removedFromQuorum, err := s.getOperatorQuorumEvents(ctx, startBlock, endBlock, nonsignerAddressToId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create operators' quorum intervals.
-	operatorQuorumIntervals, err := CreateOperatorQuorumIntervals(startBlock, endBlock, operatorInitialQuorum, addedToQuorum, removedFromQuorum)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return operatorQuorumIntervals, allQuorums, nil
-}
-
-func (s *server) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
-	addedToQuorum := make(map[string][]*OperatorQuorum)
-	removedFromQuorum := make(map[string][]*OperatorQuorum)
-	if startBlock == endBlock {
-		return addedToQuorum, removedFromQuorum, nil
-	}
-	operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
-	if err != nil {
-		return nil, nil, err
-	}
-	// Make quorum events organize by operatorID (instead of address) and drop those who
-	// are not nonsigners.
-	for op, events := range operatorQuorumEvents.AddedToQuorum {
-		if id, ok := nonsignerAddressToId[op]; ok {
-			addedToQuorum[id.Hex()] = events
-		}
-	}
-	for op, events := range operatorQuorumEvents.RemovedFromQuorum {
-		if id, ok := nonsignerAddressToId[op]; ok {
-			removedFromQuorum[id.Hex()] = events
-		}
-	}
-	return addedToQuorum, removedFromQuorum, nil
 }
 
 func getNonSigners(batches []*BatchNonSigningInfo) ([]core.OperatorID, error) {

@@ -185,7 +185,7 @@ func NewNode(
 	}
 
 	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
-		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
+		"dispersalPort", config.DispersalPort, "v2DispersalPort", config.V2DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
@@ -287,11 +287,11 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort))
 	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
-			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
+			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort, "v2DispersalPort", n.Config.V2DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
@@ -649,7 +649,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
+			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort)
 			if err != nil {
 				n.Logger.Error("failed to get socket address", "err", err)
 				continue

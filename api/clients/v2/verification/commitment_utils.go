@@ -2,6 +2,7 @@ package verification
 
 import (
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -36,23 +37,22 @@ func GenerateBlobCommitment(
 }
 
 // GenerateAndCompareBlobCommitment generates the kzg-bn254 commitment of the blob, and compares it with a claimed
-// commitment. An error is returned if there is a problem generating the commitment, or if the comparison fails.
+// commitment. An error is returned if there is a problem generating the commitment. True is returned if the commitment
+// is successfully generated, and is equal to the claimed commitment, otherwise false.
 func GenerateAndCompareBlobCommitment(
 	g1Srs []bn254.G1Affine,
 	blobBytes []byte,
-	claimedCommitment *encoding.G1Commitment) error {
+	claimedCommitment *encoding.G1Commitment) (bool, error) {
 
 	computedCommitment, err := GenerateBlobCommitment(g1Srs, blobBytes)
 	if err != nil {
-		return fmt.Errorf("compute commitment: %w", err)
+		return false, fmt.Errorf("compute commitment: %w", err)
 	}
 
 	if claimedCommitment.X.Equal(&computedCommitment.X) &&
 		claimedCommitment.Y.Equal(&computedCommitment.Y) {
-		return nil
+		return true, nil
 	}
 
-	return fmt.Errorf(
-		"commitment field elements do not match. computed commitment: (x: %x, y: %x), claimed commitment (x: %x, y: %x)",
-		computedCommitment.X, computedCommitment.Y, claimedCommitment.X, claimedCommitment.Y)
+	return false, nil
 }
