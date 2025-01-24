@@ -49,7 +49,7 @@ func BuildEigenDAClient(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	blobVerifier, err := verification.NewBlobVerifier(ethClient, clientConfig.EigenDABlobVerifierAddr)
+	blobVerifier, err := verification.NewBlobVerifier(*ethClient, clientConfig.EigenDABlobVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new blob verifier: %w", err)
 	}
