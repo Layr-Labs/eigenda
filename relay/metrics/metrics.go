@@ -158,7 +158,7 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 	getChunksRequestedBandwidth := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "get_chunks_requested__bandwidth_bytes",
+			Name:      "get_chunks_requested_bandwidth_bytes",
 			Help:      "Running total requested bandwidth in GetChunks requests (prior to throttling).",
 		},
 		[]string{"requester"},
