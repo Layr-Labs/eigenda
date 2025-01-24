@@ -54,19 +54,7 @@ type RelayClient interface {
 	Close() error
 }
 
-// grpcClient encapsulates a gRPC client and a channel for limiting concurrent requests to that client.
-type grpcClient struct {
-	// client is the gRPC client used for sending gRPC requests.
-	client relaygrpc.RelayClient
-	// permits is a channel for limiting the number of concurrent requests to the client.
-	// when a request is initiated, a value is sent to the channel, and when the request is completed,
-	// the value is received. The channel has a buffer size of `MaxConcurrentRequests`, and will block
-	// if the number of concurrent requests exceeds this limit.
-	permits chan struct{}
-}
-
-// TODO (cody-littley / litt3): when randomly selecting a relay client to use, we should avoid selecting a
-// client that currently has exhausted its concurrency permits.
+var _ RelayClient = (*relayClient)(nil)
 
 type relayClient struct {
 	config *RelayClientConfig
@@ -78,11 +66,9 @@ type relayClient struct {
 	conns  sync.Map
 	logger logging.Logger
 
-	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]*grpcClient`
+	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]*limitedRelayClient`
 	grpcClients sync.Map
 }
-
-var _ RelayClient = (*relayClient)(nil)
 
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
@@ -111,17 +97,7 @@ func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blo
 		return nil, err
 	}
 
-	select {
-	case client.permits <- struct{}{}:
-		// permit acquired
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
-	}
-	defer func() {
-		<-client.permits
-	}()
-
-	res, err := client.client.GetBlob(ctx, &relaygrpc.GetBlobRequest{
+	res, err := client.GetBlob(ctx, &relaygrpc.GetBlobRequest{
 		BlobKey: blobKey[:],
 	})
 	if err != nil {
@@ -188,17 +164,7 @@ func (c *relayClient) GetChunksByRange(
 		return nil, err
 	}
 
-	select {
-	case client.permits <- struct{}{}:
-		// permit acquired
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
-	}
-	defer func() {
-		<-client.permits
-	}()
-
-	res, err := client.client.GetChunks(ctx, request)
+	res, err := client.GetChunks(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -241,17 +207,7 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, err
 	}
 
-	select {
-	case client.permits <- struct{}{}:
-		// permit acquired
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled while waiting for permit for relay key: %v", relayKey)
-	}
-	defer func() {
-		<-client.permits
-	}()
-
-	res, err := client.client.GetChunks(ctx, request)
+	res, err := client.GetChunks(ctx, request)
 
 	if err != nil {
 		return nil, err
@@ -260,7 +216,7 @@ func (c *relayClient) GetChunksByIndex(
 	return res.GetData(), nil
 }
 
-func (c *relayClient) getClient(key corev2.RelayKey) (*grpcClient, error) {
+func (c *relayClient) getClient(key corev2.RelayKey) (*limitedRelayClient, error) {
 	if err := c.initOnceGrpcConnection(key); err != nil {
 		return nil, err
 	}
@@ -268,7 +224,7 @@ func (c *relayClient) getClient(key corev2.RelayKey) (*grpcClient, error) {
 	if !ok {
 		return nil, fmt.Errorf("no grpc client for relay key: %v", key)
 	}
-	client, ok := maybeClient.(*grpcClient)
+	client, ok := maybeClient.(*limitedRelayClient)
 	if !ok {
 		return nil, fmt.Errorf("invalid grpc client for relay key: %v", key)
 	}
@@ -295,10 +251,7 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 		}
 		c.conns.Store(key, conn)
 
-		wrappedClient := &grpcClient{
-			client:  relaygrpc.NewRelayClient(conn),
-			permits: make(chan struct{}, c.config.MaxConcurrentRequests),
-		}
+		wrappedClient := newLimitedRelayClient(relaygrpc.NewRelayClient(conn), key, c.config.MaxConcurrentRequests)
 		c.grpcClients.Store(key, wrappedClient)
 	})
 	return initErr
