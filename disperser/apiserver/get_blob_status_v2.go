@@ -30,7 +30,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Warn("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob metadata: %s", err.Error()))
 	}
 
@@ -42,7 +42,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	cert, _, err := s.blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob certificate", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Error("failed to get blob certificate for certified blob", "err", err, "blobKey", blobKey.Hex())
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			return nil, api.NewErrorNotFound("no such blob certificate found")
 		}
@@ -52,7 +52,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 	// For certified blobs, include signed batch and blob inclusion info
 	blobInclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob inclusion info", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Error("failed to get blob inclusion info for certified blob", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob inclusion info: %s", err.Error()))
 	}
 
@@ -69,7 +69,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 		// get the signed batch from this inclusion info
 		batchHeaderHash, err := inclusionInfo.BatchHeader.Hash()
 		if err != nil {
-			s.logger.Error("failed to get batch header hash", "err", err, "blobKey", blobKey.Hex())
+			s.logger.Error("failed to get batch header hash from blob inclusion info", "err", err, "blobKey", blobKey.Hex())
 			continue
 		}
 		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)

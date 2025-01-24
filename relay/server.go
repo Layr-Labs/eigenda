@@ -201,7 +201,7 @@ func NewServer(
 
 	return &Server{
 		config:           config,
-		logger:           logger,
+		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
@@ -232,6 +232,8 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
 	}
+
+	s.logger.Debug("GetBlob request received", "key", key.Hex())
 
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
@@ -296,8 +298,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
+			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
+		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 
 	finishedAuthenticating := time.Now()
