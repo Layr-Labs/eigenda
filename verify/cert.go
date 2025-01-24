@@ -78,27 +78,22 @@ func NewCertVerifier(cfg *Config, l log.Logger) (*CertVerifier, error) {
 func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 	ctx context.Context, batchID uint32, batchMetadata *disperser.BatchMetadata,
 ) error {
-	// 1. Verify batch is actually onchain at the batchMetadata's state confirmedBlockNumber.
-	// This is super unlikely if the disperser is honest, but it could technically happen that a confirmed batch's block gets reorged out,
-	// yet the tx is included in an earlier or later block, making the batchMetadata received from the disperser
-	// no longer valid. The eigenda batcher does check for these reorgs and updates the batch's confirmation block number:
-	// https://github.com/Layr-Labs/eigenda/blob/bee55ed9207f16153c3fd8ebf73c219e68685def/disperser/batcher/finalizer.go#L198
-	// TODO: We could require the disperser for the new batch, or try to reconstruct it ourselves by querying the chain,
-	// but for now we opt to simply fail the verification, which will force the batcher to resubmit the batch to eigenda.
-	confirmationBlockNumber := batchMetadata.GetConfirmationBlockNumber()
-	confirmationBlockNumberBigInt := big.NewInt(0).SetInt64(int64(confirmationBlockNumber))
-	_, err := cv.retrieveBatchMetadataHash(ctx, batchID, confirmationBlockNumberBigInt)
-	if err != nil {
-		return fmt.Errorf("failed to reference batch from service manager @ block %d: %w", confirmationBlockNumber, err)
-	}
-
-	// 2. Verify that the confirmation status has been reached.
+	// 1. Verify that the confirmation status has been reached.
 	// The eigenda-client already checks for this, but it is possible for either
 	//  1. a reorg to happen, causing the batch to be confirmed by fewer number of blocks than required
 	//  2. proxy's node is behind the eigenda_client's node that deemed the batch confirmed, or
 	//     even if we use the same url, that the connection drops and we get load-balanced to a different eth node.
 	// We retry up to 60 seconds (allowing for reorgs up to 5 blocks deep), but we only wait 3 seconds between each retry,
 	// in case (2) is the case and the node simply needs to resync, which could happen fast.
+	//
+	// Note that we don't verify that the batch is actually onchain at the batchMetadata's state confirmedBlockNumber, because that would require an archive node.
+	// This is super unlikely if the disperser is honest, but it could technically happen that a confirmed batch's block gets reorged out,
+	// yet the tx is included in an earlier or later block, making the batchMetadata received from the disperser
+	// no longer valid. The eigenda batcher does check for these reorgs and updates the batch's confirmation block number:
+	// https://github.com/Layr-Labs/eigenda/blob/bee55ed9207f16153c3fd8ebf73c219e68685def/disperser/batcher/finalizer.go#L198
+	// confirmedBlockNum                               currentBlock-confirmationDepth        currentBlock
+	// | (don't verify here, need archive node)                    | (verify here)               |
+	// +-----------------------------------------------------------+-----------------------------+
 	onchainHash, err := retry.Do(ctx, 20, retry.Fixed(3*time.Second), func() ([32]byte, error) {
 		blockNumber, err := cv.getConfDeepBlockNumber(ctx)
 		if err != nil {
@@ -107,10 +102,10 @@ func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 		return cv.retrieveBatchMetadataHash(ctx, batchID, blockNumber)
 	})
 	if err != nil {
-		return fmt.Errorf("retrieving batch that was confirmed at block %v: %w", confirmationBlockNumber, err)
+		return fmt.Errorf("retrieving batch that was confirmed at block %v: %w", batchMetadata.GetConfirmationBlockNumber(), err)
 	}
 
-	// 3. Compute the hash of the batch metadata received as argument.
+	// 2. Compute the hash of the batch metadata received as argument.
 	header := &binding.IEigenDAServiceManagerBatchHeader{
 		BlobHeadersRoot:       [32]byte(batchMetadata.GetBatchHeader().GetBatchRoot()),
 		QuorumNumbers:         batchMetadata.GetBatchHeader().GetQuorumNumbers(),
@@ -118,12 +113,12 @@ func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 		SignedStakeForQuorums: batchMetadata.GetBatchHeader().GetQuorumSignedPercentages(),
 	}
 	recordHash := [32]byte(batchMetadata.GetSignatoryRecordHash())
-	computedHash, err := HashBatchMetadata(header, recordHash, confirmationBlockNumber)
+	computedHash, err := HashBatchMetadata(header, recordHash, batchMetadata.GetConfirmationBlockNumber())
 	if err != nil {
 		return fmt.Errorf("failed to hash batch metadata: %w", err)
 	}
 
-	// 4. Ensure that hash generated from local cert matches one stored on-chain.
+	// 3. Ensure that hash generated from local cert matches one stored on-chain.
 	equal := slices.Equal(onchainHash[:], computedHash[:])
 	if !equal {
 		return fmt.Errorf("batch hash mismatch, onchain: %x, computed: %x", onchainHash, computedHash)
