@@ -23,7 +23,7 @@ type PayloadDisperser struct {
 	config          *PayloadDisperserConfig
 	codec           codecs.BlobCodec
 	disperserClient DisperserClient
-	certVerifier    verification.IBlobVerifier
+	certVerifier    verification.ICertVerifier
 }
 
 // BuildPayloadDisperser builds a PayloadDisperser from config structs
@@ -64,7 +64,7 @@ func BuildPayloadDisperser(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	certVerifier, err := verification.NewBlobVerifier(*ethClient, payloadDisperserConfig.EigenDACertVerifierAddr)
+	certVerifier, err := verification.NewCertVerifier(*ethClient, payloadDisperserConfig.EigenDACertVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
@@ -143,7 +143,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.certVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
+	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey, err)
 	}

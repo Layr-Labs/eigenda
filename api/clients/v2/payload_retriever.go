@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifiercontract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -33,7 +33,7 @@ type PayloadRetriever struct {
 	codec        codecs.BlobCodec
 	relayClient  RelayClient
 	g1Srs        []bn254.G1Affine
-	blobVerifier verification.IBlobVerifier
+	certVerifier verification.ICertVerifier
 }
 
 // BuildPayloadRetriever builds a PayloadRetriever from config structs.
@@ -54,9 +54,9 @@ func BuildPayloadRetriever(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	blobVerifier, err := verification.NewBlobVerifier(*ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
+	certVerifier, err := verification.NewCertVerifier(*ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
 	if err != nil {
-		return nil, fmt.Errorf("new blob verifier: %w", err)
+		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
 	codec, err := codecs.CreateCodec(payloadRetrieverConfig.PayloadPolynomialForm, payloadRetrieverConfig.BlobEncodingVersion)
@@ -69,7 +69,7 @@ func BuildPayloadRetriever(
 		rand.New(rand.NewSource(rand.Int63())),
 		payloadRetrieverConfig,
 		relayClient,
-		blobVerifier,
+		certVerifier,
 		codec,
 		g1Srs)
 }
@@ -80,7 +80,7 @@ func NewPayloadRetriever(
 	random *rand.Rand,
 	payloadRetrieverConfig *PayloadRetrieverConfig,
 	relayClient RelayClient,
-	blobVerifier verification.IBlobVerifier,
+	certVerifier verification.ICertVerifier,
 	codec codecs.BlobCodec,
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
 
@@ -90,7 +90,7 @@ func NewPayloadRetriever(
 		config:       payloadRetrieverConfig,
 		codec:        codec,
 		relayClient:  relayClient,
-		blobVerifier: blobVerifier,
+		certVerifier: certVerifier,
 		g1Srs:        g1Srs,
 	}, nil
 }
@@ -110,14 +110,14 @@ func (pr *PayloadRetriever) GetPayload(
 		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
 	}
 
-	relayKeys := eigenDACert.BlobVerificationProof.BlobCertificate.RelayKeys
+	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
 	relayKeyCount := len(relayKeys)
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
 	}
 
 	blobCommitments, err := blobCommitmentsBindingToInternal(
-		&eigenDACert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment)
+		&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
 
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
@@ -142,16 +142,16 @@ func (pr *PayloadRetriever) GetPayload(
 
 		err = pr.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitments.Commitment, blobCommitments.Length)
 
-		// An honest relay should never send a blob which doesn't verify
+		// An honest relay should never send a blob which doesn't verify against the cert
 		if err != nil {
-			pr.log.Warn("verify blob from relay: %w", err)
+			pr.log.Warn("verify blob from relay against cert: %w", err)
 			continue
 		}
 
 		payload, err := pr.codec.DecodeBlob(blob)
 		if err != nil {
 			pr.log.Error(
-				`Blob verification was successful, but decode blob failed!
+				`Cert verification was successful, but decode blob failed!
 					This is likely a problem with the local blob codec configuration,
 					but could potentially indicate a maliciously generated blob certificate.
 					It should not be possible for an honestly generated certificate to verify
@@ -230,7 +230,7 @@ func (pr *PayloadRetriever) getBlobWithTimeout(
 	return pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 }
 
-// verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyBlobV2.
+// verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyCertV2.
 //
 // This method times out after the duration configured in payloadRetrieverConfig.ContractCallTimeout
 func (pr *PayloadRetriever) verifyCertWithTimeout(
@@ -240,7 +240,7 @@ func (pr *PayloadRetriever) verifyCertWithTimeout(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.ContractCallTimeout)
 	defer cancel()
 
-	return pr.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
+	return pr.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
@@ -261,7 +261,7 @@ func (pr *PayloadRetriever) Close() error {
 // blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
 // encoding.BlobCommitments type
 func blobCommitmentsBindingToInternal(
-	blobCommitmentBinding *contractEigenDABlobVerifier.BlobCommitment,
+	blobCommitmentBinding *verifiercontract.BlobCommitment,
 ) (*encoding.BlobCommitments, error) {
 
 	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(
