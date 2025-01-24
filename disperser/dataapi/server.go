@@ -175,13 +175,16 @@ type (
 	}
 
 	OperatorPortCheckResponse struct {
-		OperatorId      string `json:"operator_id"`
-		DispersalSocket string `json:"dispersal_socket"`
-		RetrievalSocket string `json:"retrieval_socket"`
-		DispersalOnline bool   `json:"dispersal_online"`
-		RetrievalOnline bool   `json:"retrieval_online"`
-		DispersalStatus string `json:"dispersal_status"`
-		RetrievalStatus string `json:"retrieval_status"`
+		OperatorId        string `json:"operator_id"`
+		DispersalSocket   string `json:"dispersal_socket"`
+		DispersalOnline   bool   `json:"dispersal_online"`
+		DispersalStatus   string `json:"dispersal_status"`
+		RetrievalSocket   string `json:"retrieval_socket"`
+		RetrievalOnline   bool   `json:"retrieval_online"`
+		RetrievalStatus   string `json:"retrieval_status"`
+		V2DispersalSocket string `json:"v2_dispersal_socket"`
+		V2DispersalOnline bool   `json:"v2_dispersal_online"`
+		V2DispersalStatus string `json:"v2_dispersal_status"`
 	}
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`

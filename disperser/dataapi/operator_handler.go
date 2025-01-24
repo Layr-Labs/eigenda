@@ -49,27 +49,43 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
 	retrievalSocket := operatorSocket.GetRetrievalSocket()
 	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-	retrievalOnline, retrievalStatus := false, fmt.Sprintf("port closed or unreachable for %s", retrievalSocket)
+	retrievalOnline, retrievalStatus := false, "port closed or unreachable"
 	if retrievalPortOpen {
 		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
 	}
 
-	dispersalSocket := operatorSocket.GetV1DispersalSocket()
-	dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
-	dispersalOnline, dispersalStatus := false, fmt.Sprintf("port closed or unreachable for %s", dispersalSocket)
-	if dispersalPortOpen {
-		dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "node.Dispersal", dispersalSocket, 3*time.Second)
+	v1DispersalSocket := operatorSocket.GetV1DispersalSocket()
+	v1DispersalPortOpen := checkIsOperatorPortOpen(v1DispersalSocket, 3, oh.logger)
+	v1DispersalOnline, v1DispersalStatus := false, "port closed or unreachable"
+	if v1DispersalPortOpen {
+		v1DispersalOnline, v1DispersalStatus = checkServiceOnline(ctx, "node.Dispersal", v1DispersalSocket, 3*time.Second)
+	}
+
+	v2DispersalOnline, v2DispersalStatus := false, ""
+	v2DispersalSocket := operatorSocket.GetV2DispersalSocket()
+	if v2DispersalSocket == "" {
+		v2DispersalStatus = "v2 dispersal port is not registered"
+	} else {
+		v2DispersalPortOpen := checkIsOperatorPortOpen(v2DispersalSocket, 3, oh.logger)
+		if !v2DispersalPortOpen {
+			v2DispersalStatus = "port closed or unreachable"
+		} else {
+			v2DispersalOnline, v2DispersalStatus = checkServiceOnline(ctx, "node.v2.Dispersal", v2DispersalSocket, 3*time.Second)
+		}
 	}
 
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:      operatorId,
-		DispersalSocket: dispersalSocket,
-		RetrievalSocket: retrievalSocket,
-		DispersalOnline: dispersalOnline,
-		RetrievalOnline: retrievalOnline,
-		DispersalStatus: dispersalStatus,
-		RetrievalStatus: retrievalStatus,
+		OperatorId:        operatorId,
+		DispersalSocket:   v1DispersalSocket,
+		DispersalStatus:   v1DispersalStatus,
+		DispersalOnline:   v1DispersalOnline,
+		V2DispersalSocket: v2DispersalSocket,
+		V2DispersalOnline: v2DispersalOnline,
+		V2DispersalStatus: v2DispersalStatus,
+		RetrievalSocket:   retrievalSocket,
+		RetrievalOnline:   retrievalOnline,
+		RetrievalStatus:   retrievalStatus,
 	}
 
 	// Log the online status
