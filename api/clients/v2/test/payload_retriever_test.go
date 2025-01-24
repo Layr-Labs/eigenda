@@ -131,11 +131,11 @@ func buildBlobAndCert(
 		BlobCertificate: blobCertificate,
 	}
 
-	verificationProof, err := verification.InclusionInfoProtoToBinding(inclusionInfo)
+	convertedInclusionInfo, err := verification.InclusionInfoProtoToBinding(inclusionInfo)
 	require.NoError(t, err)
 
 	return blobKey, blobBytes, &verification.EigenDACert{
-		BlobInclusionInfo: *verificationProof,
+		BlobInclusionInfo: *convertedInclusionInfo,
 	}
 }
 
