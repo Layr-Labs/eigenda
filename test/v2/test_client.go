@@ -196,9 +196,9 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 					elapsed.Seconds(),
 					totalElapsed.Seconds())
 
-				blobCert := reply.BlobVerificationInfo.BlobCertificate
+				blobCert := reply.BlobInclusionInfo.BlobCertificate
 				require.NotNil(c.t, blobCert)
-				require.True(c.t, len(blobCert.Relays) >= 1)
+				require.True(c.t, len(blobCert.RelayKeys) >= 1)
 				return blobCert
 
 			} else if status == nil || reply.Status != *status {
@@ -235,7 +235,7 @@ func (c *TestClient) ReadBlobFromRelay(
 	blobCert *commonv2.BlobCertificate,
 	payload []byte) {
 
-	for _, relayID := range blobCert.Relays {
+	for _, relayID := range blobCert.RelayKeys {
 		fmt.Printf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		require.NoError(c.t, err)

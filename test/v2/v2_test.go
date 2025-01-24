@@ -20,7 +20,7 @@ var (
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
 		KZGPath:                       "/Users/cody/ws/srs",
 		SRSOrder:                      268435456,
-		SRSNumberToLoad:               2097152,
+		SRSNumberToLoad:               1, // 2097152 is default in production, no need to load so much for tests
 	}
 
 	preprodLock   sync.Mutex
