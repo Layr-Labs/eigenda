@@ -196,8 +196,7 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 	if !ok {
 		return nil, fmt.Errorf("blob version %d not found in blob params map", cert.BlobHeader.BlobVersion)
 	}
-	chunkSize, err := v2.GetChunkLength(blobSize, blobParams)
-	chunkSize *= encoding.BYTES_PER_SYMBOL
+	chunkSize, err := v2.GetChunkLength(uint32(cert.BlobHeader.BlobCommitments.Length), blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk length: %w", err)
 	}
