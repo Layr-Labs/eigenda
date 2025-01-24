@@ -35,7 +35,7 @@ type PayloadRetrieverTester struct {
 	Random           *testrandom.TestRandom
 	PayloadRetriever *clients.PayloadRetriever
 	MockRelayClient  *clientsmock.MockRelayClient
-	MockBlobVerifier *clientsmock.MockBlobVerifier
+	MockCertVerifier *clientsmock.MockCertVerifier
 	Codec            *codecs.DefaultBlobCodec
 	G1Srs            []bn254.G1Affine
 }
@@ -52,7 +52,7 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 	mockRelayClient := clientsmock.MockRelayClient{}
 	codec := codecs.NewDefaultBlobCodec()
 
-	mockBlobVerifier := clientsmock.MockBlobVerifier{}
+	mockCertVerifier := clientsmock.MockCertVerifier{}
 
 	random := testrandom.NewTestRandom(t)
 
@@ -65,7 +65,7 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		&mockBlobVerifier,
+		&mockCertVerifier,
 		&codec,
 		g1Srs)
 
@@ -76,7 +76,7 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 		Random:           random,
 		PayloadRetriever: client,
 		MockRelayClient:  &mockRelayClient,
-		MockBlobVerifier: &mockBlobVerifier,
+		MockCertVerifier: &mockCertVerifier,
 		Codec:            &codec,
 		G1Srs:            g1Srs,
 	}
@@ -131,11 +131,11 @@ func buildBlobAndCert(
 		BlobCertificate: blobCertificate,
 	}
 
-	verificationProof, err := verification.VerificationProofProtoToBinding(inclusionInfo)
+	verificationProof, err := verification.InclusionInfoProtoToBinding(inclusionInfo)
 	require.NoError(t, err)
 
 	return blobKey, blobBytes, &verification.EigenDACert{
-		BlobVerificationProof: *verificationProof,
+		BlobInclusionInfo: *verificationProof,
 	}
 }
 
@@ -147,8 +147,8 @@ func TestGetPayloadSuccess(t *testing.T) {
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -172,8 +172,8 @@ func TestRelayCallTimeout(t *testing.T) {
 	relayKeys[0] = tester.Random.Uint32()
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -248,8 +248,8 @@ func TestRandomRelayRetries(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.MatchedBy(onlineKeyMatcher), blobKey).Return(
 		blobBytes,
 		nil)
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -286,8 +286,8 @@ func TestNoRelayResponse(t *testing.T) {
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(nil, fmt.Errorf("offline relay"))
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -307,8 +307,8 @@ func TestNoRelayResponse(t *testing.T) {
 func TestNoRelays(t *testing.T) {
 	tester := buildPayloadRetrieverTester(t)
 
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -340,8 +340,8 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -369,8 +369,8 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes2, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes1, nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -402,8 +402,8 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tooLongBytes, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -422,8 +422,8 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 	tester.MockRelayClient.AssertExpectations(t)
 }
 
-// TestBlobFailsVerifyBlobV2 tests what happens if cert verification fails
-func TestBlobFailsVerifyBlobV2(t *testing.T) {
+// TestBlobFailsVerifyCertV2 tests what happens if cert verification fails
+func TestBlobFailsVerifyCertV2(t *testing.T) {
 	tester := buildPayloadRetrieverTester(t)
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -435,8 +435,8 @@ func TestBlobFailsVerifyBlobV2(t *testing.T) {
 	tooLongBytes := make([]byte, len(blobBytes)+100)
 	copy(tooLongBytes[:], blobBytes)
 
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -464,11 +464,11 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment.DataLength--
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.DataLength--
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -505,7 +505,7 @@ func TestFailedDecoding(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, maliciousCommitment)
 
-	blobCert.BlobVerificationProof.BlobCertificate.BlobHeader.Commitment.Commitment = contractEigenDABlobVerifier.BN254G1Point{
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment = contractEigenDABlobVerifier.BN254G1Point{
 		X: maliciousCommitment.X.BigInt(new(big.Int)),
 		Y: maliciousCommitment.Y.BigInt(new(big.Int)),
 	}
@@ -513,8 +513,8 @@ func TestFailedDecoding(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
-	tester.MockBlobVerifier.On(
-		"VerifyBlobV2",
+	tester.MockCertVerifier.On(
+		"VerifyCertV2",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
