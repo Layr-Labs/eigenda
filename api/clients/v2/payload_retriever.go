@@ -17,29 +17,29 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// EigenDAClient provides the ability to get payloads from the relay subsystem, and to send new payloads to the disperser.
+// PayloadRetriever provides the ability to get payloads from the relay subsystem.
 //
 // This struct is goroutine safe.
-type EigenDAClient struct {
+type PayloadRetriever struct {
 	log logging.Logger
 	// random doesn't need to be cryptographically secure, as it's only used to distribute load across relays.
 	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
 	// must be evaluated for thread safety.
-	random       *rand.Rand
-	clientConfig *EigenDAClientConfig
-	codec        codecs.BlobCodec
-	relayClient  RelayClient
-	g1Srs        []bn254.G1Affine
-	blobVerifier verification.IBlobVerifier
+	random                 *rand.Rand
+	payloadRetrieverConfig *PayloadRetrieverConfig
+	codec                  codecs.BlobCodec
+	relayClient            RelayClient
+	g1Srs                  []bn254.G1Affine
+	blobVerifier           verification.IBlobVerifier
 }
 
-// BuildEigenDAClient builds an EigenDAClient from config structs.
-func BuildEigenDAClient(
+// BuildPayloadRetriever builds a PayloadRetriever from config structs.
+func BuildPayloadRetriever(
 	log logging.Logger,
-	clientConfig *EigenDAClientConfig,
+	payloadRetrieverConfig *PayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
 	relayClientConfig *RelayClientConfig,
-	g1Srs []bn254.G1Affine) (*EigenDAClient, error) {
+	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
 
 	relayClient, err := NewRelayClient(relayClientConfig, log)
 	if err != nil {
@@ -51,44 +51,44 @@ func BuildEigenDAClient(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	blobVerifier, err := verification.NewBlobVerifier(*ethClient, clientConfig.EigenDABlobVerifierAddr)
+	blobVerifier, err := verification.NewBlobVerifier(*ethClient, payloadRetrieverConfig.EigenDABlobVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new blob verifier: %w", err)
 	}
 
-	codec, err := createCodec(clientConfig)
+	codec, err := createCodec(payloadRetrieverConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewEigenDAClient(
+	return NewPayloadRetriever(
 		log,
 		rand.New(rand.NewSource(rand.Int63())),
-		clientConfig,
+		payloadRetrieverConfig,
 		relayClient,
 		blobVerifier,
 		codec,
 		g1Srs)
 }
 
-// NewEigenDAClient assembles an EigenDAClient from subcomponents that have already been constructed and initialized.
-func NewEigenDAClient(
+// NewPayloadRetriever assembles a PayloadRetriever from subcomponents that have already been constructed and initialized.
+func NewPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
-	clientConfig *EigenDAClientConfig,
+	payloadRetrieverConfig *PayloadRetrieverConfig,
 	relayClient RelayClient,
 	blobVerifier verification.IBlobVerifier,
 	codec codecs.BlobCodec,
-	g1Srs []bn254.G1Affine) (*EigenDAClient, error) {
+	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
 
-	return &EigenDAClient{
-		log:          log,
-		random:       random,
-		clientConfig: clientConfig,
-		codec:        codec,
-		relayClient:  relayClient,
-		blobVerifier: blobVerifier,
-		g1Srs:        g1Srs,
+	return &PayloadRetriever{
+		log:                    log,
+		random:                 random,
+		payloadRetrieverConfig: payloadRetrieverConfig,
+		codec:                  codec,
+		relayClient:            relayClient,
+		blobVerifier:           blobVerifier,
+		g1Srs:                  g1Srs,
 	}, nil
 }
 
@@ -97,12 +97,12 @@ func NewEigenDAClient(
 //
 // If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
 // to yield the payload (the original user data), and the payload is returned.
-func (c *EigenDAClient) GetPayload(
+func (pr *PayloadRetriever) GetPayload(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	eigenDACert *verification.EigenDACert) ([]byte, error) {
 
-	err := c.verifyCertWithTimeout(ctx, eigenDACert)
+	err := pr.verifyCertWithTimeout(ctx, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
 	}
@@ -121,7 +121,7 @@ func (c *EigenDAClient) GetPayload(
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
-	indices := c.random.Perm(relayKeyCount)
+	indices := pr.random.Perm(relayKeyCount)
 
 	// TODO (litt3): consider creating a utility which deprioritizes relays that fail to respond (or respond maliciously),
 	//  and prioritizes relays with lower latencies.
@@ -130,24 +130,24 @@ func (c *EigenDAClient) GetPayload(
 	for _, val := range indices {
 		relayKey := relayKeys[val]
 
-		blob, err := c.getBlobWithTimeout(ctx, relayKey, blobKey)
+		blob, err := pr.getBlobWithTimeout(ctx, relayKey, blobKey)
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
-			c.log.Warn("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
+			pr.log.Warn("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
 			continue
 		}
 
-		err = c.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitments.Commitment, blobCommitments.Length)
+		err = pr.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitments.Commitment, blobCommitments.Length)
 
 		// An honest relay should never send a blob which doesn't verify
 		if err != nil {
-			c.log.Warn("verify blob from relay: %w", err)
+			pr.log.Warn("verify blob from relay: %w", err)
 			continue
 		}
 
-		payload, err := c.codec.DecodeBlob(blob)
+		payload, err := pr.codec.DecodeBlob(blob)
 		if err != nil {
-			c.log.Error(
+			pr.log.Error(
 				`Blob verification was successful, but decode blob failed!
 					This is likely a problem with the local blob codec configuration,
 					but could potentially indicate a maliciously generated blob certificate.
@@ -171,7 +171,7 @@ func (c *EigenDAClient) GetPayload(
 // 3. Verify that the blob length is less than or equal to the cert's blob length
 //
 // If all verifications succeed, the method returns nil. Otherwise, it returns an error.
-func (c *EigenDAClient) verifyBlobAgainstCert(
+func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	blobKey core.BlobKey,
 	relayKey core.RelayKey,
 	blob []byte,
@@ -185,7 +185,7 @@ func (c *EigenDAClient) verifyBlobAgainstCert(
 
 	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
 	//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
-	valid, err := verification.GenerateAndCompareBlobCommitment(c.g1Srs, blob, kzgCommitment)
+	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, kzgCommitment)
 	if err != nil {
 		return fmt.Errorf(
 			"generate and compare commitment for blob %v received from relay %v: %w",
@@ -216,28 +216,28 @@ func (c *EigenDAClient) verifyBlobAgainstCert(
 }
 
 // getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
-func (c *EigenDAClient) getBlobWithTimeout(
+func (pr *PayloadRetriever) getBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
 	blobKey core.BlobKey) ([]byte, error) {
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, c.clientConfig.RelayTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.RelayTimeout)
 	defer cancel()
 
-	return c.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
+	return pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
 }
 
 // verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyBlobV2.
 //
-// This method times out after the duration configured in clientConfig.ContractCallTimeout
-func (c *EigenDAClient) verifyCertWithTimeout(
+// This method times out after the duration configured in payloadRetrieverConfig.ContractCallTimeout
+func (pr *PayloadRetriever) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
 ) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, c.clientConfig.ContractCallTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.ContractCallTimeout)
 	defer cancel()
 
-	return c.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
+	return pr.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
@@ -246,15 +246,14 @@ func (c *EigenDAClient) verifyCertWithTimeout(
 // Any and all errors returned from closing internal clients will be joined and returned.
 //
 // This method should only be called once.
-func (c *EigenDAClient) Close() error {
-	relayClientErr := c.relayClient.Close()
+func (pr *PayloadRetriever) Close() error {
+	relayClientErr := pr.relayClient.Close()
 
-	// TODO: this is using join, since there will be more subcomponents requiring closing after adding PUT functionality
-	return errors.Join(relayClientErr)
+	return fmt.Errorf("close relay client: %w", relayClientErr)
 }
 
 // createCodec creates the codec based on client config values
-func createCodec(config *EigenDAClientConfig) (codecs.BlobCodec, error) {
+func createCodec(config *PayloadRetrieverConfig) (codecs.BlobCodec, error) {
 	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.BlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create low level codec: %w", err)
