@@ -19,6 +19,9 @@ import (
 
 // PayloadRetriever provides the ability to get payloads from the relay subsystem.
 //
+// In the future, this struct will be expanded to support distributed retrieval directly from DA nodes, if unable
+// to retrieve a payload from the relay subsystem.
+//
 // This struct is goroutine safe.
 type PayloadRetriever struct {
 	log logging.Logger
