@@ -4,14 +4,14 @@ pragma solidity ^0.8.9;
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
-interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
+interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
 
     /**
      * @notice Verifies a the blob is valid for the required quorums
      * @param blobHeader The blob header to verify
      * @param blobVerificationProof The blob verification proof to verify the blob against
      */
-    function verifyBlobV1(
+    function verifyDACertV1(
         BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof
     ) external view;
@@ -22,7 +22,7 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
      * @param blobHeaders The blob headers to verify
      * @param blobVerificationProofs The blob verification proofs to verify the blobs against
      */
-    function verifyBlobsV1(
+    function verifyDACertsV1(
         BlobHeader[] calldata blobHeaders,
         BlobVerificationProof[] calldata blobVerificationProofs
     ) external view;
@@ -30,23 +30,23 @@ interface IEigenDABlobVerifier is IEigenDAThresholdRegistry {
     /**
      * @notice Verifies a blob for the required quorums and the default security thresholds
      * @param batchHeader The batch header of the blob
-     * @param blobVerificationProof The blob verification proof for the blob
+     * @param blobInclusionInfo The inclusion proof for the blob
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob against
      */
-    function verifyBlobV2(
+    function verifyDACertV2(
         BatchHeaderV2 calldata batchHeader,
-        BlobVerificationProofV2 calldata blobVerificationProof,
+        BlobInclusionInfo calldata blobInclusionInfo,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
     ) external view;
 
     /**
      * @notice Verifies a blob for the base required quorums and the default security thresholds
      * @param signedBatch The signed batch to verify the blob against
-     * @param blobVerificationProof The blob verification proof for the blob
+     * @param blobInclusionInfo The inclusion proof for the blob
      */
-    function verifyBlobV2FromSignedBatch(
+    function verifyDACertV2FromSignedBatch(
         SignedBatch calldata signedBatch,
-        BlobVerificationProofV2 calldata blobVerificationProof
+        BlobInclusionInfo calldata blobInclusionInfo
     ) external view;
 
     /**

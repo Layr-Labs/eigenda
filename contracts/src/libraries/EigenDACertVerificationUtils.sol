@@ -15,15 +15,15 @@ import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Library of functions to be used by smart contracts wanting to verify submissions of blobs on EigenDA.
+ * @title Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
  * @author Layr Labs, Inc.
  */
-library EigenDABlobVerificationUtils {
+library EigenDACertVerificationUtils {
     using BN254 for BN254.G1Point;
 
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
     
-    function _verifyBlobV1ForQuorums(
+    function _verifyDACertV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
         BlobHeader calldata blobHeader,
@@ -86,7 +86,7 @@ library EigenDABlobVerificationUtils {
         );
     }
 
-    function _verifyBlobsV1ForQuorums(
+    function _verifyDACertsV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
         BlobHeader[] calldata blobHeaders,
@@ -159,22 +159,22 @@ library EigenDABlobVerificationUtils {
         }
     }
 
-    function _verifyBlobV2ForQuorums(
+    function _verifyDACertV2ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 memory batchHeader,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
             Merkle.verifyInclusionKeccak(
-                blobVerificationProof.inclusionProof, 
+                blobInclusionInfo.inclusionProof, 
                 batchHeader.batchRoot, 
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
-                blobVerificationProof.blobIndex
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate))),
+                blobInclusionInfo.blobIndex
             ),
             "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
         );
@@ -184,24 +184,24 @@ library EigenDABlobVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
 
         _verifyRelayKeysSet(
             eigenDARelayRegistry,
-            blobVerificationProof.blobCertificate.relayKeys
+            blobInclusionInfo.blobCertificate.relayKeys
         );
 
         _verifyBlobSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(blobVerificationProof.blobCertificate.blobHeader.version),
+            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
 
         uint256 confirmedQuorumsBitmap;
 
-        for (uint i = 0; i < blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
                 quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold,
@@ -210,7 +210,7 @@ library EigenDABlobVerificationUtils {
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobVerificationProof.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
             );
         }
 
@@ -223,27 +223,27 @@ library EigenDABlobVerificationUtils {
         );
     }
 
-    function _verifyBlobV2ForQuorumsForThresholds(
+    function _verifyDACertV2ForQuorumsForThresholds(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 memory batchHeader,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
-            securityThresholds.length == blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length,
+            securityThresholds.length == blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length,
             "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: securityThresholds length does not match quorumNumbers"
         );
 
         require(
             Merkle.verifyInclusionKeccak(
-                blobVerificationProof.inclusionProof, 
+                blobInclusionInfo.inclusionProof, 
                 batchHeader.batchRoot, 
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
-                blobVerificationProof.blobIndex
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate))),
+                blobInclusionInfo.blobIndex
             ),
             "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
         );
@@ -253,20 +253,20 @@ library EigenDABlobVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
 
         _verifyRelayKeysSet(
             eigenDARelayRegistry,
-            blobVerificationProof.blobCertificate.relayKeys
+            blobInclusionInfo.blobCertificate.relayKeys
         );
 
         uint256 confirmedQuorumsBitmap;
-        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVerificationProof.blobCertificate.blobHeader.version);
+        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version);
 
-        for (uint i = 0; i < blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
             _verifyBlobSecurityParams(
                 blobParams,
                 securityThresholds[i]
@@ -280,7 +280,7 @@ library EigenDABlobVerificationUtils {
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobVerificationProof.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
             );
         }
 
@@ -293,14 +293,14 @@ library EigenDABlobVerificationUtils {
         );
     }
 
-    function _verifyBlobV2ForQuorumsFromSignedBatch(
+    function _verifyDACertV2ForQuorumsFromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -310,26 +310,26 @@ library EigenDABlobVerificationUtils {
             signedBatch
         );
 
-        _verifyBlobV2ForQuorums(
+        _verifyDACertV2ForQuorums(
             eigenDAThresholdRegistry,
             signatureVerifier,
             eigenDARelayRegistry,
             signedBatch.batchHeader,
-            blobVerificationProof,
+            blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers
         );
     }
 
-    function _verifyBlobV2ForQuorumsForThresholdsFromSignedBatch(
+    function _verifyDACertV2ForQuorumsForThresholdsFromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -339,12 +339,12 @@ library EigenDABlobVerificationUtils {
             signedBatch
         );
 
-        _verifyBlobV2ForQuorumsForThresholds(
+        _verifyDACertV2ForQuorumsForThresholds(
             eigenDAThresholdRegistry,
             signatureVerifier,
             eigenDARelayRegistry,
             signedBatch.batchHeader,
-            blobVerificationProof,
+            blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers

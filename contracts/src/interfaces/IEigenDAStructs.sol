@@ -66,7 +66,7 @@ struct DisperserInfo {
     address disperserAddress;
 }
 
-struct BlobVerificationProofV2 {
+struct BlobInclusionInfo {
     BlobCertificate blobCertificate;
     uint32 blobIndex;
     bytes inclusionProof;
@@ -82,8 +82,8 @@ struct BlobHeaderV2 {
     uint16 version;
     bytes quorumNumbers;
     BlobCommitment commitment;
-    uint32 salt;
     bytes32 paymentHeaderHash;
+    uint32 salt;
 }
 
 struct BlobCommitment {

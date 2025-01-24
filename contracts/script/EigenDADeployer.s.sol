@@ -17,7 +17,7 @@ import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
-import {EigenDABlobVerifier} from "../src/core/EigenDABlobVerifier.sol";
+import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
 import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
@@ -46,7 +46,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
     EigenDAThresholdRegistry public eigenDAThresholdRegistry;
-    EigenDABlobVerifier public eigenDABlobVerifier;
+    EigenDACertVerifier public eigenDACertVerifier;
     RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
@@ -317,7 +317,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         operatorStateRetriever = new OperatorStateRetriever();
 
-        eigenDABlobVerifier = new EigenDABlobVerifier(
+        eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
