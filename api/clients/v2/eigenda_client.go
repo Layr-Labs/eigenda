@@ -22,7 +22,9 @@ import (
 // This struct is goroutine safe.
 type EigenDAClient struct {
 	log logging.Logger
-	// doesn't need to be cryptographically secure, as it's only used to distribute load across relays
+	// random doesn't need to be cryptographically secure, as it's only used to distribute load across relays.
+	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
+	// must be evaluated for thread safety.
 	random       *rand.Rand
 	clientConfig *EigenDAClientConfig
 	codec        codecs.BlobCodec
