@@ -16,8 +16,8 @@ type PayloadClientConfig struct {
 	// The Ethereum RPC URL to use for querying the Ethereum blockchain.
 	EthRpcUrl string
 
-	// The address of the EigenDABlobVerifier contract
-	EigenDABlobVerifierAddr string
+	// The address of the EigenDACertVerifier contract
+	EigenDACertVerifierAddr string
 
 	// PayloadPolynomialForm is the initial form of a Payload after being encoded. The configured form does not imply
 	// any restrictions on the contents of a payload: it merely dictates how payload data is treated after being

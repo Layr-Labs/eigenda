@@ -19,29 +19,29 @@ import (
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
-	log             logging.Logger
+	logger          logging.Logger
 	config          *PayloadDisperserConfig
 	codec           codecs.BlobCodec
 	disperserClient DisperserClient
-	blobVerifier    verification.IBlobVerifier
+	certVerifier    verification.IBlobVerifier
 }
 
 // BuildPayloadDisperser builds a PayloadDisperser from config structs
 func BuildPayloadDisperser(
-	log logging.Logger,
+	logger logging.Logger,
 	payloadDisperserConfig *PayloadDisperserConfig,
 	disperserClientConfig *DisperserClientConfig,
-// signer to sign blob dispersal requests
+	// signer to sign blob dispersal requests
 	signer core.BlobRequestSigner,
-// prover is used to compute commitments to a new blob during the dispersal process
-//
-// IMPORTANT: it is permissible for the prover parameter to be nil, but operating with this configuration
-// puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
-//
-// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
+	// prover is used to compute commitments to a new blob during the dispersal process
+	//
+	// IMPORTANT: it is permissible for the prover parameter to be nil, but operating with this configuration
+	// puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+	//
+	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
+	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
+	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	prover encoding.Prover,
 	accountant *Accountant,
 	ethConfig geth.EthClientConfig,
@@ -56,40 +56,43 @@ func BuildPayloadDisperser(
 
 	disperserClient, err := NewDisperserClient(disperserClientConfig, signer, prover, accountant)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create disperser client: %s", err)
+		return nil, fmt.Errorf("new disperser client: %s", err)
 	}
 
-	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, log)
+	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	if err != nil {
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	blobVerifier, err := verification.NewBlobVerifier(*ethClient, payloadDisperserConfig.EigenDABlobVerifierAddr)
+	certVerifier, err := verification.NewBlobVerifier(*ethClient, payloadDisperserConfig.EigenDACertVerifierAddr)
 	if err != nil {
-		return nil, fmt.Errorf("new blob verifier: %w", err)
+		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
 	return &PayloadDisperser{
-		log:             log,
+		logger:          logger,
 		config:          payloadDisperserConfig,
 		codec:           codec,
 		disperserClient: disperserClient,
-		blobVerifier:    blobVerifier,
+		certVerifier:    certVerifier,
 	}, nil
 }
 
-// SendPayload executes the dispersal of a payload, with these basic steps:
+// SendPayload executes the dispersal of a payload, with these steps:
 //
 //  1. Encode payload into a blob
 //  2. Disperse the blob
-//  3. Continually poll the disperser with GetBlobStatus, until a terminal status is reached, or the polling timeout
-//     is reached
+//  3. Poll the disperser with GetBlobStatus until a terminal status is reached, or until the polling timeout is reached
 //  4. Construct an EigenDACert if dispersal is successful
 //  5. Verify the constructed cert with a call to an ethereum contract
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
+	// payload is the raw data to be stored on eigenDA
 	payload []byte,
+	// salt is added while constructing the blob header
+	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
+	// different blob key.
 	salt uint32,
 ) (*verification.EigenDACert, error) {
 
@@ -97,6 +100,7 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("encode payload to blob: %w", err)
 	}
+	pd.logger.Debug("Payload encoded to blob")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
@@ -106,40 +110,44 @@ func (pd *PayloadDisperser) SendPayload(
 		pd.config.BlobVersion,
 		pd.config.Quorums,
 		salt)
-
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
+	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus, "blobKey", blobKey)
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
-
 	blobStatusReply, err := pd.pollBlobStatus(timeoutCtx, blobKey, blobStatus.ToProfobuf())
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status: %w", err)
 	}
+	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey)
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	nonSignerStakesAndSignature, err := pd.blobVerifier.GetNonSignerStakesAndSignature(
+	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
 		timeoutCtx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
+	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey)
 
 	eigenDACert, err := verification.BuildEigenDACert(
 		blobStatusReply.GetBlobInclusionInfo(),
 		blobStatusReply.GetSignedBatch().GetHeader(),
 		nonSignerStakesAndSignature)
-
 	if err != nil {
 		return nil, fmt.Errorf("build eigen da cert: %w", err)
 	}
+	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey)
 
-	err = pd.verifyCertWithTimeout(ctx, eigenDACert)
+	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	err = pd.certVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
 	if err != nil {
-		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
+		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey, err)
 	}
+	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey)
 
 	return eigenDACert, nil
 }
@@ -159,6 +167,7 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
+// pollBlobStatus polls the disperser for the status of a blob that has been dispersed
 func (pd *PayloadDisperser) pollBlobStatus(
 	ctx context.Context,
 	blobKey core.BlobKey,
@@ -182,22 +191,18 @@ func (pd *PayloadDisperser) pollBlobStatus(
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
 			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
-
 			if err != nil {
-				pd.log.Warn("get blob status", "err", err, "blobKey", blobKey)
+				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey)
 				continue
 			}
 
 			newStatus := blobStatusReply.Status
 			if newStatus != previousStatus {
-				pd.log.Info(
+				pd.logger.Debug(
 					"Blob status changed",
-					"blob key",
-					blobKey,
-					"previous status",
-					previousStatus,
-					"new status",
-					newStatus)
+					"blob key", blobKey,
+					"previous status", previousStatus,
+					"new status", newStatus)
 				previousStatus = newStatus
 			}
 
@@ -211,17 +216,4 @@ func (pd *PayloadDisperser) pollBlobStatus(
 			}
 		}
 	}
-}
-
-// verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyBlobV2.
-//
-// This method times out after the duration configured in PayloadDisperserConfig.ContractCallTimeout
-func (pd *PayloadDisperser) verifyCertWithTimeout(
-	ctx context.Context,
-	eigenDACert *verification.EigenDACert,
-) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
-	defer cancel()
-
-	return pd.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
 }
