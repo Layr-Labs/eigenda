@@ -87,6 +87,7 @@ type Config struct {
 	EncoderConfig   kzg.KzgConfig
 
 	EnableV2                    bool
+	DisableV1                   bool
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
 	GRPCMsgSizeLimitV2          int
@@ -232,55 +233,35 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
-	// check if the ports are valid integers
+	// v1 ports must be defined and valid even if v1 is disabled
+	v1Disabled := ctx.GlobalBool(flags.DisableV1Flag.Name)
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
-	err = core.ValidatePort(dispersalPort)
-	if err != nil {
-		return nil, fmt.Errorf("invalid dispersal port: %s", dispersalPort)
+	if core.ValidatePort(dispersalPort) != nil {
+		return nil, fmt.Errorf("invalid v1 dispersal port: %s", dispersalPort)
 	}
-
 	retrievalPort := ctx.GlobalString(flags.RetrievalPortFlag.Name)
-	err = core.ValidatePort(retrievalPort)
-	if err != nil {
-		return nil, fmt.Errorf("invalid retrieval port: %s", retrievalPort)
+	if core.ValidatePort(retrievalPort) != nil {
+		return nil, fmt.Errorf("invalid v1 retrieval port: %s", retrievalPort)
 	}
 
 	v2Enabled := ctx.GlobalBool(flags.EnableV2Flag.Name)
-
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
-	if v2DispersalPort == "" {
-		if v2Enabled {
-			return nil, fmt.Errorf("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be specified if v2 is enabled")
-		}
-	} else {
-		if !v2Enabled {
-			return nil, fmt.Errorf("enable v2 flag needs to be set when v2 dispersal port (NODE_V2_DISPERSAL_PORT) is specified")
-		}
-		if v2DispersalPort == dispersalPort {
-			return nil, fmt.Errorf("ensure to v1 and v2 dispersal ports are not the same")
-		}
-		err = core.ValidatePort(v2DispersalPort)
-		if err != nil {
+	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
+	if v2Enabled {
+		if v2DispersalPort == "" {
+			return nil, fmt.Errorf("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
+		} else if core.ValidatePort(v2DispersalPort) != nil {
 			return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
+		}
+		if v2RetrievalPort == "" {
+			return nil, fmt.Errorf("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be defined when v2 is enabled")
+		} else if core.ValidatePort(v2RetrievalPort) != nil {
+			return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
 		}
 	}
 
-	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
-	if v2RetrievalPort == "" {
-		if v2Enabled {
-			return nil, fmt.Errorf("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be specified if v2 is enabled")
-		}
-	} else {
-		if !v2Enabled {
-			return nil, fmt.Errorf("enable v2 flag needs to be set when v2 retrieval port (NODE_V2_RETRIEVAL_PORT) is specified")
-		}
-		if v2RetrievalPort == retrievalPort {
-			return nil, fmt.Errorf("ensure to v1 and v2 retrieval ports are not the same")
-		}
-		err = core.ValidatePort(v2RetrievalPort)
-		if err != nil {
-			return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
-		}
+	if v1Disabled && !v2Enabled {
+		return nil, fmt.Errorf("invalid configuration: both v1 and v2 are disabled")
 	}
 
 	return &Config{
@@ -323,6 +304,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
+		DisableV1:                           v1Disabled,
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),

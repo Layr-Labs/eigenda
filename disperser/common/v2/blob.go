@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -71,7 +71,7 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 
 // BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {
-	BlobHeader *core.BlobHeader
+	BlobHeader *corev2.BlobHeader
 	Signature  []byte
 
 	// BlobStatus indicates the current status of the blob

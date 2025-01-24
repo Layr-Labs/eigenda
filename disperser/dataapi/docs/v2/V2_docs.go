@@ -464,7 +464,7 @@ const docTemplateV2 = `{
                 "tags": [
                     "Operators"
                 ],
-                "summary": "Operator node reachability check",
+                "summary": "Operator v2 node reachability check",
                 "parameters": [
                     {
                         "type": "string",
@@ -602,58 +602,6 @@ const docTemplateV2 = `{
     "definitions": {
         "big.Int": {
             "type": "object"
-        },
-        "core.BlobHeader": {
-            "type": "object",
-            "properties": {
-                "accountID": {
-                    "description": "AccountID is the account that is paying for the blob to be stored",
-                    "type": "string"
-                },
-                "commitment": {
-                    "$ref": "#/definitions/encoding.G1Commitment"
-                },
-                "length": {
-                    "type": "integer"
-                },
-                "length_commitment": {
-                    "$ref": "#/definitions/encoding.G2Commitment"
-                },
-                "length_proof": {
-                    "$ref": "#/definitions/encoding.LengthProof"
-                },
-                "quorumInfos": {
-                    "description": "QuorumInfos contains the quorum specific parameters for the blob",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/core.BlobQuorumInfo"
-                    }
-                }
-            }
-        },
-        "core.BlobQuorumInfo": {
-            "type": "object",
-            "properties": {
-                "adversaryThreshold": {
-                    "description": "AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum",
-                    "type": "integer"
-                },
-                "chunkLength": {
-                    "description": "ChunkLength is the number of symbols in a chunk",
-                    "type": "integer"
-                },
-                "confirmationThreshold": {
-                    "description": "ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum",
-                    "type": "integer"
-                },
-                "quorumID": {
-                    "type": "integer"
-                },
-                "quorumRate": {
-                    "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
-                    "type": "integer"
-                }
-            }
         },
         "core.G1Point": {
             "type": "object",
@@ -1110,7 +1058,7 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "blobHeader": {
-                    "$ref": "#/definitions/core.BlobHeader"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
                 },
                 "blobSize": {
                     "description": "BlobSize is the size of the blob in bytes",
@@ -1290,15 +1238,6 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "retrieval_status": {
-                    "type": "string"
-                },
-                "v2_dispersal_online": {
-                    "type": "boolean"
-                },
-                "v2_dispersal_socket": {
-                    "type": "string"
-                },
-                "v2_dispersal_status": {
                     "type": "string"
                 }
             }

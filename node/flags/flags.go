@@ -1,8 +1,9 @@
 package flags
 
 import (
-	"github.com/docker/go-units"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -51,13 +52,13 @@ var (
 	V2DispersalPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
 		Usage:    "Port at which node registers to listen for v2 dispersal calls",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
 	}
 	V2RetrievalPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "v2-retrieval-port"),
 		Usage:    "Port at which node registers to listen for v2 retrieval calls",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
 	EnableNodeApiFlag = cli.BoolFlag{
@@ -231,11 +232,17 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolTFlag{
+	EnableV2Flag = cli.BoolFlag{
 		Name:     "enable-v2",
-		Usage:    "Enable V2 features",
+		Usage:    "Enable V2 features (default=false)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
+	}
+	DisableV1Flag = cli.BoolFlag{
+		Name:     "disable-v1",
+		Usage:    "Disable V1 features (default=false, NOTE: your operator can be ejected if used incorrectly)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_V1"),
 	}
 	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
@@ -443,6 +450,7 @@ var optionalFlags = []cli.Flag{
 	BLSSignerCertFileFlag,
 	BLSSignerAPIKeyFlag,
 	EnableV2Flag,
+	DisableV1Flag,
 	V2DispersalPortFlag,
 	V2RetrievalPortFlag,
 	OnchainStateRefreshIntervalFlag,

@@ -126,16 +126,13 @@ type (
 	}
 
 	OperatorPortCheckResponse struct {
-		OperatorId        string `json:"operator_id"`
-		DispersalSocket   string `json:"dispersal_socket"`
-		DispersalOnline   bool   `json:"dispersal_online"`
-		DispersalStatus   string `json:"dispersal_status"`
-		RetrievalSocket   string `json:"retrieval_socket"`
-		RetrievalOnline   bool   `json:"retrieval_online"`
-		RetrievalStatus   string `json:"retrieval_status"`
-		V2DispersalSocket string `json:"v2_dispersal_socket"`
-		V2DispersalOnline bool   `json:"v2_dispersal_online"`
-		V2DispersalStatus string `json:"v2_dispersal_status"`
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		DispersalStatus string `json:"dispersal_status"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+		RetrievalStatus string `json:"retrieval_status"`
 	}
 
 	SemverReportResponse struct {
@@ -849,7 +846,7 @@ func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 
 // CheckOperatorsReachability godoc
 //
-//	@Summary	Operator node reachability check
+//	@Summary	Operator v2 node reachability check
 //	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
@@ -866,7 +863,7 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.ProbeOperatorHosts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.ProbeV2OperatorPorts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound

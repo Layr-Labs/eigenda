@@ -47,6 +47,9 @@ import (
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+
+	v1CheckPath = "api/v1/operators-info/port-check"
+	v2CheckPath = "api/v2/operators/reachability"
 )
 
 var (
@@ -276,13 +279,16 @@ func (n *Node) Start(ctx context.Context) error {
 		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
 	}
 
-	go n.expireLoop()
-	go n.checkNodeReachability()
+	if !n.Config.DisableV1 {
+		go n.expireLoop()
+		go n.checkNodeReachability(v1CheckPath)
+	}
 
 	if n.Config.EnableV2 {
 		go func() {
 			_ = n.RefreshOnchainState(ctx)
 		}()
+		go n.checkNodeReachability(v2CheckPath)
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
@@ -666,11 +672,13 @@ type OperatorReachabilityResponse struct {
 	RetrievalSocket string `json:"retrieval_socket"`
 	DispersalOnline bool   `json:"dispersal_online"`
 	RetrievalOnline bool   `json:"retrieval_online"`
+	DispersalStatus string `json:"dispersal_status"`
+	RetrievalStatus string `json:"retrieval_status"`
 }
 
-func (n *Node) checkNodeReachability() {
+func (n *Node) checkNodeReachability(checkPath string) {
 	if n.Config.ReachabilityPollIntervalSec == 0 {
-		n.Logger.Warn("Node reachability checks disabled!!! ReachabilityPollIntervalSec set to 0")
+		n.Logger.Warn("Node reachability checks disabled!")
 		return
 	}
 
@@ -679,7 +687,12 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
-	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, n.Config.ID.Hex())
+	version := "v1"
+	if strings.Contains(checkPath, "v2") {
+		version = "v2"
+	}
+
+	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, checkPath, n.Config.ID.Hex())
 	if err != nil {
 		n.Logger.Error("Failed to get reachability check URL", err)
 		return
@@ -692,11 +705,11 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
-		n.Logger.Debug("Calling reachability check", "url", checkURL)
+		n.Logger.Debug(fmt.Sprintf("Calling %s reachability check", version), "url", checkURL)
 
 		resp, err := http.Get(checkURL)
 		if err != nil {
-			n.Logger.Error("Reachability check request failed", err)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), err)
 			continue
 		} else if resp.StatusCode == 404 {
 			body, _ := io.ReadAll(resp.Body)
@@ -707,13 +720,13 @@ func (n *Node) checkNodeReachability() {
 			}
 			continue
 		} else if resp.StatusCode != 200 {
-			n.Logger.Error("Reachability check request failed", "status", resp.StatusCode)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), "status", resp.StatusCode)
 			continue
 		}
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
-			n.Logger.Error("Failed to read reachability check response", err)
+			n.Logger.Error(fmt.Sprintf("Failed to read %s reachability check response", version), err)
 			continue
 		}
 
@@ -725,24 +738,24 @@ func (n *Node) checkNodeReachability() {
 		}
 
 		if responseObject.DispersalOnline {
-			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
 		}
 		if responseObject.RetrievalOnline {
-			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - retrieval socket is UNREACHABLE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
 		}
 	}
 }
 
-func GetReachabilityURL(dataApiUrl, operatorID string) (string, error) {
-	checkURLString, err := url.JoinPath(dataApiUrl, "/api/v1/operators-info/port-check")
+func GetReachabilityURL(dataApiUrl, path, operatorID string) (string, error) {
+	checkURLString, err := url.JoinPath(dataApiUrl, path)
 	if err != nil {
 		return "", err
 	}
