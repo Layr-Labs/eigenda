@@ -340,7 +340,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		if strings.Contains(err.Error(), "internal error") {
 			return nil, api.NewErrorInternal(err.Error())
 		}
-		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
+		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
 	s.metrics.ReportChunkDataSize(requiredBandwidth)
 
@@ -471,6 +471,28 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 	}
 
 	return requiredBandwidth, nil
+}
+
+// buildInsufficientBandwidthError builds an informative error message for when there is insufficient
+// bandwidth to serve a GetChunks() request.
+func buildInsufficientGetChunksBandwidthError(
+	request *pb.GetChunksRequest,
+	requiredBandwidth int,
+	originalError error) error {
+
+	chunkCount := 0
+	for _, chunkRequest := range request.ChunkRequests {
+		if chunkRequest.GetByIndex() != nil {
+			chunkCount += len(chunkRequest.GetByIndex().ChunkIndices)
+		} else {
+			chunkCount += int(chunkRequest.GetByRange().EndIndex - chunkRequest.GetByRange().StartIndex)
+		}
+	}
+
+	blobCount := len(request.ChunkRequests)
+
+	return api.NewErrorResourceExhausted(fmt.Sprintf("unable to serve data (%d blobs, %d chunks, %d bytes): %v",
+		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
