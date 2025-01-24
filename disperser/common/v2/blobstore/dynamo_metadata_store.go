@@ -30,6 +30,7 @@ const (
 	OperatorDispersalIndexName = "OperatorDispersalIndex"
 	OperatorResponseIndexName  = "OperatorResponseIndex"
 	RequestedAtIndexName       = "RequestedAtIndex"
+	AttestedAtIndexName        = "AttestedAtAIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -49,6 +50,11 @@ const (
 	requestedAtBucketSizeNano = uint64(time.Hour / time.Nanosecond)
 	// 14 days with 1 hour margin of safety.
 	maxBlobAgeInNano = uint64((14*24*time.Hour + 1*time.Hour) / time.Nanosecond)
+
+	// The number of nanoseconds for an attestedAt bucket (1d)
+	// - 1d would be a good estimate for attestation needs (e.g. signing rate over past 24h is a common use case)
+	// - even at 1 attesation/s, it'll be 86,400 attestations in a bucket, which is reasonable
+	attestedAtBucketSizeNano = uint64(24 * time.Hour / time.Nanosecond)
 )
 
 var (
@@ -138,12 +144,6 @@ func (cursor *BlobFeedCursor) FromCursorKey(encoded string) (*BlobFeedCursor, er
 	if err != nil {
 		return nil, err
 	}
-	if len(blobKey) == 0 {
-		return &BlobFeedCursor{
-			RequestedAt: requestedAt,
-		}, nil
-
-	}
 	return &BlobFeedCursor{
 		RequestedAt: requestedAt,
 		BlobKey:     blobKey,
@@ -210,7 +210,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		blob, err := s.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
-			s.logger.Errorf("failed to get blob metadata for key %s: %v", blobKey.Hex(), err)
+			return fmt.Errorf("failed to get blob metadata for key %s: %v", blobKey.Hex(), err)
 		}
 
 		if blob.BlobStatus == status {
@@ -288,27 +288,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
-// getBucketIDRange returns the adjusted start and end bucket IDs based on
-// the allowed time range for blobs.
-func (s *BlobMetadataStore) getBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
-	now := uint64(time.Now().UnixNano())
-	oldestAllowed := now - maxBlobAgeInNano
-
-	startBucket := computeBucketID(startTime, requestedAtBucketSizeNano)
-	if startTime < oldestAllowed {
-		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeNano)
-	}
-
-	endBucket := computeBucketID(endTime, requestedAtBucketSizeNano)
-	if endTime > now {
-		endBucket = computeBucketID(now, requestedAtBucketSizeNano)
-	}
-
-	return startBucket, endBucket
-}
-
-// queryBucketMetadata queries a single bucket for blob metadata within the given key range.
-func (s *BlobMetadataStore) queryBucketMetadata(
+// queryBucketBlobMetadata queries a single bucket for blob metadata within the given key range.
+func (s *BlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
 	startKey string,
@@ -356,7 +337,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 		return nil, nil, errors.New("start cursor is expected to be less than end cursor")
 	}
 
-	startBucket, endBucket := s.getBucketIDRange(start.RequestedAt, end.RequestedAt)
+	startBucket, endBucket := getRequestedAtBucketIDRange(start.RequestedAt, end.RequestedAt)
 	startKey := start.ToCursorKey()
 	endKey := end.ToCursorKey()
 
@@ -368,7 +349,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 			break
 		}
 
-		bucketMetadata, err := s.queryBucketMetadata(ctx, bucket, startKey, endKey)
+		bucketMetadata, err := s.queryBucketBlobMetadata(ctx, bucket, startKey, endKey)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -398,6 +379,116 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 	}
 
 	return result, lastProcessedCursor, nil
+}
+
+// queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
+// ascending order.
+//
+// The function handles DynamoDB's 1MB response size limitation by performing multiple queries  if necessary.
+// If there are more than numToReturn attestations in the bucket, returns numToReturn attestations; otherwise returns all attestations in bucket.
+func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, start, end uint64, numToReturn int) ([]*corev2.Attestation, error) {
+	attestations := make([]*corev2.Attestation, 0)
+	var lastEvaledKey map[string]types.AttributeValue
+
+	// Iteratively fetch results from the bucket until we get desired number of items
+	// or exhaust the entire bucket.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		startTime := start
+		if lastEvaledKey != nil {
+			at, err := UnmarshalAttestedAt(lastEvaledKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse the AttestedAt from the LastEvaluatedKey: %w", err)
+			}
+			startTime = at
+		}
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			AttestedAtIndexName,
+			"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTime), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
+			},
+			0, // no limit within a bucket
+			lastEvaledKey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			at, err := UnmarshalAttestation(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
+			}
+			attestations = append(attestations, at)
+
+			// Desired number of items collected
+			if len(attestations) >= numToReturn {
+				return attestations, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
+	}
+
+	return attestations, nil
+}
+
+// GetAttestationByAttestedAt returns attestations within a specified time range (start, end],
+// ordered by their AttestedAt timestamp in ascending order.
+//
+// The function splits the time range into buckets and queries each bucket sequentially.
+// Results from all buckets are combined while maintaining the ordering.
+//
+// If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
+// in the time range.
+func (s *BlobMetadataStore) GetAttestationByAttestedAt(
+	ctx context.Context,
+	start uint64,
+	end uint64,
+	limit int,
+) ([]*corev2.Attestation, error) {
+	if start >= end {
+		return nil, errors.New("start must be less than end")
+	}
+
+	startBucket, endBucket := getAttestedAtBucketIDRange(start, end)
+
+	result := make([]*corev2.Attestation, 0)
+	for bucket := startBucket; bucket <= endBucket; bucket++ {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
+		}
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, start+1, end, remaining)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ba := range bucketAttestation {
+			result = append(result, ba)
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // GetBlobMetadataByStatusPaginated returns all the metadata with the given status that were updated after the given cursor.
@@ -476,7 +567,11 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	lastEvaludatedKey := res.LastEvaluatedKey
 	if lastEvaludatedKey == nil {
 		lastItem := res.Items[len(res.Items)-1]
-		updatedAt, err := strconv.ParseUint(lastItem["UpdatedAt"].(*types.AttributeValueMemberN).Value, 10, 64)
+		u, ok := lastItem["UpdatedAt"].(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected *types.AttributeValueMemberN for UpdatedAt, got %T", u)
+		}
+		updatedAt, err := strconv.ParseUint(u.Value, 10, 64)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -808,8 +903,8 @@ func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash 
 	return attestation, nil
 }
 
-func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verificationInfo *corev2.BlobVerificationInfo) error {
-	item, err := MarshalBlobVerificationInfo(verificationInfo)
+func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionInfo *corev2.BlobInclusionInfo) error {
+	item, err := MarshalBlobInclusionInfo(inclusionInfo)
 	if err != nil {
 		return err
 	}
@@ -822,12 +917,12 @@ func (s *BlobMetadataStore) PutBlobVerificationInfo(ctx context.Context, verific
 	return err
 }
 
-// PutBlobVerificationInfos puts multiple verification infos into the store
+// PutBlobInclusionInfos puts multiple inclusion infos into the store
 // It retries failed items up to 2 times
-func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verificationInfos []*corev2.BlobVerificationInfo) error {
-	items := make([]commondynamodb.Item, len(verificationInfos))
-	for i, info := range verificationInfos {
-		item, err := MarshalBlobVerificationInfo(info)
+func (s *BlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, inclusionInfos []*corev2.BlobInclusionInfo) error {
+	items := make([]commondynamodb.Item, len(inclusionInfos))
+	for i, info := range inclusionInfos {
+		item, err := MarshalBlobInclusionInfo(info)
 		if err != nil {
 			return err
 		}
@@ -842,7 +937,7 @@ func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verifi
 		}
 
 		if len(failedItems) > 0 {
-			s.logger.Warnf("failed to put verification infos, retrying: %v", failedItems)
+			s.logger.Warnf("failed to put inclusion infos, retrying: %v", failedItems)
 			items = failedItems
 			time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
 		} else {
@@ -853,7 +948,7 @@ func (s *BlobMetadataStore) PutBlobVerificationInfos(ctx context.Context, verifi
 	return nil
 }
 
-func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobVerificationInfo, error) {
+func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobInclusionInfo, error) {
 	bhh := hex.EncodeToString(batchHeaderHash[:])
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
@@ -869,10 +964,10 @@ func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
-	info, err := UnmarshalBlobVerificationInfo(item)
+	info, err := UnmarshalBlobInclusionInfo(item)
 	if err != nil {
 		return nil, err
 	}
@@ -880,7 +975,7 @@ func (s *BlobMetadataStore) GetBlobVerificationInfo(ctx context.Context, blobKey
 	return info, nil
 }
 
-func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobVerificationInfo, error) {
+func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
 	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -895,14 +990,14 @@ func (s *BlobMetadataStore) GetBlobVerificationInfos(ctx context.Context, blobKe
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: verification info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
 	}
 
-	responses := make([]*corev2.BlobVerificationInfo, len(items))
+	responses := make([]*corev2.BlobInclusionInfo, len(items))
 	for i, item := range items {
-		responses[i], err = UnmarshalBlobVerificationInfo(item)
+		responses[i], err = UnmarshalBlobInclusionInfo(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal verification info: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal inclusion info: %w", err)
 		}
 	}
 
@@ -927,12 +1022,16 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	var header *corev2.BatchHeader
 	var attestation *corev2.Attestation
 	for _, item := range items {
-		if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, batchHeaderSK) {
+		sk, ok := item["SK"].(*types.AttributeValueMemberS)
+		if !ok {
+			return nil, nil, fmt.Errorf("expected *types.AttributeValueMemberS for SK, got %T", item["SK"])
+		}
+		if strings.HasPrefix(sk.Value, batchHeaderSK) {
 			header, err = UnmarshalBatchHeader(item)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to unmarshal batch header: %w", err)
 			}
-		} else if strings.HasPrefix(item["SK"].(*types.AttributeValueMemberS).Value, attestationSK) {
+		} else if strings.HasPrefix(sk.Value, attestationSK) {
 			attestation, err = UnmarshalAttestation(item)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to unmarshal attestation: %w", err)
@@ -991,6 +1090,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 			{
 				AttributeName: aws.String("RequestedAtBlobKey"),
 				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("AttestedAtBucket"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("AttestedAt"),
+				AttributeType: types.ScalarAttributeTypeN,
 			},
 		},
 		KeySchema: []types.KeySchemaElement{
@@ -1074,6 +1181,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 					},
 					{
 						AttributeName: aws.String("RequestedAtBlobKey"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
+				IndexName: aws.String(AttestedAtIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AttestedAtBucket"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("AttestedAt"),
 						KeyType:       types.KeyTypeRange,
 					},
 				},
@@ -1188,6 +1315,20 @@ func UnmarshalBatchHeaderHash(item commondynamodb.Item) ([32]byte, error) {
 
 	root := strings.TrimPrefix(obj.PK, dispersalKeyPrefix)
 	return hexToHash(root)
+}
+
+func UnmarshalAttestedAt(item commondynamodb.Item) (uint64, error) {
+	type Object struct {
+		AttestedAt uint64
+	}
+
+	obj := Object{}
+	err := attributevalue.UnmarshalMap(item, &obj)
+	if err != nil {
+		return 0, err
+	}
+
+	return obj.AttestedAt, nil
 }
 
 func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
@@ -1307,32 +1448,32 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	return &header, nil
 }
 
-func MarshalBlobVerificationInfo(verificationInfo *corev2.BlobVerificationInfo) (commondynamodb.Item, error) {
-	fields, err := attributevalue.MarshalMap(verificationInfo)
+func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(inclusionInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal blob verification info: %w", err)
+		return nil, fmt.Errorf("failed to marshal blob inclusion info: %w", err)
 	}
 
-	bhh, err := verificationInfo.BatchHeader.Hash()
+	bhh, err := inclusionInfo.BatchHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
 	hashstr := hex.EncodeToString(bhh[:])
 
-	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + verificationInfo.BlobKey.Hex()}
+	fields["PK"] = &types.AttributeValueMemberS{Value: blobKeyPrefix + inclusionInfo.BlobKey.Hex()}
 	fields["SK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
 
 	return fields, nil
 }
 
-func UnmarshalBlobVerificationInfo(item commondynamodb.Item) (*corev2.BlobVerificationInfo, error) {
-	verificationInfo := corev2.BlobVerificationInfo{}
-	err := attributevalue.UnmarshalMap(item, &verificationInfo)
+func UnmarshalBlobInclusionInfo(item commondynamodb.Item) (*corev2.BlobInclusionInfo, error) {
+	inclusionInfo := corev2.BlobInclusionInfo{}
+	err := attributevalue.UnmarshalMap(item, &inclusionInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal blob verification info: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal blob inclusion info: %w", err)
 	}
 
-	return &verificationInfo, nil
+	return &inclusionInfo, nil
 }
 
 func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, error) {
@@ -1349,7 +1490,7 @@ func MarshalAttestation(attestation *corev2.Attestation) (commondynamodb.Item, e
 
 	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
 	fields["SK"] = &types.AttributeValueMemberS{Value: attestationSK}
-
+	fields["AttestedAtBucket"] = &types.AttributeValueMemberS{Value: computeAttestedAtBucket(attestation.AttestedAt)}
 	return fields, nil
 }
 
@@ -1382,6 +1523,49 @@ func computeBucketID(timestamp, bucketSizeNano uint64) uint64 {
 func computeRequestedAtBucket(requestedAt uint64) string {
 	id := computeBucketID(requestedAt, requestedAtBucketSizeNano)
 	return fmt.Sprintf("%d", id)
+}
+
+func computeAttestedAtBucket(attestedAt uint64) string {
+	id := computeBucketID(attestedAt, attestedAtBucketSizeNano)
+	return fmt.Sprintf("%d", id)
+}
+
+// getRequestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// the allowed time range for blobs.
+func getRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+	now := uint64(time.Now().UnixNano())
+	oldestAllowed := now - maxBlobAgeInNano
+
+	startBucket := computeBucketID(startTime, requestedAtBucketSizeNano)
+	if startTime < oldestAllowed {
+		startBucket = computeBucketID(oldestAllowed, requestedAtBucketSizeNano)
+	}
+
+	endBucket := computeBucketID(endTime, requestedAtBucketSizeNano)
+	if endTime > now {
+		endBucket = computeBucketID(now, requestedAtBucketSizeNano)
+	}
+
+	return startBucket, endBucket
+}
+
+// getAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// the allowed time range for blobs.
+func getAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+	now := uint64(time.Now().UnixNano())
+	oldestAllowed := now - maxBlobAgeInNano
+
+	startBucket := computeBucketID(startTime, attestedAtBucketSizeNano)
+	if startTime < oldestAllowed {
+		startBucket = computeBucketID(oldestAllowed, attestedAtBucketSizeNano)
+	}
+
+	endBucket := computeBucketID(endTime, attestedAtBucketSizeNano)
+	if endTime > now {
+		endBucket = computeBucketID(now, attestedAtBucketSizeNano)
+	}
+
+	return startBucket, endBucket
 }
 
 // encodeBlobFeedCursorKey encodes <requestedAt, blobKey> into string which

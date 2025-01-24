@@ -4,6 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
@@ -14,14 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"io"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -364,7 +365,7 @@ func (env *Config) StopAnvil() {
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 
-	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT))
+	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT))
 
 	envVars := []string{
 		"NODE_OPERATION=" + operation,

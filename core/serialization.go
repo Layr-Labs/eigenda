@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"regexp"
 	"slices"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -528,33 +527,26 @@ func decode(data []byte, obj any) error {
 	return nil
 }
 
-func (s OperatorSocket) GetDispersalSocket() string {
-	ip, port1, _, err := extractIPAndPorts(string(s))
+func (s OperatorSocket) GetV1DispersalSocket() string {
+	ip, v1DispersalPort, _, _, err := ParseOperatorSocket(string(s))
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, port1)
+	return fmt.Sprintf("%s:%s", ip, v1DispersalPort)
+}
+
+func (s OperatorSocket) GetV2DispersalSocket() string {
+	ip, _, _, v2DispersalPort, err := ParseOperatorSocket(string(s))
+	if err != nil || v2DispersalPort == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%s", ip, v2DispersalPort)
 }
 
 func (s OperatorSocket) GetRetrievalSocket() string {
-	ip, _, port2, err := extractIPAndPorts(string(s))
+	ip, _, retrievalPort, _, err := ParseOperatorSocket(string(s))
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, port2)
-}
-
-func extractIPAndPorts(s string) (string, string, string, error) {
-	regex := regexp.MustCompile(`^([^:]+):([^;]+);([^;]+)$`)
-	matches := regex.FindStringSubmatch(s)
-
-	if len(matches) != 4 {
-		return "", "", "", errors.New("input string does not match expected format")
-	}
-
-	ip := matches[1]
-	port1 := matches[2]
-	port2 := matches[3]
-
-	return ip, port1, port2, nil
+	return fmt.Sprintf("%s:%s", ip, retrievalPort)
 }

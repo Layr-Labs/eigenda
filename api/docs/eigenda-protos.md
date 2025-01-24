@@ -14,13 +14,13 @@
 - [common/common.proto](#common_common-proto)
     - [BlobCommitment](#common-BlobCommitment)
     - [G1Commitment](#common-G1Commitment)
-    - [PaymentHeader](#common-PaymentHeader)
   
 - [common/v2/common_v2.proto](#common_v2_common_v2-proto)
     - [Batch](#common-v2-Batch)
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
     - [BlobHeader](#common-v2-BlobHeader)
+    - [PaymentHeader](#common-v2-PaymentHeader)
   
 - [disperser/disperser.proto](#disperser_disperser-proto)
     - [AuthenticatedReply](#disperser-AuthenticatedReply)
@@ -37,7 +37,6 @@
     - [BlobVerificationProof](#disperser-BlobVerificationProof)
     - [DisperseBlobReply](#disperser-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-DisperseBlobRequest)
-    - [DispersePaidBlobRequest](#disperser-DispersePaidBlobRequest)
     - [RetrieveBlobReply](#disperser-RetrieveBlobReply)
     - [RetrieveBlobRequest](#disperser-RetrieveBlobRequest)
   
@@ -49,9 +48,9 @@
     - [Attestation](#disperser-v2-Attestation)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
+    - [BlobInclusionInfo](#disperser-v2-BlobInclusionInfo)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
     - [BlobStatusRequest](#disperser-v2-BlobStatusRequest)
-    - [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
@@ -277,24 +276,6 @@ A KZG commitment
 
 
 
-
-<a name="common-PaymentHeader"></a>
-
-### PaymentHeader
-PaymentHeader contains payment information for a blob.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
-| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
-| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. |
-| salt | [uint32](#uint32) |  | The salt of the disperser request. This is used to ensure that the payment header is intentionally unique. |
-
-
-
-
-
  
 
  
@@ -356,7 +337,8 @@ Validator nodes eventually sign the blob certificate once they are in custody of
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains data about the blob. |
-| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
+| signature | [bytes](#bytes) |  | signature is an ECDSA signature signed by the blob request signer&#39;s account ID over the BlobHeader&#39;s blobKey, which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request&#39;s account ID |
+| relay_keys | [uint32](#uint32) | repeated | relay_keys is the list of relay keys that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
 
@@ -376,8 +358,30 @@ BlobHeader contains the information describing a blob and the way it is to be di
 
 The following quorums are currently required: - 0: ETH - 1: EIGEN |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | payment_header contains payment information for the blob |
-| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
+| payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
+| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
+
+
+
+
+
+
+<a name="common-v2-PaymentHeader"></a>
+
+### PaymentHeader
+PaymentHeader contains payment information for a blob.
+At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+is always considered before cumulative_payment. If reservation_period is set but not valid, 
+the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer. |
 
 
 
@@ -640,24 +644,6 @@ BlobStatusRequest is used to query the status of a blob.
 
 
 
-<a name="disperser-DispersePaidBlobRequest"></a>
-
-### DispersePaidBlobRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
-| quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains account_id, reservation_period, cumulative_payment, and salt |
-| payment_signature | [bytes](#bytes) |  | signature of payment_header |
-
-
-
-
-
-
 <a name="disperser-RetrieveBlobReply"></a>
 
 ### RetrieveBlobReply
@@ -791,7 +777,24 @@ This can be used to construct a BlobHeader.commitment.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The blob data to compute the commitment for. |
+| blob | [bytes](#bytes) |  | The blob data to compute the commitment for. |
+
+
+
+
+
+
+<a name="disperser-v2-BlobInclusionInfo"></a>
+
+### BlobInclusionInfo
+BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_certificate | [common.v2.BlobCertificate](#common-v2-BlobCertificate) |  |  |
+| blob_index | [uint32](#uint32) |  | blob_index is the index of the blob in the batch |
+| inclusion_proof | [bytes](#bytes) |  | inclusion_proof is the inclusion proof of the blob in the batch |
 
 
 
@@ -808,7 +811,7 @@ BlobStatusReply is the reply to a BlobStatusRequest.
 | ----- | ---- | ----- | ----------- |
 | status | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob. |
 | signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch. Unset if the status is not CERTIFIED. |
-| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  | BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
+| blob_inclusion_info | [BlobInclusionInfo](#disperser-v2-BlobInclusionInfo) |  | BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
 
 
 
@@ -824,23 +827,6 @@ BlobStatusRequest is used to query the status of a blob.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | blob_key | [bytes](#bytes) |  | The unique identifier for the blob. |
-
-
-
-
-
-
-<a name="disperser-v2-BlobVerificationInfo"></a>
-
-### BlobVerificationInfo
-BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| blob_certificate | [common.v2.BlobCertificate](#common-v2-BlobCertificate) |  |  |
-| blob_index | [uint32](#uint32) |  | blob_index is the index of the blob in the batch |
-| inclusion_proof | [bytes](#bytes) |  | inclusion_proof is the inclusion proof of the blob in the batch |
 
 
 
@@ -875,7 +861,7 @@ A request to disperse a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed.
+| blob | [bytes](#bytes) |  | The blob to be dispersed.
 
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 
@@ -883,6 +869,7 @@ Every 32 bytes of data is interpreted as an integer in big endian format where t
 | blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob.
 
 This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob, which is dispersed separately. |
+| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id |
 
 
 

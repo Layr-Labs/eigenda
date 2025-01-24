@@ -12,35 +12,55 @@ import (
 
 // Operators
 
+// OperatorSocket is formatted as "host:dispersalPort;retrievalPort;v2DispersalPort"
 type OperatorSocket string
 
 func (s OperatorSocket) String() string {
 	return string(s)
 }
 
-func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSocket {
-	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort string) OperatorSocket {
+	if v2DispersalPort == "" {
+		return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+	}
+	return OperatorSocket(fmt.Sprintf("%s:%s;%s;%s", nodeIP, dispersalPort, retrievalPort, v2DispersalPort))
 }
 
 type StakeAmount = *big.Int
 
-func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, err error) {
+func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, v2DispersalPort string, err error) {
 	s := strings.Split(socket, ";")
-	if len(s) != 2 {
-		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", socket)
+
+	if len(s) == 2 {
+		// no v2 dispersal port
+		retrievalPort = s[1]
+		s = strings.Split(s[0], ":")
+		if len(s) != 2 {
+			err = fmt.Errorf("invalid socket address format: %s", socket)
+			return
+		}
+		host = s[0]
+		dispersalPort = s[1]
+
 		return
 	}
-	retrievalPort = s[1]
 
-	s = strings.Split(s[0], ":")
-	if len(s) != 2 {
-		err = fmt.Errorf("invalid socket address format: %s", socket)
+	if len(s) == 3 {
+		// all ports specified
+		v2DispersalPort = s[2]
+		retrievalPort = s[1]
+
+		s = strings.Split(s[0], ":")
+		if len(s) != 2 {
+			err = fmt.Errorf("invalid socket address format: %s", socket)
+			return
+		}
+		host = s[0]
+		dispersalPort = s[1]
 		return
 	}
-	host = s[0]
-	dispersalPort = s[1]
 
-	return
+	return "", "", "", "", fmt.Errorf("invalid socket address format %s: it must specify dispersal port, retrieval port, and/or v2 dispersal port (ex. 0.0.0.0:32004;32005;32006)", socket)
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,

@@ -74,6 +74,7 @@ struct BlobVerificationProofV2 {
 
 struct BlobCertificate {
     BlobHeaderV2 blobHeader;
+    bytes signature;
     uint32[] relayKeys;
 }
 
@@ -81,6 +82,7 @@ struct BlobHeaderV2 {
     uint16 version;
     bytes quorumNumbers;
     BlobCommitment commitment;
+    uint32 salt;
     bytes32 paymentHeaderHash;
 }
 
