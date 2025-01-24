@@ -28,12 +28,12 @@ type PayloadRetriever struct {
 	// random doesn't need to be cryptographically secure, as it's only used to distribute load across relays.
 	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
 	// must be evaluated for thread safety.
-	random                 *rand.Rand
-	payloadRetrieverConfig *PayloadRetrieverConfig
-	codec                  codecs.BlobCodec
-	relayClient            RelayClient
-	g1Srs                  []bn254.G1Affine
-	blobVerifier           verification.IBlobVerifier
+	random       *rand.Rand
+	config       *PayloadRetrieverConfig
+	codec        codecs.BlobCodec
+	relayClient  RelayClient
+	g1Srs        []bn254.G1Affine
+	blobVerifier verification.IBlobVerifier
 }
 
 // BuildPayloadRetriever builds a PayloadRetriever from config structs.
@@ -85,13 +85,13 @@ func NewPayloadRetriever(
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
 
 	return &PayloadRetriever{
-		log:                    log,
-		random:                 random,
-		payloadRetrieverConfig: payloadRetrieverConfig,
-		codec:                  codec,
-		relayClient:            relayClient,
-		blobVerifier:           blobVerifier,
-		g1Srs:                  g1Srs,
+		log:          log,
+		random:       random,
+		config:       payloadRetrieverConfig,
+		codec:        codec,
+		relayClient:  relayClient,
+		blobVerifier: blobVerifier,
+		g1Srs:        g1Srs,
 	}, nil
 }
 
@@ -181,8 +181,6 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	kzgCommitment *encoding.G1Commitment,
 	blobLength uint) error {
 
-	rand.Int63()
-
 	// An honest relay should never send an empty blob
 	if len(blob) == 0 {
 		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey, relayKey)
@@ -226,7 +224,7 @@ func (pr *PayloadRetriever) getBlobWithTimeout(
 	relayKey core.RelayKey,
 	blobKey core.BlobKey) ([]byte, error) {
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.RelayTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
 	return pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
@@ -239,7 +237,7 @@ func (pr *PayloadRetriever) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
 ) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.ContractCallTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.ContractCallTimeout)
 	defer cancel()
 
 	return pr.blobVerifier.VerifyBlobV2(timeoutCtx, eigenDACert)
