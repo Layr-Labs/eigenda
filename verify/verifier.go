@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -15,6 +16,10 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+)
+
+const (
+	HoleskySVCManagerV1Address = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 )
 
 type Config struct {
@@ -45,6 +50,8 @@ type Verifier struct {
 	// cert verification is optional, and verifies certs retrieved from eigenDA when turned on
 	verifyCerts bool
 	cv          *CertVerifier
+	// holesky is a flag to enable/disable holesky specific checks
+	holesky bool
 }
 
 func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
@@ -67,6 +74,7 @@ func NewVerifier(cfg *Config, l log.Logger) (*Verifier, error) {
 		kzgVerifier: kzgVerifier,
 		verifyCerts: cfg.VerifyCerts,
 		cv:          cv,
+		holesky:     isHolesky(cfg.SvcManagerAddr),
 	}, nil
 }
 
@@ -183,11 +191,27 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 	}
 
 	// ensure that required quorums are present in the confirmed ones
-	for _, quorum := range v.cv.quorumsRequired {
+	for _, quorum := range requiredQuorum(batchHeader.ReferenceBlockNumber, v) {
 		if !confirmedQuorums[quorum] {
 			return fmt.Errorf("quorum %d is required but not present in confirmed quorums", quorum)
 		}
 	}
 
 	return nil
+}
+
+func requiredQuorum(referenceBlockNumber uint32, v *Verifier) []uint8 {
+	// This check is required due to a bug we had when we updated the EigenDAServiceManager in Holesky. For a brief period of time, the quorum 1 was not
+	// required for the commitment to be confirmed, so the disperser created batches with only quorum 0 signatures.
+	// Archive nodes trying to sync from these stored batches would thus fail validation here since
+	// quorumsRequired is read from the latestBlock, where the bug has been fixed and both quorums are required.
+	// This check is only for testnet and for a specific block range.
+	if v.holesky && referenceBlockNumber >= 2950000 && referenceBlockNumber < 2960000 {
+		return []uint8{0}
+	}
+	return v.cv.quorumsRequired
+}
+
+func isHolesky(svcAddress string) bool {
+	return strings.EqualFold(strings.TrimPrefix(svcAddress, "0x"), strings.TrimPrefix(HoleskySVCManagerV1Address, "0x"))
 }
