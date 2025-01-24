@@ -168,6 +168,9 @@ func (pd *PayloadDisperser) Close() error {
 }
 
 // pollBlobStatus polls the disperser for the status of a blob that has been dispersed
+//
+// This method will only return a non-nil BlobStatusReply if the blob is reported to be CERTIFIED prior to the timeout.
+// In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
 func (pd *PayloadDisperser) pollBlobStatus(
 	ctx context.Context,
 	blobKey core.BlobKey,
