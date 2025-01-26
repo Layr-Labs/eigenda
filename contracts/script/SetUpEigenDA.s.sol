@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
-import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
+import {PauserRegistry} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
-import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
-import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
-import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
-import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
+import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
+import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
+import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "../src/payments/PaymentVault.sol";

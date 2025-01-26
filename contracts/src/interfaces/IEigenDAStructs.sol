@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 ///////////////////////// V1 ///////////////////////////////
 

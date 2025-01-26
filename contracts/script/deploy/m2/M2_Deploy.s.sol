@@ -4,14 +4,14 @@ pragma solidity =0.8.12;
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
 
-import "eigenlayer-middleware/BLSPublicKeyCompendium.sol";
-import "eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
-import "eigenlayer-middleware/BLSPubkeyRegistry.sol";
-import "eigenlayer-middleware/IndexRegistry.sol";
-import "eigenlayer-middleware/StakeRegistry.sol";
-import "eigenlayer-middleware/BLSOperatorStateRetriever.sol";
+import "../lib/eigenlayer-middleware/BLSPublicKeyCompendium.sol";
+import "../lib/eigenlayer-middleware/BLSRegistryCoordinatorWithIndices.sol";
+import "../lib/eigenlayer-middleware/BLSPubkeyRegistry.sol";
+import "../lib/eigenlayer-middleware/IndexRegistry.sol";
+import "../lib/eigenlayer-middleware/StakeRegistry.sol";
+import "../lib/eigenlayer-middleware/BLSOperatorStateRetriever.sol";
 
-import "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
+import "../lib/eigenlayer-middleware/src/contracts/permissions/PauserRegistry.sol";
 
 import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
 
