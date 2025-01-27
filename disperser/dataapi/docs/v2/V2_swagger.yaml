@@ -51,16 +51,10 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   core.G2Point:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -84,10 +78,6 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -106,23 +96,15 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -193,6 +175,13 @@ definitions:
         items:
           type: integer
         type: array
+      signature:
+        description: |-
+          Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,
+          which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+        items:
+          type: integer
+        type: array
     type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
     properties:
@@ -213,15 +202,8 @@ definitions:
         description: Salt is used to make blob intentionally unique when everything
           else is the same
         type: integer
-      signature:
-        description: |-
-          Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
-          which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
-        items:
-          type: integer
-        type: array
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo:
+  github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
     properties:
       BlobKey:
         items:
@@ -271,10 +253,6 @@ definitions:
         items:
           type: integer
         type: array
-      a1:
-        items:
-          type: integer
-        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -321,9 +299,9 @@ definitions:
     properties:
       batch_header_hash:
         type: string
-      blob_verification_infos:
+      blob_inclusion_infos:
         items:
-          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
         type: array
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
@@ -337,10 +315,22 @@ definitions:
     properties:
       blobs:
         items:
-          $ref: '#/definitions/v2.BlobMetadata'
+          $ref: '#/definitions/v2.BlobInfo'
         type: array
       pagination_token:
         type: string
+    type: object
+  v2.BlobInclusionInfoResponse:
+    properties:
+      blob_inclusion_info:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+    type: object
+  v2.BlobInfo:
+    properties:
+      blob_key:
+        type: string
+      blob_metadata:
+        $ref: '#/definitions/v2.BlobMetadata'
     type: object
   v2.BlobMetadata:
     properties:
@@ -367,6 +357,10 @@ definitions:
         description: RequestedAt is the Unix timestamp of when the blob was requested
           in seconds
         type: integer
+      signature:
+        items:
+          type: integer
+        type: array
       totalChunkSizeBytes:
         description: TotalChunkSizeBytes is the total size of the file containing
           all chunk coefficients for the blob.
@@ -388,11 +382,6 @@ definitions:
         type: integer
       status:
         type: string
-    type: object
-  v2.BlobVerificationInfoResponse:
-    properties:
-      blob_verification_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
     type: object
   v2.DispersalResponse:
     properties:
@@ -650,7 +639,7 @@ paths:
       summary: Fetch blob certificate by blob key v2
       tags:
       - Blob
-  /blobs/{blob_key}/verification-info:
+  /blobs/{blob_key}/inclusion-info:
     get:
       parameters:
       - description: Blob key in hex string
@@ -669,7 +658,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.BlobVerificationInfoResponse'
+            $ref: '#/definitions/v2.BlobInclusionInfoResponse'
         "400":
           description: 'error: Bad request'
           schema:
@@ -682,7 +671,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob verification info by blob key and batch header hash
+      summary: Fetch blob inclusion info by blob key and batch header hash
       tags:
       - Blob
   /blobs/feed:
