@@ -92,7 +92,7 @@ func (pd *PayloadDisperser) SendPayload(
 	payload []byte,
 	// salt is added while constructing the blob header
 	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
-	// different blob key.
+	// different blob key, when using reserved bandwidth payments.
 	salt uint32,
 ) (*verification.EigenDACert, error) {
 

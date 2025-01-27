@@ -40,7 +40,7 @@ var _ ICertVerifier = &CertVerifier{}
 
 // NewCertVerifier constructs a CertVerifier
 func NewCertVerifier(
-	ethClient geth.EthClient,   // the eth client, which should already be set up
+	ethClient geth.EthClient, // the eth client, which should already be set up
 	certVerifierAddress string, // the hex address of the EigenDACertVerifier contract
 ) (*CertVerifier, error) {
 
@@ -119,7 +119,7 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 
 	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
-		return nil, fmt.Errorf("convert signed batch: %s", err)
+		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
 
 	nonSignerStakesAndSignature, err := cv.certVerifierCaller.GetNonSignerStakesAndSignature(
@@ -127,7 +127,7 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		*signedBatchBinding)
 
 	if err != nil {
-		return nil, fmt.Errorf("get non signer stakes and signature: %s", err)
+		return nil, fmt.Errorf("get non signer stakes and signature: %w", err)
 	}
 
 	return &nonSignerStakesAndSignature, nil
