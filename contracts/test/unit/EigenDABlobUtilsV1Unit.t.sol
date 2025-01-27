@@ -55,7 +55,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
 
         uint256 gasBefore = gasleft();
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
@@ -101,7 +101,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
         }
         uint256 gasBefore = gasleft();
-        eigenDABlobVerifier.verifyBlobsV1(blobHeader, blobVerificationProofs);
+        eigenDACertVerifier.verifyDACertsV1(blobHeader, blobVerificationProofs);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
@@ -116,8 +116,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
 
-        cheats.expectRevert("EigenDABlobVerificationUtils._verifyBlobForQuorums: batchMetadata does not match stored metadata");
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: batchMetadata does not match stored metadata");
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
@@ -142,8 +142,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));        
         blobVerificationProof.blobIndex = 1;
 
-        cheats.expectRevert("EigenDABlobVerificationUtils._verifyBlobForQuorums: inclusion proof is invalid");
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: inclusion proof is invalid");
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_RequiredQuorumsNotMet(uint256 pseudoRandomNumber) public {
@@ -185,8 +185,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDABlobVerificationUtils._verifyBlobForQuorums: required quorums are not a subset of the confirmed quorums");
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums");
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
@@ -229,8 +229,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
-        cheats.expectRevert("EigenDABlobVerificationUtils._verifyBlobForQuorums: quorumNumber does not match");
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: quorumNumber does not match");
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
@@ -274,19 +274,19 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert("EigenDABlobVerificationUtils._verifyBlobForQuorums: confirmationThresholdPercentage is not met");
-        eigenDABlobVerifier.verifyBlobV1(blobHeader[1], blobVerificationProof);
+        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: confirmationThresholdPercentage is not met");
+        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testThresholds() public {
-        require(eigenDABlobVerifier.getQuorumAdversaryThresholdPercentage(0) == 33, "getQuorumAdversaryThresholdPercentage failed");
-        require(eigenDABlobVerifier.getQuorumAdversaryThresholdPercentage(1) == 33, "getQuorumAdversaryThresholdPercentage failed");
-        require(eigenDABlobVerifier.getQuorumAdversaryThresholdPercentage(2) == 33, "getQuorumAdversaryThresholdPercentage failed");
-        require(eigenDABlobVerifier.getQuorumConfirmationThresholdPercentage(0) == 55, "getQuorumConfirmationThresholdPercentage failed");
-        require(eigenDABlobVerifier.getQuorumConfirmationThresholdPercentage(1) == 55, "getQuorumConfirmationThresholdPercentage failed");
-        require(eigenDABlobVerifier.getQuorumConfirmationThresholdPercentage(2) == 55, "getQuorumConfirmationThresholdPercentage failed");
-        require(eigenDABlobVerifier.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
-        require(eigenDABlobVerifier.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
-        require(eigenDABlobVerifier.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
+        require(eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(0) == 33, "getQuorumAdversaryThresholdPercentage failed");
+        require(eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(1) == 33, "getQuorumAdversaryThresholdPercentage failed");
+        require(eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(2) == 33, "getQuorumAdversaryThresholdPercentage failed");
+        require(eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(0) == 55, "getQuorumConfirmationThresholdPercentage failed");
+        require(eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(1) == 55, "getQuorumConfirmationThresholdPercentage failed");
+        require(eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(2) == 55, "getQuorumConfirmationThresholdPercentage failed");
+        require(eigenDACertVerifier.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
+        require(eigenDACertVerifier.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
+        require(eigenDACertVerifier.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
     }    
 }
