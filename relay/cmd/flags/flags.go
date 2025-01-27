@@ -157,7 +157,7 @@ var (
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS"),
-		Value:    20 * 1024 * 1024,
+		Value:    1024 * 1024 * 1024,
 	}
 	MaxConcurrentGetChunkOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops"),
