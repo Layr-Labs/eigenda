@@ -81,7 +81,16 @@ type frameMap map[v2.BlobKey][]*encoding.Frame
 // computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
 // is equal to the size required to store the data, in bytes.
 func computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
-	return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+	//return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+
+	size, err := computeInMemoryFrameSize(frames)
+
+	if err != nil {
+		panic(err) // TODO log here instead of exploding
+		//return 0   // TODO
+	}
+
+	return size
 }
 
 // GetFrames retrieves the frames for a blob.
