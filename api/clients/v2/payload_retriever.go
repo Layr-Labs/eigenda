@@ -54,7 +54,7 @@ func BuildPayloadRetriever(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	certVerifier, err := verification.NewCertVerifier(*ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
+	certVerifier, err := verification.NewCertVerifier(ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}

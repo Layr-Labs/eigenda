@@ -40,7 +40,7 @@ var _ ICertVerifier = &CertVerifier{}
 
 // NewCertVerifier constructs a CertVerifier
 func NewCertVerifier(
-	ethClient geth.EthClient, // the eth client, which should already be set up
+	ethClient *geth.EthClient,  // the eth client, which should already be set up
 	certVerifierAddress string, // the hex address of the EigenDACertVerifier contract
 ) (*CertVerifier, error) {
 
