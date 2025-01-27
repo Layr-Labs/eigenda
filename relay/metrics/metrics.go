@@ -299,9 +299,9 @@ func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int) {
 	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
 }
 
-func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int, requesterID string) {
+func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int) {
 	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
-	m.getChunksRequestedBandwidth.WithLabelValues(requesterID).Add(float64(size))
+	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 }
 
 func (m *RelayMetrics) ReportBlobLatency(duration time.Duration) {
