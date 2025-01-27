@@ -226,10 +226,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	}
 	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey)
 
-	eigenDACert, err := verification.BuildEigenDACert(
-		blobStatusReply.GetBlobInclusionInfo(),
-		blobStatusReply.GetSignedBatch().GetHeader(),
-		nonSignerStakesAndSignature)
+	eigenDACert, err := verification.BuildEigenDACert(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigen da cert: %w", err)
 	}

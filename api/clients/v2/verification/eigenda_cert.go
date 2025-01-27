@@ -5,7 +5,6 @@ import (
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 
-	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
 )
 
@@ -18,22 +17,18 @@ type EigenDACert struct {
 	NonSignerStakesAndSignature contractEigenDABlobVerifier.NonSignerStakesAndSignature
 }
 
-// BuildEigenDACert creates a new EigenDACert from a BlobInclusionInfo, BatchHeader, and NonSignerStakesAndSignature
-//
-// For convenience, this function accepts arguments as protobufs where applicable, since that's the form the caller
-// will have.
+// BuildEigenDACert creates a new EigenDACert from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACert(
-	blobInclusionInfo *disperser.BlobInclusionInfo,
-	batchHeader *commonv2.BatchHeader,
+	blobStatusReply *disperser.BlobStatusReply,
 	nonSignerStakesAndSignature *contractEigenDABlobVerifier.NonSignerStakesAndSignature,
 ) (*EigenDACert, error) {
 
-	bindingInclusionInfo, err := InclusionInfoProtoToBinding(blobInclusionInfo)
+	bindingInclusionInfo, err := InclusionInfoProtoToBinding(blobStatusReply.GetBlobInclusionInfo())
 	if err != nil {
 		return nil, fmt.Errorf("convert inclusion info to binding: %w", err)
 	}
 
-	bindingBatchHeader, err := BatchHeaderProtoToBinding(batchHeader)
+	bindingBatchHeader, err := BatchHeaderProtoToBinding(blobStatusReply.GetSignedBatch().GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header to binding: %w", err)
 	}
