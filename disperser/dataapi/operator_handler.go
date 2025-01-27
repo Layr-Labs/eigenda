@@ -28,6 +28,51 @@ type OperatorHandler struct {
 	subgraphClient    SubgraphClient
 }
 
+// OperatorList wraps a set of operators with their IDs and addresses.
+type OperatorList struct {
+	operatorIds []core.OperatorID
+
+	// The addressToId and idToAddress provide 1:1 mapping of operator ID and address
+	// for operators provided in the "operatorIds" above.
+	addressToId map[string]core.OperatorID
+	idToAddress map[core.OperatorID]string
+}
+
+func NewOperatorList() *OperatorList {
+	return &OperatorList{
+		operatorIds: make([]core.OperatorID, 0),
+		addressToId: make(map[string]core.OperatorID),
+		idToAddress: make(map[core.OperatorID]string),
+	}
+}
+
+func (o *OperatorList) Add(id core.OperatorID, address string) {
+	if _, exists := o.idToAddress[id]; exists {
+		return
+	}
+	if _, exists := o.addressToId[address]; exists {
+		return
+	}
+
+	o.addressToId[address] = id
+	o.idToAddress[id] = address
+	o.operatorIds = append(o.operatorIds, id)
+}
+
+func (o *OperatorList) GetAddress(id string) (string, bool) {
+	opID, err := core.OperatorIDFromHex(id)
+	if err != nil {
+		return "", false
+	}
+	address, exists := o.idToAddress[opID]
+	return address, exists
+}
+
+func (o *OperatorList) GetID(address string) (core.OperatorID, bool) {
+	id, exists := o.addressToId[address]
+	return id, exists
+}
+
 func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *OperatorHandler {
 	return &OperatorHandler{
 		logger:            logger,
@@ -229,18 +274,29 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 
 }
 
-func (oh *OperatorHandler) CreateOperatorQuorumIntervals(ctx context.Context, nonsigners []core.OperatorID, nonsignerAddressToId map[string]core.OperatorID, startBlock, endBlock uint32) (OperatorQuorumIntervals, []uint8, error) {
-	// Get operators' initial quorums (at startBlock).
+// CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the
+// the block interval [startBlock, endBlock] for operators specified in OperatorList.
+//
+// Note: the returned result OperatorQuorumIntervals[op][q] means a sequence of increasing
+// and non-overlapping block intervals during which the operator "op" is registered in
+// quorum "q".
+func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
+	ctx context.Context,
+	operatorList *OperatorList,
+	operatorQuorumEvents *OperatorQuorumEvents,
+	startBlock, endBlock uint32,
+) (OperatorQuorumIntervals, []uint8, error) {
+	// Get operators' quorums at startBlock.
 	quorumSeen := make(map[uint8]struct{}, 0)
 
-	bitmaps, err := oh.chainReader.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, nonsigners, startBlock)
+	bitmaps, err := oh.chainReader.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, operatorList.operatorIds, startBlock)
 	if err != nil {
 		return nil, nil, err
 	}
 	operatorInitialQuorum := make(map[string][]uint8)
 	for i := range bitmaps {
 		opQuorumIDs := eth.BitmapToQuorumIds(bitmaps[i])
-		operatorInitialQuorum[nonsigners[i].Hex()] = opQuorumIDs
+		operatorInitialQuorum[operatorList.operatorIds[i].Hex()] = opQuorumIDs
 		for _, q := range opQuorumIDs {
 			quorumSeen[q] = struct{}{}
 		}
@@ -252,8 +308,8 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(ctx context.Context, no
 		allQuorums = append(allQuorums, q)
 	}
 
-	// Get operators' quorum change events from [startBlock+1, endBlock].
-	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, startBlock, endBlock, nonsignerAddressToId)
+	// Get quorum change events from [startBlock+1, endBlock] for operators in operator set.
+	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, operatorQuorumEvents, operatorList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -267,25 +323,22 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(ctx context.Context, no
 	return operatorQuorumIntervals, allQuorums, nil
 }
 
-func (oh *OperatorHandler) getOperatorQuorumEvents(ctx context.Context, startBlock, endBlock uint32, nonsignerAddressToId map[string]core.OperatorID) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
+func (oh *OperatorHandler) getOperatorQuorumEvents(
+	ctx context.Context,
+	operatorQuorumEvents *OperatorQuorumEvents,
+	operatorList *OperatorList,
+) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
 	addedToQuorum := make(map[string][]*OperatorQuorum)
 	removedFromQuorum := make(map[string][]*OperatorQuorum)
-	if startBlock == endBlock {
-		return addedToQuorum, removedFromQuorum, nil
-	}
-	operatorQuorumEvents, err := oh.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
-	if err != nil {
-		return nil, nil, err
-	}
 	// Make quorum events organize by operatorID (instead of address) and drop those who
-	// are not nonsigners.
+	// are not in the operator set.
 	for op, events := range operatorQuorumEvents.AddedToQuorum {
-		if id, ok := nonsignerAddressToId[op]; ok {
+		if id, ok := operatorList.GetID(op); ok {
 			addedToQuorum[id.Hex()] = events
 		}
 	}
 	for op, events := range operatorQuorumEvents.RemovedFromQuorum {
-		if id, ok := nonsignerAddressToId[op]; ok {
+		if id, ok := operatorList.GetID(op); ok {
 			removedFromQuorum[id.Hex()] = events
 		}
 	}
