@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
-import "lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import "lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IETHPOSDeposit.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IETHPOSDeposit.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/Slasher.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/DelegationManager.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/AVSDirectory.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/RewardsCoordinator.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/Slasher.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/DelegationManager.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/AVSDirectory.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/RewardsCoordinator.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/strategies/StrategyBaseTVLLimits.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/strategies/StrategyBaseTVLLimits.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/pods/EigenPod.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/pods/EigenPodManager.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/pods/EigenPod.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/pods/EigenPodManager.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
-import "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/ETHDepositMock.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/ETHDepositMock.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";

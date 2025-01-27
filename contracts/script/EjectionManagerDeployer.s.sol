@@ -8,7 +8,7 @@ import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoor
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
 import {IStakeRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import "lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";

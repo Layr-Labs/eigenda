@@ -1,11 +1,12 @@
 {
   "name": "@eigenda/contracts",
-  "version": "0.0.3",
+  "version": "0.1.0-rc-1",
   "description": "EigenDA core contracts",
   "main": "index.js",
   "directories": {
     "lib": "lib",
-    "test": "test"
+    "test": "test",
+    "src": "src"
   },
   "files": [
     "out/",
@@ -13,7 +14,8 @@
     "lib/"
   ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "forge test -v",
+    "build": "forge build"
   },
   "repository": {
     "type": "git",
@@ -22,6 +24,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@eigenda/contracts": "^0.0.3"
+    "@openzeppelin/contracts": "4.7.0",
+    "@openzeppelin/contracts-upgradeable": "4.7.0"
   }
 }
