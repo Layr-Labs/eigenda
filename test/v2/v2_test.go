@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -44,12 +45,19 @@ func getPreprodClient(t *testing.T) *TestClient {
 	return preprodClient
 }
 
+func skipInCI(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping integration test in CI environment")
+	}
+}
+
 // Tests the basic dispersal workflow:
 // - disperse a blob
 // - wait for it to be confirmed
 // - read the blob from the relays
 // - read the blob from the validators
 func testBasicDispersal(t *testing.T, rand *random.TestRandom, payload []byte, requestedLength int, quorums []core.QuorumID) error {
+	skipInCI(t)
 	client := getPreprodClient(t)
 
 	// Make sure the payload is the correct length
@@ -65,6 +73,7 @@ func testBasicDispersal(t *testing.T, rand *random.TestRandom, payload []byte, r
 // Disperse a 0 byte payload.
 // Empty blobs are not allowed by the disperser
 func TestEmptyBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	payload := []byte{}
 	// This should fail with "data is empty" error
@@ -75,6 +84,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (no padding).
 func TestMicroscopicBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	payload := []byte{1}
 	err := testBasicDispersal(t, rand, payload, 1, []core.QuorumID{0, 1})
@@ -83,6 +93,7 @@ func TestMicroscopicBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (with padding).
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	payload := []byte{1}
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -94,6 +105,7 @@ func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
 // Disperser a payload without padding.
 // This should fail with "encountered an error to convert a 32-bytes into a valid field element" error
 func TestPaddingError(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	payload := rand.Bytes(33)
 	err := testBasicDispersal(t, rand, payload, len(payload), []core.QuorumID{0, 1})
@@ -102,6 +114,7 @@ func TestPaddingError(t *testing.T) {
 
 // Disperse a small payload (between 1KB and 2KB).
 func TestSmallBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	dataLength := 1024 + rand.Intn(1024)
 	payload := rand.Bytes(dataLength)
@@ -113,6 +126,7 @@ func TestSmallBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 100KB and 200KB).
 func TestMediumBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	dataLength := 1024 * (100 + rand.Intn(100))
 	payload := rand.Bytes(dataLength)
@@ -124,6 +138,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	dataLength := int(1024 * 1024 * (1 + rand.Float64()))
 	payload := rand.Bytes(dataLength)
@@ -135,6 +150,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 
 // Disperse a small payload (between 1KB and 2KB) with a single quorum
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	desiredDataLength := 1024 + rand.Intn(1024)
 	payload := rand.Bytes(desiredDataLength)
@@ -147,6 +163,7 @@ func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 // TODO:(dmanc): This test is failing. "Timed out waiting for blob to be confirmed"
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
+	skipInCI(t)
 
 	t.Skipf("2mb is the max size in preprod") // TODO
 
@@ -164,6 +181,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
+	skipInCI(t)
 	rand := random.NewTestRandom(t)
 	originalSize, err := calculateOriginalSize(16*1024*1024 + 2) // 16MB + 2 bytes
 	require.NoError(t, err)
