@@ -49,10 +49,10 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 	}
 
 	// Create a mapping from address to operatorID.
-	operatorSet := NewOperatorSet()
+	operatorList := NewOperatorList()
 	for i := range nonsigners {
 		addr := strings.ToLower(nonsignerAddresses[i].Hex())
-		operatorSet.Add(nonsigners[i], addr)
+		operatorList.Add(nonsigners[i], addr)
 	}
 
 	operatorQuorumEvents, err := s.operatorHandler.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
@@ -61,7 +61,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, operatorSet, operatorQuorumEvents, startBlock, endBlock)
+	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, operatorList, operatorQuorumEvents, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					continue
 				}
 
-				addr, exist := operatorSet.GetAddress(op)
+				addr, exist := operatorList.GetAddress(op)
 				if !exist {
 					// This should never happen, but we don't fail the entire request, just
 					// mark error for the address field.

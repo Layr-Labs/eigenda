@@ -28,26 +28,25 @@ type OperatorHandler struct {
 	subgraphClient    SubgraphClient
 }
 
-// OperatorSet wraps a set of operators with their IDs and addresses.
-type OperatorSet struct {
-	// The addressToId and idToAddress provide 1:1 mapping of operator ID and address.
-	// They always have the same length and same operator IDs/addresses.
+// OperatorList wraps a set of operators with their IDs and addresses.
+type OperatorList struct {
+	operatorIds []core.OperatorID
+
+	// The addressToId and idToAddress provide 1:1 mapping of operator ID and address
+	// for operators provided in the "operatorIds" above.
 	addressToId map[string]core.OperatorID
 	idToAddress map[core.OperatorID]string
-
-	// operatorIds always has the same IDs as implied by the two maps.
-	operatorIds []core.OperatorID
 }
 
-func NewOperatorSet() *OperatorSet {
-	return &OperatorSet{
+func NewOperatorList() *OperatorList {
+	return &OperatorList{
+		operatorIds: make([]core.OperatorID, 0),
 		addressToId: make(map[string]core.OperatorID),
 		idToAddress: make(map[core.OperatorID]string),
-		operatorIds: make([]core.OperatorID, 0),
 	}
 }
 
-func (o *OperatorSet) Add(id core.OperatorID, address string) {
+func (o *OperatorList) Add(id core.OperatorID, address string) {
 	if _, exists := o.idToAddress[id]; exists {
 		return
 	}
@@ -60,7 +59,7 @@ func (o *OperatorSet) Add(id core.OperatorID, address string) {
 	o.operatorIds = append(o.operatorIds, id)
 }
 
-func (o *OperatorSet) GetAddress(id string) (string, bool) {
+func (o *OperatorList) GetAddress(id string) (string, bool) {
 	opID, err := core.OperatorIDFromHex(id)
 	if err != nil {
 		return "", false
@@ -69,7 +68,7 @@ func (o *OperatorSet) GetAddress(id string) (string, bool) {
 	return address, exists
 }
 
-func (o *OperatorSet) GetID(address string) (core.OperatorID, bool) {
+func (o *OperatorList) GetID(address string) (core.OperatorID, bool) {
 	id, exists := o.addressToId[address]
 	return id, exists
 }
@@ -276,28 +275,28 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 }
 
 // CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the
-// the block interval [startBlock, endBlock] for operators specified in OperatorSet.
+// the block interval [startBlock, endBlock] for operators specified in OperatorList.
 //
 // Note: the returned result OperatorQuorumIntervals[op][q] means a sequence of increasing
 // and non-overlapping block intervals during which the operator "op" is registered in
 // quorum "q".
 func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 	ctx context.Context,
-	operatorSet *OperatorSet,
+	operatorList *OperatorList,
 	operatorQuorumEvents *OperatorQuorumEvents,
 	startBlock, endBlock uint32,
 ) (OperatorQuorumIntervals, []uint8, error) {
 	// Get operators' quorums at startBlock.
 	quorumSeen := make(map[uint8]struct{}, 0)
 
-	bitmaps, err := oh.chainReader.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, operatorSet.operatorIds, startBlock)
+	bitmaps, err := oh.chainReader.GetQuorumBitmapForOperatorsAtBlockNumber(ctx, operatorList.operatorIds, startBlock)
 	if err != nil {
 		return nil, nil, err
 	}
 	operatorInitialQuorum := make(map[string][]uint8)
 	for i := range bitmaps {
 		opQuorumIDs := eth.BitmapToQuorumIds(bitmaps[i])
-		operatorInitialQuorum[operatorSet.operatorIds[i].Hex()] = opQuorumIDs
+		operatorInitialQuorum[operatorList.operatorIds[i].Hex()] = opQuorumIDs
 		for _, q := range opQuorumIDs {
 			quorumSeen[q] = struct{}{}
 		}
@@ -310,7 +309,7 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 	}
 
 	// Get quorum change events from [startBlock+1, endBlock] for operators in operator set.
-	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, operatorQuorumEvents, operatorSet)
+	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, operatorQuorumEvents, operatorList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -327,19 +326,19 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 func (oh *OperatorHandler) getOperatorQuorumEvents(
 	ctx context.Context,
 	operatorQuorumEvents *OperatorQuorumEvents,
-	operatorSet *OperatorSet,
+	operatorList *OperatorList,
 ) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
 	addedToQuorum := make(map[string][]*OperatorQuorum)
 	removedFromQuorum := make(map[string][]*OperatorQuorum)
 	// Make quorum events organize by operatorID (instead of address) and drop those who
 	// are not in the operator set.
 	for op, events := range operatorQuorumEvents.AddedToQuorum {
-		if id, ok := operatorSet.GetID(op); ok {
+		if id, ok := operatorList.GetID(op); ok {
 			addedToQuorum[id.Hex()] = events
 		}
 	}
 	for op, events := range operatorQuorumEvents.RemovedFromQuorum {
-		if id, ok := operatorSet.GetID(op); ok {
+		if id, ok := operatorList.GetID(op); ok {
 			removedFromQuorum[id.Hex()] = events
 		}
 	}
