@@ -20,7 +20,7 @@ import (
 // This struct is goroutine safe.
 type PayloadDisperser struct {
 	logger          logging.Logger
-	config          *PayloadDisperserConfig
+	config          PayloadDisperserConfig
 	codec           codecs.BlobCodec
 	disperserClient DisperserClient
 	certVerifier    verification.ICertVerifier
@@ -29,8 +29,8 @@ type PayloadDisperser struct {
 // BuildPayloadDisperser builds a PayloadDisperser from config structs
 func BuildPayloadDisperser(
 	logger logging.Logger,
-	payloadDisperserConfig *PayloadDisperserConfig,
-	disperserClientConfig *DisperserClientConfig,
+	payloadDisperserConfig PayloadDisperserConfig,
+	disperserClientConfig DisperserClientConfig,
 	// signer to sign blob dispersal requests
 	signer core.BlobRequestSigner,
 	// prover is used to compute commitments to a new blob during the dispersal process
@@ -54,7 +54,7 @@ func BuildPayloadDisperser(
 		return nil, fmt.Errorf("create codec: %w", err)
 	}
 
-	disperserClient, err := NewDisperserClient(disperserClientConfig, signer, prover, accountant)
+	disperserClient, err := NewDisperserClient(&disperserClientConfig, signer, prover, accountant)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %s", err)
 	}
