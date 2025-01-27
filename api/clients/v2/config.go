@@ -70,5 +70,12 @@ type PayloadDisperserConfig struct {
 	// GetBlobStatus.
 	BlobStatusPollInterval time.Duration
 
+	// Quorums is the set of quorums that need to have a threshold of signatures for an EigenDA cert to successfully
+	// verify.
+	//
+	// TODO: Clients are currently charged for QuorumIDs 0 and 1 regardless of whether or not they are included in this
+	//  array. A decision still needs to be made for how we want to handle this. Should this field be called
+	//  `CustomQuorums`, and we simply append any values contained onto [0, 1]? Or should we require users to include 0
+	//  and 1 here, and throw an error if they don't?
 	Quorums []core.QuorumID
 }
