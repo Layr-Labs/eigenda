@@ -3,6 +3,12 @@ package v2
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -19,11 +25,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path"
-	"strings"
-	"testing"
-	"time"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -152,28 +153,35 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
 	payload []byte,
-	quorums []core.QuorumID) {
+	quorums []core.QuorumID) error {
 
-	key := c.DispersePayload(ctx, payload, quorums)
+	key, err := c.DispersePayload(ctx, payload, quorums)
+	if err != nil {
+		return err
+	}
 	blobCert := c.WaitForCertification(ctx, key)
-	c.ReadBlobFromRelay(ctx, key, blobCert, payload)
-	c.ReadBlobFromValidators(ctx, blobCert, quorums, payload)
+
+	// Unpad the payload
+	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
+
+	// Read the blob from the relays and validators
+	c.ReadBlobFromRelay(ctx, key, blobCert, unpaddedPayload)
+	c.ReadBlobFromValidators(ctx, blobCert, quorums, unpaddedPayload)
+
+	return nil
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
 func (c *TestClient) DispersePayload(
 	ctx context.Context,
 	payload []byte,
-	quorums []core.QuorumID) corev2.BlobKey {
+	quorums []core.QuorumID) (corev2.BlobKey, error) {
 
 	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
-
-	padded := codec.ConvertByPaddingEmptyByte(payload)
-	_, key, err := c.DisperserClient.DisperseBlob(ctx, padded, 0, quorums, 0)
-	require.NoError(c.t, err)
+	_, key, err := c.DisperserClient.DisperseBlob(ctx, payload, 0, quorums, 0)
 	fmt.Printf("Dispersed blob with key %x\n", key)
 
-	return key
+	return key, err
 }
 
 // WaitForCertification waits for a blob to be certified. Returns the blob certificate.
