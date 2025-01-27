@@ -300,7 +300,7 @@ func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int) {
 }
 
 func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int, requesterID string) {
-	m.getChunksRequestedBandwidth.WithLabelValues("global").Add(float64(size))
+	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 	m.getChunksRequestedBandwidth.WithLabelValues(requesterID).Add(float64(size))
 }
 
