@@ -277,8 +277,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
-	operatorID := fmt.Sprintf("%x", request.OperatorId)
-	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth, operatorID)
+	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth)
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		if strings.Contains(err.Error(), "internal error") {
