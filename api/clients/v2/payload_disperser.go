@@ -119,27 +119,15 @@ func (pd *PayloadDisperser) SendPayload(
 	defer cancel()
 	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
 	if err != nil {
-		return nil, fmt.Errorf("poll blob status: %w", err)
+		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey)
 
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
-	defer cancel()
-	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
-		timeoutCtx, blobStatusReply.GetSignedBatch())
+	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
 	if err != nil {
-		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
+		// error returned from method is sufficiently descriptive
+		return nil, err
 	}
-	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey)
-
-	eigenDACert, err := verification.BuildEigenDACert(
-		blobStatusReply.GetBlobInclusionInfo(),
-		blobStatusReply.GetSignedBatch().GetHeader(),
-		nonSignerStakesAndSignature)
-	if err != nil {
-		return nil, fmt.Errorf("build eigen da cert: %w", err)
-	}
-	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey)
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -219,4 +207,33 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			}
 		}
 	}
+}
+
+// buildEigenDACert makes a call to the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
+// contract, and then assembles an EigenDACert
+func (pd *PayloadDisperser) buildEigenDACert(
+	ctx context.Context,
+	blobKey core.BlobKey,
+	blobStatusReply *dispgrpc.BlobStatusReply,
+) (*verification.EigenDACert, error) {
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
+		timeoutCtx, blobStatusReply.GetSignedBatch())
+	if err != nil {
+		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
+	}
+	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey)
+
+	eigenDACert, err := verification.BuildEigenDACert(
+		blobStatusReply.GetBlobInclusionInfo(),
+		blobStatusReply.GetSignedBatch().GetHeader(),
+		nonSignerStakesAndSignature)
+	if err != nil {
+		return nil, fmt.Errorf("build eigen da cert: %w", err)
+	}
+	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey)
+
+	return eigenDACert, nil
 }
