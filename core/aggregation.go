@@ -138,7 +138,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
 			if err != nil {
-				a.Logger.Error("failed to get operator address from registry", "operatorID", operatorIDHex)
+				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
 				a.OperatorAddresses.Add(r.Operator, operatorAddr)

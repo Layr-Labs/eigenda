@@ -8,6 +8,7 @@
     - [BatchHeader](#common-v2-BatchHeader)
     - [BlobCertificate](#common-v2-BlobCertificate)
     - [BlobHeader](#common-v2-BlobHeader)
+    - [PaymentHeader](#common-v2-PaymentHeader)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -55,13 +56,17 @@ BatchHeader is the header of a batch of blobs
 <a name="common-v2-BlobCertificate"></a>
 
 ### BlobCertificate
-BlobCertificate is what gets attested by the network
+BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
+is provided by the blob submitter (i.e. the blob header), and part is provided by the disperser (i.e. the relays).
+Validator nodes eventually sign the blob certificate once they are in custody of the required chunks
+(note that the signature is indirect; validators sign the hash of a Batch, which contains the blob certificate).
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| blob_header | [BlobHeader](#common-v2-BlobHeader) |  |  |
-| relays | [uint32](#uint32) | repeated |  |
+| blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains data about the blob. |
+| signature | [bytes](#bytes) |  | signature is an ECDSA signature signed by the blob request signer&#39;s account ID over the BlobHeader&#39;s blobKey, which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request&#39;s account ID |
+| relay_keys | [uint32](#uint32) | repeated | relay_keys is the list of relay keys that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
 
@@ -71,16 +76,40 @@ BlobCertificate is what gets attested by the network
 <a name="common-v2-BlobHeader"></a>
 
 ### BlobHeader
-
+BlobHeader contains the information describing a blob and the way it is to be dispersed.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| version | [uint32](#uint32) |  | Blob version |
-| quorum_numbers | [uint32](#uint32) | repeated |  |
-| commitment | [common.BlobCommitment](#common-BlobCommitment) |  |  |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  |  |
-| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
+| version | [uint32](#uint32) |  | The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values are checked against supplied or default security thresholds to validate the security assumptions of the blob&#39;s availability. |
+| quorum_numbers | [uint32](#uint32) | repeated | quorum_numbers is the list of quorum numbers that the blob is part of. All quorums must be specified (including required quorums).
+
+The following quorums are currently required: - 0: ETH - 1: EIGEN |
+| commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
+| payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
+| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
+
+
+
+
+
+
+<a name="common-v2-PaymentHeader"></a>
+
+### PaymentHeader
+PaymentHeader contains payment information for a blob.
+At least one of reservation_period or cumulative_payment must be set, and reservation_period 
+is always considered before cumulative_payment. If reservation_period is set but not valid, 
+the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
+Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer. |
 
 
 

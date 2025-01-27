@@ -18,7 +18,6 @@
     - [BlobVerificationProof](#disperser-BlobVerificationProof)
     - [DisperseBlobReply](#disperser-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-DisperseBlobRequest)
-    - [DispersePaidBlobRequest](#disperser-DispersePaidBlobRequest)
     - [RetrieveBlobReply](#disperser-RetrieveBlobReply)
     - [RetrieveBlobRequest](#disperser-RetrieveBlobRequest)
   
@@ -271,24 +270,6 @@ BlobStatusRequest is used to query the status of a blob.
 | data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617 If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
 | custom_quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob will be sent, in addition to the required quorums which are configured on the EigenDA smart contract. If required quorums are included here, an error will be returned. The disperser will ensure that the encoded blobs for each quorum are all processed within the same batch. |
 | account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
-
-
-
-
-
-
-<a name="disperser-DispersePaidBlobRequest"></a>
-
-### DispersePaidBlobRequest
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed. Same requirements as DisperseBlobRequest. |
-| quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob to be sent |
-| payment_header | [common.PaymentHeader](#common-PaymentHeader) |  | Payment header contains account_id, reservation_period, cumulative_payment, and salt |
-| payment_signature | [bytes](#bytes) |  | signature of payment_header |
 
 
 

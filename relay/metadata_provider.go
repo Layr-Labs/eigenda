@@ -39,9 +39,9 @@ type metadataProvider struct {
 	// assigned to this server will not be in the cache.
 	metadataCache cache.CacheAccessor[v2.BlobKey, *blobMetadata]
 
-	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
-	// that are not assigned to one of these IDs.
-	relayIDSet map[v2.RelayKey]struct{}
+	// relayKeySet is the set of relay keys assigned to this relay. This relay will refuse to serve metadata for blobs
+	// that are not assigned to one of these keys.
+	relayKeySet map[v2.RelayKey]struct{}
 
 	// fetchTimeout is the maximum time to wait for a metadata fetch operation to complete.
 	fetchTimeout time.Duration
@@ -57,21 +57,21 @@ func newMetadataProvider(
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	maxIOConcurrency int,
-	relayIDs []v2.RelayKey,
+	relayKeys []v2.RelayKey,
 	fetchTimeout time.Duration,
 	blobParamsMap *v2.BlobVersionParameterMap,
 	metrics *cache.CacheAccessorMetrics) (*metadataProvider, error) {
 
-	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
-	for _, id := range relayIDs {
-		relayIDSet[id] = struct{}{}
+	relayKeySet := make(map[v2.RelayKey]struct{}, len(relayKeys))
+	for _, id := range relayKeys {
+		relayKeySet[id] = struct{}{}
 	}
 
 	server := &metadataProvider{
 		ctx:           ctx,
 		logger:        logger,
 		metadataStore: metadataStore,
-		relayIDSet:    relayIDSet,
+		relayKeySet:   relayKeySet,
 		fetchTimeout:  fetchTimeout,
 	}
 	server.blobParamsMap.Store(blobParamsMap)
@@ -176,10 +176,10 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
 
-	if len(m.relayIDSet) > 0 {
+	if len(m.relayKeySet) > 0 {
 		validShard := false
 		for _, shard := range cert.RelayKeys {
-			if _, ok := m.relayIDSet[shard]; ok {
+			if _, ok := m.relayKeySet[shard]; ok {
 				validShard = true
 				break
 			}
