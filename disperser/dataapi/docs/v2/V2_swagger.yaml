@@ -65,16 +65,11 @@ definitions:
       cumulative_payment:
         allOf:
         - $ref: '#/definitions/big.Int'
-        description: |-
-          TODO: we are thinking the contract can use uint128 for cumulative payment,
-          but the definition on v2 uses uint64. Double check with team.
+        description: CumulativePayment represents the total amount of payment (in
+          wei) made by the user up to this point
       reservation_period:
         description: ReservationPeriod represents the range of time at which the dispersal
           is made
-        type: integer
-      salt:
-        description: Allow same blob to be dispersed multiple times within the same
-          reservation period
         type: integer
     type: object
   core.Signature:
@@ -180,6 +175,13 @@ definitions:
         items:
           type: integer
         type: array
+      signature:
+        description: |-
+          Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,
+          which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+        items:
+          type: integer
+        type: array
     type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobHeader:
     properties:
@@ -196,14 +198,12 @@ definitions:
         items:
           type: integer
         type: array
-      signature:
-        description: Signature is the signature of the blob header by the account
-          ID
-        items:
-          type: integer
-        type: array
+      salt:
+        description: Salt is used to make blob intentionally unique when everything
+          else is the same
+        type: integer
     type: object
-  github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo:
+  github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
     properties:
       BlobKey:
         items:
@@ -269,13 +269,39 @@ definitions:
           type: number
         type: object
     type: object
+  v2.BatchFeedResponse:
+    properties:
+      batches:
+        items:
+          $ref: '#/definitions/v2.BatchInfo'
+        type: array
+    type: object
+  v2.BatchInfo:
+    properties:
+      aggregated_signature:
+        $ref: '#/definitions/core.Signature'
+      attested_at:
+        type: integer
+      batch_header:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
+      batch_header_hash:
+        type: string
+      quorum_numbers:
+        items:
+          type: integer
+        type: array
+      quorum_signed_percentages:
+        additionalProperties:
+          type: integer
+        type: object
+    type: object
   v2.BatchResponse:
     properties:
       batch_header_hash:
         type: string
-      blob_verification_infos:
+      blob_inclusion_infos:
         items:
-          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
         type: array
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
@@ -289,10 +315,22 @@ definitions:
     properties:
       blobs:
         items:
-          $ref: '#/definitions/v2.BlobMetadata'
+          $ref: '#/definitions/v2.BlobInfo'
         type: array
       pagination_token:
         type: string
+    type: object
+  v2.BlobInclusionInfoResponse:
+    properties:
+      blob_inclusion_info:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+    type: object
+  v2.BlobInfo:
+    properties:
+      blob_key:
+        type: string
+      blob_metadata:
+        $ref: '#/definitions/v2.BlobMetadata'
     type: object
   v2.BlobMetadata:
     properties:
@@ -319,6 +357,10 @@ definitions:
         description: RequestedAt is the Unix timestamp of when the blob was requested
           in seconds
         type: integer
+      signature:
+        items:
+          type: integer
+        type: array
       totalChunkSizeBytes:
         description: TotalChunkSizeBytes is the total size of the file containing
           all chunk coefficients for the blob.
@@ -340,11 +382,6 @@ definitions:
         type: integer
       status:
         type: string
-    type: object
-  v2.BlobVerificationInfoResponse:
-    properties:
-      blob_verification_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo'
     type: object
   v2.DispersalResponse:
     properties:
@@ -415,11 +452,21 @@ definitions:
         type: boolean
       dispersal_socket:
         type: string
+      dispersal_status:
+        type: string
       operator_id:
         type: string
       retrieval_online:
         type: boolean
       retrieval_socket:
+        type: string
+      retrieval_status:
+        type: string
+      v2_dispersal_online:
+        type: boolean
+      v2_dispersal_socket:
+        type: string
+      v2_dispersal_status:
         type: string
     type: object
   v2.OperatorStake:
@@ -492,6 +539,46 @@ paths:
       summary: Fetch batch by the batch header hash
       tags:
       - Batch
+  /batches/feed:
+    get:
+      parameters:
+      - description: 'Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
+          [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch batches starting from an interval (in seconds) before
+          the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'The maximum number of batches to fetch. System max (1000) if
+          limit <= 0 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BatchFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch batch feed
+      tags:
+      - Blob
   /blobs/{blob_key}:
     get:
       parameters:
@@ -552,7 +639,7 @@ paths:
       summary: Fetch blob certificate by blob key v2
       tags:
       - Blob
-  /blobs/{blob_key}/verification-info:
+  /blobs/{blob_key}/inclusion-info:
     get:
       parameters:
       - description: Blob key in hex string
@@ -571,7 +658,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/v2.BlobVerificationInfoResponse'
+            $ref: '#/definitions/v2.BlobInclusionInfoResponse'
         "400":
           description: 'error: Bad request'
           schema:
@@ -584,7 +671,52 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob verification info by blob key and batch header hash
+      summary: Fetch blob inclusion info by blob key and batch header hash
+      tags:
+      - Blob
+  /blobs/feed:
+    get:
+      parameters:
+      - description: 'Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
+          [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch blobs starting from an interval (in seconds) before the
+          end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Fetch blobs starting from the pagination token (exclusively).
+          Overrides the interval param if specified [default: empty]'
+        in: query
+        name: pagination_token
+        type: string
+      - description: 'The maximum number of blobs to fetch. System max (1000) if limit
+          <= 0 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob feed
       tags:
       - Blob
   /metrics/summary:

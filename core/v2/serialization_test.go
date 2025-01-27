@@ -48,8 +48,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 			ReservationPeriod: 5,
 			CumulativePayment: big.NewInt(100),
 		},
-		Signature: []byte{1, 2, 3},
-		Salt:      42,
+		Salt: 42,
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
@@ -103,16 +102,16 @@ func TestBlobCertHash(t *testing.T) {
 				ReservationPeriod: 5,
 				CumulativePayment: big.NewInt(100),
 			},
-			Signature: []byte{1, 2, 3},
-			Salt:      42,
+			Salt: 42,
 		},
+		Signature: []byte{1, 2, 3},
 		RelayKeys: []v2.RelayKey{4, 5, 6},
 	}
 
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
-	// 0x52126dcdab9cdbc69ccab962d2c77f535868528d116217c2540a125eec36fbb4 verified in solidity
-	assert.Equal(t, "52126dcdab9cdbc69ccab962d2c77f535868528d116217c2540a125eec36fbb4", hex.EncodeToString(hash[:]))
+	// 0x1db857aeead06422b8d727dc3972db6ceb04ceb87e194cb6c2389ac3015eda49 verified in solidity
+	assert.Equal(t, "1db857aeead06422b8d727dc3972db6ceb04ceb87e194cb6c2389ac3015eda49", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
@@ -132,9 +131,9 @@ func TestBlobCertSerialization(t *testing.T) {
 				ReservationPeriod: 5,
 				CumulativePayment: big.NewInt(100),
 			},
-			Signature: []byte{1, 2, 3},
-			Salt:      42,
+			Salt: 42,
 		},
+		Signature: []byte{1, 2, 3},
 		RelayKeys: []v2.RelayKey{4, 5, 6},
 	}
 

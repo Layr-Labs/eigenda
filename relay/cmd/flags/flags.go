@@ -34,11 +34,11 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_TABLE_NAME"),
 	}
-	RelayIDsFlag = cli.IntSliceFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "relay-ids"),
-		Usage:    "Relay IDs to use",
+	RelayKeysFlag = cli.IntSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-keys"),
+		Usage:    "Relay keys to use",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_IDS"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_KEYS"),
 	}
 	MaxGRPCMessageSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-grpc-message-size"),
@@ -295,7 +295,7 @@ var requiredFlags = []cli.Flag{
 	GRPCPortFlag,
 	BucketNameFlag,
 	MetadataTableNameFlag,
-	RelayIDsFlag,
+	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
 }

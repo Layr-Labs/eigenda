@@ -67,9 +67,9 @@ type Server struct {
 
 type Config struct {
 
-	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
+	// RelayKeys contains the keys of the relays that this server is willing to serve data for. If empty, the server will
 	// serve data for any shard it can.
-	RelayIDs []v2.RelayKey
+	RelayKeys []v2.RelayKey
 
 	// GRPCPort is the port that the relay server listens on.
 	GRPCPort int
@@ -153,7 +153,7 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataMaxConcurrency,
-		config.RelayIDs,
+		config.RelayKeys,
 		config.Timeouts.InternalGetMetadataTimeout,
 		v2.NewBlobVersionParameterMap(blobParams),
 		relayMetrics.MetadataCacheMetrics)
@@ -201,7 +201,7 @@ func NewServer(
 
 	return &Server{
 		config:           config,
-		logger:           logger,
+		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
@@ -232,6 +232,8 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
 	}
+
+	s.logger.Debug("GetBlob request received", "key", key.Hex())
 
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
@@ -296,8 +298,10 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
+			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
+		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 
 	finishedAuthenticating := time.Now()
@@ -336,7 +340,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		if strings.Contains(err.Error(), "internal error") {
 			return nil, api.NewErrorInternal(err.Error())
 		}
-		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
+		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
 	s.metrics.ReportChunkDataSize(requiredBandwidth)
 
@@ -467,6 +471,28 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 	}
 
 	return requiredBandwidth, nil
+}
+
+// buildInsufficientBandwidthError builds an informative error message for when there is insufficient
+// bandwidth to serve a GetChunks() request.
+func buildInsufficientGetChunksBandwidthError(
+	request *pb.GetChunksRequest,
+	requiredBandwidth int,
+	originalError error) error {
+
+	chunkCount := 0
+	for _, chunkRequest := range request.ChunkRequests {
+		if chunkRequest.GetByIndex() != nil {
+			chunkCount += len(chunkRequest.GetByIndex().ChunkIndices)
+		} else {
+			chunkCount += int(chunkRequest.GetByRange().EndIndex - chunkRequest.GetByRange().StartIndex)
+		}
+	}
+
+	blobCount := len(request.ChunkRequests)
+
+	return api.NewErrorResourceExhausted(fmt.Sprintf("unable to serve data (%d blobs, %d chunks, %d bytes): %v",
+		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.

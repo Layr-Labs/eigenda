@@ -26,8 +26,9 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) {
 	hashBlobHeader(hasher, blobCertificate.BlobHeader)
-	for _, relayID := range blobCertificate.Relays {
-		hashUint32(hasher, relayID)
+	hasher.Write(blobCertificate.Signature)
+	for _, relayKey := range blobCertificate.RelayKeys {
+		hashUint32(hasher, relayKey)
 	}
 }
 
@@ -39,7 +40,6 @@ func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) {
 	hashBlobCommitment(hasher, header.Commitment)
 	hashPaymentHeader(hasher, header.PaymentHeader)
 	hashUint32(hasher, header.Salt)
-	hasher.Write(header.Signature)
 }
 
 func hashBatchHeader(hasher hash.Hash, header *common.BatchHeader) {
