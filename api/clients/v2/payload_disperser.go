@@ -113,7 +113,7 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
-	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus, "blobKey", blobKey)
+	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey)
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
@@ -175,8 +175,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 		case <-ctx.Done():
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
-				dispgrpc.BlobStatus_CERTIFIED,
-				previousStatus,
+				dispgrpc.BlobStatus_CERTIFIED.Descriptor(),
+				previousStatus.Descriptor(),
 				ctx.Err())
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
@@ -192,8 +192,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 				pd.logger.Debug(
 					"Blob status changed",
 					"blob key", blobKey,
-					"previous status", previousStatus,
-					"new status", newStatus)
+					"previous status", previousStatus.Descriptor(),
+					"new status", newStatus.Descriptor())
 				previousStatus = newStatus
 			}
 
@@ -203,7 +203,10 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				continue
 			default:
-				return nil, fmt.Errorf("terminal dispersal failure for blobKey %v. blob status: %v", blobKey, newStatus)
+				return nil, fmt.Errorf(
+					"terminal dispersal failure for blobKey %v. blob status: %v",
+					blobKey,
+					newStatus.Descriptor())
 			}
 		}
 	}
