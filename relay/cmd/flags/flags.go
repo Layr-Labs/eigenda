@@ -150,14 +150,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND"),
-		Value:    20 * 1024 * 1024,
+		Value:    80 * 1024 * 1024,
 	}
 	GetChunkBytesBurstinessFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS"),
-		Value:    1024 * 1024 * 1024,
+		Value:    800 * 1024 * 1024,
 	}
 	MaxConcurrentGetChunkOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops"),
@@ -185,14 +185,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT"),
-		Value:    2 * 1024 * 1024,
+		Value:    40 * 1024 * 1024,
 	}
 	GetChunkBytesBurstinessClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness-client"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS_CLIENT"),
-		Value:    2 * 1024 * 1024,
+		Value:    400 * 1024 * 1024,
 	}
 	MaxConcurrentGetChunkOpsClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops-client"),
