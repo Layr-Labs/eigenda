@@ -80,7 +80,7 @@ var (
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
-		Value:    4 * 1024 * 1024 * 1024,
+		Value:    1024 * 1024 * 1024,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
