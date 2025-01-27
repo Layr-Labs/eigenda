@@ -41,3 +41,32 @@ type PayloadClientConfig struct {
 
 	Quorums []core.QuorumID
 }
+
+// PayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
+// by a PayloadRetriever
+type PayloadRetrieverConfig struct {
+	PayloadClientConfig
+
+	// The timeout duration for relay calls to retrieve blobs.
+	RelayTimeout time.Duration
+}
+
+// PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
+// by a PayloadDisperser
+type PayloadDisperserConfig struct {
+	PayloadClientConfig
+
+	// DisperseBlobTimeout is the duration after which the PayloadDisperser will time out, when trying to disperse a
+	// blob
+	DisperseBlobTimeout time.Duration
+
+	// BlobCertifiedTimeout is the duration after which the PayloadDisperser will time out, while polling
+	// the disperser for blob status, waiting for BlobStatus_CERTIFIED
+	BlobCertifiedTimeout time.Duration
+
+	// BlobStatusPollInterval is the tick rate for the PayloadDisperser to use, while polling the disperser with
+	// GetBlobStatus.
+	BlobStatusPollInterval time.Duration
+}
+
+
