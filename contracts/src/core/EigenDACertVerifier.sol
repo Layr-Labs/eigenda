@@ -40,9 +40,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V1 ///////////////////////////////
 
     /**
-     * @notice Verifies a the blob is valid for the required quorums
+     * @notice Verifies a the blob cert is valid for the required quorums
      * @param blobHeader The blob header to verify
-     * @param blobVerificationProof The blob verification proof to verify the blob against
+     * @param blobVerificationProof The blob cert verification proof to verify
      */
     function verifyDACertV1(
         BlobHeader calldata blobHeader,
@@ -58,9 +58,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies a batch of blobs for the required quorums
+     * @notice Verifies a batch of blob certs for the required quorums
      * @param blobHeaders The blob headers to verify
-     * @param blobVerificationProofs The blob verification proofs to verify the blobs against
+     * @param blobVerificationProofs The blob cert verification proofs to verify against
      */
     function verifyDACertsV1(
         BlobHeader[] calldata blobHeaders,
@@ -78,10 +78,10 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V2 ///////////////////////////////
 
     /**
-     * @notice Verifies a blob for the base required quorums and the default security thresholds
-     * @param batchHeader The batch header of the blob
-     * @param blobInclusionInfo The inclusion proof for the blob
-     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature for the blob
+     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @param batchHeader The batch header of the blob 
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
      */
     function verifyDACertV2(
         BatchHeaderV2 calldata batchHeader,
@@ -101,9 +101,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies a blob for the base required quorums and the default security thresholds
-     * @param signedBatch The signed batch to verify the blob against
-     * @param blobInclusionInfo The inclusion proof for the blob
+     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @param signedBatch The signed batch to verify the blob cert against
+     * @param blobInclusionInfo The inclusion proof for the blob cert
      */
     function verifyDACertV2FromSignedBatch(
         SignedBatch calldata signedBatch,
@@ -125,7 +125,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 
     /**
-     * @notice Returns the nonSignerStakesAndSignature for a given blob and signed batch
+     * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      */
     function getNonSignerStakesAndSignature(
@@ -139,27 +139,27 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies the security parameters for a blob
+     * @notice Verifies the security parameters for a blob cert
      * @param blobParams The blob params to verify 
      * @param securityThresholds The security thresholds to verify against
      */
-    function verifyBlobSecurityParams(
+    function verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) external view {
-        EigenDACertVerificationUtils._verifyBlobSecurityParams(blobParams, securityThresholds);
+        EigenDACertVerificationUtils._verifyDACertSecurityParams(blobParams, securityThresholds);
     }
 
     /**
-     * @notice Verifies the security parameters for a blob
+     * @notice Verifies the security parameters for a blob cert
      * @param version The version of the blob to verify
      * @param securityThresholds The security thresholds to verify against
      */
-    function verifyBlobSecurityParams(
+    function verifyDACertSecurityParams(
         uint16 version,
         SecurityThresholds memory securityThresholds
     ) external view {
-        EigenDACertVerificationUtils._verifyBlobSecurityParams(getBlobParams(version), securityThresholds);
+        EigenDACertVerificationUtils._verifyDACertSecurityParams(getBlobParams(version), securityThresholds);
     }
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index

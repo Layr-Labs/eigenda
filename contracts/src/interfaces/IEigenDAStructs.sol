@@ -90,7 +90,7 @@ struct BlobCommitment {
     BN254.G1Point commitment;
     BN254.G2Point lengthCommitment;
     BN254.G2Point lengthProof;
-    uint32 dataLength;
+    uint32 length;
 }
 
 struct SignedBatch {

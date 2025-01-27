@@ -3,7 +3,7 @@ pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
 
-contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
+contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
     using BN254 for BN254.G1Point;
 
@@ -14,7 +14,7 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
         _deployDA();
     }
 
-    function test_verifyBlobV2(uint256 pseudoRandomNumber) public {
+    function test_verifyDACertV2(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 
             BlobInclusionInfo memory blobInclusionInfo, 
@@ -41,18 +41,18 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
     }
 
-    function test_verifyBlobV2_revert_RelayKeysNotSet(uint256 pseudoRandomNumber) public {
+    function test_verifyDACertV2_revert_RelayKeysNotSet(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 
             BlobInclusionInfo memory blobInclusionInfo, 
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        vm.expectRevert("EigenDABlobVerificationUtils._verifyRelayKeysSet: relay key is not set");
+        vm.expectRevert("EigenDACertVerificationUtils._verifyRelayKeysSet: relay key is not set");
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
-    function test_verifyBlobV2_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
+    function test_verifyDACertV2_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 
             BlobInclusionInfo memory blobInclusionInfo, 
@@ -61,11 +61,11 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
 
         blobInclusionInfo.inclusionProof = abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
 
-        vm.expectRevert("EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid");
+        vm.expectRevert("EigenDACertVerificationUtils._verifyDACertV2ForQuorums: inclusion proof is invalid");
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
-    function test_verifyBlobV2_revert_BadVersion(uint256 pseudoRandomNumber) public {
+    function test_verifyDACertV2_revert_BadVersion(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 
             BlobInclusionInfo memory blobInclusionInfo, 
@@ -78,7 +78,7 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
-    function test_verifyBlobV2_revert_BadSecurityParams(uint256 pseudoRandomNumber) public {
+    function test_verifyDACertV2_revert_BadSecurityParams(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 
             BlobInclusionInfo memory blobInclusionInfo, 
@@ -93,15 +93,15 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
 
         _registerRelayKeys();
 
-        vm.expectRevert("EigenDABlobVerificationUtils._verifyBlobSecurityParams: confirmationThreshold must be greater than adversaryThreshold");
+        vm.expectRevert("EigenDACertVerificationUtils._verifyDACertSecurityParams: confirmationThreshold must be greater than adversaryThreshold");
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
-    function test_verifyBlobSecurityParams() public {
+    function test_verifyDACertSecurityParams() public {
         VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
         SecurityThresholds memory securityThresholds = eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
-        eigenDACertVerifier.verifyBlobSecurityParams(blobParams, securityThresholds);
-        eigenDACertVerifier.verifyBlobSecurityParams(0, securityThresholds);
+        eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
+        eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version) internal returns (SignedBatch memory, BlobInclusionInfo memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
@@ -177,7 +177,7 @@ contract EigenDABlobVerifierV2Unit is MockEigenDADeployer {
                 commitment: BN254.G1Point(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.X"))), uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.Y")))),
                 lengthCommitment: BN254.G2Point(lengthCommitmentX, lengthCommitmentY),
                 lengthProof: BN254.G2Point(lengthProofX, lengthProofY),
-                dataLength: uint32(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.dataLength"))))
+                length: uint32(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.length"))))
             }),
             paymentHeaderHash: keccak256(abi.encode(psuedoRandomNumber, "blobHeader.paymentHeaderHash")),
             salt: uint32(uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.salt"))))
