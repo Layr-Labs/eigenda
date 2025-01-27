@@ -186,7 +186,7 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 		burstiness := l.config.GetChunkBytesBurstinessClient / 1024 / 1024
 
 		return fmt.Errorf(
-			"client rate limit %0.1fMiB (bustiness %dMiB) exceeded for GetChunk bandwidth, try again later",
+			"client rate limit %0.1fMiB (burstiness %dMiB) exceeded for GetChunk bandwidth, try again later",
 			rateLimit, burstiness)
 	}
 

@@ -125,7 +125,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := 1024 * 1024 * (1 + rand.Intn(16))
+	dataLength := int(1024 * 1024 * (1 + rand.Float64()))
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	require.Equal(t, calculateExpectedPaddedSize(dataLength), len(paddedPayload))
@@ -147,6 +147,9 @@ func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 // TODO:(dmanc): This test is failing. "Timed out waiting for blob to be confirmed"
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
+
+	t.Skipf("2mb is the max size in preprod") // TODO
+
 	rand := random.NewTestRandom(t)
 	originalSize, err := calculateOriginalSize(16 * 1024 * 1024)
 	require.NoError(t, err)
