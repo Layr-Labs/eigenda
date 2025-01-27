@@ -60,7 +60,7 @@ func RunScan(ctx *cli.Context) error {
 
 	tx, err := eth.NewReader(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("could not start eth.NewReader", err)
 	}
 	chainState := eth.NewChainState(tx, gethClient)
 
