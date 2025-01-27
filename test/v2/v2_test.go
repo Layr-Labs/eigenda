@@ -24,7 +24,7 @@ var (
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
 		KZGPath:                       "/Users/cody/ws/srs",
 		SRSOrder:                      268435456,
-		SRSNumberToLoad:               1, // 2097152 is default in production, no need to load so much for tests
+		SRSNumberToLoad:               2097152, // 2097152 is default in production, no need to load so much for tests
 	}
 
 	preprodLock   sync.Mutex
@@ -122,7 +122,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Disperse a medium payload (between 1MB and 16MB).
+// Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	dataLength := 1024 * 1024 * (1 + rand.Intn(16))
