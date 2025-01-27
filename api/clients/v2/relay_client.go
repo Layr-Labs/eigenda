@@ -251,8 +251,8 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 		}
 		c.conns.Store(key, conn)
 
-		wrappedClient := newLimitedRelayClient(relaygrpc.NewRelayClient(conn), key, c.config.MaxConcurrentRequests)
-		c.grpcClients.Store(key, wrappedClient)
+		limitedClient := newLimitedRelayClient(relaygrpc.NewRelayClient(conn), key, c.config.MaxConcurrentRequests)
+		c.grpcClients.Store(key, limitedClient)
 	})
 	return initErr
 }
