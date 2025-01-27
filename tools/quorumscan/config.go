@@ -20,6 +20,7 @@ type Config struct {
 	Timeout            time.Duration
 	UseRetrievalClient bool
 	QuorumIDs          []core.QuorumID
+	TopN               uint
 
 	ChainStateConfig thegraph.Config
 	EthClientConfig  geth.EthClientConfig
@@ -48,6 +49,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		QuorumIDs:                     quorumIDs,
 		BlockNumber:                   ctx.Uint64(flags.BlockNumberFlag.Name),
+		TopN:                          ctx.Uint(flags.TopNFlag.Name),
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -102,11 +103,23 @@ func RunScan(ctx *cli.Context) error {
 	}
 
 	quorumMetrics := quorumscan.QuorumScan(operators, operatorState, logger)
-	displayResults(quorumMetrics, operatorIdToAddress)
+	displayResults(quorumMetrics, operatorIdToAddress, config.TopN)
 	return nil
 }
 
-func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAddress map[string]string) {
+func humanizeEth(value *big.Float) string {
+	v, _ := value.Float64()
+	switch {
+	case v >= 1_000_000:
+		return fmt.Sprintf("%.2fM", v/1_000_000)
+	case v >= 1_000:
+		return fmt.Sprintf("%.2fK", v/1_000)
+	default:
+		return fmt.Sprintf("%.2f", v)
+	}
+}
+
+func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAddress map[string]string, topN uint) {
 	weiToEth := new(big.Float).SetFloat64(1e18)
 
 	// Create sorted list of quorums
@@ -121,7 +134,11 @@ func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAdd
 	for _, quorum := range quorums {
 		tw := table.NewWriter()
 		rowAutoMerge := table.RowConfig{AutoMerge: true}
-		tw.AppendHeader(table.Row{"QUORUM", "OPERATOR", "ADDRESS", "STAKE", "STAKE PCT"}, rowAutoMerge)
+		operatorHeader := "OPERATOR"
+		if topN > 0 {
+			operatorHeader = "TOP " + strconv.Itoa(int(topN)) + " OPERATORS"
+		}
+		tw.AppendHeader(table.Row{"QUORUM", operatorHeader, "ADDRESS", "STAKE", "STAKE"}, rowAutoMerge)
 
 		total_operators := 0
 		total_stake_pct := 0.0
@@ -143,15 +160,19 @@ func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAdd
 		})
 
 		for _, op := range operators {
+			if topN > 0 && uint(total_operators) >= topN {
+				break
+			}
 			stakeInEth := new(big.Float).Quo(new(big.Float).SetFloat64(op.stake), weiToEth)
+			stakeInEth.SetPrec(64)
 			total_operators += 1
 			total_stake.Add(total_stake, stakeInEth)
 			total_stake_pct += op.pct
 
-			tw.AppendRow(table.Row{quorum, op.id, operatorIdToAddress[op.id], stakeInEth, op.pct})
-			//fmt.Printf("Quorum %d %s %.2f ETH %.2f%%\n", quorum, op.id, stakeInEth, op.pct)
+			tw.AppendRow(table.Row{quorum, op.id, operatorIdToAddress[op.id], humanizeEth(stakeInEth), fmt.Sprintf("%.2f%%", op.pct)})
 		}
-		tw.AppendFooter(table.Row{"TOTAL", total_operators, total_operators, total_stake, total_stake_pct})
+		total_stake.SetPrec(64)
+		tw.AppendFooter(table.Row{"TOTAL", total_operators, total_operators, humanizeEth(total_stake), fmt.Sprintf("%.2f%%", total_stake_pct)})
 		tw.SetColumnConfigs([]table.ColumnConfig{
 			{Number: 1, AutoMerge: true},
 		})

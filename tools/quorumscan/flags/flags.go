@@ -41,6 +41,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "QUORUM_IDS"),
 		Value:    "0,1,2",
 	}
+	TopNFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "top"),
+		Usage:    "Show only top N operators by stake",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "TOP"),
+		Value:    0,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -51,6 +58,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	BlockNumberFlag,
 	QuorumIDsFlag,
+	TopNFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
