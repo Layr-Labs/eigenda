@@ -6,8 +6,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 )
 
-// EigenDAClientConfig contains configuration values for EigenDAClient
-type EigenDAClientConfig struct {
+// PayloadRetrieverConfig contains configuration values for a PayloadRetriever
+type PayloadRetrieverConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
