@@ -32,13 +32,17 @@ type limitedRelayClient struct {
 func newLimitedRelayClient(
 	client relaygrpc.RelayClient,
 	relayKey corev2.RelayKey,
-	maxConcurrentRequests uint) *limitedRelayClient {
+	maxConcurrentRequests uint) (*limitedRelayClient, error) {
+
+	if maxConcurrentRequests == 0 {
+		return nil, fmt.Errorf("maxConcurrentRequests must be greater than 0")
+	}
 
 	return &limitedRelayClient{
 		client:   client,
 		relayKey: relayKey,
 		permits:  make(chan struct{}, maxConcurrentRequests),
-	}
+	}, nil
 }
 
 func (l *limitedRelayClient) GetBlob(
