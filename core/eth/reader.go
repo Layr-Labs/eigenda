@@ -527,6 +527,21 @@ func (t *Reader) BatchOperatorIDToAddress(ctx context.Context, operatorIds []cor
 	return addresses, nil
 }
 
+func (t *Reader) BatchOperatorAddressToID(ctx context.Context, addresses []gethcommon.Address) ([]core.OperatorID, error) {
+	ids, err := t.bindings.OpStateRetriever.GetBatchOperatorId(&bind.CallOpts{
+		Context: ctx,
+	}, t.bindings.RegCoordinatorAddr, addresses)
+	if err != nil {
+		t.logger.Error("Failed to get operator IDs in batch", "err", err)
+		return nil, err
+	}
+	operatorIds := make([]core.OperatorID, len(ids))
+	for i, id := range ids {
+		operatorIds[i] = core.OperatorID(id)
+	}
+	return operatorIds, nil
+}
+
 func (t *Reader) GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId core.OperatorID) (*big.Int, error) {
 	return t.bindings.RegistryCoordinator.GetCurrentQuorumBitmap(&bind.CallOpts{
 		Context: ctx,
