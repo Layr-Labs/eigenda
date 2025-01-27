@@ -286,7 +286,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
-	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth, operatorID)
+	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {

@@ -152,7 +152,7 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 			Name:      "get_chunks_bandwidth_bytes",
 			Help:      "Running total bandwidth used in GetChunks requests.",
 		},
-		[]string{"requester"},
+		[]string{},
 	)
 
 	getChunksRequestedBandwidth := promauto.With(registry).NewCounterVec(
@@ -161,7 +161,7 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 			Name:      "get_chunks_requested_bandwidth_bytes",
 			Help:      "Running total requested bandwidth in GetChunks requests (prior to throttling).",
 		},
-		[]string{"requester"},
+		[]string{},
 	)
 
 	getBlobLatency := promauto.With(registry).NewSummaryVec(
@@ -294,9 +294,9 @@ func (m *RelayMetrics) ReportChunkKeyCount(count int) {
 	m.getChunksKeyCount.WithLabelValues().Set(float64(count))
 }
 
-func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int, requesterID string) {
-	m.getChunksBandwidth.WithLabelValues("global").Add(float64(size))
-	m.getChunksBandwidth.WithLabelValues(requesterID).Add(float64(size))
+func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int) {
+	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
+	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
 }
 
 func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int, requesterID string) {
