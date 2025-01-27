@@ -29,14 +29,14 @@ contracts="PaymentVault \
   OperatorStateRetriever \
   RegistryCoordinator \
   BLSApkRegistry \
-  IndexRegistry \
+  IIndexRegistry \
   StakeRegistry \
   BN254 \
   EigenDAServiceManager \
   IEigenDAServiceManager \
   MockRollup \
   EjectionManager \
-  EigenDABlobVerifier \
+  EigenDACertVerifier \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
