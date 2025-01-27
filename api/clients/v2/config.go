@@ -37,9 +37,11 @@ type PayloadClientConfig struct {
 	// The timeout duration for contract calls
 	ContractCallTimeout time.Duration
 
+	// The BlobVersion to use when creating new blobs, or interpreting blob bytes.
+	//
+	// BlobVersion needs to point to a version defined in the threshold registry contract.
+	// https://github.com/Layr-Labs/eigenda/blob/3ed9ef6ed3eb72c46ce3050eb84af28f0afdfae2/contracts/src/interfaces/IEigenDAThresholdRegistry.sol#L6
 	BlobVersion v2.BlobVersion
-
-	Quorums []core.QuorumID
 }
 
 // PayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -67,6 +69,6 @@ type PayloadDisperserConfig struct {
 	// BlobStatusPollInterval is the tick rate for the PayloadDisperser to use, while polling the disperser with
 	// GetBlobStatus.
 	BlobStatusPollInterval time.Duration
+
+	Quorums []core.QuorumID
 }
-
-
