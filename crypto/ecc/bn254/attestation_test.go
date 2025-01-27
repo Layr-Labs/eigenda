@@ -1,4 +1,4 @@
-package bn_test
+package bn254_test
 
 import (
 	"math/big"
