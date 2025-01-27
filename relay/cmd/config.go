@@ -62,7 +62,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			MetadataMaxConcurrency:     ctx.Int(flags.MetadataMaxConcurrencyFlag.Name),
 			BlobCacheBytes:             ctx.Uint64(flags.BlobCacheBytes.Name),
 			BlobMaxConcurrency:         ctx.Int(flags.BlobMaxConcurrencyFlag.Name),
-			ChunkCacheSize:             ctx.Uint64(flags.ChunkCacheSizeFlag.Name),
+			ChunkCacheBytes:            ctx.Uint64(flags.ChunkCacheBytesFlag.Name),
 			ChunkMaxConcurrency:        ctx.Int(flags.ChunkMaxConcurrencyFlag.Name),
 			MaxKeysPerGetChunksRequest: ctx.Int(flags.MaxKeysPerGetChunksRequestFlag.Name),
 			RateLimits: limiter.Config{

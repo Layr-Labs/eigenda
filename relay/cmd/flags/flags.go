@@ -75,11 +75,11 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	ChunkCacheSizeFlag = cli.Int64Flag{
-		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-size"),
+	ChunkCacheBytesFlag = cli.Int64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-bytes"),
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_SIZE"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
 		Value:    4 * 1024 * 1024 * 1024,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
@@ -306,7 +306,7 @@ var optionalFlags = []cli.Flag{
 	MetadataMaxConcurrencyFlag,
 	BlobCacheBytes,
 	BlobMaxConcurrencyFlag,
-	ChunkCacheSizeFlag,
+	ChunkCacheBytesFlag,
 	ChunkMaxConcurrencyFlag,
 	MaxKeysPerGetChunksRequestFlag,
 	MaxGetBlobOpsPerSecondFlag,
