@@ -15,7 +15,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// PayloadDisperser provides the ability to disperse payloads to EigenDA
+// PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
@@ -84,7 +84,7 @@ func BuildPayloadDisperser(
 //  2. Disperse the blob
 //  3. Poll the disperser with GetBlobStatus until a terminal status is reached, or until the polling timeout is reached
 //  4. Construct an EigenDACert if dispersal is successful
-//  5. Verify the constructed cert with a call to an ethereum contract
+//  5. Verify the constructed cert with an eth_call to the EigenDACertVerifier contract
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,

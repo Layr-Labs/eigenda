@@ -13,7 +13,7 @@ type PayloadClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
-	// The Ethereum RPC URL to use for querying the Ethereum blockchain.
+	// The Ethereum RPC URL to use for querying an Ethereum network
 	EthRpcUrl string
 
 	// The address of the EigenDACertVerifier contract
