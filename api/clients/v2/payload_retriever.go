@@ -107,7 +107,7 @@ func (pr *PayloadRetriever) GetPayload(
 
 	err := pr.verifyCertWithTimeout(ctx, eigenDACert)
 	if err != nil {
-		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
+		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey.Hex(), err)
 	}
 
 	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
@@ -136,7 +136,11 @@ func (pr *PayloadRetriever) GetPayload(
 		blob, err := pr.getBlobWithTimeout(ctx, relayKey, blobKey)
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
-			pr.log.Warn("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
+			pr.log.Warn(
+				"blob couldn't be retrieved from relay",
+				"blobKey", blobKey.Hex(),
+				"relayKey", relayKey,
+				"error", err)
 			continue
 		}
 
@@ -156,14 +160,14 @@ func (pr *PayloadRetriever) GetPayload(
 					but could potentially indicate a maliciously generated blob certificate.
 					It should not be possible for an honestly generated certificate to verify
 					for an invalid blob!`,
-				"blobKey", blobKey, "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
+				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
 
 		return payload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey, relayKeyCount)
+	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
 // verifyBlobAgainstCert verifies the blob received from a relay against the certificate.
@@ -183,7 +187,7 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 
 	// An honest relay should never send an empty blob
 	if len(blob) == 0 {
-		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey, relayKey)
+		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey.Hex(), relayKey)
 	}
 
 	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
@@ -192,13 +196,13 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	if err != nil {
 		return fmt.Errorf(
 			"generate and compare commitment for blob %v received from relay %v: %w",
-			blobKey,
+			blobKey.Hex(),
 			relayKey,
 			err)
 	}
 
 	if !valid {
-		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey, relayKey)
+		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey.Hex(), relayKey)
 	}
 
 	// Checking that the length returned by the relay is <= the length claimed in the BlobCommitments is sufficient
@@ -209,7 +213,7 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	if uint(len(blob)) > blobLength*encoding.BYTES_PER_SYMBOL {
 		return fmt.Errorf(
 			"length for blob %v (%d bytes) received from relay %v is greater than claimed blob length (%d bytes)",
-			blobKey,
+			blobKey.Hex(),
 			len(blob),
 			relayKey,
 			blobLength*encoding.BYTES_PER_SYMBOL)

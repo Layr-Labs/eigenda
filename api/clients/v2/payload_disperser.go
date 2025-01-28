@@ -113,7 +113,7 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
-	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey)
+	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
@@ -121,7 +121,7 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
-	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey)
+	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
 	if err != nil {
@@ -133,9 +133,9 @@ func (pd *PayloadDisperser) SendPayload(
 	defer cancel()
 	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
 	if err != nil {
-		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey, err)
+		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
-	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey)
+	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
 }
@@ -183,7 +183,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
 			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
 			if err != nil {
-				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey)
+				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
 			}
 
@@ -191,7 +191,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			if newStatus != previousStatus {
 				pd.logger.Debug(
 					"Blob status changed",
-					"blob key", blobKey,
+					"blob key", blobKey.Hex(),
 					"previous status", previousStatus.Descriptor(),
 					"new status", newStatus.Descriptor())
 				previousStatus = newStatus
@@ -205,7 +205,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			default:
 				return nil, fmt.Errorf(
 					"terminal dispersal failure for blobKey %v. blob status: %v",
-					blobKey,
+					blobKey.Hex(),
 					newStatus.Descriptor())
 			}
 		}
@@ -227,13 +227,13 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
-	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey)
+	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey.Hex())
 
 	eigenDACert, err := verification.BuildEigenDACert(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigen da cert: %w", err)
 	}
-	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey)
+	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
 }
