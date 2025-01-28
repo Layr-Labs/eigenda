@@ -447,6 +447,7 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
+	RelayMaxGRPCMessageSizeFlag,
 }
 
 func init() {

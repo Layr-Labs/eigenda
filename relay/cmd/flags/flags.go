@@ -67,7 +67,7 @@ var (
 		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    units.GiB,
+		Value:    8 * units.GiB,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
