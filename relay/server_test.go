@@ -31,7 +31,7 @@ func defaultConfig() *Config {
 		MetadataMaxConcurrency:     32,
 		BlobCacheBytes:             1024 * 1024,
 		BlobMaxConcurrency:         32,
-		ChunkCacheSize:             1024 * 1024,
+		ChunkCacheBytes:            1024 * 1024,
 		ChunkMaxConcurrency:        32,
 		MaxKeysPerGetChunksRequest: 1024,
 		AuthenticationKeyCacheSize: 1024,

@@ -78,9 +78,13 @@ type (
 		InclusionInfo *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
 	}
 
+	BlobInfo struct {
+		BlobKey      string                    `json:"blob_key"`
+		BlobMetadata *disperserv2.BlobMetadata `json:"blob_metadata"`
+	}
 	BlobFeedResponse struct {
-		Blobs           []*disperserv2.BlobMetadata `json:"blobs"`
-		PaginationToken string                      `json:"pagination_token"`
+		Blobs           []BlobInfo `json:"blobs"`
+		PaginationToken string     `json:"pagination_token"`
 	}
 
 	BatchResponse struct {
@@ -212,17 +216,17 @@ func (s *ServerV2) Start() error {
 
 	v2 := router.Group(basePath)
 	{
-		blob := v2.Group("/blob")
+		blobs := v2.Group("/blobs")
 		{
-			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
-			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
-			blob.GET("/blobs/:blob_key/certificate", s.FetchBlobCertificateHandler)
-			blob.GET("/blobs/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
+			blobs.GET("/feed", s.FetchBlobFeedHandler)
+			blobs.GET("/:blob_key", s.FetchBlobHandler)
+			blobs.GET("/:blob_key/certificate", s.FetchBlobCertificateHandler)
+			blobs.GET("/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
 		}
-		batch := v2.Group("/batch")
+		batches := v2.Group("/batches")
 		{
-			batch.GET("/batches/feed", s.FetchBatchFeedHandler)
-			batch.GET("/batches/:batch_header_hash", s.FetchBatchHandler)
+			batches.GET("/feed", s.FetchBatchFeedHandler)
+			batches.GET("/:batch_header_hash", s.FetchBatchHandler)
 		}
 		operators := v2.Group("/operators")
 		{
@@ -435,8 +439,19 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 	if paginationToken != nil {
 		token = paginationToken.ToCursorKey()
 	}
+	blobInfo := make([]BlobInfo, len(blobs))
+	for i := 0; i < len(blobs); i++ {
+		bk, err := blobs[i].BlobHeader.BlobKey()
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobFeedHandler")
+			errorResponse(c, fmt.Errorf("failed to serialize blob key: %w", err))
+			return
+		}
+		blobInfo[i].BlobKey = bk.Hex()
+		blobInfo[i].BlobMetadata = blobs[i]
+	}
 	response := &BlobFeedResponse{
-		Blobs:           blobs,
+		Blobs:           blobInfo,
 		PaginationToken: token,
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"

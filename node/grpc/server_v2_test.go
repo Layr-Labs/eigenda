@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
@@ -118,7 +118,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
-	resp, err := c.server.GetNodeInfo(context.Background(), &pbv2.GetNodeInfoRequest{})
+	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
 	assert.True(t, resp.Semver == "0.0.0")
 	assert.True(t, err == nil)
 }
@@ -127,10 +127,10 @@ func TestV2ServerWithoutV2(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = false
 	c := newTestComponents(t, config)
-	_, err := c.server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{})
+	_, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{})
 	requireErrorStatus(t, err, codes.InvalidArgument)
 
-	_, err = c.server.GetChunks(context.Background(), &pbv2.GetChunksRequest{})
+	_, err = c.server.GetChunks(context.Background(), &validator.GetChunksRequest{})
 	requireErrorStatus(t, err, codes.InvalidArgument)
 }
 
@@ -142,13 +142,13 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 	batchProto, err := batch.ToProtobuf()
 	require.NoError(t, err)
 
-	req := &pbv2.StoreChunksRequest{
+	req := &validator.StoreChunksRequest{
 		Batch: &pbcommon.Batch{},
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatus(t, err, codes.InvalidArgument)
 
-	req = &pbv2.StoreChunksRequest{
+	req = &validator.StoreChunksRequest{
 		Batch: &pbcommon.Batch{
 			Header:           &pbcommon.BatchHeader{},
 			BlobCertificates: batchProto.BlobCertificates,
@@ -157,7 +157,7 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatus(t, err, codes.InvalidArgument)
 
-	req = &pbv2.StoreChunksRequest{
+	req = &validator.StoreChunksRequest{
 		Batch: &pbcommon.Batch{
 			Header:           batchProto.Header,
 			BlobCertificates: []*pbcommon.BlobCertificate{},
@@ -206,7 +206,7 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, nil)
-	reply, err := c.server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{
+	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		Batch: batchProto,
 	})
 	require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	relayErr := errors.New("error")
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
-	reply, err := c.server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{
+	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		Batch: batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
@@ -280,7 +280,7 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, errors.New("error"))
-	reply, err := c.server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{
+	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		Batch: batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
@@ -327,7 +327,7 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return([]kvstore.Key{mockKey{}}, nil)
 	c.store.On("DeleteKeys", mock.Anything, mock.Anything).Return(nil)
-	reply, err := c.server.StoreChunks(context.Background(), &pbv2.StoreChunksRequest{
+	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		Batch: batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
@@ -341,7 +341,7 @@ func TestV2GetChunksInputValidation(t *testing.T) {
 	config.EnableV2 = true
 	c := newTestComponents(t, config)
 	ctx := context.Background()
-	req := &pbv2.GetChunksRequest{
+	req := &validator.GetChunksRequest{
 		BlobKey: []byte{0},
 	}
 	_, err := c.server.GetChunks(ctx, req)
@@ -349,7 +349,7 @@ func TestV2GetChunksInputValidation(t *testing.T) {
 
 	bk := [32]byte{0}
 	maxUInt32 := uint32(0xFFFFFFFF)
-	req = &pbv2.GetChunksRequest{
+	req = &validator.GetChunksRequest{
 		BlobKey:  bk[:],
 		QuorumId: maxUInt32,
 	}

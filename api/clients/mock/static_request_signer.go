@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	v2 "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	"github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/node/auth"
 )
 
@@ -24,7 +24,7 @@ func NewStaticRequestSigner(key *ecdsa.PrivateKey) clients.DispersalRequestSigne
 
 func (s *staticRequestSigner) SignStoreChunksRequest(
 	ctx context.Context,
-	request *v2.StoreChunksRequest) ([]byte, error) {
+	request *validator.StoreChunksRequest) ([]byte, error) {
 
 	return auth.SignStoreChunksRequest(s.key, request)
 }

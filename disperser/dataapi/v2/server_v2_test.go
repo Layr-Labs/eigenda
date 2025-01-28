@@ -429,8 +429,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
-			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
@@ -443,8 +443,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
-			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
@@ -455,12 +455,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, numBlobs, len(response.Blobs))
 		// First 3 blobs ordered by key due to same timestamp
-		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
-		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
-		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[2].BlobMetadata.BlobHeader)
 		for i := 3; i < numBlobs; i++ {
-			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
@@ -474,8 +474,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
-			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[41+i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[41+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
@@ -495,8 +495,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
-			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[43+i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
@@ -507,8 +507,8 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
-			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobHeader)
-			assert.Equal(t, requestedAt[63+i], response.Blobs[i].RequestedAt)
+			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[63+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
@@ -527,10 +527,10 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 2, len(response.Blobs))
-		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobHeader)
-		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobHeader)
-		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
-		assert.Equal(t, firstBlobTime, response.Blobs[1].RequestedAt)
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[0].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobMetadata.BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
+		assert.Equal(t, firstBlobTime, response.Blobs[1].BlobMetadata.RequestedAt)
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
 
@@ -542,12 +542,12 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		// 1. Last same-timestamp blob
 		// 2. Following blobs with sequential timestamps
 		require.Equal(t, 3, len(response.Blobs))
-		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobHeader)
-		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobHeader)
-		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobHeader)
-		assert.Equal(t, firstBlobTime, response.Blobs[0].RequestedAt)
-		assert.Equal(t, requestedAt[3], response.Blobs[1].RequestedAt)
-		assert.Equal(t, requestedAt[4], response.Blobs[2].RequestedAt)
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[0].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, keys[3], response.Blobs[1].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, keys[4], response.Blobs[2].BlobMetadata.BlobHeader)
+		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
+		assert.Equal(t, requestedAt[3], response.Blobs[1].BlobMetadata.RequestedAt)
+		assert.Equal(t, requestedAt[4], response.Blobs[2].BlobMetadata.RequestedAt)
 		assert.True(t, len(response.PaginationToken) > 0)
 		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
 	})

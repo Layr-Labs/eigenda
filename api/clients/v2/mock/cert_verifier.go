@@ -5,7 +5,7 @@ package mock
 import (
 	"context"
 
-	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/stretchr/testify/mock"
 
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -19,23 +19,23 @@ type MockCertVerifier struct {
 }
 
 // GetNonSignerStakesAndSignature provides a mock function with given fields: ctx, signedBatch
-func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, signedBatch *v2.SignedBatch) (*contractEigenDABlobVerifier.NonSignerStakesAndSignature, error) {
+func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, signedBatch *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error) {
 	ret := _m.Called(ctx, signedBatch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNonSignerStakesAndSignature")
 	}
 
-	var r0 *contractEigenDABlobVerifier.NonSignerStakesAndSignature
+	var r0 *contractEigenDACertVerifier.NonSignerStakesAndSignature
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) (*contractEigenDABlobVerifier.NonSignerStakesAndSignature, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error)); ok {
 		return rf(ctx, signedBatch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) *contractEigenDABlobVerifier.NonSignerStakesAndSignature); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) *contractEigenDACertVerifier.NonSignerStakesAndSignature); ok {
 		r0 = rf(ctx, signedBatch)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*contractEigenDABlobVerifier.NonSignerStakesAndSignature)
+			r0 = ret.Get(0).(*contractEigenDACertVerifier.NonSignerStakesAndSignature)
 		}
 	}
 

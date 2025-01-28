@@ -273,7 +273,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/verification-info": {
+        "/blobs/{blob_key}/inclusion-info": {
             "get": {
                 "produces": [
                     "application/json"
@@ -281,7 +281,7 @@ const docTemplateV2 = `{
                 "tags": [
                     "Blob"
                 ],
-                "summary": "Fetch blob verification info by blob key and batch header hash",
+                "summary": "Fetch blob inclusion info by blob key and batch header hash",
                 "parameters": [
                     {
                         "type": "string",
@@ -302,7 +302,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobVerificationInfoResponse"
+                            "$ref": "#/definitions/v2.BlobInclusionInfoResponse"
                         }
                     },
                     "400": {
@@ -663,12 +663,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -676,9 +670,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -712,12 +703,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -746,12 +731,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -760,9 +739,6 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -770,9 +746,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -869,6 +842,13 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "signature": {
+                    "description": "Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,\nwhich is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -899,17 +879,10 @@ const docTemplateV2 = `{
                 "salt": {
                     "description": "Salt is used to make blob intentionally unique when everything else is the same",
                     "type": "integer"
-                },
-                "signature": {
-                    "description": "Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,\nwhich is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
+        "github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo": {
             "type": "object",
             "properties": {
                 "BlobKey": {
@@ -972,12 +945,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "a0": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -1054,10 +1021,10 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "blob_verification_infos": {
+                "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
                     }
                 },
                 "signed_batch": {
@@ -1079,11 +1046,30 @@ const docTemplateV2 = `{
                 "blobs": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/v2.BlobMetadata"
+                        "$ref": "#/definitions/v2.BlobInfo"
                     }
                 },
                 "pagination_token": {
                     "type": "string"
+                }
+            }
+        },
+        "v2.BlobInclusionInfoResponse": {
+            "type": "object",
+            "properties": {
+                "blob_inclusion_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                }
+            }
+        },
+        "v2.BlobInfo": {
+            "type": "object",
+            "properties": {
+                "blob_key": {
+                    "type": "string"
+                },
+                "blob_metadata": {
+                    "$ref": "#/definitions/v2.BlobMetadata"
                 }
             }
         },
@@ -1121,6 +1107,12 @@ const docTemplateV2 = `{
                     "description": "RequestedAt is the Unix timestamp of when the blob was requested in seconds",
                     "type": "integer"
                 },
+                "signature": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "totalChunkSizeBytes": {
                     "description": "TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.",
                     "type": "integer"
@@ -1148,14 +1140,6 @@ const docTemplateV2 = `{
                 },
                 "status": {
                     "type": "string"
-                }
-            }
-        },
-        "v2.BlobVerificationInfoResponse": {
-            "type": "object",
-            "properties": {
-                "blob_verification_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
                 }
             }
         },

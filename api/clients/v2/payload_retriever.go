@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifiercontract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifiercontract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -54,7 +54,7 @@ func BuildPayloadRetriever(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	certVerifier, err := verification.NewCertVerifier(ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
+	certVerifier, err := verification.NewCertVerifier(*ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
