@@ -380,8 +380,8 @@ Once the server has accepted the payment header, a client cannot cancel or rollb
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
-| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. |
-| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer. |
+| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request. The dispersal client&#39;s account will set this value to current timestamp divided by the on-chain configured reservation period interval. The disperser server validates this value to be the period they receive this request, or from the previous period. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative payment of the dispersal request. This field will be parsed as a big integer, and must represent the total amount of tokens paid over all previous requests. The disperser server validates this value against the total on-chain deposit of the user&#39;s account, and the total amount of tokens paid over all previous requests. This is not incremental but cumulative so the requests can arrive out of order but still has clear declaration of the payment being used for the current request. |
 
 
 

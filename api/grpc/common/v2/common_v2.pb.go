@@ -321,9 +321,15 @@ type PaymentHeader struct {
 	// The account ID of the disperser client. This account ID is an eth wallet address of the user,
 	// corresponding to the key used by the client to sign the BlobHeader.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// The reservation period of the dispersal request.
+	// The reservation period of the dispersal request. The dispersal client's account will set this value to
+	// current timestamp divided by the on-chain configured reservation period interval. The disperser server validates
+	// this value to be the period they receive this request, or from the previous period.
 	ReservationPeriod uint32 `protobuf:"varint,2,opt,name=reservation_period,json=reservationPeriod,proto3" json:"reservation_period,omitempty"`
-	// The cumulative payment of the dispersal request. This field will be parsed as a big integer.
+	// The cumulative payment of the dispersal request. This field will be parsed as a big integer, and must represent
+	// the total amount of tokens paid over all previous requests. The disperser server validates this value against the
+	// total on-chain deposit of the user's account, and the total amount of tokens paid over all previous requests. This
+	// is not incremental but cumulative so the requests can arrive out of order but still has clear declaration of the
+	// payment being used for the current request.
 	CumulativePayment []byte `protobuf:"bytes,3,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
 }
 
