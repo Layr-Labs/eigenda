@@ -73,8 +73,14 @@ type relayClient struct {
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
 func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
-	if config == nil || len(config.Sockets) <= 0 {
-		return nil, fmt.Errorf("invalid config: %v", config)
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if len(config.Sockets) <= 0 {
+		return nil, errors.New("no relay sockets provided")
+	}
+	if config.MaxConcurrentRequests == 0 {
+		return nil, errors.New("maxConcurrentRequests must be greater than 0")
 	}
 
 	logger.Info("creating relay client", "urls", config.Sockets)

@@ -424,10 +424,11 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			}
 
 			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-				Sockets:           relayURLs,
-				UseSecureGrpcFlag: n.Config.UseSecureGrpc,
-				OperatorID:        &n.Config.ID,
-				MessageSigner:     n.SignMessage,
+				Sockets:               relayURLs,
+				UseSecureGrpcFlag:     n.Config.UseSecureGrpc,
+				OperatorID:            &n.Config.ID,
+				MessageSigner:         n.SignMessage,
+				MaxConcurrentRequests: n.Config.RelayConcurrency,
 			}, n.Logger)
 			if err != nil {
 				n.Logger.Error("error creating relay client", "err", err)

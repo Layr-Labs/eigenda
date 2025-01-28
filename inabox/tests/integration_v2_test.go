@@ -207,7 +207,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		// Test retrieval from relay
 		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
+			Sockets:               relays,
+			MaxConcurrentRequests: 8,
 		}, logger)
 		Expect(err).To(BeNil())
 
