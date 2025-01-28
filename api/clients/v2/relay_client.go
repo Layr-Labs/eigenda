@@ -23,6 +23,8 @@ type RelayClientConfig struct {
 	UseSecureGrpcFlag bool
 	OperatorID        *core.OperatorID
 	MessageSigner     MessageSigner
+	// MaxConcurrentRequests is the maximum number of concurrent requests to a particular relay server.
+	MaxConcurrentRequests uint
 }
 
 type ChunkRequestByRange struct {
@@ -52,6 +54,8 @@ type RelayClient interface {
 	Close() error
 }
 
+var _ RelayClient = (*relayClient)(nil)
+
 type relayClient struct {
 	config *RelayClientConfig
 
@@ -62,17 +66,21 @@ type relayClient struct {
 	conns  sync.Map
 	logger logging.Logger
 
-	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
+	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]*limitedRelayClient`
 	grpcClients sync.Map
 }
-
-var _ RelayClient = (*relayClient)(nil)
 
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
 func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
-	if config == nil || len(config.Sockets) <= 0 {
-		return nil, fmt.Errorf("invalid config: %v", config)
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+	if len(config.Sockets) <= 0 {
+		return nil, errors.New("no relay sockets provided")
+	}
+	if config.MaxConcurrentRequests == 0 {
+		return nil, errors.New("maxConcurrentRequests must be greater than 0")
 	}
 
 	logger.Info("creating relay client", "urls", config.Sockets)
@@ -214,7 +222,7 @@ func (c *relayClient) GetChunksByIndex(
 	return res.GetData(), nil
 }
 
-func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, error) {
+func (c *relayClient) getClient(key corev2.RelayKey) (*limitedRelayClient, error) {
 	if err := c.initOnceGrpcConnection(key); err != nil {
 		return nil, err
 	}
@@ -222,7 +230,7 @@ func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, err
 	if !ok {
 		return nil, fmt.Errorf("no grpc client for relay key: %v", key)
 	}
-	client, ok := maybeClient.(relaygrpc.RelayClient)
+	client, ok := maybeClient.(*limitedRelayClient)
 	if !ok {
 		return nil, fmt.Errorf("invalid grpc client for relay key: %v", key)
 	}
@@ -248,7 +256,13 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 			return
 		}
 		c.conns.Store(key, conn)
-		c.grpcClients.Store(key, relaygrpc.NewRelayClient(conn))
+
+		limitedClient, err := newLimitedRelayClient(relaygrpc.NewRelayClient(conn), key, c.config.MaxConcurrentRequests)
+		if err != nil {
+			initErr = err
+			return
+		}
+		c.grpcClients.Store(key, limitedClient)
 	})
 	return initErr
 }
