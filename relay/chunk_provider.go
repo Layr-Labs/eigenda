@@ -63,7 +63,7 @@ func newChunkProvider(
 	}
 
 	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight),
+		cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, server.computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)
@@ -80,8 +80,20 @@ type frameMap map[v2.BlobKey][]*encoding.Frame
 
 // computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
 // is equal to the size required to store the data, in bytes.
-func computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
-	return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+func (s *chunkProvider) computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
+
+	// This returns the size of the frames when serialized.
+	// The in-memory footprint is much larger, so this isn't a good proxy for cache size.
+	// return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+
+	size, err := computeInMemoryFrameSize(frames)
+
+	if err != nil {
+		s.logger.Errorf("Failed to compute frame size for blob %v: %s", key.blobKey.Hex(), err)
+		return 0
+	}
+
+	return size
 }
 
 // GetFrames retrieves the frames for a blob.
