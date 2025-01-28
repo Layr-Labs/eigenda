@@ -3,6 +3,7 @@ package relay
 import (
 	"context"
 	"encoding/binary"
+	"github.com/docker/go-units"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 func defaultConfig() *Config {
 	return &Config{
 		GRPCPort:                   50051,
-		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		MaxGRPCMessageSize:         units.MB,
 		MetadataCacheSize:          1024 * 1024,
 		MetadataMaxConcurrency:     32,
 		BlobCacheBytes:             1024 * 1024,
