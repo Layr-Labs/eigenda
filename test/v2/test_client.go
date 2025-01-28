@@ -131,8 +131,9 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	require.NoError(t, err)
 
 	relayConfig := &clients.RelayClientConfig{
-		Sockets:           relayURLS,
-		UseSecureGrpcFlag: true,
+		Sockets:            relayURLS,
+		UseSecureGrpcFlag:  true,
+		MaxGRPCMessageSize: 1024 * 1024 * 1024,
 	}
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
