@@ -3,9 +3,11 @@ package eth
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
 type ChainState struct {
@@ -87,4 +89,14 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32)
 	}
 
 	return state, nil
+}
+
+type OnchainState struct {
+	QuorumCount           uint8
+	RequiredQuorums       []core.QuorumID
+	BlobVersionParameters *corev2.BlobVersionParameterMap
+	TTL                   time.Duration
+	MaxNumSymbolsPerBlob  uint64
+
+	onchainStateRefreshInterval time.Duration
 }
