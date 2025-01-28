@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-units"
 	"os"
 	"path"
 	"strings"
@@ -133,7 +134,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	relayConfig := &clients.RelayClientConfig{
 		Sockets:            relayURLS,
 		UseSecureGrpcFlag:  true,
-		MaxGRPCMessageSize: 1024 * 1024 * 1024,
+		MaxGRPCMessageSize: units.GiB,
 	}
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
