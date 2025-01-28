@@ -23,12 +23,18 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
 
+	// Validate the request
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
 
 	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
+		return nil, err
+	}
+
+	// Check against payment meter to make sure there is quota remaining
+	if err := s.checkPaymentMeter(ctx, req); err != nil {
 		return nil, err
 	}
 
@@ -40,7 +46,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	blob := req.GetBlob()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
-		return nil, api.NewErrorInternal(err.Error())
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %w", err))
 	}
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
@@ -92,6 +98,33 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob metadata: %v", err))
 	}
 	return blobKey, err
+}
+
+func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest) error {
+	blobHeaderProto := req.GetBlobHeader()
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	if err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob header: %s", err.Error()))
+	}
+	blobLength := encoding.GetBlobLengthPowerOf2(uint(len(req.GetBlob())))
+
+	// handle payments and check rate limits
+	reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
+	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
+	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+
+	paymentHeader := core.PaymentMetadata{
+		AccountID:         accountID,
+		ReservationPeriod: reservationPeriod,
+		CumulativePayment: cumulativePayment,
+	}
+
+	err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	if err != nil {
+		return api.NewErrorResourceExhausted(err.Error())
+	}
+
+	return nil
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
@@ -162,22 +195,6 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 
 	if err = s.authenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
-	}
-
-	// handle payments and check rate limits
-	reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
-	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
-	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
-
-	paymentHeader := core.PaymentMetadata{
-		AccountID:         accountID,
-		ReservationPeriod: reservationPeriod,
-		CumulativePayment: cumulativePayment,
-	}
-
-	err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
-	if err != nil {
-		return api.NewErrorResourceExhausted(err.Error())
 	}
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
