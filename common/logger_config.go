@@ -80,6 +80,21 @@ func DefaultTextLoggerConfig() LoggerConfig {
 	}
 }
 
+// DefaultConsoleLoggerConfig returns a LoggerConfig with the default settings
+// for logging to a console (i.e. with human eyeballs). Adds color, and so should
+// not be used when logs are captured in a file.
+func DefaultConsoleLoggerConfig() LoggerConfig {
+	return LoggerConfig{
+		Format:       TextLogFormat,
+		OutputWriter: os.Stdout,
+		HandlerOpts: logging.SLoggerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+			NoColor:   false,
+		},
+	}
+}
+
 func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, error) {
 	cfg := DefaultLoggerConfig()
 	format := ctx.GlobalString(PrefixFlag(flagPrefix, FormatFlagName))

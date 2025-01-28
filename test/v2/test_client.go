@@ -27,6 +27,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	SRSPath           = "srs"
+	SRSPathG1         = SRSPath + "/g1.point"
+	SRSPathG2         = SRSPath + "/g2.point"
+	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
+	SRSPathSRSTables  = SRSPath + "/SRSTables"
+	KeyPath           = "private-key.txt"
+)
+
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	t                 *testing.T
@@ -38,27 +47,47 @@ type TestClient struct {
 }
 
 type TestClientConfig struct {
-	PrivateKeyFile                string
+	TestDataPath                  string
 	DisperserHostname             string
 	DisperserPort                 int
 	EthRPCURLs                    []string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
 	SubgraphURL                   string
-	KZGPath                       string
 	SRSOrder                      uint64
 	SRSNumberToLoad               uint64
+}
+
+// path returns the full path to a file in the test data directory.
+func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	root := strings.Replace(c.TestDataPath, "~", homeDir, 1)
+
+	combinedElements := make([]string, 0, len(elements)+1)
+	combinedElements = append(combinedElements, root)
+	combinedElements = append(combinedElements, elements...)
+
+	return path.Join(combinedElements...)
 }
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	var loggerConfig common.LoggerConfig
+	if os.Getenv("CI") != "" {
+		loggerConfig = common.DefaultLoggerConfig()
+	} else {
+		loggerConfig = common.DefaultConsoleLoggerConfig()
+	}
+
+	logger, err := common.NewLogger(loggerConfig)
 	require.NoError(t, err)
 
 	// Construct the disperser client
 
-	privateKeyFile := config.PrivateKeyFile
+	privateKeyFile := config.path(t, KeyPath)
 	privateKey, err := os.ReadFile(privateKeyFile)
 	require.NoError(t, err)
 
@@ -120,10 +149,10 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:          path.Join(config.KZGPath, "g1.point"),
-		G2Path:          path.Join(config.KZGPath, "g2.point"),
-		G2PowerOf2Path:  path.Join(config.KZGPath, "g2.point.powerOf2"),
-		CacheDir:        path.Join(config.KZGPath, "SRSTables"),
+		G1Path:          config.path(t, SRSPathG1),
+		G2Path:          config.path(t, SRSPathG2),
+		G2PowerOf2Path:  config.path(t, SRSPathG2PowerOf2),
+		CacheDir:        config.path(t, SRSPathSRSTables),
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,

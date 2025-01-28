@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -16,14 +17,13 @@ import (
 
 var (
 	preprodConfig = &TestClientConfig{
-		PrivateKeyFile:                "/users/cody/ws/keys/preprod-account.txt",
+		TestDataPath:                  "~/.test-v2",
 		DisperserHostname:             "disperser-preprod-holesky.eigenda.xyz",
 		DisperserPort:                 443,
 		EthRPCURLs:                    []string{"https://ethereum-holesky-rpc.publicnode.com"},
 		BLSOperatorStateRetrieverAddr: "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
 		EigenDAServiceManagerAddr:     "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
-		KZGPath:                       "/Users/cody/ws/srs",
 		SRSOrder:                      268435456,
 		SRSNumberToLoad:               2097152, // 2097152 is default in production, no need to load so much for tests
 	}
@@ -32,11 +32,94 @@ var (
 	preprodClient *TestClient
 )
 
+//mkdir srs
+//mkdir srs/SRSTables
+//wget https://srs-mainnet.s3.amazonaws.com/kzg/g1.point --output-document=./srs/g1.point
+//wget https://srs-mainnet.s3.amazonaws.com/kzg/g2.point --output-document=./srs/g2.point
+//wget https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2 --output-document=./srs/g2.point.powerOf2
+
+func setupFilesystem(t *testing.T, config *TestClientConfig) {
+	// Create the test data directory if it does not exist
+	err := os.MkdirAll(config.TestDataPath, 0755)
+	require.NoError(t, err)
+
+	// Create the SRS directories if they do not exist
+	err = os.MkdirAll(config.path(t, SRSPath), 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(config.path(t, SRSPathSRSTables), 0755)
+	require.NoError(t, err)
+
+	// If any of the srs files do not exist, download them.
+	filePath := config.path(t, SRSPathG1)
+	_, err = os.Stat(filePath)
+	if os.IsNotExist(err) {
+		command := make([]string, 3)
+		command[0] = "wget"
+		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
+		command[2] = "--output-document=" + filePath
+		fmt.Printf("executing %s\n", command)
+
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	filePath = config.path(t, SRSPathG2)
+	_, err = os.Stat(filePath)
+	if os.IsNotExist(err) {
+		command := make([]string, 3)
+		command[0] = "wget"
+		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
+		command[2] = "--output-document=" + filePath
+		fmt.Printf("executing %s\n", command)
+
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	filePath = config.path(t, SRSPathG2PowerOf2)
+	_, err = os.Stat(filePath)
+	if os.IsNotExist(err) {
+		command := make([]string, 3)
+		command[0] = "wget"
+		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
+		command[2] = "--output-document=" + filePath
+		fmt.Printf("executing %s\n", command)
+
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+
+	// Check to see if the private key file exists. If not, stop the test.
+	filePath = config.path(t, KeyPath)
+	_, err = os.Stat(filePath)
+	require.NoError(t, err,
+		"private key file %s does not exist. This file should "+
+			"contain the private key for the account used in the test, in hex.",
+		filePath)
+}
+
 // TODO: automatically download KZG points if they are not present
 
 func getPreprodClient(t *testing.T) *TestClient {
 	preprodLock.Lock()
 	defer preprodLock.Unlock()
+
+	setupFilesystem(t, preprodConfig)
 
 	if preprodClient == nil {
 		preprodClient = NewTestClient(t, preprodConfig)
