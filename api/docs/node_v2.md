@@ -3,29 +3,29 @@
 
 ## Table of Contents
 
-- [node/v2/node_v2.proto](#node_v2_node_v2-proto)
-    - [GetChunksReply](#node-v2-GetChunksReply)
-    - [GetChunksRequest](#node-v2-GetChunksRequest)
-    - [GetNodeInfoReply](#node-v2-GetNodeInfoReply)
-    - [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest)
-    - [StoreChunksReply](#node-v2-StoreChunksReply)
-    - [StoreChunksRequest](#node-v2-StoreChunksRequest)
+- [validator/node_v2.proto](#validator_node_v2-proto)
+    - [GetChunksReply](#validator-GetChunksReply)
+    - [GetChunksRequest](#validator-GetChunksRequest)
+    - [GetNodeInfoReply](#validator-GetNodeInfoReply)
+    - [GetNodeInfoRequest](#validator-GetNodeInfoRequest)
+    - [StoreChunksReply](#validator-StoreChunksReply)
+    - [StoreChunksRequest](#validator-StoreChunksRequest)
   
-    - [Dispersal](#node-v2-Dispersal)
-    - [Retrieval](#node-v2-Retrieval)
+    - [Dispersal](#validator-Dispersal)
+    - [Retrieval](#validator-Retrieval)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="node_v2_node_v2-proto"></a>
+<a name="validator_node_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## node/v2/node_v2.proto
+## validator/node_v2.proto
 
 
 
-<a name="node-v2-GetChunksReply"></a>
+<a name="validator-GetChunksReply"></a>
 
 ### GetChunksReply
 The response to the GetChunks() RPC.
@@ -40,7 +40,7 @@ The response to the GetChunks() RPC.
 
 
 
-<a name="node-v2-GetChunksRequest"></a>
+<a name="validator-GetChunksRequest"></a>
 
 ### GetChunksRequest
 The parameter for the GetChunks() RPC.
@@ -56,7 +56,7 @@ The parameter for the GetChunks() RPC.
 
 
 
-<a name="node-v2-GetNodeInfoReply"></a>
+<a name="validator-GetNodeInfoReply"></a>
 
 ### GetNodeInfoReply
 Node info reply
@@ -75,7 +75,7 @@ Node info reply
 
 
 
-<a name="node-v2-GetNodeInfoRequest"></a>
+<a name="validator-GetNodeInfoRequest"></a>
 
 ### GetNodeInfoRequest
 The parameter for the GetNodeInfo() RPC.
@@ -85,7 +85,7 @@ The parameter for the GetNodeInfo() RPC.
 
 
 
-<a name="node-v2-StoreChunksReply"></a>
+<a name="validator-StoreChunksReply"></a>
 
 ### StoreChunksReply
 StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
@@ -100,7 +100,7 @@ StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 
 
-<a name="node-v2-StoreChunksRequest"></a>
+<a name="validator-StoreChunksRequest"></a>
 
 ### StoreChunksRequest
 Request that the Node store a batch of chunks.
@@ -110,7 +110,7 @@ Request that the Node store a batch of chunks.
 | ----- | ---- | ----- | ----------- |
 | batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
 | disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
-| signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
+| signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
 
 Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned). A reference implementation (golang) can be found at https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
 
@@ -129,26 +129,26 @@ Note that this signature is not included in the hash for obvious reasons. |
  
 
 
-<a name="node-v2-Dispersal"></a>
+<a name="validator-Dispersal"></a>
 
 ### Dispersal
 Dispersal is utilized to disperse chunk data.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
-| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
+| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
 
 
-<a name="node-v2-Retrieval"></a>
+<a name="validator-Retrieval"></a>
 
 ### Retrieval
 Retrieval is utilized to retrieve chunk data.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
-| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | Retrieve node info metadata |
+| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata |
 
  
 

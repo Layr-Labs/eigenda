@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"google.golang.org/grpc"

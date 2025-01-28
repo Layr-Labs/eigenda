@@ -160,6 +160,24 @@ func (m *metadataProvider) UpdateBlobVersionParameters(blobParamsMap *v2.BlobVer
 	m.blobParamsMap.Store(blobParamsMap)
 }
 
+func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSizeBytes uint32) (uint32, error) {
+	blobParamsMap := m.blobParamsMap.Load()
+	if blobParamsMap == nil {
+		return 0, fmt.Errorf("blob version parameters is nil")
+	}
+
+	blobParams, ok := blobParamsMap.Get(header.BlobVersion)
+	if !ok {
+		return 0, fmt.Errorf("blob version %d not found in blob params map", header.BlobVersion)
+	}
+
+	if blobParams.NumChunks == 0 {
+		return 0, fmt.Errorf("numChunks is 0, this should never happen")
+	}
+
+	return totalChunkSizeBytes / blobParams.NumChunks, nil
+}
+
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
@@ -192,12 +210,8 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
-	blobParams, ok := blobParamsMap.Get(cert.BlobHeader.BlobVersion)
-	if !ok {
-		return nil, fmt.Errorf("blob version %d not found in blob params map", cert.BlobHeader.BlobVersion)
-	}
-	chunkSize, err := v2.GetChunkLength(blobSize, blobParams)
-	chunkSize *= encoding.BYTES_PER_SYMBOL
+
+	chunkSize, err := m.computeChunkSize(cert.BlobHeader, fragmentInfo.TotalChunkSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk length: %w", err)
 	}

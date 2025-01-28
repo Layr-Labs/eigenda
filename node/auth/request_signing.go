@@ -3,7 +3,7 @@ package auth
 import (
 	"crypto/ecdsa"
 	"fmt"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

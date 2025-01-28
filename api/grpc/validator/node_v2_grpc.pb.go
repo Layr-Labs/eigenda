@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: node/v2/node_v2.proto
+// source: validator/node_v2.proto
 
-package v2
+package validator
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Dispersal_StoreChunks_FullMethodName = "/node.v2.Dispersal/StoreChunks"
-	Dispersal_GetNodeInfo_FullMethodName = "/node.v2.Dispersal/GetNodeInfo"
+	Dispersal_StoreChunks_FullMethodName = "/validator.Dispersal/StoreChunks"
+	Dispersal_GetNodeInfo_FullMethodName = "/validator.Dispersal/GetNodeInfo"
 )
 
 // DispersalClient is the client API for Dispersal service.
@@ -141,7 +141,7 @@ func _Dispersal_GetNodeInfo_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Dispersal_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "node.v2.Dispersal",
+	ServiceName: "validator.Dispersal",
 	HandlerType: (*DispersalServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -154,12 +154,12 @@ var Dispersal_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "node/v2/node_v2.proto",
+	Metadata: "validator/node_v2.proto",
 }
 
 const (
-	Retrieval_GetChunks_FullMethodName   = "/node.v2.Retrieval/GetChunks"
-	Retrieval_GetNodeInfo_FullMethodName = "/node.v2.Retrieval/GetNodeInfo"
+	Retrieval_GetChunks_FullMethodName   = "/validator.Retrieval/GetChunks"
+	Retrieval_GetNodeInfo_FullMethodName = "/validator.Retrieval/GetNodeInfo"
 )
 
 // RetrievalClient is the client API for Retrieval service.
@@ -274,7 +274,7 @@ func _Retrieval_GetNodeInfo_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Retrieval_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "node.v2.Retrieval",
+	ServiceName: "validator.Retrieval",
 	HandlerType: (*RetrievalServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -287,5 +287,5 @@ var Retrieval_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "node/v2/node_v2.proto",
+	Metadata: "validator/node_v2.proto",
 }
