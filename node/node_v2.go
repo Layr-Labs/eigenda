@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
+
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/gammazero/workerpool"
@@ -57,6 +58,12 @@ func (n *Node) DownloadBundles(
 	rawBundles := make([]*RawBundles, len(batch.BlobCertificates))
 	requests := make(map[corev2.RelayKey]*relayRequest)
 	for i, cert := range batch.BlobCertificates {
+
+		// err := n.validateDispersalRequest(ctx, cert, n.onchainState.Load())
+		// if err != nil {
+		// 	return nil, nil, fmt.Errorf("failed to validate dispersal request: %v", err)
+		// }
+
 		blobKey, err := cert.BlobHeader.BlobKey()
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get blob key: %v", err)
@@ -186,3 +193,77 @@ func (n *Node) ValidateBatchV2(
 	blobVersionParams := n.BlobVersionParams.Load()
 	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, pool, operatorState)
 }
+
+// func (n *Node) validateDispersalRequest(ctx context.Context, blobCert *corev2.BlobCertificate, onchainState *eth.OnchainState) error {
+// 	if len(blobCert.Signature) != 65 {
+// 		return api.NewErrorInvalidArg(fmt.Sprintf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature)))
+// 	}
+
+// 	blobLength := blobCert.BlobHeader.BlobCommitments.Length
+// 	if blobLength == 0 {
+// 		return api.NewErrorInvalidArg("blob length must be greater than 0")
+// 	}
+// 	if blobLength > uint(onchainState.MaxNumSymbolsPerBlob) {
+// 		return api.NewErrorInvalidArg("blob length too big")
+// 	}
+// 	if blobLength != encoding.NextPowerOf2(blobLength) {
+// 		return api.NewErrorInvalidArg("invalid blob length, must be a power of 2")
+// 	}
+
+// 	blobHeader := blobCert.BlobHeader
+// 	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+// 		return api.NewErrorInvalidArg("payment metadata is required")
+// 	}
+
+// 	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0) {
+// 		return api.NewErrorInvalidArg("invalid payment metadata")
+// 	}
+
+// 	quorumNumbers := blobHeader.QuorumNumbers
+// 	if len(quorumNumbers) == 0 {
+// 		return api.NewErrorInvalidArg("blob header must contain at least one quorum number")
+// 	}
+
+// 	if len(quorumNumbers) > int(onchainState.QuorumCount) {
+// 		return api.NewErrorInvalidArg(fmt.Sprintf("too many quorum numbers specified: maximum is %d", onchainState.QuorumCount))
+// 	}
+
+// 	for _, quorum := range quorumNumbers {
+// 		if quorum > corev2.MaxQuorumID || uint8(quorum) >= onchainState.QuorumCount {
+// 			return api.NewErrorInvalidArg(fmt.Sprintf("invalid quorum number %d; maximum is %d", quorum, onchainState.QuorumCount))
+// 		}
+// 	}
+
+// 	// // validate every 32 bytes is a valid field element
+// 	// _, err = rs.ToFrArray(blob)
+// 	// if err != nil {
+// 	// 	s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
+// 	// 	return api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+// 	// }
+
+// 	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeader.BlobVersion)); !ok {
+// 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeader.BlobVersion, onchainState.BlobVersionParameters.Keys()))
+// 	}
+
+// 	if err := n.authenticator.AuthenticateBlobRequest(blobHeader, blobCert.Signature); err != nil {
+// 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+// 	}
+
+// 	// handle payments and check rate limits
+// 	timestamp := blobHeader.PaymentMetadata.Timestamp
+// 	cumulativePayment := blobHeader.PaymentMetadata.CumulativePayment
+// 	accountID := blobHeader.PaymentMetadata.AccountID
+
+// 	paymentHeader := core.PaymentMetadata{
+// 		AccountID:         accountID,
+// 		Timestamp:         timestamp,
+// 		CumulativePayment: cumulativePayment,
+// 	}
+
+// 	if err := n.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers); err != nil {
+// 		return api.NewErrorResourceExhausted(err.Error())
+// 	}
+
+// 	// should node run prover here? doesn't have data yet though
+// 	return nil
+// }

@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -86,6 +88,12 @@ type Node struct {
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	chainReader   core.Reader
+	meterer       *meterer.Meterer
+	authenticator corev2.BlobRequestAuthenticator
+
+	prover encoding.Prover
 }
 
 // NewNode creates a new Node with the provided config.
