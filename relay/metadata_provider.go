@@ -171,6 +171,10 @@ func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSiz
 		return 0, fmt.Errorf("blob version %d not found in blob params map", header.BlobVersion)
 	}
 
+	if blobParams.NumChunks == 0 {
+		return 0, fmt.Errorf("numChunks is 0, this should never happen")
+	}
+
 	return totalChunkSizeBytes / blobParams.NumChunks, nil
 }
 

@@ -89,7 +89,7 @@ func (s *chunkProvider) computeFramesCacheWeight(key blobKeyWithMetadata, frames
 	size, err := computeInMemoryFrameSize(frames)
 
 	if err != nil {
-		s.logger.Errorf("Failed to compute frame size for blob %v: %v", key.blobKey.Hex(), err)
+		s.logger.Errorf("Failed to compute frame size for blob %v: %s", key.blobKey.Hex(), err)
 		return 0
 	}
 

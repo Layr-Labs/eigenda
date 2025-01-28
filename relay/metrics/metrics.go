@@ -296,11 +296,9 @@ func (m *RelayMetrics) ReportChunkKeyCount(count int) {
 
 func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int) {
 	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
-	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
 }
 
 func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int) {
-	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 }
 
