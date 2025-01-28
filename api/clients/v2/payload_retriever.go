@@ -29,7 +29,7 @@ type PayloadRetriever struct {
 	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
 	// must be evaluated for thread safety.
 	random       *rand.Rand
-	config       *PayloadRetrieverConfig
+	config       PayloadRetrieverConfig
 	codec        codecs.BlobCodec
 	relayClient  RelayClient
 	g1Srs        []bn254.G1Affine
@@ -39,7 +39,7 @@ type PayloadRetriever struct {
 // BuildPayloadRetriever builds a PayloadRetriever from config structs.
 func BuildPayloadRetriever(
 	log logging.Logger,
-	payloadRetrieverConfig *PayloadRetrieverConfig,
+	payloadRetrieverConfig PayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
 	relayClientConfig *RelayClientConfig,
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
@@ -78,11 +78,16 @@ func BuildPayloadRetriever(
 func NewPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
-	payloadRetrieverConfig *PayloadRetrieverConfig,
+	payloadRetrieverConfig PayloadRetrieverConfig,
 	relayClient RelayClient,
 	certVerifier verification.ICertVerifier,
 	codec codecs.BlobCodec,
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
+
+	err := payloadRetrieverConfig.checkAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set PayloadRetrieverConfig config: %w", err)
+	}
 
 	return &PayloadRetriever{
 		log:          log,

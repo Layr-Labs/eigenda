@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -78,4 +79,117 @@ type PayloadDisperserConfig struct {
 	//  `CustomQuorums`, and we simply append any values contained onto [0, 1]? Or should we require users to include 0
 	//  and 1 here, and throw an error if they don't?
 	Quorums []core.QuorumID
+}
+
+// GetDefaultPayloadClientConfig creates a PayloadClientConfig with default values
+//
+// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+func getDefaultPayloadClientConfig() *PayloadClientConfig {
+	return &PayloadClientConfig{
+		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
+		PayloadPolynomialForm: codecs.PolynomialFormEval,
+		ContractCallTimeout:   5 * time.Second,
+		BlobVersion:           0,
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct and performs the following actions:
+//
+// 1. If a config value is 0, and a 0 value makes sense, do nothing.
+// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
+// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+func (cc *PayloadClientConfig) checkAndSetDefaults() error {
+	// BlobEncodingVersion may be 0, so don't do anything
+
+	if cc.EthRpcUrl == "" {
+		return fmt.Errorf("EthRpcUrl is required")
+	}
+
+	if cc.EigenDACertVerifierAddr == "" {
+		return fmt.Errorf("EigenDACertVerifierAddr is required")
+	}
+
+	// Nothing to do for PayloadPolynomialForm
+
+	defaultConfig := getDefaultPayloadClientConfig()
+
+	if cc.ContractCallTimeout == 0 {
+		cc.ContractCallTimeout = defaultConfig.ContractCallTimeout
+	}
+
+	// BlobVersion may be 0, so don't do anything
+
+	return nil
+}
+
+// GetDefaultPayloadRetrieverConfig creates a PayloadRetrieverConfig with default values
+//
+// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
+	return &PayloadRetrieverConfig{
+		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		RelayTimeout:        5 * time.Second,
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct and performs the following actions:
+//
+// 1. If a config value is 0, and a 0 value makes sense, do nothing.
+// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
+// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+func (rc *PayloadRetrieverConfig) checkAndSetDefaults() error {
+	err := rc.PayloadClientConfig.checkAndSetDefaults()
+	if err != nil {
+		return err
+	}
+
+	defaultConfig := GetDefaultPayloadRetrieverConfig()
+	if rc.RelayTimeout == 0 {
+		rc.RelayTimeout = defaultConfig.RelayTimeout
+	}
+
+	return nil
+}
+
+// GetDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values
+//
+// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
+	return &PayloadDisperserConfig{
+		PayloadClientConfig:    *getDefaultPayloadClientConfig(),
+		DisperseBlobTimeout:    5 * time.Second,
+		BlobCertifiedTimeout:   10 * time.Second,
+		BlobStatusPollInterval: 1 * time.Second,
+		Quorums:                []core.QuorumID{0, 1},
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct and performs the following actions:
+//
+// 1. If a config value is 0, and a 0 value makes sense, do nothing.
+// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
+// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
+	err := dc.PayloadClientConfig.checkAndSetDefaults()
+	if err != nil {
+		return err
+	}
+
+	defaultConfig := GetDefaultPayloadDisperserConfig()
+
+	if dc.DisperseBlobTimeout == 0 {
+		dc.DisperseBlobTimeout = defaultConfig.DisperseBlobTimeout
+	}
+
+	if dc.BlobCertifiedTimeout == 0 {
+		dc.BlobCertifiedTimeout = defaultConfig.BlobCertifiedTimeout
+	}
+
+	if dc.BlobStatusPollInterval == 0 {
+		dc.BlobStatusPollInterval = defaultConfig.BlobStatusPollInterval
+	}
+
+	// Quorums may be empty, so don't do anything
+
+	return nil
 }

@@ -39,6 +39,11 @@ func NewPayloadDisperser(
 	certVerifier verification.ICertVerifier,
 ) (*PayloadDisperser, error) {
 
+	err := payloadDisperserConfig.checkAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
+	}
+
 	return &PayloadDisperser{
 		logger:          logger,
 		config:          payloadDisperserConfig,
