@@ -36,6 +36,10 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
+	saltType, err := abi.NewType("uint32", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
 	commitmentType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
 			Name: "commitment",
@@ -97,6 +101,9 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 		{
 			Type: commitmentType,
 		},
+		{
+			Type: saltType,
+		},
 	}
 
 	packedBytes, err := arguments.Pack(
@@ -129,6 +136,7 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 			},
 			DataLength: uint32(b.BlobCommitments.Length),
 		},
+		b.Salt,
 	)
 	if err != nil {
 		return [32]byte{}, err
@@ -195,6 +203,11 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
+	signatureType, err := abi.NewType("bytes", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
 	relayKeysType, err := abi.NewType("uint32[]", "", nil)
 	if err != nil {
 		return [32]byte{}, err
@@ -203,6 +216,9 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 	arguments := abi.Arguments{
 		{
 			Type: blobKeyType,
+		},
+		{
+			Type: signatureType,
 		},
 		{
 			Type: relayKeysType,
@@ -214,7 +230,7 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	bytes, err := arguments.Pack(blobKey, c.RelayKeys)
+	bytes, err := arguments.Pack(blobKey, c.Signature, c.RelayKeys)
 	if err != nil {
 		return [32]byte{}, err
 	}

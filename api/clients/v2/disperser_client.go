@@ -140,7 +140,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
+	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
@@ -187,19 +187,20 @@ func (c *disperserClient) DisperseBlob(
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
 		PaymentMetadata: *payment,
+		Salt:            salt,
 	}
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
 	}
-	blobHeader.Signature = sig
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:       data,
+		Blob:       data,
+		Signature:  sig,
 		BlobHeader: blobHeaderProto,
 	}
 
@@ -213,7 +214,45 @@ func (c *disperserClient) DisperseBlob(
 		return nil, [32]byte{}, err
 	}
 
+	if verifyReceivedBlobKey(blobHeader, reply) != nil {
+		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
+	}
+
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
+}
+
+// verifyReceivedBlobKey computes the BlobKey from the BlobHeader which was sent to the disperser, and compares it with
+// the BlobKey which was returned by the disperser in the DisperseBlobReply
+//
+// A successful verification guarantees that the disperser didn't make any modifications to the BlobHeader that it
+// received from this client.
+//
+// This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
+func verifyReceivedBlobKey(
+	// the blob header which was constructed locally and sent to the disperser
+	blobHeader *corev2.BlobHeader,
+	// the reply received back from the disperser
+	disperserReply *disperser_rpc.DisperseBlobReply,
+) error {
+
+	actualBlobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		// this shouldn't be possible, since the blob key has already been used when signing dispersal
+		return fmt.Errorf("computing blob key: %w", err)
+	}
+
+	blobKeyFromDisperser, err := corev2.BytesToBlobKey(disperserReply.GetBlobKey())
+	if err != nil {
+		return fmt.Errorf("converting returned bytes to blob key: %w", err)
+	}
+
+	if actualBlobKey != blobKeyFromDisperser {
+		return fmt.Errorf(
+			"blob key returned by disperser (%v) doesn't match blob which was dispersed (%v)",
+			blobKeyFromDisperser, actualBlobKey)
+	}
+
+	return nil
 }
 
 // GetBlobStatus returns the status of a blob with the given blob key.
@@ -264,7 +303,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	}
 
 	request := &disperser_rpc.BlobCommitmentRequest{
-		Data: data,
+		Blob: data,
 	}
 	return c.client.GetBlobCommitment(ctx, request)
 }

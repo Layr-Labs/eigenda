@@ -34,15 +34,15 @@ func RandomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 					LengthProof:      rand.Bytes(32),
 					Length:           rand.Uint32(),
 				},
-				PaymentHeader: &common.PaymentHeader{
+				PaymentHeader: &v2.PaymentHeader{
 					AccountId:         rand.String(32),
 					ReservationPeriod: rand.Uint32(),
 					CumulativePayment: rand.Bytes(32),
-					Salt:              rand.Uint32(),
 				},
-				Signature: rand.Bytes(32),
+				Salt: rand.Uint32(),
 			},
-			Relays: relays,
+			Signature: rand.Bytes(32),
+			RelayKeys: relays,
 		}
 	}
 

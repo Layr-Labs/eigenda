@@ -35,16 +35,16 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	finishedValidation := time.Now()
 	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
 
-	s.metrics.reportDisperseBlobSize(len(req.GetData()))
+	s.metrics.reportDisperseBlobSize(len(req.GetBlob()))
 
-	data := req.GetData()
+	blob := req.GetBlob()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
 	}
-	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(data), "quorums", req.GetBlobHeader().GetQuorumNumbers())
+	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	blobKey, err := s.StoreBlob(ctx, data, blobHeader, time.Now(), onchainState.TTL)
+	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}, nil
 }
 
-func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, requestedAt time.Time, ttl time.Duration) (corev2.BlobKey, error) {
+func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, signature []byte, requestedAt time.Time, ttl time.Duration) (corev2.BlobKey, error) {
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return corev2.BlobKey{}, api.NewErrorInvalidArg(fmt.Sprintf("failed to get blob key: %v", err))
@@ -74,6 +74,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 
 	blobMetadata := &dispv2.BlobMetadata{
 		BlobHeader:  blobHeader,
+		Signature:   signature,
 		BlobStatus:  dispv2.Queued,
 		Expiry:      uint64(requestedAt.Add(ttl).Unix()),
 		NumRetries:  0,
@@ -94,8 +95,12 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
-	data := req.GetData()
-	blobSize := len(data)
+	signature := req.GetSignature()
+	if len(signature) != 65 {
+		return api.NewErrorInvalidArg(fmt.Sprintf("signature is expected to be 65 bytes, but got %d bytes", len(signature)))
+	}
+	blob := req.GetBlob()
+	blobSize := len(blob)
 	if blobSize == 0 {
 		return api.NewErrorInvalidArg("blob size must be greater than 0")
 	}
@@ -109,9 +114,6 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg("blob header must contain commitments")
 	}
 
-	if blobHeaderProto.GetCommitment() == nil {
-		return api.NewErrorInvalidArg("blob header must contain a commitment")
-	}
 	commitmentLength := blobHeaderProto.GetCommitment().GetLength()
 	if commitmentLength == 0 || commitmentLength != encoding.NextPowerOf2(commitmentLength) {
 		return api.NewErrorInvalidArg("invalid commitment length, must be a power of 2")
@@ -145,7 +147,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	}
 
 	// validate every 32 bytes is a valid field element
-	_, err = rs.ToFrArray(data)
+	_, err = rs.ToFrArray(blob)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
 		return api.NewErrorInvalidArg("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
@@ -155,7 +157,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys()))
 	}
 
-	if err = s.authenticator.AuthenticateBlobRequest(blobHeader); err != nil {
+	if err = s.authenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
 		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
@@ -175,7 +177,7 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 		return api.NewErrorResourceExhausted(err.Error())
 	}
 
-	commitments, err := s.prover.GetCommitmentsForPaddedLength(data)
+	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to get commitments: %v", err))
 	}

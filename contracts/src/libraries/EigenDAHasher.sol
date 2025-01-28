@@ -123,7 +123,8 @@ library EigenDAHasher {
                     abi.encode(
                         blobHeader.version,
                         blobHeader.quorumNumbers,
-                        blobHeader.commitment
+                        blobHeader.commitment,
+                        blobHeader.salt
                     )
                 ),
                 blobHeader.paymentHeaderHash
@@ -139,6 +140,7 @@ library EigenDAHasher {
         return keccak256(
             abi.encode(
                 hashBlobHeaderV2(blobCertificate.blobHeader),
+                blobCertificate.signature,
                 blobCertificate.relayKeys
             )
         );
