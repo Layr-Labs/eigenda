@@ -8,11 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
@@ -26,48 +23,21 @@ type PayloadDisperser struct {
 	certVerifier    verification.ICertVerifier
 }
 
-// BuildPayloadDisperser builds a PayloadDisperser from config structs
-func BuildPayloadDisperser(
+// NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
+func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	disperserClientConfig DisperserClientConfig,
-	// signer to sign blob dispersal requests
-	signer core.BlobRequestSigner,
-	// prover is used to compute commitments to a new blob during the dispersal process
-	//
-	// IMPORTANT: it is permissible for the prover parameter to be nil, but operating with this configuration
-	// puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+	codec codecs.BlobCodec,
+	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
+	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
 	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
 	//
 	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
-	prover encoding.Prover,
-	accountant *Accountant,
-	ethConfig geth.EthClientConfig,
+	disperserClient DisperserClient,
+	certVerifier verification.ICertVerifier,
 ) (*PayloadDisperser, error) {
-
-	codec, err := codecs.CreateCodec(
-		payloadDisperserConfig.PayloadPolynomialForm,
-		payloadDisperserConfig.BlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create codec: %w", err)
-	}
-
-	disperserClient, err := NewDisperserClient(&disperserClientConfig, signer, prover, accountant)
-	if err != nil {
-		return nil, fmt.Errorf("new disperser client: %s", err)
-	}
-
-	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
-	if err != nil {
-		return nil, fmt.Errorf("new eth client: %w", err)
-	}
-
-	certVerifier, err := verification.NewCertVerifier(ethClient, payloadDisperserConfig.EigenDACertVerifierAddr)
-	if err != nil {
-		return nil, fmt.Errorf("new cert verifier: %w", err)
-	}
 
 	return &PayloadDisperser{
 		logger:          logger,
