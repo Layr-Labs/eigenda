@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/docker/go-units"
 	"log"
 	"math"
 	"math/big"
@@ -367,6 +368,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			QuorumIDList:                        registeredQuorums,
 			DispersalAuthenticationKeyCacheSize: 1024,
 			DisableDispersalAuthentication:      false,
+			RelayMaxMessageSize:                 units.GiB,
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe

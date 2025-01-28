@@ -3,6 +3,7 @@ package node_test
 import (
 	"context"
 	"errors"
+	"github.com/docker/go-units"
 	"os"
 	"runtime"
 	"testing"
@@ -56,6 +57,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		EnableNodeApi:             false,
 		EnableMetrics:             false,
 		RegisterNodeAtStart:       false,
+		RelayMaxMessageSize:       units.GiB,
 	}
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
