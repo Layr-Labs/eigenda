@@ -52,6 +52,8 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	}
 }
 
+// DefaultLoggerConfig returns a LoggerConfig with the default settings for a JSON logger.
+// In general, this should be the baseline config for most services running in production.
 func DefaultLoggerConfig() LoggerConfig {
 	return LoggerConfig{
 		Format:       JSONLogFormat,
