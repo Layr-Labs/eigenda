@@ -18,7 +18,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
-	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -464,7 +464,7 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.DataLength--
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length--
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
 	tester.MockCertVerifier.On(
@@ -505,7 +505,7 @@ func TestFailedDecoding(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, maliciousCommitment)
 
-	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment = contractEigenDABlobVerifier.BN254G1Point{
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment = contractEigenDACertVerifier.BN254G1Point{
 		X: maliciousCommitment.X.BigInt(new(big.Int)),
 		Y: maliciousCommitment.Y.BigInt(new(big.Int)),
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -174,7 +174,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -192,7 +192,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -257,7 +257,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 	})
 })
 
-func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.BlobVerificationProofV2, error) {
+func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.BlobInclusionInfo, error) {
 	blobCertificate, err := corev2.BlobCertificateFromProtobuf(inclusionInfo.GetBlobCertificate())
 	if err != nil {
 		return nil, err
@@ -290,7 +290,7 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A0.BigInt(lengthProofY0)
 	lengthProofY1 := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A1.BigInt(lengthProofY1)
-	return &verifierbindings.BlobVerificationProofV2{
+	return &verifierbindings.BlobInclusionInfo{
 		BlobCertificate: verifierbindings.BlobCertificate{
 			BlobHeader: verifierbindings.BlobHeaderV2{
 				Version:       uint16(blobCertificate.BlobHeader.BlobVersion),
@@ -308,7 +308,7 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 						X: [2]*big.Int{lengthProofX0, lengthProofX1},
 						Y: [2]*big.Int{lengthProofY0, lengthProofY1},
 					},
-					DataLength: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
+					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
 				Salt:              blobCertificate.BlobHeader.Salt,

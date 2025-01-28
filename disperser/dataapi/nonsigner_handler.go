@@ -49,16 +49,19 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 	}
 
 	// Create a mapping from address to operatorID.
-	nonsignerAddressToId := make(map[string]core.OperatorID)
-	nonsignerIdToAddress := make(map[string]string)
+	operatorList := NewOperatorList()
 	for i := range nonsigners {
 		addr := strings.ToLower(nonsignerAddresses[i].Hex())
-		nonsignerAddressToId[addr] = nonsigners[i]
-		nonsignerIdToAddress[nonsigners[i].Hex()] = addr
+		operatorList.Add(nonsigners[i], addr)
+	}
+
+	operatorQuorumEvents, err := s.operatorHandler.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create operators' quorum intervals.
-	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, nonsigners, nonsignerAddressToId, startBlock, endBlock)
+	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, operatorList, operatorQuorumEvents, startBlock, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +109,15 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					continue
 				}
 
+				addr, exist := operatorList.GetAddress(op)
+				if !exist {
+					// This should never happen, but we don't fail the entire request, just
+					// mark error for the address field.
+					addr = "Unexpected internal error"
+				}
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
 					OperatorId:           fmt.Sprintf("0x%s", op),
-					OperatorAddress:      nonsignerIdToAddress[op],
+					OperatorAddress:      addr,
 					QuorumId:             q,
 					TotalUnsignedBatches: unsignedCount,
 					TotalBatches:         totalCount,

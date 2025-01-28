@@ -35,7 +35,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -395,7 +394,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
 			if err == nil {
 				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
-					n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParams))
+					n.BlobVersionParams.Store(corev2.NewBlobVersionParameterMap(blobParams))
 				}
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
@@ -407,7 +406,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 				continue
 			}
 
-			existingURLs := map[v2.RelayKey]string{}
+			existingURLs := map[corev2.RelayKey]string{}
 			if existingRelayClient != nil {
 				existingURLs = existingRelayClient.GetSockets()
 			}

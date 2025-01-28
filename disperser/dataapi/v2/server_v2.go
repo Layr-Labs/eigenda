@@ -216,17 +216,17 @@ func (s *ServerV2) Start() error {
 
 	v2 := router.Group(basePath)
 	{
-		blob := v2.Group("/blob")
+		blobs := v2.Group("/blobs")
 		{
-			blob.GET("/blobs/feed", s.FetchBlobFeedHandler)
-			blob.GET("/blobs/:blob_key", s.FetchBlobHandler)
-			blob.GET("/blobs/:blob_key/certificate", s.FetchBlobCertificateHandler)
-			blob.GET("/blobs/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
+			blobs.GET("/feed", s.FetchBlobFeedHandler)
+			blobs.GET("/:blob_key", s.FetchBlobHandler)
+			blobs.GET("/:blob_key/certificate", s.FetchBlobCertificateHandler)
+			blobs.GET("/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
 		}
-		batch := v2.Group("/batch")
+		batches := v2.Group("/batches")
 		{
-			batch.GET("/batches/feed", s.FetchBatchFeedHandler)
-			batch.GET("/batches/:batch_header_hash", s.FetchBatchHandler)
+			batches.GET("/feed", s.FetchBatchFeedHandler)
+			batches.GET("/:batch_header_hash", s.FetchBatchHandler)
 		}
 		operators := v2.Group("/operators")
 		{

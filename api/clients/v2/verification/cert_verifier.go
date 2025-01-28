@@ -7,7 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -25,21 +25,21 @@ type ICertVerifier interface {
 // CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
 // structural integrity of V2 certificates
 //
-// The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDABlobVerifier.sol
+// The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol
 type CertVerifier struct {
 	// go binding around the EigenDACertVerifier ethereum contract
-	certVerifierCaller *verifierBindings.ContractEigenDABlobVerifierCaller
+	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
 }
 
 var _ ICertVerifier = &CertVerifier{}
 
 // NewCertVerifier constructs a CertVerifier
 func NewCertVerifier(
-	ethClient geth.EthClient,   // the eth client, which should already be set up
+	ethClient geth.EthClient, // the eth client, which should already be set up
 	certVerifierAddress string, // the hex address of the EigenDACertVerifier contract
 ) (*CertVerifier, error) {
 
-	verifierCaller, err := verifierBindings.NewContractEigenDABlobVerifierCaller(
+	verifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
 		gethcommon.HexToAddress(certVerifierAddress),
 		ethClient)
 
@@ -57,10 +57,10 @@ func NewCertVerifier(
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 	ctx context.Context,
-// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
-// is used to verify that the described blob actually exists in a valid batch.
+	// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
+	// is used to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
-// Contains all necessary information about the blob, so that the cert can be verified.
+	// Contains all necessary information about the blob, so that the cert can be verified.
 	blobInclusionInfo *disperser.BlobInclusionInfo,
 ) error {
 	convertedSignedBatch, err := SignedBatchProtoToBinding(signedBatch)
@@ -73,7 +73,7 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("convert blob inclusion info: %w", err)
 	}
 
-	err = cv.certVerifierCaller.VerifyBlobV2FromSignedBatch(
+	err = cv.certVerifierCaller.VerifyDACertV2FromSignedBatch(
 		&bind.CallOpts{Context: ctx},
 		*convertedSignedBatch,
 		*convertedBlobInclusionInfo)
@@ -92,7 +92,7 @@ func (cv *CertVerifier) VerifyCertV2(
 	ctx context.Context,
 	eigenDACert *EigenDACert,
 ) error {
-	err := cv.certVerifierCaller.VerifyBlobV2(
+	err := cv.certVerifierCaller.VerifyDACertV2(
 		&bind.CallOpts{Context: ctx},
 		eigenDACert.BatchHeader,
 		eigenDACert.BlobInclusionInfo,

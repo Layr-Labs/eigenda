@@ -15,15 +15,15 @@ import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Library of functions to be used by smart contracts wanting to verify submissions of blobs on EigenDA.
+ * @title Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
  * @author Layr Labs, Inc.
  */
-library EigenDABlobVerificationUtils {
+library EigenDACertVerificationUtils {
     using BN254 for BN254.G1Point;
 
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
     
-    function _verifyBlobV1ForQuorums(
+    function _verifyDACertV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
         BlobHeader calldata blobHeader,
@@ -33,7 +33,7 @@ library EigenDABlobVerificationUtils {
         require(
             EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata) ==
             IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(blobVerificationProof.batchId),
-            "EigenDABlobVerificationUtils._verifyBlobForQuorums: batchMetadata does not match stored metadata"
+            "EigenDACertVerificationUtils._verifyDACertForQuorums: batchMetadata does not match stored metadata"
         );
 
         require(
@@ -43,7 +43,7 @@ library EigenDABlobVerificationUtils {
                 keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeader))),
                 blobVerificationProof.blobIndex
             ),
-            "EigenDABlobVerificationUtils._verifyBlobForQuorums: inclusion proof is invalid"
+            "EigenDACertVerificationUtils._verifyDACertForQuorums: inclusion proof is invalid"
         );
 
         uint256 confirmedQuorumsBitmap;
@@ -53,25 +53,25 @@ library EigenDABlobVerificationUtils {
             require(
                 uint8(blobVerificationProof.batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProof.quorumIndices[i])]) == 
                 blobHeader.quorumBlobParams[i].quorumNumber, 
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: quorumNumber does not match"
+                "EigenDACertVerificationUtils._verifyDACertForQuorums: quorumNumber does not match"
             );
 
             require(
                 blobHeader.quorumBlobParams[i].confirmationThresholdPercentage >
                 blobHeader.quorumBlobParams[i].adversaryThresholdPercentage, 
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: threshold percentages are not valid"
+                "EigenDACertVerificationUtils._verifyDACertForQuorums: threshold percentages are not valid"
             );
 
             require(
                 blobHeader.quorumBlobParams[i].confirmationThresholdPercentage >= 
                 eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber), 
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: confirmationThresholdPercentage is not met"
+                "EigenDACertVerificationUtils._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
             );
 
             require(
                 uint8(blobVerificationProof.batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProof.quorumIndices[i])]) >= 
                 blobHeader.quorumBlobParams[i].confirmationThresholdPercentage, 
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: confirmationThresholdPercentage is not met"
+                "EigenDACertVerificationUtils._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
             );
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, blobHeader.quorumBlobParams[i].quorumNumber);
@@ -82,11 +82,11 @@ library EigenDABlobVerificationUtils {
                 BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
                 confirmedQuorumsBitmap
             ),
-            "EigenDABlobVerificationUtils._verifyBlobForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationUtils._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
         );
     }
 
-    function _verifyBlobsV1ForQuorums(
+    function _verifyDACertsV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
         BlobHeader[] calldata blobHeaders,
@@ -95,7 +95,7 @@ library EigenDABlobVerificationUtils {
     ) internal view {
         require(
             blobHeaders.length == blobVerificationProofs.length,
-            "EigenDABlobVerificationUtils._verifyBlobsForQuorums: blobHeaders and blobVerificationProofs length mismatch"
+            "EigenDACertVerificationUtils._verifyDACertsForQuorums: blobHeaders and blobVerificationProofs length mismatch"
         );
 
         bytes memory confirmationThresholdPercentages = eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
@@ -104,7 +104,7 @@ library EigenDABlobVerificationUtils {
             require(
                 EigenDAHasher.hashBatchMetadata(blobVerificationProofs[i].batchMetadata) ==
                 IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(blobVerificationProofs[i].batchId),
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: batchMetadata does not match stored metadata"
+                "EigenDACertVerificationUtils._verifyDACertsForQuorums: batchMetadata does not match stored metadata"
             );
 
             require(
@@ -114,7 +114,7 @@ library EigenDABlobVerificationUtils {
                     keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeaders[i]))),
                     blobVerificationProofs[i].blobIndex
                 ),
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: inclusion proof is invalid"
+                "EigenDACertVerificationUtils._verifyDACertsForQuorums: inclusion proof is invalid"
             );
 
             uint256 confirmedQuorumsBitmap;
@@ -124,25 +124,25 @@ library EigenDABlobVerificationUtils {
                 require(
                     uint8(blobVerificationProofs[i].batchMetadata.batchHeader.quorumNumbers[uint8(blobVerificationProofs[i].quorumIndices[j])]) == 
                     blobHeaders[i].quorumBlobParams[j].quorumNumber, 
-                    "EigenDABlobVerificationUtils._verifyBlobForQuorums: quorumNumber does not match"
+                    "EigenDACertVerificationUtils._verifyDACertsForQuorums: quorumNumber does not match"
                 );
 
                 require(
                     blobHeaders[i].quorumBlobParams[j].confirmationThresholdPercentage >
                     blobHeaders[i].quorumBlobParams[j].adversaryThresholdPercentage, 
-                    "EigenDABlobVerificationUtils._verifyBlobForQuorums: threshold percentages are not valid"
+                    "EigenDACertVerificationUtils._verifyDACertsForQuorums: threshold percentages are not valid"
                 );
 
                 require(
                     blobHeaders[i].quorumBlobParams[j].confirmationThresholdPercentage >= 
                     uint8(confirmationThresholdPercentages[blobHeaders[i].quorumBlobParams[j].quorumNumber]), 
-                    "EigenDABlobVerificationUtils._verifyBlobForQuorums: confirmationThresholdPercentage is not met"
+                    "EigenDACertVerificationUtils._verifyDACertsForQuorums: confirmationThresholdPercentage is not met"
                 );
 
                 require(
                     uint8(blobVerificationProofs[i].batchMetadata.batchHeader.signedStakeForQuorums[uint8(blobVerificationProofs[i].quorumIndices[j])]) >= 
                     blobHeaders[i].quorumBlobParams[j].confirmationThresholdPercentage, 
-                    "EigenDABlobVerificationUtils._verifyBlobForQuorums: confirmationThresholdPercentage is not met"
+                    "EigenDACertVerificationUtils._verifyDACertsForQuorums: confirmationThresholdPercentage is not met"
                 );
 
                 confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, blobHeaders[i].quorumBlobParams[j].quorumNumber);
@@ -153,30 +153,30 @@ library EigenDABlobVerificationUtils {
                     BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
                     confirmedQuorumsBitmap
                 ),
-                "EigenDABlobVerificationUtils._verifyBlobForQuorums: required quorums are not a subset of the confirmed quorums"
+                "EigenDACertVerificationUtils._verifyDACertsForQuorums: required quorums are not a subset of the confirmed quorums"
             );
 
         }
     }
 
-    function _verifyBlobV2ForQuorums(
+    function _verifyDACertV2ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 memory batchHeader,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
             Merkle.verifyInclusionKeccak(
-                blobVerificationProof.inclusionProof, 
+                blobInclusionInfo.inclusionProof, 
                 batchHeader.batchRoot, 
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
-                blobVerificationProof.blobIndex
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate))),
+                blobInclusionInfo.blobIndex
             ),
-            "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: inclusion proof is invalid"
         );
 
         (
@@ -184,33 +184,33 @@ library EigenDABlobVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
 
         _verifyRelayKeysSet(
             eigenDARelayRegistry,
-            blobVerificationProof.blobCertificate.relayKeys
+            blobInclusionInfo.blobCertificate.relayKeys
         );
 
-        _verifyBlobSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(blobVerificationProof.blobCertificate.blobHeader.version),
+        _verifyDACertSecurityParams(
+            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
 
         uint256 confirmedQuorumsBitmap;
 
-        for (uint i = 0; i < blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
                 quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold,
-                "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: signatories do not own at least threshold percentage of a quorum"
+                "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: signatories do not own at least threshold percentage of a quorum"
             );
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobVerificationProof.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
             );
         }
 
@@ -219,33 +219,33 @@ library EigenDABlobVerificationUtils {
                 BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
                 confirmedQuorumsBitmap
             ),
-            "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the confirmed quorums"
         );
     }
 
-    function _verifyBlobV2ForQuorumsForThresholds(
+    function _verifyDACertV2ForQuorumsForThresholds(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         BatchHeaderV2 memory batchHeader,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
-            securityThresholds.length == blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length,
-            "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: securityThresholds length does not match quorumNumbers"
+            securityThresholds.length == blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length,
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: securityThresholds length does not match quorumNumbers"
         );
 
         require(
             Merkle.verifyInclusionKeccak(
-                blobVerificationProof.inclusionProof, 
+                blobInclusionInfo.inclusionProof, 
                 batchHeader.batchRoot, 
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobVerificationProof.blobCertificate))),
-                blobVerificationProof.blobIndex
+                keccak256(abi.encodePacked(EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate))),
+                blobInclusionInfo.blobIndex
             ),
-            "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: inclusion proof is invalid"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: inclusion proof is invalid"
         );
 
         (
@@ -253,21 +253,21 @@ library EigenDABlobVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobVerificationProof.blobCertificate.blobHeader.quorumNumbers,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
 
         _verifyRelayKeysSet(
             eigenDARelayRegistry,
-            blobVerificationProof.blobCertificate.relayKeys
+            blobInclusionInfo.blobCertificate.relayKeys
         );
 
         uint256 confirmedQuorumsBitmap;
-        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobVerificationProof.blobCertificate.blobHeader.version);
+        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version);
 
-        for (uint i = 0; i < blobVerificationProof.blobCertificate.blobHeader.quorumNumbers.length; i++) {
-            _verifyBlobSecurityParams(
+        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+            _verifyDACertSecurityParams(
                 blobParams,
                 securityThresholds[i]
             );
@@ -275,12 +275,12 @@ library EigenDABlobVerificationUtils {
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
                 quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds[i].confirmationThreshold,
-                "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: signatories do not own at least threshold percentage of a quorum"
+                "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: signatories do not own at least threshold percentage of a quorum"
             );
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobVerificationProof.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
             );
         }
 
@@ -289,18 +289,18 @@ library EigenDABlobVerificationUtils {
                 BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
                 confirmedQuorumsBitmap
             ),
-            "EigenDABlobVerificationUtils._verifyBlobV2ForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the confirmed quorums"
         );
     }
 
-    function _verifyBlobV2ForQuorumsFromSignedBatch(
+    function _verifyDACertV2ForQuorumsFromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -310,26 +310,26 @@ library EigenDABlobVerificationUtils {
             signedBatch
         );
 
-        _verifyBlobV2ForQuorums(
+        _verifyDACertV2ForQuorums(
             eigenDAThresholdRegistry,
             signatureVerifier,
             eigenDARelayRegistry,
             signedBatch.batchHeader,
-            blobVerificationProof,
+            blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers
         );
     }
 
-    function _verifyBlobV2ForQuorumsForThresholdsFromSignedBatch(
+    function _verifyDACertV2ForQuorumsForThresholdsFromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
         IEigenDARelayRegistry eigenDARelayRegistry,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
-        BlobVerificationProofV2 memory blobVerificationProof,
+        BlobInclusionInfo memory blobInclusionInfo,
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
@@ -339,12 +339,12 @@ library EigenDABlobVerificationUtils {
             signedBatch
         );
 
-        _verifyBlobV2ForQuorumsForThresholds(
+        _verifyDACertV2ForQuorumsForThresholds(
             eigenDAThresholdRegistry,
             signatureVerifier,
             eigenDARelayRegistry,
             signedBatch.batchHeader,
-            blobVerificationProof,
+            blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers
@@ -383,17 +383,17 @@ library EigenDABlobVerificationUtils {
         nonSignerStakesAndSignature.nonSignerStakeIndices = checkSignaturesIndices.nonSignerStakeIndices; 
     }
 
-    function _verifyBlobSecurityParams(
+    function _verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) internal pure {
         require(
             securityThresholds.confirmationThreshold > securityThresholds.adversaryThreshold,
-            "EigenDABlobVerificationUtils._verifyBlobSecurityParams: confirmationThreshold must be greater than adversaryThreshold"
+            "EigenDACertVerificationUtils._verifyDACertSecurityParams: confirmationThreshold must be greater than adversaryThreshold"
         );
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        require(n >= blobParams.maxNumOperators * 10000, "EigenDABlobVerificationUtils._verifyBlobSecurityParams: security assumptions are not met");
+        require(n >= blobParams.maxNumOperators * 10000, "EigenDACertVerificationUtils._verifyDACertSecurityParams: security assumptions are not met");
     }
 
     function _verifyRelayKeysSet(
@@ -403,7 +403,7 @@ library EigenDABlobVerificationUtils {
         for (uint i = 0; i < relayKeys.length; ++i) {
             require(
                 eigenDARelayRegistry.relayKeyToAddress(relayKeys[i]) != address(0),
-                "EigenDABlobVerificationUtils._verifyRelayKeysSet: relay key is not set"
+                "EigenDACertVerificationUtils._verifyRelayKeysSet: relay key is not set"
             );
         }
     }

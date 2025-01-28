@@ -1,14 +1,14 @@
 package verification
 
 import (
-	contractEigenDABlobVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 )
 
 // EigenDACert contains all data necessary to retrieve and validate a blob
 //
 // This struct represents the composition of a eigenDA blob certificate, as it would exist in a rollup inbox.
 type EigenDACert struct {
-	BlobInclusionInfo           contractEigenDABlobVerifier.BlobVerificationProofV2
-	BatchHeader                 contractEigenDABlobVerifier.BatchHeaderV2
-	NonSignerStakesAndSignature contractEigenDABlobVerifier.NonSignerStakesAndSignature
+	BlobInclusionInfo           contractEigenDACertVerifier.BlobInclusionInfo
+	BatchHeader                 contractEigenDACertVerifier.BatchHeaderV2
+	NonSignerStakesAndSignature contractEigenDACertVerifier.NonSignerStakesAndSignature
 }
