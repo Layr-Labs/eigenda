@@ -25,7 +25,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	blobKey, err := corev2.BytesToBlobKey(req.GetBlobKey())
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob key cannot be parsed: %w", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob key bytes: %v", err))
 	}
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)

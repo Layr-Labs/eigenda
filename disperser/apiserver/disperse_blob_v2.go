@@ -46,7 +46,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	blob := req.GetBlob()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %w", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %v", err))
 	}
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
