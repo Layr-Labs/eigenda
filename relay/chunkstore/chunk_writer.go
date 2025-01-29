@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // ChunkWriter writes chunks that can be read by ChunkReader.
@@ -57,12 +56,7 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
-	for _, proof := range proofs {
-		proofBytes := proof.Bytes()
-		bytes = append(bytes, proofBytes[:]...)
-	}
-
+	bytes := rs.SerializeFrameProofs(proofs)
 	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
 	if err != nil {
 		c.logger.Errorf("Failed to upload chunk proofs to S3: %v", err)
