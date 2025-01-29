@@ -130,6 +130,10 @@ func ComputeBlobKey(
 				X: blobCommitments.Commitment.X.BigInt(new(big.Int)),
 				Y: blobCommitments.Commitment.Y.BigInt(new(big.Int)),
 			},
+			// Most crypptography library serializes a G2 point by having
+			// A0 followed by A1 for both X, Y field of G2. However, ethereum
+			// precompile assumes an ordering of A1, A0. Currently, we choose
+			// to conform with Ethereum order when serializing a blobHeaderV2
 			LengthCommitment: abiG2Commit{
 				X: [2]*big.Int{
 					blobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
@@ -140,6 +144,7 @@ func ComputeBlobKey(
 					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 				},
 			},
+			// Same as above
 			LengthProof: abiG2Commit{
 				X: [2]*big.Int{
 					blobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
