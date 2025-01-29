@@ -75,9 +75,9 @@ type PayloadDisperserConfig struct {
 	// verify.
 	//
 	// TODO: Clients are currently charged for QuorumIDs 0 and 1 regardless of whether or not they are included in this
-	//  array. A decision still needs to be made for how we want to handle this. Should this field be called
-	//  `CustomQuorums`, and we simply append any values contained onto [0, 1]? Or should we require users to include 0
-	//  and 1 here, and throw an error if they don't?
+	//  array. Therefore, if 0 and 1 aren't included in this array, you are missing out on security that your are paying
+	//  for. The strategy for how to handle this field in the context of rollups is still in flux: this comment should
+	//  be revisited and revised as necessary.
 	Quorums []core.QuorumID
 }
 
