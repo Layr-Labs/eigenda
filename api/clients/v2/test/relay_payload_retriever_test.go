@@ -31,17 +31,17 @@ import (
 const g1Path = "../../../../inabox/resources/kzg/g1.point"
 const payloadLength = 100
 
-type PayloadRetrieverTester struct {
-	Random           *testrandom.TestRandom
-	PayloadRetriever *clients.PayloadRetriever
-	MockRelayClient  *clientsmock.MockRelayClient
-	MockCertVerifier *clientsmock.MockCertVerifier
-	Codec            *codecs.DefaultBlobCodec
-	G1Srs            []bn254.G1Affine
+type RelayPayloadRetrieverTester struct {
+	Random                *testrandom.TestRandom
+	RelayPayloadRetriever *clients.RelayPayloadRetriever
+	MockRelayClient       *clientsmock.MockRelayClient
+	MockCertVerifier      *clientsmock.MockCertVerifier
+	Codec                 *codecs.DefaultBlobCodec
+	G1Srs                 []bn254.G1Affine
 }
 
-// buildPayloadRetrieverTester sets up a client with mocks necessary for testing
-func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
+// buildRelayPayloadRetrieverTester sets up a client with mocks necessary for testing
+func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 		EigenDACertVerifierAddr: "y",
 	}
 
-	clientConfig := clients.PayloadRetrieverConfig{
+	clientConfig := clients.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: payloadClientConfig,
 		RelayTimeout: 50 * time.Millisecond,
 	}
@@ -67,7 +67,7 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	client, err := clients.NewPayloadRetriever(
+	client, err := clients.NewRelayPayloadRetriever(
 		logger,
 		random.Rand,
 		clientConfig,
@@ -79,20 +79,20 @@ func buildPayloadRetrieverTester(t *testing.T) PayloadRetrieverTester {
 	require.NotNil(t, client)
 	require.NoError(t, err)
 
-	return PayloadRetrieverTester{
-		Random:           random,
-		PayloadRetriever: client,
-		MockRelayClient:  &mockRelayClient,
-		MockCertVerifier: &mockCertVerifier,
-		Codec:            &codec,
-		G1Srs:            g1Srs,
+	return RelayPayloadRetrieverTester{
+		Random:                random,
+		RelayPayloadRetriever: client,
+		MockRelayClient:       &mockRelayClient,
+		MockCertVerifier:      &mockCertVerifier,
+		Codec:                 &codec,
+		G1Srs:                 g1Srs,
 	}
 }
 
 // Builds a random blob key, blob bytes, and valid certificate
 func buildBlobAndCert(
 	t *testing.T,
-	tester PayloadRetrieverTester,
+	tester RelayPayloadRetrieverTester,
 	relayKeys []core.RelayKey,
 ) (core.BlobKey, []byte, *verification.EigenDACert) {
 
@@ -148,7 +148,7 @@ func buildBlobAndCert(
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
 func TestGetPayloadSuccess(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
@@ -161,10 +161,7 @@ func TestGetPayloadSuccess(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey,
-		blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 
 	require.NotNil(t, payload)
 	require.NoError(t, err)
@@ -174,7 +171,7 @@ func TestGetPayloadSuccess(t *testing.T) {
 
 // TestRelayCallTimeout verifies that calls to the relay timeout after the expected duration
 func TestRelayCallTimeout(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
@@ -216,12 +213,12 @@ func TestRelayCallTimeout(t *testing.T) {
 
 	require.NotPanics(
 		t, func() {
-			_, _ = tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+			_, _ = tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 		})
 
 	require.Panics(
 		t, func() {
-			_, _ = tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+			_, _ = tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 		})
 
 	tester.MockRelayClient.AssertExpectations(t)
@@ -230,7 +227,7 @@ func TestRelayCallTimeout(t *testing.T) {
 // TestRandomRelayRetries verifies correct behavior when some relays do not respond with the blob,
 // requiring the PayloadRetriever to retry with other relays.
 func TestRandomRelayRetries(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	relayCount := 100
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -268,7 +265,7 @@ func TestRandomRelayRetries(t *testing.T) {
 
 	for i := 0; i < relayCount; i++ {
 		failedCallCount = 0
-		payload, err := tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+		payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 		require.NotNil(t, payload)
 		require.NoError(t, err)
 
@@ -283,7 +280,7 @@ func TestRandomRelayRetries(t *testing.T) {
 
 // TestNoRelayResponse tests functionality when none of the relays respond
 func TestNoRelayResponse(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -300,10 +297,7 @@ func TestNoRelayResponse(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey,
-		blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.Nil(t, payload)
 	require.NotNil(t, err)
 
@@ -312,7 +306,7 @@ func TestNoRelayResponse(t *testing.T) {
 
 // TestNoRelays tests that having no relay keys is handled gracefully
 func TestNoRelays(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	tester.MockCertVerifier.On(
 		"VerifyCertV2",
@@ -321,9 +315,9 @@ func TestNoRelays(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	blobKey, _, blobCert := buildBlobAndCert(t, tester, []core.RelayKey{})
+	_, _, blobCert := buildBlobAndCert(t, tester, []core.RelayKey{})
 
-	payload, err := tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.Nil(t, payload)
 	require.NotNil(t, err)
 
@@ -332,7 +326,7 @@ func TestNoRelays(t *testing.T) {
 
 // TestGetBlobReturns0Len verifies that a 0 length blob returned from a relay is handled gracefully, and that the PayloadRetriever retries after such a failure
 func TestGetBlobReturns0Len(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -355,7 +349,7 @@ func TestGetBlobReturns0Len(t *testing.T) {
 		mock.Anything).Return(nil)
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
-	payload, err := tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.NotNil(t, payload)
 	require.NoError(t, err)
 
@@ -365,7 +359,7 @@ func TestGetBlobReturns0Len(t *testing.T) {
 // TestGetBlobReturnsDifferentBlob tests what happens when one relay returns a blob that doesn't match the commitment.
 // It also tests that the PayloadRetriever retries to get the correct blob from a different relay
 func TestGetBlobReturnsDifferentBlob(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
@@ -383,10 +377,7 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey1,
-		blobCert1)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert1)
 	require.NotNil(t, payload)
 	require.NoError(t, err)
 
@@ -396,7 +387,7 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 // TestGetBlobReturnsInvalidBlob tests what happens if a relay returns a blob which causes commitment verification to
 // throw an error. It verifies that the PayloadRetriever tries again with a different relay after such a failure.
 func TestGetBlobReturnsInvalidBlob(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
@@ -418,10 +409,7 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 	// this will fail the first time, since there isn't enough srs loaded to compute the commitment of the returned bytes
 	// it will succeed when the second relay gives the correct bytes
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey,
-		blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 
 	require.NotNil(t, payload)
 	require.NoError(t, err)
@@ -431,13 +419,13 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 // TestBlobFailsVerifyCertV2 tests what happens if cert verification fails
 func TestBlobFailsVerifyCertV2(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
 	for i := 0; i < relayCount; i++ {
 		relayKeys[i] = tester.Random.Uint32()
 	}
-	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tooLongBytes := make([]byte, len(blobBytes)+100)
 	copy(tooLongBytes[:], blobBytes)
@@ -450,10 +438,7 @@ func TestBlobFailsVerifyCertV2(t *testing.T) {
 		mock.Anything).Return(errors.New("verification failed")).Once()
 
 	// this will fail the first time, since verifyBlobV2 will fail
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey,
-		blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 
 	require.Nil(t, payload)
 	require.Error(t, err)
@@ -464,7 +449,7 @@ func TestBlobFailsVerifyCertV2(t *testing.T) {
 // TestGetBlobReturnsBlobWithInvalidLen check what happens if the blob length doesn't match the length that exists in
 // the BlobCommitment
 func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
@@ -482,10 +467,7 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 		mock.Anything).Return(nil)
 
 	// this will fail, since the length in the BlobCommitment doesn't match the actual blob length
-	payload, err := tester.PayloadRetriever.GetPayload(
-		context.Background(),
-		blobKey,
-		blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 
 	require.Nil(t, payload)
 	require.Error(t, err)
@@ -495,7 +477,7 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 
 // TestFailedDecoding verifies that a failed blob decode is handled gracefully
 func TestFailedDecoding(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	relayCount := 10
 	relayKeys := make([]core.RelayKey, relayCount)
@@ -527,7 +509,7 @@ func TestFailedDecoding(t *testing.T) {
 		mock.Anything,
 		mock.Anything).Return(nil)
 
-	payload, err := tester.PayloadRetriever.GetPayload(context.Background(), blobKey, blobCert)
+	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.Error(t, err)
 	require.Nil(t, payload)
 
@@ -536,11 +518,11 @@ func TestFailedDecoding(t *testing.T) {
 
 // TestErrorFreeClose tests the happy case, where none of the internal closes yield an error
 func TestErrorFreeClose(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	tester.MockRelayClient.On("Close").Return(nil).Once()
 
-	err := tester.PayloadRetriever.Close()
+	err := tester.RelayPayloadRetriever.Close()
 	require.NoError(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
@@ -548,11 +530,11 @@ func TestErrorFreeClose(t *testing.T) {
 
 // TestErrorClose tests what happens when subcomponents throw errors when being closed
 func TestErrorClose(t *testing.T) {
-	tester := buildPayloadRetrieverTester(t)
+	tester := buildRelayPayloadRetrieverTester(t)
 
 	tester.MockRelayClient.On("Close").Return(fmt.Errorf("close failed")).Once()
 
-	err := tester.PayloadRetriever.Close()
+	err := tester.RelayPayloadRetriever.Close()
 	require.NotNil(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
