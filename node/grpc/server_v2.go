@@ -182,7 +182,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	res := <-storeChan
 	if res.err != nil {
-		return nil, api.WrapAsInternal(err, "failed to store batch")
+		return nil, api.WrapAsInternal(res.err, "failed to store batch")
 	}
 
 	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])

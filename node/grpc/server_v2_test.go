@@ -44,6 +44,16 @@ var (
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	}
+	ecdsaSig = []byte{
+		0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b,
+		0x0c, 0x1d, 0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d,
+		0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f,
+		0x6a, 0x7b, 0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b,
+		0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b, 0x0c, 0x1d,
+		0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d, 0x8e, 0x9f,
+		0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
+		0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b, 0x4c, 0x5d,
+	}
 )
 
 type testComponents struct {
@@ -155,19 +165,9 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 	_, err = c.server.StoreChunks(context.Background(), req)
 	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "signature must be 64 bytes")
 
-	sig := []byte{
-		0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b,
-		0x0c, 0x1d, 0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d,
-		0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f,
-		0x6a, 0x7b, 0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b,
-		0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b, 0x0c, 0x1d,
-		0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d, 0x8e, 0x9f,
-		0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
-		0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b, 0x4c, 0x5d,
-	}
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   sig,
+		Signature:   ecdsaSig,
 		Batch:       &pbcommon.Batch{},
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
@@ -175,7 +175,7 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   sig,
+		Signature:   ecdsaSig,
 		Batch: &pbcommon.Batch{
 			Header:           &pbcommon.BatchHeader{},
 			BlobCertificates: batchProto.BlobCertificates,
@@ -186,7 +186,7 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
-		Signature:   sig,
+		Signature:   ecdsaSig,
 		Batch: &pbcommon.Batch{
 			Header:           batchProto.Header,
 			BlobCertificates: []*pbcommon.BlobCertificate{},
@@ -236,7 +236,9 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, nil)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
-		Batch: batchProto,
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, reply.GetSignature())
@@ -264,7 +266,9 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{}, relayErr)
 	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{}, relayErr)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
-		Batch: batchProto,
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
@@ -310,10 +314,12 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 	})
 	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, errors.New("error"))
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
-		Batch: batchProto,
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
-	requireErrorStatus(t, err, codes.Internal)
+	requireErrorStatusAndMsg(t, err, codes.Internal, "failed to store batch")
 }
 
 func TestV2StoreChunksValidationFailure(t *testing.T) {
@@ -357,7 +363,9 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	c.store.On("StoreBatch", batch, mock.Anything).Return([]kvstore.Key{mockKey{}}, nil)
 	c.store.On("DeleteKeys", mock.Anything, mock.Anything).Return(nil)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
-		Batch: batchProto,
+		DisperserID: 0,
+		Signature:   ecdsaSig,
+		Batch:       batchProto,
 	})
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
