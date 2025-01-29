@@ -132,22 +132,22 @@ func ComputeBlobKey(
 			},
 			LengthCommitment: abiG2Commit{
 				X: [2]*big.Int{
-					blobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 				},
 			},
 			LengthProof: abiG2Commit{
 				X: [2]*big.Int{
-					blobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					blobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
 				},
 			},
 			DataLength: uint32(blobCommitments.Length),
