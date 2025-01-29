@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api"
+	"github.com/docker/go-units"
 	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -118,7 +119,7 @@ func (c *nodeClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err

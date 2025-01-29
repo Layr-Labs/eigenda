@@ -20,12 +20,12 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 	}()
 
 	if req.GetBlobKey() == nil || len(req.GetBlobKey()) != 32 {
-		return nil, api.NewErrorInvalidArg("invalid blob key")
+		return nil, api.NewErrorInvalidArg("blob key must be present and with 32 bytes")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(req.GetBlobKey())
 	if err != nil {
-		return nil, api.NewErrorInvalidArg("invalid blob key")
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob key bytes: %v", err))
 	}
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
@@ -57,8 +57,8 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 	}
 
 	if len(blobInclusionInfos) == 0 {
-		s.logger.Error("no inclusion info found for certified blob", "blobKey", blobKey.Hex())
-		return nil, api.NewErrorInternal("no inclusion info found")
+		s.logger.Error("no blob inclusion info found for certified blob", "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal("no blob inclusion info found")
 	}
 
 	if len(blobInclusionInfos) > 1 {

@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"github.com/docker/go-units"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -45,14 +46,14 @@ var (
 		Usage:    "Max size of a gRPC message in bytes",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GRPC_MESSAGE_SIZE"),
-		Value:    1024 * 1024 * 300,
+		Value:    4 * units.MiB,
 	}
 	MetadataCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metadata-cache-size"),
 		Usage:    "Max number of items in the metadata cache",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_CACHE_SIZE"),
-		Value:    1024 * 1024,
+		Value:    units.MiB,
 	}
 	MetadataMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metadata-max-concurrency"),
@@ -66,7 +67,7 @@ var (
 		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    1024 * 1024 * 1024,
+		Value:    units.GiB,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
@@ -80,7 +81,7 @@ var (
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
-		Value:    1024 * 1024 * 1024,
+		Value:    8 * units.GiB,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -115,14 +116,14 @@ var (
 		Usage:    "Max bandwidth for GetBlob operations in bytes per second",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_BLOB_BYTES_PER_SECOND"),
-		Value:    20 * 1024 * 1024,
+		Value:    20 * units.MiB,
 	}
 	GetBlobBytesBurstinessFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-blob-bytes-burstiness"),
 		Usage:    "Burstiness of the GetBlob bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_BLOB_BYTES_BURSTINESS"),
-		Value:    20 * 1024 * 1024,
+		Value:    20 * units.MiB,
 	}
 	MaxConcurrentGetBlobOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-blob-ops"),
@@ -150,14 +151,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND"),
-		Value:    80 * 1024 * 1024,
+		Value:    80 * units.MiB,
 	}
 	GetChunkBytesBurstinessFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS"),
-		Value:    800 * 1024 * 1024,
+		Value:    800 * units.MiB,
 	}
 	MaxConcurrentGetChunkOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops"),
@@ -185,14 +186,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT"),
-		Value:    40 * 1024 * 1024,
+		Value:    40 * units.MiB,
 	}
 	GetChunkBytesBurstinessClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness-client"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS_CLIENT"),
-		Value:    400 * 1024 * 1024,
+		Value:    400 * units.MiB,
 	}
 	MaxConcurrentGetChunkOpsClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops-client"),

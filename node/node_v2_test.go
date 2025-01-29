@@ -3,6 +3,7 @@ package node_test
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-units"
 	"testing"
 	"time"
 
@@ -257,9 +258,10 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	}
 
 	relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-		Sockets:       relayURLs,
-		OperatorID:    &c.node.Config.ID,
-		MessageSigner: messageSigner,
+		Sockets:            relayURLs,
+		OperatorID:         &c.node.Config.ID,
+		MessageSigner:      messageSigner,
+		MaxGRPCMessageSize: units.GiB,
 	}, c.node.Logger)
 	require.NoError(t, err)
 	// set up non-mock client
