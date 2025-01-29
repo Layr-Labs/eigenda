@@ -4,12 +4,11 @@ import (
 	"context"
 	"flag"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +28,9 @@ func TestClientUsingTestnet(t *testing.T) {
 
 	t.Run("PutBlobWaitForConfirmationDepth0AndGetBlob", func(t *testing.T) {
 		t.Parallel()
-		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
+		logger, err := logging.NewZapLogger(logging.Development)
+		assert.NoError(t, err)
+
 		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
 			RPC: "disperser-holesky.eigenda.xyz:443",
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
@@ -58,7 +59,9 @@ func TestClientUsingTestnet(t *testing.T) {
 	t.Run("PutBlobWaitForConfirmationDepth3AndGetBlob", func(t *testing.T) {
 		t.Parallel()
 		confDepth := uint64(3)
-		logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true))
+		logger, err := logging.NewZapLogger(logging.Development)
+		assert.NoError(t, err)
+
 		client, err := NewEigenDAClient(logger, EigenDAClientConfig{
 			RPC: "disperser-holesky.eigenda.xyz:443",
 			// Should need way less than 20 minutes, but we set it to 20 minutes to be safe
