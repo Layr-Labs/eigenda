@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 
 	"google.golang.org/grpc/codes"
@@ -10,17 +11,49 @@ import (
 // The canonical errors from the EigenDA gRPC API endpoints.
 //
 // Notes:
-// - We start with a small (but sufficient) subset of grpc's error codes,
-//   and expand when there is an important failure case to separate out. See:
-//   https://grpc.io/docs/guides/status-codes/
-// - Make sure that internally propagated errors are eventually wrapped in one of the
-//   user-facing errors defined here, since grpc otherwise returns an UNKNOWN error code,
-//   which is harder to debug and understand for users.
-// - See https://github.com/googleapis/googleapis/blob/ba8ea80f25d19bde8501cd51f314391f8d39bde8/google/rpc/code.proto
-//   for the mapping of grpc error codes to HTTP status codes.
-
+//   - We start with a small (but sufficient) subset of grpc's error codes,
+//     and expand when there is an important failure case to separate out. See:
+//     https://grpc.io/docs/guides/status-codes/
+//   - Make sure that internally propagated errors are eventually wrapped in one of the
+//     user-facing errors defined here, since grpc otherwise returns an UNKNOWN error code,
+//     which is harder to debug and understand for users.
+//   - See https://github.com/googleapis/googleapis/blob/ba8ea80f25d19bde8501cd51f314391f8d39bde8/google/rpc/code.proto
+//     for the mapping of grpc error codes to HTTP status codes.
 func newErrorGRPC(code codes.Code, msg string) error {
 	return status.Error(code, msg)
+}
+
+// WrapAsGRPCError wraps an error with a gRPC code and message. If the error already has a gRPC code,
+// it retains the code but combines the messages. Otherwise, it uses the provided code and combined message.
+func WrapAsGRPCError(err error, code codes.Code, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	combinedMessage := fmt.Sprintf("%s: %s", msg, err.Error())
+	if s, ok := status.FromError(err); ok {
+		// If it's already a gRPC error, use the same code but combine the messages
+		return status.Error(s.Code(), combinedMessage)
+	}
+
+	// If it's not a gRPC error, create a new gRPC error with the given code and message
+	return status.Error(code, combinedMessage)
+}
+
+// WrapGRPCError wraps an error with a message. If the error is a gRPC error, it retains the code
+// and combines the messages. Otherwise, it returns a new error with the combined message.
+func WrapGRPCError(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+
+	combinedMessage := fmt.Sprintf("%s: %s", msg, err.Error())
+	if s, ok := status.FromError(err); ok {
+		// If it's a gRPC error, keep it as gRPC error but combine the messages
+		return status.Error(s.Code(), combinedMessage)
+	}
+
+	return errors.New(combinedMessage)
 }
 
 // HTTP Mapping: 400 Bad Request
@@ -28,9 +61,17 @@ func NewErrorInvalidArg(msg string) error {
 	return newErrorGRPC(codes.InvalidArgument, msg)
 }
 
+func WrapAsInvalidArg(err error, msg string) error {
+	return WrapAsGRPCError(err, codes.InvalidArgument, msg)
+}
+
 // HTTP Mapping: 404 Not Found
 func NewErrorNotFound(msg string) error {
 	return newErrorGRPC(codes.NotFound, msg)
+}
+
+func WrapAsNotFound(err error, msg string) error {
+	return WrapAsGRPCError(err, codes.NotFound, msg)
 }
 
 // HTTP Mapping: 429 Too Many Requests
@@ -38,9 +79,26 @@ func NewErrorResourceExhausted(msg string) error {
 	return newErrorGRPC(codes.ResourceExhausted, msg)
 }
 
+func WrapAsResourceExhausted(err error, msg string) error {
+	return WrapAsGRPCError(err, codes.ResourceExhausted, msg)
+}
+
 // HTTP Mapping: 500 Internal Server Error
 func NewErrorInternal(msg string) error {
 	return newErrorGRPC(codes.Internal, msg)
+}
+
+func WrapAsInternal(err error, msg string) error {
+	return WrapAsGRPCError(err, codes.Internal, msg)
+}
+
+// HTTP Mapping: 401 Unauthorized
+func NewErrorUnauthenticated(msg string) error {
+	return newErrorGRPC(codes.Unauthenticated, msg)
+}
+
+func WrapAsUnauthenticated(err error, msg string) error {
+	return WrapAsGRPCError(err, codes.Unauthenticated, msg)
 }
 
 // HTTP Mapping: 500 Internal Server Error
