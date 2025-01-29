@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-units"
 	"os"
 	"os/exec"
 	"sync"
@@ -26,10 +27,13 @@ var (
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
 		SRSOrder:                      268435456,
 		SRSNumberToLoad:               2097152,
+		MaxBlobSize:                   2 * units.MiB,
 	}
 
-	preprodLock   sync.Mutex
-	preprodClient *TestClient
+	lock   sync.Mutex
+	client *TestClient
+
+	targetConfig = preprodConfig
 )
 
 func setupFilesystem(t *testing.T, config *TestClientConfig) {
@@ -107,23 +111,26 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 		filePath)
 }
 
-func getPreprodClient(t *testing.T) *TestClient {
-	preprodLock.Lock()
-	defer preprodLock.Unlock()
+// getClient returns a TestClient instance, creating one if it does not exist.
+// This uses a global static client... this is icky, but it takes ~1 minute
+// to read the SRS points, so it's the lesser of two evils to keep it around.
+func getClient(t *testing.T) *TestClient {
+	lock.Lock()
+	defer lock.Unlock()
 
 	skipInCI(t)
-	setupFilesystem(t, preprodConfig)
+	setupFilesystem(t, targetConfig)
 
-	if preprodClient == nil {
-		preprodClient = NewTestClient(t, preprodConfig)
+	if client == nil {
+		client = NewTestClient(t, targetConfig)
 	}
 
-	return preprodClient
+	return client
 }
 
 func skipInCI(t *testing.T) {
 	if os.Getenv("CI") != "" {
-		t.Skip("Skipping integration test in CI environment")
+		t.Skip("Skipping test in CI environment")
 	}
 }
 
@@ -133,7 +140,7 @@ func skipInCI(t *testing.T) {
 // - read the blob from the relays
 // - read the blob from the validators
 func testBasicDispersal(t *testing.T, rand *random.TestRandom, payload []byte, requestedLength int, quorums []core.QuorumID) error {
-	client := getPreprodClient(t)
+	client := getClient(t)
 
 	// Make sure the payload is the correct length
 	fmt.Printf("requestedLength: %d, len(payload): %d\n", requestedLength, len(payload))
@@ -208,7 +215,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := int(1024 * 1024 * (1 + rand.Float64()))
+	dataLength := int(rand.Uint64n(targetConfig.MaxBlobSize/2) + targetConfig.MaxBlobSize/2)
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	require.Equal(t, calculateExpectedPaddedSize(dataLength), len(paddedPayload))
@@ -227,13 +234,11 @@ func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TODO:(dmanc): This test is failing. "Timed out waiting for blob to be confirmed"
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
-	t.Skipf("2mb is the max size in preprod") // TODO
 
 	rand := random.NewTestRandom(t)
-	originalSize, err := calculateOriginalSize(16 * 1024 * 1024)
+	originalSize, err := calculateOriginalSize(rand.Intn(int(targetConfig.MaxBlobSize)))
 	require.NoError(t, err)
 	payload := rand.Bytes(originalSize)
 	padded := codec.ConvertByPaddingEmptyByte(payload)
@@ -247,7 +252,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	originalSize, err := calculateOriginalSize(16*1024*1024 + 2) // 16MB + 2 bytes
+	originalSize, err := calculateOriginalSize(rand.Intn(int(targetConfig.MaxBlobSize)) + 2) // 16MB + 2 bytes
 	require.NoError(t, err)
 	payload := rand.Bytes(originalSize)
 	padded := codec.ConvertByPaddingEmptyByte(payload)

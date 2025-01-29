@@ -57,6 +57,7 @@ type TestClientConfig struct {
 	SubgraphURL                   string
 	SRSOrder                      uint64
 	SRSNumberToLoad               uint64
+	MaxBlobSize                   uint64
 }
 
 // path returns the full path to a file in the test data directory.
@@ -190,7 +191,7 @@ func (c *TestClient) DisperseAndVerify(
 	if err != nil {
 		return err
 	}
-	blobCert := c.WaitForCertification(ctx, key)
+	blobCert := c.WaitForCertification(ctx, key, quorums)
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
@@ -216,7 +217,11 @@ func (c *TestClient) DispersePayload(
 }
 
 // WaitForCertification waits for a blob to be certified. Returns the blob certificate.
-func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKey) *commonv2.BlobCertificate {
+func (c *TestClient) WaitForCertification(
+	ctx context.Context,
+	key corev2.BlobKey,
+	expectedQuorums []core.QuorumID) *commonv2.BlobCertificate {
+
 	var status *v2.BlobStatus = nil
 	ticker := time.NewTicker(time.Second)
 	start := time.Now()
@@ -236,10 +241,8 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				require.NotNil(c.t, blobCert)
-				require.True(c.t, len(blobCert.RelayKeys) >= 1)
+				c.VerifyBlobCertification(reply.SignedBatch, reply.BlobInclusionInfo, expectedQuorums)
 				return blobCert
-
 			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
 				statusStart = time.Now()
@@ -265,6 +268,34 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 			require.Fail(c.t, "Timed out waiting for blob to be confirmed")
 		}
 	}
+}
+
+// VerifyBlobCertification verifies that the blob has been properly certified by the network.
+func (c *TestClient) VerifyBlobCertification(
+	signedBatch *v2.SignedBatch,
+	inclusionInfo *v2.BlobInclusionInfo,
+	expectedQuorums []core.QuorumID) {
+
+	blobCert := inclusionInfo.BlobCertificate
+	require.NotNil(c.t, blobCert)
+	require.True(c.t, len(blobCert.RelayKeys) >= 1)
+	// TODO verify this has the expected blob key (i.e. hash)
+	// TODO verify signature
+
+	// TODO verify inclusion info
+
+	// TODO verify signed batch
+	// TODO do we need to check something onchain?
+	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
+	for _, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
+		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
+	}
+	require.Equal(c.t, len(expectedQuorums), len(quorumSet))
+	for expectedQuorum := range quorumSet {
+		require.Contains(c.t, expectedQuorums, expectedQuorum)
+	}
+	// TODO verify signed percentages
+
 }
 
 // ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.

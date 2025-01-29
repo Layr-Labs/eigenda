@@ -80,6 +80,16 @@ func (r *TestRandom) String(length int) string {
 	return string(b)
 }
 
+// Uint32n generates a random uint32 less than n.
+func (r *TestRandom) Uint32n(n uint32) uint32 {
+	return r.Uint32() % n
+}
+
+// Uint64n generates a random uint64 less than n.
+func (r *TestRandom) Uint64n(n uint64) uint64 {
+	return r.Uint64() % n
+}
+
 var _ io.Reader = &randIOReader{}
 
 // randIOReader is an io.Reader that reads from a random number generator.
