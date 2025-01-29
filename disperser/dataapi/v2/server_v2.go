@@ -210,9 +210,33 @@ func (s *ServerV2) Start() error {
 	}
 
 	router := gin.New()
+
+	// Add recovery middleware (best practice according to Cursor)
+	router.Use(gin.Recovery())
+
 	basePath := "/api/v2"
 	docsv2.SwaggerInfoV2.BasePath = basePath
 	docsv2.SwaggerInfoV2.Host = os.Getenv("SWAGGER_HOST")
+
+	// Configure CORS
+	config := cors.DefaultConfig()
+	config.AllowOrigins = s.allowOrigins
+	config.AllowCredentials = true
+	config.AllowMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	config.ExposeHeaders = []string{"Content-Length"}
+
+	if s.serverMode != gin.ReleaseMode {
+		config.AllowOrigins = []string{"*"}
+	}
+
+	// Apply CORS middleware before routes
+	router.Use(cors.New(config))
+
+	// Add OPTIONS handlers for all routes
+	router.OPTIONS("/*path", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
 
 	v2 := router.Group(basePath)
 	{
@@ -255,16 +279,6 @@ func (s *ServerV2) Start() error {
 	router.Use(logger.SetLogger(
 		logger.WithSkipPath([]string{"/"}),
 	))
-
-	config := cors.DefaultConfig()
-	config.AllowOrigins = s.allowOrigins
-	config.AllowCredentials = true
-	config.AllowMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
-
-	if s.serverMode != gin.ReleaseMode {
-		config.AllowOrigins = []string{"*"}
-	}
-	router.Use(cors.New(config))
 
 	srv := &http.Server{
 		Addr:              s.socketAddr,
@@ -583,7 +597,7 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 // FetchBatchFeedHandler godoc
 //
 //	@Summary	Fetch batch feed
-//	@Tags		Blob
+//	@Tags		Batch
 //	@Produce	json
 //	@Param		end			query		string	false	"Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval	query		int		false	"Fetch batches starting from an interval (in seconds) before the end time [default: 3600]"

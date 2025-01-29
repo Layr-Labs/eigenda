@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-units"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -314,7 +315,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err

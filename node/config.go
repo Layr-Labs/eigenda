@@ -75,6 +75,7 @@ type Config struct {
 	EnableGnarkBundleEncoding      bool
 	ClientIPHeader                 string
 	UseSecureGrpc                  bool
+	RelayMaxMessageSize            uint
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
 
@@ -292,6 +293,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EnableGnarkBundleEncoding:           ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),
 		ClientIPHeader:                      ctx.GlobalString(flags.ClientIPHeaderFlag.Name),
 		UseSecureGrpc:                       ctx.GlobalBoolT(flags.ChurnerUseSecureGRPC.Name),
+		RelayMaxMessageSize:                 uint(ctx.GlobalInt(flags.RelayMaxGRPCMessageSizeFlag.Name)),
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,

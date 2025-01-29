@@ -19,10 +19,11 @@ import (
 type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, error)
 
 type RelayClientConfig struct {
-	Sockets           map[corev2.RelayKey]string
-	UseSecureGrpcFlag bool
-	OperatorID        *core.OperatorID
-	MessageSigner     MessageSigner
+	Sockets            map[corev2.RelayKey]string
+	UseSecureGrpcFlag  bool
+	MaxGRPCMessageSize uint
+	OperatorID         *core.OperatorID
+	MessageSigner      MessageSigner
 }
 
 type ChunkRequestByRange struct {
@@ -71,8 +72,12 @@ var _ RelayClient = (*relayClient)(nil)
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
 func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
-	if config == nil || len(config.Sockets) <= 0 {
-		return nil, fmt.Errorf("invalid config: %v", config)
+	if config == nil {
+		return nil, errors.New("nil config")
+	} else if len(config.Sockets) <= 0 {
+		return nil, errors.New("no relay sockets provided")
+	} else if config.MaxGRPCMessageSize == 0 {
+		return nil, errors.New("max gRPC message size must be greater than 0")
 	}
 
 	logger.Info("creating relay client", "urls", config.Sockets)
@@ -241,7 +246,7 @@ func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
 			initErr = fmt.Errorf("unknown relay key: %v", key)
 			return
 		}
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
 		conn, err := grpc.NewClient(socket, dialOptions...)
 		if err != nil {
 			initErr = err
