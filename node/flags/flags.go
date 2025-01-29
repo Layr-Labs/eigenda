@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"github.com/docker/go-units"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -249,7 +250,7 @@ var (
 		Usage:    "The maximum message size in bytes the V2 dispersal endpoint can receive from the client. This flag is only relevant in v2 (default: 1MB)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
-		Value:    1024 * 1024,
+		Value:    units.MiB,
 	}
 	DisableDispersalAuthenticationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
@@ -262,7 +263,7 @@ var (
 		Usage:    "The size of the dispersal authentication key cache",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_CACHE_SIZE"),
-		Value:    1024,
+		Value:    units.KiB,
 	}
 	DisperserKeyTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-key-timeout"),
@@ -277,6 +278,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
 		Value:    time.Minute,
+	}
+	RelayMaxGRPCMessageSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-max-grpc-message-size"),
+		Usage:    "The maximum message size in bytes for messages received from the relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
+		Value:    units.GiB, // intentionally large for the time being
 	}
 
 	// Test only, DO NOT USE the following flags in production
@@ -439,6 +447,7 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
+	RelayMaxGRPCMessageSizeFlag,
 }
 
 func init() {

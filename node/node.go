@@ -240,10 +240,11 @@ func NewNode(
 
 		logger.Info("Creating relay client", "relayURLs", relayURLs)
 		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:           relayURLs,
-			UseSecureGrpcFlag: config.UseSecureGrpc,
-			OperatorID:        &config.ID,
-			MessageSigner:     n.SignMessage,
+			Sockets:            relayURLs,
+			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			OperatorID:         &config.ID,
+			MessageSigner:      n.SignMessage,
+			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
 		}, logger)
 
 		if err != nil {
@@ -422,10 +423,11 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			}
 
 			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-				Sockets:           relayURLs,
-				UseSecureGrpcFlag: n.Config.UseSecureGrpc,
-				OperatorID:        &n.Config.ID,
-				MessageSigner:     n.SignMessage,
+				Sockets:            relayURLs,
+				UseSecureGrpcFlag:  n.Config.UseSecureGrpc,
+				OperatorID:         &n.Config.ID,
+				MessageSigner:      n.SignMessage,
+				MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
 			}, n.Logger)
 			if err != nil {
 				n.Logger.Error("error creating relay client", "err", err)
