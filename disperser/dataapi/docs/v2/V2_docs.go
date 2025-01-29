@@ -663,12 +663,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -676,9 +670,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -712,12 +703,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -746,12 +731,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -760,9 +739,6 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -770,9 +746,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -789,7 +762,7 @@ const docTemplateV2 = `{
                     ]
                 },
                 "attestedAt": {
-                    "description": "AttestedAt is the time the attestation was made",
+                    "description": "AttestedAt is the time the attestation was made in nanoseconds",
                     "type": "integer"
                 },
                 "batchRoot": {
@@ -821,7 +794,7 @@ const docTemplateV2 = `{
                     }
                 },
                 "quorumResults": {
-                    "description": "QuorumResults contains the results of the quorum verification",
+                    "description": "QuorumResults contains the operators' total signing percentage of the quorum",
                     "type": "object",
                     "additionalProperties": {
                         "type": "integer"
@@ -972,12 +945,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "a0": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -1137,7 +1104,7 @@ const docTemplateV2 = `{
                     "type": "integer"
                 },
                 "requestedAt": {
-                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in seconds",
+                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds",
                     "type": "integer"
                 },
                 "signature": {

@@ -51,16 +51,10 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   core.G2Point:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -84,10 +78,6 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -106,23 +96,15 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -132,7 +114,7 @@ definitions:
         - $ref: '#/definitions/core.G2Point'
         description: APKG2 is the aggregate public key of all signers
       attestedAt:
-        description: AttestedAt is the time the attestation was made
+        description: AttestedAt is the time the attestation was made in nanoseconds
         type: integer
       batchRoot:
         description: BatchRoot is the root of a Merkle tree whose leaves are the keys
@@ -160,7 +142,8 @@ definitions:
       quorumResults:
         additionalProperties:
           type: integer
-        description: QuorumResults contains the results of the quorum verification
+        description: QuorumResults contains the operators' total signing percentage
+          of the quorum
         type: object
       referenceBlockNumber:
         description: ReferenceBlockNumber is the block number at which all operator
@@ -271,10 +254,6 @@ definitions:
         items:
           type: integer
         type: array
-      a1:
-        items:
-          type: integer
-        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -377,7 +356,7 @@ definitions:
         type: integer
       requestedAt:
         description: RequestedAt is the Unix timestamp of when the blob was requested
-          in seconds
+          in nanoseconds
         type: integer
       signature:
         items:
