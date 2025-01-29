@@ -28,18 +28,18 @@ type PayloadRetriever struct {
 	// random doesn't need to be cryptographically secure, as it's only used to distribute load across relays.
 	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
 	// must be evaluated for thread safety.
-	random                 *rand.Rand
-	payloadRetrieverConfig *PayloadRetrieverConfig
-	codec                  codecs.BlobCodec
-	relayClient            RelayClient
-	g1Srs                  []bn254.G1Affine
-	certVerifier           verification.ICertVerifier
+	random       *rand.Rand
+	config       PayloadRetrieverConfig
+	codec        codecs.BlobCodec
+	relayClient  RelayClient
+	g1Srs        []bn254.G1Affine
+	certVerifier verification.ICertVerifier
 }
 
 // BuildPayloadRetriever builds a PayloadRetriever from config structs.
 func BuildPayloadRetriever(
 	log logging.Logger,
-	payloadRetrieverConfig *PayloadRetrieverConfig,
+	payloadRetrieverConfig PayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
 	relayClientConfig *RelayClientConfig,
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
@@ -59,7 +59,7 @@ func BuildPayloadRetriever(
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
-	codec, err := createCodec(payloadRetrieverConfig)
+	codec, err := codecs.CreateCodec(payloadRetrieverConfig.PayloadPolynomialForm, payloadRetrieverConfig.BlobEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -78,20 +78,25 @@ func BuildPayloadRetriever(
 func NewPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
-	payloadRetrieverConfig *PayloadRetrieverConfig,
+	payloadRetrieverConfig PayloadRetrieverConfig,
 	relayClient RelayClient,
 	certVerifier verification.ICertVerifier,
 	codec codecs.BlobCodec,
 	g1Srs []bn254.G1Affine) (*PayloadRetriever, error) {
 
+	err := payloadRetrieverConfig.checkAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set PayloadRetrieverConfig config: %w", err)
+	}
+
 	return &PayloadRetriever{
-		log:                    log,
-		random:                 random,
-		payloadRetrieverConfig: payloadRetrieverConfig,
-		codec:                  codec,
-		relayClient:            relayClient,
-		certVerifier:           certVerifier,
-		g1Srs:                  g1Srs,
+		log:          log,
+		random:       random,
+		config:       payloadRetrieverConfig,
+		codec:        codec,
+		relayClient:  relayClient,
+		certVerifier: certVerifier,
+		g1Srs:        g1Srs,
 	}, nil
 }
 
@@ -107,7 +112,7 @@ func (pr *PayloadRetriever) GetPayload(
 
 	err := pr.verifyCertWithTimeout(ctx, eigenDACert)
 	if err != nil {
-		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey, err)
+		return nil, fmt.Errorf("verify cert with timeout for blobKey %v: %w", blobKey.Hex(), err)
 	}
 
 	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
@@ -136,7 +141,11 @@ func (pr *PayloadRetriever) GetPayload(
 		blob, err := pr.getBlobWithTimeout(ctx, relayKey, blobKey)
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
-			pr.log.Warn("blob couldn't be retrieved from relay", "blobKey", blobKey, "relayKey", relayKey, "error", err)
+			pr.log.Warn(
+				"blob couldn't be retrieved from relay",
+				"blobKey", blobKey.Hex(),
+				"relayKey", relayKey,
+				"error", err)
 			continue
 		}
 
@@ -156,14 +165,14 @@ func (pr *PayloadRetriever) GetPayload(
 					but could potentially indicate a maliciously generated blob certificate.
 					It should not be possible for an honestly generated certificate to verify
 					for an invalid blob!`,
-				"blobKey", blobKey, "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
+				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
 
 		return payload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey, relayKeyCount)
+	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
 // verifyBlobAgainstCert verifies the blob received from a relay against the certificate.
@@ -183,7 +192,7 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 
 	// An honest relay should never send an empty blob
 	if len(blob) == 0 {
-		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey, relayKey)
+		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey.Hex(), relayKey)
 	}
 
 	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
@@ -192,13 +201,13 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	if err != nil {
 		return fmt.Errorf(
 			"generate and compare commitment for blob %v received from relay %v: %w",
-			blobKey,
+			blobKey.Hex(),
 			relayKey,
 			err)
 	}
 
 	if !valid {
-		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey, relayKey)
+		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey.Hex(), relayKey)
 	}
 
 	// Checking that the length returned by the relay is <= the length claimed in the BlobCommitments is sufficient
@@ -209,7 +218,7 @@ func (pr *PayloadRetriever) verifyBlobAgainstCert(
 	if uint(len(blob)) > blobLength*encoding.BYTES_PER_SYMBOL {
 		return fmt.Errorf(
 			"length for blob %v (%d bytes) received from relay %v is greater than claimed blob length (%d bytes)",
-			blobKey,
+			blobKey.Hex(),
 			len(blob),
 			relayKey,
 			blobLength*encoding.BYTES_PER_SYMBOL)
@@ -224,7 +233,7 @@ func (pr *PayloadRetriever) getBlobWithTimeout(
 	relayKey core.RelayKey,
 	blobKey core.BlobKey) ([]byte, error) {
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.RelayTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
 	return pr.relayClient.GetBlob(timeoutCtx, relayKey, blobKey)
@@ -237,7 +246,7 @@ func (pr *PayloadRetriever) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
 ) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.payloadRetrieverConfig.ContractCallTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.ContractCallTimeout)
 	defer cancel()
 
 	return pr.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
@@ -256,27 +265,6 @@ func (pr *PayloadRetriever) Close() error {
 	}
 
 	return nil
-}
-
-// createCodec creates the codec based on client config values
-func createCodec(config *PayloadRetrieverConfig) (codecs.BlobCodec, error) {
-	lowLevelCodec, err := codecs.BlobEncodingVersionToCodec(config.BlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create low level codec: %w", err)
-	}
-
-	switch config.PayloadPolynomialForm {
-	case codecs.PolynomialFormCoeff:
-		// Data must NOT be IFFTed during blob construction, since the payload is already in PolynomialFormCoeff after
-		// being encoded.
-		return codecs.NewNoIFFTCodec(lowLevelCodec), nil
-	case codecs.PolynomialFormEval:
-		// Data MUST be IFFTed during blob construction, since the payload is in PolynomialFormEval after being encoded,
-		// but must be in PolynomialFormCoeff to produce a valid blob.
-		return codecs.NewIFFTCodec(lowLevelCodec), nil
-	default:
-		return nil, fmt.Errorf("unsupported polynomial form: %d", config.PayloadPolynomialForm)
-	}
 }
 
 // blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
