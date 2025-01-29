@@ -560,24 +560,24 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 		}
 
 		if failed {
-			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.InsufficientSignatures)
+			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.InsufficientSignatures)
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
 			}
 			continue
 		}
 
-		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
+		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Complete)
 		if err != nil {
-			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to certified: %w", blobKey.Hex(), err))
+			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to complete: %w", blobKey.Hex(), err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
 			d.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
-			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Certified)
+			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Complete)
 		}
 	}
 

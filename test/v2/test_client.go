@@ -3,12 +3,13 @@ package v2
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"os"
 	"path"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -190,7 +191,7 @@ func (c *TestClient) DisperseAndVerify(
 	if err != nil {
 		return err
 	}
-	blobCert := c.WaitForCertification(ctx, key)
+	blobCert := c.WaitForCompletion(ctx, key)
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
@@ -215,8 +216,9 @@ func (c *TestClient) DispersePayload(
 	return key, err
 }
 
-// WaitForCertification waits for a blob to be certified. Returns the blob certificate.
-func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKey) *commonv2.BlobCertificate {
+// WaitForCompletion waits for a blob to be complete. Returns the blob certificate.
+// TODO: When GATHERING_SIGNATURES is added, this function should be updated to validate it first moves to GATHERING_SIGNATURES before moving to COMPLETE status.
+func (c *TestClient) WaitForCompletion(ctx context.Context, key corev2.BlobKey) *commonv2.BlobCertificate {
 	var status *v2.BlobStatus = nil
 	ticker := time.NewTicker(time.Second)
 	start := time.Now()
@@ -227,11 +229,11 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
 			require.NoError(c.t, err)
 
-			if reply.Status == v2.BlobStatus_CERTIFIED {
+			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
 				totalElapsed := time.Since(start)
 				fmt.Printf(
-					"Blob is certified (spent %0.1fs in prior status, total time %0.1fs)\n",
+					"Blob is complete (spent %0.1fs in prior status, total time %0.1fs)\n",
 					elapsed.Seconds(),
 					totalElapsed.Seconds())
 
@@ -253,8 +255,7 @@ func (c *TestClient) WaitForCertification(ctx context.Context, key corev2.BlobKe
 				status = &reply.Status
 
 				if reply.Status == v2.BlobStatus_FAILED ||
-					reply.Status == v2.BlobStatus_UNKNOWN ||
-					reply.Status == v2.BlobStatus_INSUFFICIENT_SIGNATURES {
+					reply.Status == v2.BlobStatus_UNKNOWN {
 					require.Fail(
 						c.t,
 						"Blob status is in a terminal non-successful state.",

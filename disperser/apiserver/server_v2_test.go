@@ -329,7 +329,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	err = c.BlobMetadataStore.PutBlobCertificate(ctx, blobCert, nil)
 	require.NoError(t, err)
 
-	// Non ceritified blob status
+	// Queued/Encoded blob status
 	status, err := c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	})
@@ -343,8 +343,8 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
 
-	// Certified blob status
-	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Certified)
+	// Complete blob status
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
@@ -384,7 +384,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_CERTIFIED, reply.GetStatus())
+	require.Equal(t, pbv2.BlobStatus_COMPLETE, reply.GetStatus())
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	require.NoError(t, err)
 	blobCertProto, err := blobCert.ToProtobuf()
