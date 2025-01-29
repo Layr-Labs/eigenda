@@ -11,8 +11,8 @@ import (
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	grpcdisperser "github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/disperser"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -55,10 +55,8 @@ func TestPutRetrieveBlobIFFTSuccess(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                          "localhost:51001",
 			StatusQueryTimeout:           10 * time.Minute,
@@ -122,11 +120,10 @@ func TestPutRetrieveBlobIFFTNoDecodeSuccess(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
+
 	ifftCodec := codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec())
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                          "localhost:51001",
 			StatusQueryTimeout:           10 * time.Minute,
@@ -195,10 +192,8 @@ func TestPutRetrieveBlobNoIFFTSuccess(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
 	(disperserClient.On("RetrieveBlob", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil).Once()) // pass nil in as the return blob to tell the mock to return the corresponding blob
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                          "localhost:51001",
 			StatusQueryTimeout:           10 * time.Minute,
@@ -229,10 +224,8 @@ func TestPutBlobFailDispersal(t *testing.T) {
 	disperserClient := clientsmock.NewMockDisperserClient()
 	(disperserClient.On("DisperseBlobAuthenticated", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, nil, fmt.Errorf("error dispersing")))
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
@@ -263,10 +256,8 @@ func TestPutBlobFailureInsufficentSignatures(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_INSUFFICIENT_SIGNATURES}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
@@ -297,10 +288,8 @@ func TestPutBlobFailureGeneral(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FAILED}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
@@ -331,10 +320,8 @@ func TestPutBlobFailureUnknown(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_DISPERSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_UNKNOWN}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
@@ -367,10 +354,8 @@ func TestPutBlobFinalizationTimeout(t *testing.T) {
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_PROCESSING}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       200 * time.Millisecond,
@@ -428,10 +413,8 @@ func TestPutBlobIndividualRequestTimeout(t *testing.T) {
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       10 * time.Minute,
@@ -492,10 +475,8 @@ func TestPutBlobTotalTimeout(t *testing.T) {
 	}
 	(disperserClient.On("GetBlobStatus", mock.Anything, mock.Anything).
 		Return(&grpcdisperser.BlobStatusReply{Status: grpcdisperser.BlobStatus_FINALIZED, Info: finalizedBlobInfo}, nil).Once())
-	logger, err := logging.NewZapLogger(logging.Development)
-	require.NoError(t, err)
 	eigendaClient := clients.EigenDAClient{
-		Log: logger,
+		Log: testutils.GetLogger(),
 		Config: clients.EigenDAClientConfig{
 			RPC:                      "localhost:51001",
 			StatusQueryTimeout:       100 * time.Millisecond, // low total timeout
