@@ -196,7 +196,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 }
 
 // assembleFrames assembles a slice of frames from its composite proofs and coefficients.
-func assembleFrames(frames []*rs.Frame, proofs []*encoding.Proof) ([]*encoding.Frame, error) {
+func assembleFrames(frames []rs.FrameCoeffs, proofs []*encoding.Proof) ([]*encoding.Frame, error) {
 	if len(frames) != len(proofs) {
 		return nil, fmt.Errorf("number of frames and proofs must be equal (%d != %d)", len(frames), len(proofs))
 	}
@@ -205,7 +205,7 @@ func assembleFrames(frames []*rs.Frame, proofs []*encoding.Proof) ([]*encoding.F
 	for i := range frames {
 		assembledFrames[i] = &encoding.Frame{
 			Proof:  *proofs[i],
-			Coeffs: frames[i].Coeffs,
+			Coeffs: frames[i],
 		}
 	}
 

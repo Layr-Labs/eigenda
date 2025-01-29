@@ -188,16 +188,12 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
-func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int, params encoding.EncodingParams) []*rs.Frame {
+// TODO rename
+
+func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int, params encoding.EncodingParams) []rs.FrameCoeffs {
 	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)), params)
-	result := make([]*rs.Frame, len(frames))
 	require.NoError(t, err)
-
-	for i := 0; i < len(frames); i++ {
-		result[i] = &frames[i]
-	}
-
-	return result
+	return frames
 }
 
 func RandomCoefficientsTest(t *testing.T, client s3.Client) {
@@ -215,7 +211,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
 
-	expectedValues := make(map[corev2.BlobKey][]*rs.Frame)
+	expectedValues := make(map[corev2.BlobKey][]rs.FrameCoeffs)
 	metadataMap := make(map[corev2.BlobKey]*encoding.FragmentInfo)
 
 	// Write data
@@ -236,7 +232,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 		require.NoError(t, err)
 		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {
-			require.Equal(t, *expectedCoefficients[i], *coefficients[i])
+			require.Equal(t, expectedCoefficients[i], coefficients[i])
 		}
 	}
 }

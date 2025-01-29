@@ -15,7 +15,7 @@ type GlobalPoly struct {
 }
 
 // just a wrapper to take bytes not Fr Element
-func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams) ([]Frame, []uint32, error) {
+func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
 	inputFr, err := ToFrArray(inputBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot convert bytes to field elements, %w", err)
@@ -30,7 +30,7 @@ func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams)
 // frame, the multireveal interpolating coefficients are identical to the part of input bytes
 // in the form of field element. The extra returned integer list corresponds to which leading
 // coset root of unity, the frame is proving against, which can be deduced from a frame's index
-func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]Frame, []uint32, error) {
+func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) ([]FrameCoeffs, []uint32, error) {
 	start := time.Now()
 	intermediate := time.Now()
 

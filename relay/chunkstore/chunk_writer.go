@@ -20,7 +20,7 @@ type ChunkWriter interface {
 	PutChunkCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
-		frames []*rs.Frame) (*encoding.FragmentInfo, error)
+		frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error)
 	// ProofExists checks if the proofs for the blob key exist in the chunk store.
 	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
 	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
@@ -75,11 +75,11 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 func (c *chunkWriter) PutChunkCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
+	frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error) {
 	if len(frames) == 0 {
 		return nil, fmt.Errorf("no frames to upload")
 	}
-	bytes, err := rs.GnarkEncodeFrames(frames)
+	bytes, err := rs.SerializeFrameCoeffsSlice(frames)
 	if err != nil {
 		c.logger.Error("Failed to encode frames", "err", err)
 		return nil, fmt.Errorf("failed to encode frames: %v", err)
