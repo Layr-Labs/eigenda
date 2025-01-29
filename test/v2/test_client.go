@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/docker/go-units"
 	"os"
 	"path"
@@ -45,6 +46,7 @@ type TestClient struct {
 	RelayClient       clients.RelayClient
 	indexedChainState core.IndexedChainState
 	RetrievalClient   clients.RetrievalClient
+	CertVerifier      *verification.CertVerifier
 }
 
 type TestClientConfig struct {
@@ -170,6 +172,18 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		blobVerifier,
 		20)
 
+	// the cert verifier needs a different flavor of eth client
+	gethClientConfig := geth.EthClientConfig{
+		RPCURLs:          config.EthRPCURLs,
+		PrivateKeyString: privateKeyString,
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}
+	gethClient, err := geth.NewClient(gethClientConfig, gethcommon.Address{}, 0, logger)
+	require.NoError(t, err)
+	certVerifier, err := verification.NewCertVerifier(*gethClient, config.EigenDAServiceManagerAddr)
+	require.NoError(t, err)
+
 	return &TestClient{
 		t:                 t,
 		logger:            logger,
@@ -177,6 +191,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		RelayClient:       relayClient,
 		indexedChainState: indexedChainState,
 		RetrievalClient:   retrievalClient,
+		CertVerifier:      certVerifier,
 	}
 }
 
@@ -241,7 +256,11 @@ func (c *TestClient) WaitForCertification(
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				c.VerifyBlobCertification(reply.SignedBatch, reply.BlobInclusionInfo, expectedQuorums)
+				c.VerifyBlobCertification(
+					key,
+					expectedQuorums,
+					reply.SignedBatch,
+					reply.BlobInclusionInfo)
 				return blobCert
 			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
@@ -272,20 +291,23 @@ func (c *TestClient) WaitForCertification(
 
 // VerifyBlobCertification verifies that the blob has been properly certified by the network.
 func (c *TestClient) VerifyBlobCertification(
+	key corev2.BlobKey,
+	expectedQuorums []core.QuorumID,
 	signedBatch *v2.SignedBatch,
-	inclusionInfo *v2.BlobInclusionInfo,
-	expectedQuorums []core.QuorumID) {
+	inclusionInfo *v2.BlobInclusionInfo) {
 
 	blobCert := inclusionInfo.BlobCertificate
 	require.NotNil(c.t, blobCert)
 	require.True(c.t, len(blobCert.RelayKeys) >= 1)
-	// TODO verify this has the expected blob key (i.e. hash)
-	// TODO verify signature
 
-	// TODO verify inclusion info
+	// make sure the returned header hash matches the expected blob key
+	bh, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
+	require.NoError(c.t, err)
+	computedBlobKey, err := bh.BlobKey()
+	require.NoError(c.t, err)
+	require.Equal(c.t, key, computedBlobKey)
 
-	// TODO verify signed batch
-	// TODO do we need to check something onchain?
+	// verify that expected quorums are present
 	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
 	for _, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
 		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
@@ -294,8 +316,12 @@ func (c *TestClient) VerifyBlobCertification(
 	for expectedQuorum := range quorumSet {
 		require.Contains(c.t, expectedQuorums, expectedQuorum)
 	}
-	// TODO verify signed percentages
 
+	// TODO verify signed percentages by parsing byte array
+
+	// On-chain verification
+	err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
+	require.NoError(c.t, err)
 }
 
 // ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.

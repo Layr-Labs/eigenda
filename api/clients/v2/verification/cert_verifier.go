@@ -35,7 +35,7 @@ var _ ICertVerifier = &CertVerifier{}
 
 // NewCertVerifier constructs a CertVerifier
 func NewCertVerifier(
-	ethClient geth.EthClient, // the eth client, which should already be set up
+	ethClient geth.EthClient,   // the eth client, which should already be set up
 	certVerifierAddress string, // the hex address of the EigenDACertVerifier contract
 ) (*CertVerifier, error) {
 
@@ -52,15 +52,15 @@ func NewCertVerifier(
 	}, nil
 }
 
-// VerifyCertV2FromSignedBatch calls the verifyCertV2FromSignedBatch view function on the EigenDACertVerifier contract
+// VerifyCertV2FromSignedBatch calls the verifyDACertV2FromSignedBatch view function on the EigenDACertVerifier contract
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 	ctx context.Context,
-	// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
-	// is used to verify that the described blob actually exists in a valid batch.
+// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
+// is used to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
-	// Contains all necessary information about the blob, so that the cert can be verified.
+// Contains all necessary information about the blob, so that the cert can be verified.
 	blobInclusionInfo *disperser.BlobInclusionInfo,
 ) error {
 	convertedSignedBatch, err := SignedBatchProtoToBinding(signedBatch)
