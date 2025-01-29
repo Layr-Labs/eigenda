@@ -18,12 +18,10 @@ func NewAuthenticator() *authenticator {
 
 var _ core.BlobRequestAuthenticator = &authenticator{}
 
-func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader) error {
-	sig := header.Signature
-
+func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature []byte) error {
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
-	if len(sig) != 65 {
-		return fmt.Errorf("signature length is unexpected: %d", len(sig))
+	if len(signature) != 65 {
+		return fmt.Errorf("signature length is unexpected: %d", len(signature))
 	}
 
 	blobKey, err := header.BlobKey()
@@ -32,7 +30,7 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader) error {
 	}
 
 	// Recover public key from signature
-	sigPublicKeyECDSA, err := crypto.SigToPub(blobKey[:], sig)
+	sigPublicKeyECDSA, err := crypto.SigToPub(blobKey[:], signature)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
 	}

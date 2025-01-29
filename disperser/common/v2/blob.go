@@ -72,6 +72,7 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 // BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {
 	BlobHeader *core.BlobHeader
+	Signature  []byte
 
 	// BlobStatus indicates the current status of the blob
 	BlobStatus BlobStatus

@@ -35,7 +35,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
@@ -185,7 +184,7 @@ func NewNode(
 	}
 
 	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
-		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
+		"dispersalPort", config.DispersalPort, "v2DispersalPort", config.V2DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
 		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
@@ -241,10 +240,11 @@ func NewNode(
 
 		logger.Info("Creating relay client", "relayURLs", relayURLs)
 		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:           relayURLs,
-			UseSecureGrpcFlag: config.UseSecureGrpc,
-			OperatorID:        &config.ID,
-			MessageSigner:     n.SignMessage,
+			Sockets:            relayURLs,
+			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			OperatorID:         &config.ID,
+			MessageSigner:      n.SignMessage,
+			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
 		}, logger)
 
 		if err != nil {
@@ -286,11 +286,11 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort))
 	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
-			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
+			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort, "v2DispersalPort", n.Config.V2DispersalPort,
 			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
@@ -395,7 +395,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
 			if err == nil {
 				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
-					n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParams))
+					n.BlobVersionParams.Store(corev2.NewBlobVersionParameterMap(blobParams))
 				}
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
@@ -407,7 +407,7 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 				continue
 			}
 
-			existingURLs := map[v2.RelayKey]string{}
+			existingURLs := map[corev2.RelayKey]string{}
 			if existingRelayClient != nil {
 				existingURLs = existingRelayClient.GetSockets()
 			}
@@ -423,10 +423,11 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			}
 
 			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-				Sockets:           relayURLs,
-				UseSecureGrpcFlag: n.Config.UseSecureGrpc,
-				OperatorID:        &n.Config.ID,
-				MessageSigner:     n.SignMessage,
+				Sockets:            relayURLs,
+				UseSecureGrpcFlag:  n.Config.UseSecureGrpc,
+				OperatorID:         &n.Config.ID,
+				MessageSigner:      n.SignMessage,
+				MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
 			}, n.Logger)
 			if err != nil {
 				n.Logger.Error("error creating relay client", "err", err)
@@ -648,7 +649,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
+			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort)
 			if err != nil {
 				n.Logger.Error("failed to get socket address", "err", err)
 				continue

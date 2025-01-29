@@ -45,9 +45,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
-	relayIDs := ctx.IntSlice(flags.RelayIDsFlag.Name)
-	if len(relayIDs) == 0 {
-		return Config{}, fmt.Errorf("no relay IDs specified")
+	relayKeys := ctx.IntSlice(flags.RelayKeysFlag.Name)
+	if len(relayKeys) == 0 {
+		return Config{}, fmt.Errorf("no relay keys specified")
 	}
 	config := Config{
 		Log:               *loggerConfig,
@@ -55,14 +55,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BucketName:        ctx.String(flags.BucketNameFlag.Name),
 		MetadataTableName: ctx.String(flags.MetadataTableNameFlag.Name),
 		RelayConfig: relay.Config{
-			RelayIDs:                   make([]core.RelayKey, len(relayIDs)),
+			RelayKeys:                  make([]core.RelayKey, len(relayKeys)),
 			GRPCPort:                   ctx.Int(flags.GRPCPortFlag.Name),
 			MaxGRPCMessageSize:         ctx.Int(flags.MaxGRPCMessageSizeFlag.Name),
 			MetadataCacheSize:          ctx.Int(flags.MetadataCacheSizeFlag.Name),
 			MetadataMaxConcurrency:     ctx.Int(flags.MetadataMaxConcurrencyFlag.Name),
 			BlobCacheBytes:             ctx.Uint64(flags.BlobCacheBytes.Name),
 			BlobMaxConcurrency:         ctx.Int(flags.BlobMaxConcurrencyFlag.Name),
-			ChunkCacheSize:             ctx.Uint64(flags.ChunkCacheSizeFlag.Name),
+			ChunkCacheBytes:            ctx.Uint64(flags.ChunkCacheBytesFlag.Name),
 			ChunkMaxConcurrency:        ctx.Int(flags.ChunkMaxConcurrencyFlag.Name),
 			MaxKeysPerGetChunksRequest: ctx.Int(flags.MaxKeysPerGetChunksRequestFlag.Name),
 			RateLimits: limiter.Config{
@@ -101,8 +101,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 	}
-	for i, id := range relayIDs {
-		config.RelayConfig.RelayIDs[i] = core.RelayKey(id)
+	for i, id := range relayKeys {
+		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)
 	}
 	return config, nil
 }

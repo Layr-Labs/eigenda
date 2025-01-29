@@ -1,4 +1,4 @@
-package contractEigenDABlobVerifier
+package verification
 
 import (
 	"fmt"
@@ -8,22 +8,24 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
 
-func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, error) {
-	convertedBatchHeader, err := ConvertBatchHeader(inputBatch.GetHeader())
+func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.SignedBatch, error) {
+	convertedBatchHeader, err := BatchHeaderProtoToBinding(inputBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header: %s", err)
 	}
 
-	convertedAttestation, err := convertAttestation(inputBatch.GetAttestation())
+	convertedAttestation, err := attestationProtoToBinding(inputBatch.GetAttestation())
 	if err != nil {
 		return nil, fmt.Errorf("convert attestation: %s", err)
 	}
 
-	outputSignedBatch := &SignedBatch{
+	outputSignedBatch := &contractEigenDACertVerifier.SignedBatch{
 		BatchHeader: *convertedBatchHeader,
 		Attestation: *convertedAttestation,
 	}
@@ -31,7 +33,7 @@ func ConvertSignedBatch(inputBatch *disperserv2.SignedBatch) (*SignedBatch, erro
 	return outputSignedBatch, nil
 }
 
-func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, error) {
+func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEigenDACertVerifier.BatchHeaderV2, error) {
 	var outputBatchRoot [32]byte
 
 	inputBatchRoot := inputHeader.GetBatchRoot()
@@ -48,7 +50,7 @@ func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, erro
 			math.MaxUint32)
 	}
 
-	convertedHeader := &BatchHeaderV2{
+	convertedHeader := &contractEigenDACertVerifier.BatchHeaderV2{
 		BatchRoot:            outputBatchRoot,
 		ReferenceBlockNumber: uint32(inputReferenceBlockNumber),
 	}
@@ -56,13 +58,13 @@ func ConvertBatchHeader(inputHeader *commonv2.BatchHeader) (*BatchHeaderV2, erro
 	return convertedHeader, nil
 }
 
-func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation, error) {
-	nonSignerPubkeys, err := repeatedBytesToG1Points(inputAttestation.GetNonSignerPubkeys())
+func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*contractEigenDACertVerifier.Attestation, error) {
+	nonSignerPubkeys, err := repeatedBytesToBN254G1Points(inputAttestation.GetNonSignerPubkeys())
 	if err != nil {
 		return nil, fmt.Errorf("convert non signer pubkeys to g1 points: %s", err)
 	}
 
-	quorumApks, err := repeatedBytesToG1Points(inputAttestation.GetQuorumApks())
+	quorumApks, err := repeatedBytesToBN254G1Points(inputAttestation.GetQuorumApks())
 	if err != nil {
 		return nil, fmt.Errorf("convert quorum apks to g1 points: %s", err)
 	}
@@ -77,7 +79,7 @@ func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation
 		return nil, fmt.Errorf("convert apk g2 to g2 point: %s", err)
 	}
 
-	convertedAttestation := &Attestation{
+	convertedAttestation := &contractEigenDACertVerifier.Attestation{
 		NonSignerPubkeys: nonSignerPubkeys,
 		QuorumApks:       quorumApks,
 		Sigma:            *sigma,
@@ -88,33 +90,34 @@ func convertAttestation(inputAttestation *disperserv2.Attestation) (*Attestation
 	return convertedAttestation, nil
 }
 
-func ConvertVerificationProof(inputVerificationInfo *disperserv2.BlobVerificationInfo) (*BlobVerificationProofV2, error) {
-	convertedBlobCertificate, err := convertBlobCertificate(inputVerificationInfo.GetBlobCertificate())
+func InclusionInfoProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDACertVerifier.BlobInclusionInfo, error) {
+	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {
 		return nil, fmt.Errorf("convert blob certificate: %s", err)
 	}
 
-	return &BlobVerificationProofV2{
+	return &contractEigenDACertVerifier.BlobInclusionInfo{
 		BlobCertificate: *convertedBlobCertificate,
-		BlobIndex:       inputVerificationInfo.GetBlobIndex(),
-		InclusionProof:  inputVerificationInfo.GetInclusionProof(),
+		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
+		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
 	}, nil
 }
 
-func convertBlobCertificate(inputCertificate *commonv2.BlobCertificate) (*BlobCertificate, error) {
-	convertedBlobHeader, err := convertBlobHeader(inputCertificate.GetBlobHeader())
+func blobCertificateProtoToBinding(inputCertificate *commonv2.BlobCertificate) (*contractEigenDACertVerifier.BlobCertificate, error) {
+	convertedBlobHeader, err := blobHeaderProtoToBinding(inputCertificate.GetBlobHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert blob header: %s", err)
 	}
 
-	return &BlobCertificate{
+	return &contractEigenDACertVerifier.BlobCertificate{
 		BlobHeader: *convertedBlobHeader,
-		RelayKeys:  inputCertificate.GetRelays(),
+		Signature:  inputCertificate.GetSignature(),
+		RelayKeys:  inputCertificate.GetRelayKeys(),
 	}, nil
 }
 
-func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) {
+func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenDACertVerifier.BlobHeaderV2, error) {
 	inputVersion := inputHeader.GetVersion()
 	if inputVersion > math.MaxUint16 {
 		return nil, fmt.Errorf(
@@ -135,7 +138,7 @@ func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) 
 		quorumNumbers = append(quorumNumbers, byte(quorumNumber))
 	}
 
-	convertedBlobCommitment, err := convertBlobCommitment(inputHeader.GetCommitment())
+	convertedBlobCommitment, err := blobCommitmentProtoToBinding(inputHeader.GetCommitment())
 	if err != nil {
 		return nil, fmt.Errorf("convert blob commitment: %s", err)
 	}
@@ -145,15 +148,16 @@ func convertBlobHeader(inputHeader *commonv2.BlobHeader) (*BlobHeaderV2, error) 
 		return nil, fmt.Errorf("hash payment header: %s", err)
 	}
 
-	return &BlobHeaderV2{
+	return &contractEigenDACertVerifier.BlobHeaderV2{
 		Version:           uint16(inputVersion),
 		QuorumNumbers:     quorumNumbers,
 		Commitment:        *convertedBlobCommitment,
 		PaymentHeaderHash: paymentHeaderHash,
+		Salt:              inputHeader.GetSalt(),
 	}, nil
 }
 
-func convertBlobCommitment(inputCommitment *common.BlobCommitment) (*BlobCommitment, error) {
+func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*contractEigenDACertVerifier.BlobCommitment, error) {
 	convertedCommitment, err := bytesToBN254G1Point(inputCommitment.GetCommitment())
 	if err != nil {
 		return nil, fmt.Errorf("convert commitment to g1 point: %s", err)
@@ -169,15 +173,25 @@ func convertBlobCommitment(inputCommitment *common.BlobCommitment) (*BlobCommitm
 		return nil, fmt.Errorf("convert length proof to g2 point: %s", err)
 	}
 
-	return &BlobCommitment{
+	return &contractEigenDACertVerifier.BlobCommitment{
 		Commitment:       *convertedCommitment,
 		LengthCommitment: *convertedLengthCommitment,
 		LengthProof:      *convertedLengthProof,
-		DataLength:       inputCommitment.GetLength(),
+		Length:           inputCommitment.GetLength(),
 	}, nil
 }
 
-func bytesToBN254G1Point(bytes []byte) (*BN254G1Point, error) {
+// BlobCommitmentBindingToProto converts a BlobCommitment binding into a common.BlobCommitment protobuf
+func BlobCommitmentBindingToProto(inputCommitment *contractEigenDACertVerifier.BlobCommitment) *common.BlobCommitment {
+	return &common.BlobCommitment{
+		Commitment:       bn254G1PointToBytes(&inputCommitment.Commitment),
+		LengthCommitment: bn254G2PointToBytes(&inputCommitment.LengthCommitment),
+		LengthProof:      bn254G2PointToBytes(&inputCommitment.LengthProof),
+		Length:           inputCommitment.Length,
+	}
+}
+
+func bytesToBN254G1Point(bytes []byte) (*contractEigenDACertVerifier.BN254G1Point, error) {
 	var g1Point bn254.G1Affine
 	_, err := g1Point.SetBytes(bytes)
 
@@ -185,13 +199,25 @@ func bytesToBN254G1Point(bytes []byte) (*BN254G1Point, error) {
 		return nil, fmt.Errorf("deserialize g1 point: %s", err)
 	}
 
-	return &BN254G1Point{
+	return &contractEigenDACertVerifier.BN254G1Point{
 		X: g1Point.X.BigInt(new(big.Int)),
 		Y: g1Point.Y.BigInt(new(big.Int)),
 	}, nil
 }
 
-func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
+func bn254G1PointToBytes(inputPoint *contractEigenDACertVerifier.BN254G1Point) []byte {
+	var x fp.Element
+	x.SetBigInt(inputPoint.X)
+	var y fp.Element
+	y.SetBigInt(inputPoint.Y)
+
+	g1Point := &bn254.G1Affine{X: x, Y: y}
+
+	bytes := g1Point.Bytes()
+	return bytes[:]
+}
+
+func bytesToBN254G2Point(bytes []byte) (*contractEigenDACertVerifier.BN254G2Point, error) {
 	var g2Point bn254.G2Affine
 
 	// SetBytes checks that the result is in the correct subgroup
@@ -210,14 +236,31 @@ func bytesToBN254G2Point(bytes []byte) (*BN254G2Point, error) {
 	y[0] = g2Point.Y.A1.BigInt(new(big.Int))
 	y[1] = g2Point.Y.A0.BigInt(new(big.Int))
 
-	return &BN254G2Point{
+	return &contractEigenDACertVerifier.BN254G2Point{
 		X: x,
 		Y: y,
 	}, nil
 }
 
-func repeatedBytesToG1Points(repeatedBytes [][]byte) ([]BN254G1Point, error) {
-	var outputPoints []BN254G1Point
+func bn254G2PointToBytes(inputPoint *contractEigenDACertVerifier.BN254G2Point) []byte {
+	var g2Point bn254.G2Affine
+
+	// Order is intentionally reversed when converting here
+	// (see https://github.com/Layr-Labs/eigenlayer-middleware/blob/512ce7326f35e8060b9d46e23f9c159c0000b546/src/libraries/BN254.sol#L43)
+
+	var xa0, xa1, ya0, ya1 fp.Element
+	g2Point.X.A0 = *(xa0.SetBigInt(inputPoint.X[1]))
+	g2Point.X.A1 = *(xa1.SetBigInt(inputPoint.X[0]))
+
+	g2Point.Y.A0 = *(ya0.SetBigInt(inputPoint.Y[1]))
+	g2Point.Y.A1 = *(ya1.SetBigInt(inputPoint.Y[0]))
+
+	pointBytes := g2Point.Bytes()
+	return pointBytes[:]
+}
+
+func repeatedBytesToBN254G1Points(repeatedBytes [][]byte) ([]contractEigenDACertVerifier.BN254G1Point, error) {
+	var outputPoints []contractEigenDACertVerifier.BN254G1Point
 	for _, bytes := range repeatedBytes {
 		g1Point, err := bytesToBN254G1Point(bytes)
 		if err != nil {

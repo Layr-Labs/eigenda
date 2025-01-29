@@ -72,10 +72,6 @@ type BlobHeader struct {
 
 	// Salt is used to make blob intentionally unique when everything else is the same
 	Salt uint32
-
-	// Signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
-	// which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
-	Signature []byte
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -127,7 +123,6 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
-		Signature:       proto.GetSignature(),
 		Salt:            proto.GetSalt(),
 	}, nil
 }
@@ -148,7 +143,6 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		QuorumNumbers: quorums,
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
-		Signature:     b.Signature,
 		Salt:          b.Salt,
 	}, nil
 }
@@ -169,6 +163,10 @@ type RelayKey = uint32
 
 type BlobCertificate struct {
 	BlobHeader *BlobHeader
+
+	// Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,
+	// which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+	Signature []byte
 
 	// RelayKeys
 	RelayKeys []RelayKey
@@ -191,7 +189,8 @@ func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
 
 	return &commonpb.BlobCertificate{
 		BlobHeader: blobHeader,
-		Relays:     relays,
+		Signature:  c.Signature,
+		RelayKeys:  relays,
 	}, nil
 }
 
@@ -205,13 +204,14 @@ func BlobCertificateFromProtobuf(proto *commonpb.BlobCertificate) (*BlobCertific
 		return nil, fmt.Errorf("failed to create blob header: %v", err)
 	}
 
-	relayKeys := make([]RelayKey, len(proto.GetRelays()))
-	for i, r := range proto.GetRelays() {
+	relayKeys := make([]RelayKey, len(proto.GetRelayKeys()))
+	for i, r := range proto.GetRelayKeys() {
 		relayKeys[i] = RelayKey(r)
 	}
 
 	return &BlobCertificate{
 		BlobHeader: blobHeader,
+		Signature:  proto.GetSignature(),
 		RelayKeys:  relayKeys,
 	}, nil
 }
@@ -293,9 +293,10 @@ func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
 
 		blobCerts[i] = &BlobCertificate{
 			BlobHeader: blobHeader,
-			RelayKeys:  make([]RelayKey, len(cert.GetRelays())),
+			Signature:  cert.GetSignature(),
+			RelayKeys:  make([]RelayKey, len(cert.GetRelayKeys())),
 		}
-		for j, r := range cert.GetRelays() {
+		for j, r := range cert.GetRelayKeys() {
 			blobCerts[i].RelayKeys[j] = RelayKey(r)
 		}
 	}
@@ -360,7 +361,7 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 	}, nil
 }
 
-type BlobVerificationInfo struct {
+type BlobInclusionInfo struct {
 	*BatchHeader
 
 	BlobKey
@@ -368,12 +369,12 @@ type BlobVerificationInfo struct {
 	InclusionProof []byte
 }
 
-func (v *BlobVerificationInfo) ToProtobuf(blobCert *BlobCertificate) (*disperserpb.BlobVerificationInfo, error) {
+func (v *BlobInclusionInfo) ToProtobuf(blobCert *BlobCertificate) (*disperserpb.BlobInclusionInfo, error) {
 	blobCertProto, err := blobCert.ToProtobuf()
 	if err != nil {
 		return nil, err
 	}
-	return &disperserpb.BlobVerificationInfo{
+	return &disperserpb.BlobInclusionInfo{
 		BlobCertificate: blobCertProto,
 		BlobIndex:       v.BlobIndex,
 		InclusionProof:  v.InclusionProof,

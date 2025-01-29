@@ -355,15 +355,15 @@
                 </li>
               
                 <li>
+                  <a href="#disperser.v2.BlobInclusionInfo"><span class="badge">M</span>BlobInclusionInfo</a>
+                </li>
+              
+                <li>
                   <a href="#disperser.v2.BlobStatusReply"><span class="badge">M</span>BlobStatusReply</a>
                 </li>
               
                 <li>
                   <a href="#disperser.v2.BlobStatusRequest"><span class="badge">M</span>BlobStatusRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#disperser.v2.BlobVerificationInfo"><span class="badge">M</span>BlobVerificationInfo</a>
                 </li>
               
                 <li>
@@ -513,49 +513,6 @@
         
           
           <li>
-            <a href="#node%2fv2%2fnode_v2.proto">node/v2/node_v2.proto</a>
-            <ul>
-              
-                <li>
-                  <a href="#node.v2.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
-                </li>
-              
-              
-              
-              
-                <li>
-                  <a href="#node.v2.Dispersal"><span class="badge">S</span>Dispersal</a>
-                </li>
-              
-                <li>
-                  <a href="#node.v2.Retrieval"><span class="badge">S</span>Retrieval</a>
-                </li>
-              
-            </ul>
-          </li>
-        
-          
-          <li>
             <a href="#relay%2frelay.proto">relay/relay.proto</a>
             <ul>
               
@@ -638,6 +595,49 @@
               
                 <li>
                   <a href="#retriever.v2.Retriever"><span class="badge">S</span>Retriever</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#validator%2fnode_v2.proto">validator/node_v2.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#validator.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#validator.Dispersal"><span class="badge">S</span>Dispersal</a>
+                </li>
+              
+                <li>
+                  <a href="#validator.Retrieval"><span class="badge">S</span>Retrieval</a>
                 </li>
               
             </ul>
@@ -1052,10 +1052,18 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                 </tr>
               
                 <tr>
-                  <td>relays</td>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>signature is an ECDSA signature signed by the blob request signer&#39;s account ID over the BlobHeader&#39;s blobKey,
+which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request&#39;s account ID </p></td>
+                </tr>
+              
+                <tr>
+                  <td>relay_keys</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
-                  <td><p>relays is the list of relays that are in custody of the blob.
+                  <td><p>relay_keys is the list of relay keys that are in custody of the blob.
 The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
 It needs to contain at least 1 relay number.
 To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract:
@@ -1122,13 +1130,6 @@ The following quorums are currently required:
                   <td><p>salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
 reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
 payments already have unique cumulative_payment values for intentionally unique dispersal requests. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.account_id </p></td>
                 </tr>
               
             </tbody>
@@ -2019,10 +2020,48 @@ The order of the quorum_signed_percentages should match the order of the quorum_
             <tbody>
               
                 <tr>
-                  <td>data</td>
+                  <td>blob</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The blob data to compute the commitment for. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.BlobInclusionInfo">BlobInclusionInfo</h3>
+        <p>BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_certificate</td>
+                  <td><a href="#common.v2.BlobCertificate">common.v2.BlobCertificate</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>blob_index is the index of the blob in the batch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>inclusion_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>inclusion_proof is the inclusion proof of the blob in the batch </p></td>
                 </tr>
               
             </tbody>
@@ -2057,10 +2096,10 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                 </tr>
               
                 <tr>
-                  <td>blob_verification_info</td>
-                  <td><a href="#disperser.v2.BlobVerificationInfo">BlobVerificationInfo</a></td>
+                  <td>blob_inclusion_info</td>
+                  <td><a href="#disperser.v2.BlobInclusionInfo">BlobInclusionInfo</a></td>
                   <td></td>
-                  <td><p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
+                  <td><p>BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
 Unset if the status is not CERTIFIED. </p></td>
                 </tr>
               
@@ -2086,44 +2125,6 @@ Unset if the status is not CERTIFIED. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The unique identifier for the blob. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="disperser.v2.BlobVerificationInfo">BlobVerificationInfo</h3>
-        <p>BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>blob_certificate</td>
-                  <td><a href="#common.v2.BlobCertificate">common.v2.BlobCertificate</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>blob_index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>blob_index is the index of the blob in the batch </p></td>
-                </tr>
-              
-                <tr>
-                  <td>inclusion_proof</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>inclusion_proof is the inclusion proof of the blob in the batch </p></td>
                 </tr>
               
             </tbody>
@@ -2183,10 +2184,10 @@ the disperser to reject the blob (DisperseBlob() RPC will return an error). </p>
             <tbody>
               
                 <tr>
-                  <td>data</td>
+                  <td>blob</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The data to be dispersed.
+                  <td><p>The blob to be dispersed.
 
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
 (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
@@ -2207,6 +2208,13 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how
 dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob,
 which is dispersed separately. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id </p></td>
                 </tr>
               
             </tbody>
@@ -3366,283 +3374,6 @@ DEPRECATED: AttestBatch method is not used</p></td>
     
       
       <div class="file-heading">
-        <h2 id="node/v2/node_v2.proto">node/v2/node_v2.proto</h2><a href="#title">Top</a>
-      </div>
-      <p></p>
-
-      
-        <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
-        <p>The response to the GetChunks() RPC.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>chunks</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td>repeated</td>
-                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
-        <p>The parameter for the GetChunks() RPC.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>blob_key</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>The unique identifier for the blob the chunks are being requested for.
-The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
-https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 </p></td>
-                </tr>
-              
-                <tr>
-                  <td>quorum_id</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>Which quorum of the blob to retrieve for (note: a blob can have multiple
-quorums and the chunks for different quorums at a Node can be different).
-The ID must be in range [0, 254]. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="node.v2.GetNodeInfoReply">GetNodeInfoReply</h3>
-        <p>Node info reply</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>semver</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The version of the node. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>arch</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The architecture of the node. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>os</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The operating system of the node. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>num_cpu</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>The number of CPUs on the node. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>mem_bytes</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p>The amount of memory on the node in bytes. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="node.v2.GetNodeInfoRequest">GetNodeInfoRequest</h3>
-        <p>The parameter for the GetNodeInfo() RPC.</p>
-
-        
-
-        
-      
-        <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
-        <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>a custody signature of the received chunks </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="node.v2.StoreChunksRequest">StoreChunksRequest</h3>
-        <p>Request that the Node store a batch of chunks.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>batch</td>
-                  <td><a href="#common.v2.Batch">common.v2.Batch</a></td>
-                  <td></td>
-                  <td><p>batch of blobs to store </p></td>
-                </tr>
-              
-                <tr>
-                  <td>disperserID</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>ID of the disperser that is requesting the storage of the batch. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature
-is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
-
-Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned).
-A reference implementation (golang) can be found at
-https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
-
-1. digest batch.BatchHeader.BatchRoot
-2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
-3. for each certificate in batch.BlobCertificates:
-  a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian)
-  b. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
-    i. digest quorum_number (4 bytes, unsigned big endian)
-  c. digest certificate.BlobHeader.Commitment.Commitment
-  d. digest certificate.BlobHeader.Commitment.LengthCommitment
-  e. digest certificate.BlobHeader.Commitment.LengthProof
-  f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
-  g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
-  i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  k. digest certificate.BlobHeader.Signature
-  l. for each relay in certificate.Relays:
-    i. digest relay (4 bytes, unsigned big endian)
-4. digest disperserID (4 bytes, unsigned big endian)
-
-Note that this signature is not included in the hash for obvious reasons. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-
-      
-
-      
-
-      
-        <h3 id="node.v2.Dispersal">Dispersal</h3>
-        <p>Dispersal is utilized to disperse chunk data.</p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>StoreChunks</td>
-                <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
-                <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
-                <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
-either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
-the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
-This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
-is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
-              </tr>
-            
-              <tr>
-                <td>GetNodeInfo</td>
-                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
-                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
-                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-
-        
-        <h3 id="node.v2.Retrieval">Retrieval</h3>
-        <p>Retrieval is utilized to retrieve chunk data.</p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>GetChunks</td>
-                <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
-                <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
-                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
-faster to retrieve chunks from the relay service if that service is available.</p></td>
-              </tr>
-            
-              <tr>
-                <td>GetNodeInfo</td>
-                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
-                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
-                <td><p>Retrieve node info metadata</p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-
-        
-    
-      
-      <div class="file-heading">
         <h2 id="relay/relay.proto">relay/relay.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
@@ -4110,6 +3841,283 @@ multiple quorums). </p></td>
                 <td><a href="#retriever.v2.BlobReply">BlobReply</a></td>
                 <td><p>This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 reconstructed original blob in response.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="validator/node_v2.proto">validator/node_v2.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="validator.GetChunksReply">GetChunksReply</h3>
+        <p>The response to the GetChunks() RPC.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="validator.GetChunksRequest">GetChunksRequest</h3>
+        <p>The parameter for the GetChunks() RPC.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The unique identifier for the blob the chunks are being requested for.
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_id</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Which quorum of the blob to retrieve for (note: a blob can have multiple
+quorums and the chunks for different quorums at a Node can be different).
+The ID must be in range [0, 254]. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="validator.GetNodeInfoReply">GetNodeInfoReply</h3>
+        <p>Node info reply</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>semver</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The version of the node. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>arch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The architecture of the node. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>os</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The operating system of the node. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>num_cpu</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The number of CPUs on the node. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>mem_bytes</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>The amount of memory on the node in bytes. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="validator.GetNodeInfoRequest">GetNodeInfoRequest</h3>
+        <p>The parameter for the GetNodeInfo() RPC.</p>
+
+        
+
+        
+      
+        <h3 id="validator.StoreChunksReply">StoreChunksReply</h3>
+        <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>a custody signature of the received chunks </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="validator.StoreChunksRequest">StoreChunksRequest</h3>
+        <p>Request that the Node store a batch of chunks.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>batch</td>
+                  <td><a href="#common.v2.Batch">common.v2.Batch</a></td>
+                  <td></td>
+                  <td><p>batch of blobs to store </p></td>
+                </tr>
+              
+                <tr>
+                  <td>disperserID</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>ID of the disperser that is requesting the storage of the batch. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature
+is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
+
+Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned).
+A reference implementation (golang) can be found at
+https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
+
+1. digest batch.BatchHeader.BatchRoot
+2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
+3. for each certificate in batch.BlobCertificates:
+  a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian)
+  b. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
+    i. digest quorum_number (4 bytes, unsigned big endian)
+  c. digest certificate.BlobHeader.Commitment.Commitment
+  d. digest certificate.BlobHeader.Commitment.LengthCommitment
+  e. digest certificate.BlobHeader.Commitment.LengthProof
+  f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
+  g. digest certificate.BlobHeader.PaymentHeader.AccountId
+  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
+  i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
+  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
+  k. digest certificate.BlobHeader.Signature
+  l. for each relay in certificate.Relays:
+    i. digest relay (4 bytes, unsigned big endian)
+4. digest disperserID (4 bytes, unsigned big endian)
+
+Note that this signature is not included in the hash for obvious reasons. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="validator.Dispersal">Dispersal</h3>
+        <p>Dispersal is utilized to disperse chunk data.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>StoreChunks</td>
+                <td><a href="#validator.StoreChunksRequest">StoreChunksRequest</a></td>
+                <td><a href="#validator.StoreChunksReply">StoreChunksReply</a></td>
+                <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetNodeInfo</td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="validator.Retrieval">Retrieval</h3>
+        <p>Retrieval is utilized to retrieve chunk data.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetChunks</td>
+                <td><a href="#validator.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#validator.GetChunksReply">GetChunksReply</a></td>
+                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+faster to retrieve chunks from the relay service if that service is available.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetNodeInfo</td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><p>Retrieve node info metadata</p></td>
               </tr>
             
           </tbody>

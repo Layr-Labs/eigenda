@@ -5,13 +5,14 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/docker/go-units"
 	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -72,8 +73,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchHeader2 *commonpb.BatchHeader
 		var signedBatch1 *disperserpb.SignedBatch
 		var signedBatch2 *disperserpb.SignedBatch
-		var blobVerification1 *disperserpb.BlobVerificationInfo
-		var blobVerification2 *disperserpb.BlobVerificationInfo
+		var blobInclusion1 *disperserpb.BlobInclusionInfo
+		var blobInclusion2 *disperserpb.BlobInclusionInfo
 		for loop := true; loop; {
 			select {
 			case <-ctx.Done():
@@ -107,13 +108,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(attestation.ApkG2).To(Not(BeNil()))
 				Expect(len(attestation.QuorumApks)).To(Equal(2))
 				Expect(attestation.QuorumSignedPercentages).To(Equal([]byte{100, 100}))
-				blobVerification1 = reply1.GetBlobVerificationInfo()
-				Expect(blobVerification1).To(Not(BeNil()))
-				Expect(blobVerification1.GetBlobCertificate()).To(Not(BeNil()))
-				blobCert1, err = corev2.BlobCertificateFromProtobuf(blobVerification1.GetBlobCertificate())
+				blobInclusion1 = reply1.GetBlobInclusionInfo()
+				Expect(blobInclusion1).To(Not(BeNil()))
+				Expect(blobInclusion1.GetBlobCertificate()).To(Not(BeNil()))
+				blobCert1, err = corev2.BlobCertificateFromProtobuf(blobInclusion1.GetBlobCertificate())
 				Expect(err).To(BeNil())
-				inclusionProofBytes := blobVerification1.GetInclusionProof()
-				blobIndex := blobVerification1.GetBlobIndex()
+				inclusionProofBytes := blobInclusion1.GetInclusionProof()
+				blobIndex := blobInclusion1.GetBlobIndex()
 				proof, err := core.DeserializeMerkleProof(inclusionProofBytes, uint64(blobIndex))
 				Expect(err).To(BeNil())
 				certHash, err := blobCert1.Hash()
@@ -123,6 +124,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 				verified, err := merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{batchHeader1.BatchRoot}, keccak256.New())
 				Expect(err).To(BeNil())
 				Expect(verified).To(BeTrue())
+				Expect(blobCert1.Signature).To(HaveLen(65))
+				Expect(len(blobCert1.RelayKeys)).To((BeNumerically(">", 0)))
 
 				signedBatch2 = reply2.GetSignedBatch()
 				batchHeader2 = signedBatch2.GetHeader()
@@ -140,13 +143,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(len(attestation2.QuorumApks)).To(Equal(len(attestation.QuorumApks)))
 				Expect(attestation2.QuorumSignedPercentages).To(Equal(attestation.QuorumSignedPercentages))
 
-				blobVerification2 = reply2.GetBlobVerificationInfo()
-				Expect(blobVerification2).To(Not(BeNil()))
-				Expect(blobVerification2.GetBlobCertificate()).To(Not(BeNil()))
-				blobCert2, err = corev2.BlobCertificateFromProtobuf(blobVerification2.GetBlobCertificate())
+				blobInclusion2 = reply2.GetBlobInclusionInfo()
+				Expect(blobInclusion2).To(Not(BeNil()))
+				Expect(blobInclusion2.GetBlobCertificate()).To(Not(BeNil()))
+				blobCert2, err = corev2.BlobCertificateFromProtobuf(blobInclusion2.GetBlobCertificate())
 				Expect(err).To(BeNil())
-				inclusionProofBytes = blobVerification2.GetInclusionProof()
-				blobIndex = blobVerification2.GetBlobIndex()
+				inclusionProofBytes = blobInclusion2.GetInclusionProof()
+				blobIndex = blobInclusion2.GetBlobIndex()
 				proof, err = core.DeserializeMerkleProof(inclusionProofBytes, uint64(blobIndex))
 				Expect(err).To(BeNil())
 				certHash, err = blobCert2.Hash()
@@ -154,6 +157,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 				verified, err = merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{batchHeader2.BatchRoot}, keccak256.New())
 				Expect(err).To(BeNil())
 				Expect(verified).To(BeTrue())
+				Expect(blobCert2.Signature).To(HaveLen(65))
+				Expect(len(blobCert2.RelayKeys)).To((BeNumerically(">", 0)))
 				loop = false
 			}
 		}
@@ -164,13 +169,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 		// test onchain verification
 		attestation, err := convertAttestation(signedBatch1.GetAttestation())
 		Expect(err).To(BeNil())
-		proof, err := convertBlobVerificationInfo(blobVerification1)
+		proof, err := convertBlobInclusionInfo(blobInclusion1)
 		Expect(err).To(BeNil())
 
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -185,10 +190,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		attestation, err = convertAttestation(signedBatch2.GetAttestation())
 		Expect(err).To(BeNil())
-		proof, err = convertBlobVerificationInfo(blobVerification2)
+		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -203,7 +208,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		// Test retrieval from relay
 		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
+			Sockets:            relays,
+			MaxGRPCMessageSize: units.GiB,
 		}, logger)
 		Expect(err).To(BeNil())
 
@@ -253,8 +259,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 	})
 })
 
-func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationInfo) (*verifierbindings.BlobVerificationProofV2, error) {
-	blobCertificate, err := corev2.BlobCertificateFromProtobuf(verificationInfo.GetBlobCertificate())
+func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.BlobInclusionInfo, error) {
+	blobCertificate, err := corev2.BlobCertificateFromProtobuf(inclusionInfo.GetBlobCertificate())
 	if err != nil {
 		return nil, err
 	}
@@ -263,8 +269,8 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 		return nil, err
 	}
 
-	inclusionProof := verificationInfo.GetInclusionProof()
-	blobIndex := verificationInfo.GetBlobIndex()
+	inclusionProof := inclusionInfo.GetInclusionProof()
+	blobIndex := inclusionInfo.GetBlobIndex()
 
 	commitX := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.Commitment.X.BigInt(commitX)
@@ -286,7 +292,7 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A0.BigInt(lengthProofY0)
 	lengthProofY1 := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A1.BigInt(lengthProofY1)
-	return &verifierbindings.BlobVerificationProofV2{
+	return &verifierbindings.BlobInclusionInfo{
 		BlobCertificate: verifierbindings.BlobCertificate{
 			BlobHeader: verifierbindings.BlobHeaderV2{
 				Version:       uint16(blobCertificate.BlobHeader.BlobVersion),
@@ -304,11 +310,12 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 						X: [2]*big.Int{lengthProofX0, lengthProofX1},
 						Y: [2]*big.Int{lengthProofY0, lengthProofY1},
 					},
-					DataLength: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
+					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
 				Salt:              blobCertificate.BlobHeader.Salt,
 			},
+			Signature: blobCertificate.Signature,
 			RelayKeys: blobCertificate.RelayKeys,
 		},
 		InclusionProof: inclusionProof,

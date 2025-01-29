@@ -48,9 +48,9 @@
     - [Attestation](#disperser-v2-Attestation)
     - [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply)
     - [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest)
+    - [BlobInclusionInfo](#disperser-v2-BlobInclusionInfo)
     - [BlobStatusReply](#disperser-v2-BlobStatusReply)
     - [BlobStatusRequest](#disperser-v2-BlobStatusRequest)
-    - [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
@@ -90,17 +90,6 @@
     - [Dispersal](#node-Dispersal)
     - [Retrieval](#node-Retrieval)
   
-- [node/v2/node_v2.proto](#node_v2_node_v2-proto)
-    - [GetChunksReply](#node-v2-GetChunksReply)
-    - [GetChunksRequest](#node-v2-GetChunksRequest)
-    - [GetNodeInfoReply](#node-v2-GetNodeInfoReply)
-    - [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest)
-    - [StoreChunksReply](#node-v2-StoreChunksReply)
-    - [StoreChunksRequest](#node-v2-StoreChunksRequest)
-  
-    - [Dispersal](#node-v2-Dispersal)
-    - [Retrieval](#node-v2-Retrieval)
-  
 - [relay/relay.proto](#relay_relay-proto)
     - [ChunkRequest](#relay-ChunkRequest)
     - [ChunkRequestByIndex](#relay-ChunkRequestByIndex)
@@ -123,6 +112,17 @@
     - [BlobRequest](#retriever-v2-BlobRequest)
   
     - [Retriever](#retriever-v2-Retriever)
+  
+- [validator/node_v2.proto](#validator_node_v2-proto)
+    - [GetChunksReply](#validator-GetChunksReply)
+    - [GetChunksRequest](#validator-GetChunksRequest)
+    - [GetNodeInfoReply](#validator-GetNodeInfoReply)
+    - [GetNodeInfoRequest](#validator-GetNodeInfoRequest)
+    - [StoreChunksReply](#validator-StoreChunksReply)
+    - [StoreChunksRequest](#validator-StoreChunksRequest)
+  
+    - [Dispersal](#validator-Dispersal)
+    - [Retrieval](#validator-Retrieval)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -337,7 +337,8 @@ Validator nodes eventually sign the blob certificate once they are in custody of
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | blob_header | [BlobHeader](#common-v2-BlobHeader) |  | blob_header contains data about the blob. |
-| relays | [uint32](#uint32) | repeated | relays is the list of relays that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
+| signature | [bytes](#bytes) |  | signature is an ECDSA signature signed by the blob request signer&#39;s account ID over the BlobHeader&#39;s blobKey, which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request&#39;s account ID |
+| relay_keys | [uint32](#uint32) | repeated | relay_keys is the list of relay keys that are in custody of the blob. The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted. It needs to contain at least 1 relay number. To retrieve a blob from the relay, one can find that relay&#39;s URL in the EigenDARelayRegistry contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol |
 
 
 
@@ -359,7 +360,6 @@ The following quorums are currently required: - 0: ETH - 1: EIGEN |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
 | payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
 | salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
-| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.account_id |
 
 
 
@@ -777,7 +777,24 @@ This can be used to construct a BlobHeader.commitment.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The blob data to compute the commitment for. |
+| blob | [bytes](#bytes) |  | The blob data to compute the commitment for. |
+
+
+
+
+
+
+<a name="disperser-v2-BlobInclusionInfo"></a>
+
+### BlobInclusionInfo
+BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_certificate | [common.v2.BlobCertificate](#common-v2-BlobCertificate) |  |  |
+| blob_index | [uint32](#uint32) |  | blob_index is the index of the blob in the batch |
+| inclusion_proof | [bytes](#bytes) |  | inclusion_proof is the inclusion proof of the blob in the batch |
 
 
 
@@ -794,7 +811,7 @@ BlobStatusReply is the reply to a BlobStatusRequest.
 | ----- | ---- | ----- | ----------- |
 | status | [BlobStatus](#disperser-v2-BlobStatus) |  | The status of the blob. |
 | signed_batch | [SignedBatch](#disperser-v2-SignedBatch) |  | The signed batch. Unset if the status is not CERTIFIED. |
-| blob_verification_info | [BlobVerificationInfo](#disperser-v2-BlobVerificationInfo) |  | BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
+| blob_inclusion_info | [BlobInclusionInfo](#disperser-v2-BlobInclusionInfo) |  | BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch. Unset if the status is not CERTIFIED. |
 
 
 
@@ -810,23 +827,6 @@ BlobStatusRequest is used to query the status of a blob.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | blob_key | [bytes](#bytes) |  | The unique identifier for the blob. |
-
-
-
-
-
-
-<a name="disperser-v2-BlobVerificationInfo"></a>
-
-### BlobVerificationInfo
-BlobVerificationInfo is the information needed to verify the inclusion of a blob in a batch.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| blob_certificate | [common.v2.BlobCertificate](#common-v2-BlobCertificate) |  |  |
-| blob_index | [uint32](#uint32) |  | blob_index is the index of the blob in the batch |
-| inclusion_proof | [bytes](#bytes) |  | inclusion_proof is the inclusion proof of the blob in the batch |
 
 
 
@@ -861,7 +861,7 @@ A request to disperse a blob.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  | The data to be dispersed.
+| blob | [bytes](#bytes) |  | The blob to be dispersed.
 
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB. (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
 
@@ -869,6 +869,7 @@ Every 32 bytes of data is interpreted as an integer in big endian format where t
 | blob_header | [common.v2.BlobHeader](#common-v2-BlobHeader) |  | The header contains metadata about the blob.
 
 This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a purpose similar to an eth_tx to disperse a 4844 blob. Note that a call to DisperseBlob requires the blob and the blobHeader, which is similar to how dispersing a blob to ethereum requires sending a tx whose data contains the hash of the kzg commit of the blob, which is dispersed separately. |
+| signature | [bytes](#bytes) |  | signature over keccak hash of the blob_header that can be verified by blob_header.payment_header.account_id |
 
 
 
@@ -1405,142 +1406,6 @@ Used to facilitate the decoding of chunks.
 
 
 
-<a name="node_v2_node_v2-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## node/v2/node_v2.proto
-
-
-
-<a name="node-v2-GetChunksReply"></a>
-
-### GetChunksReply
-The response to the GetChunks() RPC.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
-
-
-
-
-
-
-<a name="node-v2-GetChunksRequest"></a>
-
-### GetChunksRequest
-The parameter for the GetChunks() RPC.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 |
-| quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
-
-
-
-
-
-
-<a name="node-v2-GetNodeInfoReply"></a>
-
-### GetNodeInfoReply
-Node info reply
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| semver | [string](#string) |  | The version of the node. |
-| arch | [string](#string) |  | The architecture of the node. |
-| os | [string](#string) |  | The operating system of the node. |
-| num_cpu | [uint32](#uint32) |  | The number of CPUs on the node. |
-| mem_bytes | [uint64](#uint64) |  | The amount of memory on the node in bytes. |
-
-
-
-
-
-
-<a name="node-v2-GetNodeInfoRequest"></a>
-
-### GetNodeInfoRequest
-The parameter for the GetNodeInfo() RPC.
-
-
-
-
-
-
-<a name="node-v2-StoreChunksReply"></a>
-
-### StoreChunksReply
-StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
-
-
-
-
-
-
-<a name="node-v2-StoreChunksRequest"></a>
-
-### StoreChunksRequest
-Request that the Node store a batch of chunks.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
-| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
-| signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
-
-Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned). A reference implementation (golang) can be found at https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
-
-1. digest batch.BatchHeader.BatchRoot 2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian) 3. for each certificate in batch.BlobCertificates: a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian) b. for each quorum_number in certificate.BlobHeader.QuorumNumbers: i. digest quorum_number (4 bytes, unsigned big endian) c. digest certificate.BlobHeader.Commitment.Commitment d. digest certificate.BlobHeader.Commitment.LengthCommitment e. digest certificate.BlobHeader.Commitment.LengthProof f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian) g. digest certificate.BlobHeader.PaymentHeader.AccountId h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian) i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian) k. digest certificate.BlobHeader.Signature l. for each relay in certificate.Relays: i. digest relay (4 bytes, unsigned big endian) 4. digest disperserID (4 bytes, unsigned big endian)
-
-Note that this signature is not included in the hash for obvious reasons. |
-
-
-
-
-
- 
-
- 
-
- 
-
-
-<a name="node-v2-Dispersal"></a>
-
-### Dispersal
-Dispersal is utilized to disperse chunk data.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-v2-StoreChunksRequest) | [StoreChunksReply](#node-v2-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
-| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
-
-
-<a name="node-v2-Retrieval"></a>
-
-### Retrieval
-Retrieval is utilized to retrieve chunk data.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#node-v2-GetChunksRequest) | [GetChunksReply](#node-v2-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
-| GetNodeInfo | [GetNodeInfoRequest](#node-v2-GetNodeInfoRequest) | [GetNodeInfoReply](#node-v2-GetNodeInfoReply) | Retrieve node info metadata |
-
- 
-
-
-
 <a name="relay_relay-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1822,6 +1687,142 @@ worse cost and performance.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+
+ 
+
+
+
+<a name="validator_node_v2-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## validator/node_v2.proto
+
+
+
+<a name="validator-GetChunksReply"></a>
+
+### GetChunksReply
+The response to the GetChunks() RPC.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
+
+
+
+
+
+
+<a name="validator-GetChunksRequest"></a>
+
+### GetChunksRequest
+The parameter for the GetChunks() RPC.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_key | [bytes](#bytes) |  | The unique identifier for the blob the chunks are being requested for. The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here: https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 |
+| quorum_id | [uint32](#uint32) |  | Which quorum of the blob to retrieve for (note: a blob can have multiple quorums and the chunks for different quorums at a Node can be different). The ID must be in range [0, 254]. |
+
+
+
+
+
+
+<a name="validator-GetNodeInfoReply"></a>
+
+### GetNodeInfoReply
+Node info reply
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| semver | [string](#string) |  | The version of the node. |
+| arch | [string](#string) |  | The architecture of the node. |
+| os | [string](#string) |  | The operating system of the node. |
+| num_cpu | [uint32](#uint32) |  | The number of CPUs on the node. |
+| mem_bytes | [uint64](#uint64) |  | The amount of memory on the node in bytes. |
+
+
+
+
+
+
+<a name="validator-GetNodeInfoRequest"></a>
+
+### GetNodeInfoRequest
+The parameter for the GetNodeInfo() RPC.
+
+
+
+
+
+
+<a name="validator-StoreChunksReply"></a>
+
+### StoreChunksReply
+StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
+
+
+
+
+
+
+<a name="validator-StoreChunksRequest"></a>
+
+### StoreChunksRequest
+Request that the Node store a batch of chunks.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
+| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
+| signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
+
+Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned). A reference implementation (golang) can be found at https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
+
+1. digest batch.BatchHeader.BatchRoot 2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian) 3. for each certificate in batch.BlobCertificates: a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian) b. for each quorum_number in certificate.BlobHeader.QuorumNumbers: i. digest quorum_number (4 bytes, unsigned big endian) c. digest certificate.BlobHeader.Commitment.Commitment d. digest certificate.BlobHeader.Commitment.LengthCommitment e. digest certificate.BlobHeader.Commitment.LengthProof f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian) g. digest certificate.BlobHeader.PaymentHeader.AccountId h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian) i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian) k. digest certificate.BlobHeader.Signature l. for each relay in certificate.Relays: i. digest relay (4 bytes, unsigned big endian) 4. digest disperserID (4 bytes, unsigned big endian)
+
+Note that this signature is not included in the hash for obvious reasons. |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="validator-Dispersal"></a>
+
+### Dispersal
+Dispersal is utilized to disperse chunk data.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
+
+
+<a name="validator-Retrieval"></a>
+
+### Retrieval
+Retrieval is utilized to retrieve chunk data.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata |
 
  
 

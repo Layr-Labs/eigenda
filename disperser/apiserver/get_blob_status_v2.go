@@ -20,17 +20,17 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 	}()
 
 	if req.GetBlobKey() == nil || len(req.GetBlobKey()) != 32 {
-		return nil, api.NewErrorInvalidArg("invalid blob key")
+		return nil, api.NewErrorInvalidArg("blob key must be present and with 32 bytes")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(req.GetBlobKey())
 	if err != nil {
-		return nil, api.NewErrorInvalidArg("invalid blob key")
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob key bytes: %v", err))
 	}
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Warn("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob metadata: %s", err.Error()))
 	}
 
@@ -42,34 +42,34 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	cert, _, err := s.blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob certificate", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Error("failed to get blob certificate for certified blob", "err", err, "blobKey", blobKey.Hex())
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			return nil, api.NewErrorNotFound("no such blob certificate found")
 		}
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob certificate: %s", err.Error()))
 	}
 
-	// For certified blobs, include signed batch and blob verification info
-	blobVerificationInfos, err := s.blobMetadataStore.GetBlobVerificationInfos(ctx, blobKey)
+	// For certified blobs, include signed batch and blob inclusion info
+	blobInclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob verification info", "err", err, "blobKey", blobKey.Hex())
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob verification info: %s", err.Error()))
+		s.logger.Error("failed to get blob inclusion info for certified blob", "err", err, "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob inclusion info: %s", err.Error()))
 	}
 
-	if len(blobVerificationInfos) == 0 {
-		s.logger.Error("no verification info found for certified blob", "blobKey", blobKey.Hex())
-		return nil, api.NewErrorInternal("no verification info found")
+	if len(blobInclusionInfos) == 0 {
+		s.logger.Error("no blob inclusion info found for certified blob", "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal("no blob inclusion info found")
 	}
 
-	if len(blobVerificationInfos) > 1 {
-		s.logger.Warn("multiple verification info found for certified blob", "blobKey", blobKey.Hex())
+	if len(blobInclusionInfos) > 1 {
+		s.logger.Warn("multiple inclusion info found for certified blob", "blobKey", blobKey.Hex())
 	}
 
-	for _, verificationInfo := range blobVerificationInfos {
-		// get the signed batch from this verification info
-		batchHeaderHash, err := verificationInfo.BatchHeader.Hash()
+	for _, inclusionInfo := range blobInclusionInfos {
+		// get the signed batch from this inclusion info
+		batchHeaderHash, err := inclusionInfo.BatchHeader.Hash()
 		if err != nil {
-			s.logger.Error("failed to get batch header hash", "err", err, "blobKey", blobKey.Hex())
+			s.logger.Error("failed to get batch header hash from blob inclusion info", "err", err, "blobKey", blobKey.Hex())
 			continue
 		}
 		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)
@@ -78,9 +78,9 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 			continue
 		}
 
-		blobVerificationInfoProto, err := verificationInfo.ToProtobuf(cert)
+		blobInclusionInfoProto, err := inclusionInfo.ToProtobuf(cert)
 		if err != nil {
-			s.logger.Error("failed to convert blob verification info to protobuf", "err", err, "blobKey", blobKey.Hex())
+			s.logger.Error("failed to convert blob inclusion info to protobuf", "err", err, "blobKey", blobKey.Hex())
 			continue
 		}
 
@@ -97,7 +97,7 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 				Header:      batchHeader.ToProtobuf(),
 				Attestation: attestationProto,
 			},
-			BlobVerificationInfo: blobVerificationInfoProto,
+			BlobInclusionInfo: blobInclusionInfoProto,
 		}, nil
 	}
 

@@ -62,6 +62,9 @@ type Reader interface {
 	// BatchOperatorIDToAddress returns the addresses of the operators from the operator id.
 	BatchOperatorIDToAddress(ctx context.Context, operatorIds []OperatorID) ([]gethcommon.Address, error)
 
+	// BatchOperatorAddressToID returns the operator IDs for the given operator addresses.
+	BatchOperatorAddressToID(ctx context.Context, addresses []gethcommon.Address) ([]OperatorID, error)
+
 	// GetCurrentQuorumBitmapByOperatorId returns the current quorum bitmap for the operator.
 	GetCurrentQuorumBitmapByOperatorId(ctx context.Context, operatorId OperatorID) (*big.Int, error)
 

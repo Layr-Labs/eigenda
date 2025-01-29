@@ -14,7 +14,7 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -48,7 +48,7 @@ var (
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
 	mockRollup          *rollupbindings.ContractMockRollup
-	verifierContract    *verifierbindings.ContractEigenDABlobVerifier
+	verifierContract    *verifierbindings.ContractEigenDACertVerifier
 	retrievalClient     clients.RetrievalClient
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
@@ -146,7 +146,7 @@ var _ = BeforeSuite(func() {
 
 		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 		Expect(err).To(BeNil())
-		verifierContract, err = verifierbindings.NewContractEigenDABlobVerifier(gcommon.HexToAddress(testConfig.EigenDA.BlobVerifier), ethClient)
+		verifierContract, err = verifierbindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())

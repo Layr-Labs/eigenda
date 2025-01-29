@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"github.com/docker/go-units"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -46,6 +47,12 @@ var (
 		Usage:    "Port at which node listens for retrieval calls (used when node is behind NGINX)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_RETRIEVAL_PORT"),
+	}
+	V2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
+		Usage:    "Port at which node registers to listen for v2 dispersal calls",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
 	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
@@ -148,9 +155,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
-	PubIPProviderFlag = cli.StringFlag{
+	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
-		Usage:    "The ip provider service used to obtain a node's public IP [seeip (default), ipify)",
+		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
 	}
@@ -218,7 +225,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolFlag{
+	EnableV2Flag = cli.BoolTFlag{
 		Name:     "enable-v2",
 		Usage:    "Enable V2 features",
 		Required: false,
@@ -238,6 +245,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
 		Value:    20 * time.Second,
 	}
+	GRPCMsgSizeLimitV2Flag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-msg-size-limit-v2"),
+		Usage:    "The maximum message size in bytes the V2 dispersal endpoint can receive from the client. This flag is only relevant in v2 (default: 1MB)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
+		Value:    units.MiB,
+	}
 	DisableDispersalAuthenticationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
 		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
@@ -249,7 +263,7 @@ var (
 		Usage:    "The size of the dispersal authentication key cache",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_CACHE_SIZE"),
-		Value:    1024,
+		Value:    units.KiB,
 	}
 	DisperserKeyTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-key-timeout"),
@@ -264,6 +278,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
 		Value:    time.Minute,
+	}
+	RelayMaxGRPCMessageSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-max-grpc-message-size"),
+		Usage:    "The maximum message size in bytes for messages received from the relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
+		Value:    units.GiB, // intentionally large for the time being
 	}
 
 	// Test only, DO NOT USE the following flags in production
@@ -416,14 +437,17 @@ var optionalFlags = []cli.Flag{
 	BLSSignerCertFileFlag,
 	BLSSignerAPIKeyFlag,
 	EnableV2Flag,
+	V2DispersalPortFlag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
+	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
 	DisableDispersalAuthenticationFlag,
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
+	RelayMaxGRPCMessageSizeFlag,
 }
 
 func init() {

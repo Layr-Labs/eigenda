@@ -25,8 +25,6 @@ message BlobHeader {
   // reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
   // payments already have unique cumulative_payment values for intentionally unique dispersal requests.
   uint32 salt = 5;
-  // signature over keccak hash of the blob_header that can be verified by blob_header.account_id
-  bytes signature = 6;
 }
 
 // BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
@@ -36,12 +34,15 @@ message BlobHeader {
 message BlobCertificate {
   // blob_header contains data about the blob.
   BlobHeader blob_header = 1;
-  // relays is the list of relays that are in custody of the blob.
+  // signature is an ECDSA signature signed by the blob request signer's account ID over the BlobHeader's blobKey,
+  // which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+  bytes signature = 2;
+  // relay_keys is the list of relay keys that are in custody of the blob.
   // The relays custodying the data are chosen by the Disperser to which the DisperseBlob request was submitted.
   // It needs to contain at least 1 relay number.
   // To retrieve a blob from the relay, one can find that relay's URL in the EigenDARelayRegistry contract:
   // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDARelayRegistry.sol
-  repeated uint32 relays = 2;
+  repeated uint32 relay_keys = 3;
 }
 
 // BatchHeader is the header of a batch of blobs
