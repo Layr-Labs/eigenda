@@ -171,6 +171,8 @@ func GnarkSplitBinaryFrames(serializedFrames []byte) ([][]byte, error) {
 	return frameBytes, nil
 }
 
+// TODO should they be recombined like this, or recombined with the proofs?
+
 // CombineBinaryFrames combines a slice of serialized frames into a single serialized byte slice. This is the inverse
 // of GnarkSplitBinaryFrames, and produces bytes that can be deserialized by GnarkDecodeFrames.
 func CombineBinaryFrames(frameBytes [][]byte) []byte {
