@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -143,28 +144,56 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	req := &validator.StoreChunksRequest{
-		Batch: &pbcommon.Batch{},
+		DisperserID: 10,
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
-	requireErrorStatus(t, err, codes.InvalidArgument)
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "disperserID is invalid")
 
 	req = &validator.StoreChunksRequest{
+		DisperserID: 0,
+	}
+	_, err = c.server.StoreChunks(context.Background(), req)
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "signature must be 64 bytes")
+
+	sig := []byte{
+		0x2a, 0x3b, 0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b,
+		0x0c, 0x1d, 0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d,
+		0x8e, 0x9f, 0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f,
+		0x6a, 0x7b, 0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b,
+		0x4c, 0x5d, 0x6e, 0x7f, 0x8a, 0x9b, 0x0c, 0x1d,
+		0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d, 0x8e, 0x9f,
+		0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
+		0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b, 0x4c, 0x5d,
+	}
+	req = &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   sig,
+		Batch:       &pbcommon.Batch{},
+	}
+	_, err = c.server.StoreChunks(context.Background(), req)
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
+
+	req = &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   sig,
 		Batch: &pbcommon.Batch{
 			Header:           &pbcommon.BatchHeader{},
 			BlobCertificates: batchProto.BlobCertificates,
 		},
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
-	requireErrorStatus(t, err, codes.InvalidArgument)
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
 
 	req = &validator.StoreChunksRequest{
+		DisperserID: 0,
+		Signature:   sig,
 		Batch: &pbcommon.Batch{
 			Header:           batchProto.Header,
 			BlobCertificates: []*pbcommon.BlobCertificate{},
 		},
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
-	requireErrorStatus(t, err, codes.InvalidArgument)
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "failed to deserialize batch")
 }
 
 func TestV2StoreChunksSuccess(t *testing.T) {
@@ -362,6 +391,11 @@ func requireErrorStatus(t *testing.T, err error, code codes.Code) {
 	s, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, s.Code(), code)
+}
+
+func requireErrorStatusAndMsg(t *testing.T, err error, code codes.Code, substring string) {
+	requireErrorStatus(t, err, code)
+	assert.True(t, strings.Contains(err.Error(), substring))
 }
 
 type mockKey struct{}
