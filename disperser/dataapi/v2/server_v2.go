@@ -583,7 +583,7 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 // FetchBatchFeedHandler godoc
 //
 //	@Summary	Fetch batch feed
-//	@Tags		Blob
+//	@Tags		Batch
 //	@Produce	json
 //	@Param		end			query		string	false	"Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval	query		int		false	"Fetch batches starting from an interval (in seconds) before the end time [default: 3600]"
