@@ -305,8 +305,10 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 					},
 					// Most crypptography library serializes a G2 point by having
 					// A0 followed by A1 for both X, Y field of G2. However, ethereum
-					// precompile assumes an ordering of A1, A0. Currently, we choose
+					// precompile assumes an ordering of A1, A0. We choose
 					// to conform with Ethereum order when serializing a blobHeaderV2
+					// for instance, gnark, https://github.com/Consensys/gnark-crypto/blob/de0d77f2b4d520350bc54c612828b19ce2146eee/ecc/bn254/marshal.go#L1078
+					// Ethereum, https://eips.ethereum.org/EIPS/eip-197#definition-of-the-groups
 					LengthCommitment: verifierbindings.BN254G2Point{
 						X: [2]*big.Int{lengthCommitX1, lengthCommitX0},
 						Y: [2]*big.Int{lengthCommitY1, lengthCommitY0},

@@ -2,7 +2,6 @@ package v2_test
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -53,7 +52,7 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 0x2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a has not verified in solidity
+	// 0x2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a has verified in solidity  with chisel
 	assert.Equal(t, "2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a", blobKey.Hex())
 }
 
@@ -112,8 +111,7 @@ func TestBlobCertHash(t *testing.T) {
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
 
-	fmt.Printf("%x", hash)
-	// afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec has not verified in solidity
+	// afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec has verified in solidity with chisel
 	assert.Equal(t, "afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec", hex.EncodeToString(hash[:]))
 }
 
