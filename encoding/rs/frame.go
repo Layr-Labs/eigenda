@@ -119,20 +119,22 @@ func GnarkDecodeFrames(serializedFrames []byte) ([]*Frame, error) {
 }
 
 // GnarkDecodeFrame deserializes a byte slice into a frame. Returns the frame and the number of bytes read.
+// If passed a byte array that contains multiple frames, it will only decode the first frame. The uint32
+// returned is the number of bytes read from the input slice.
 func GnarkDecodeFrame(serializedFrame []byte) (*Frame, uint32, error) {
 	if len(serializedFrame) < 4 {
 		return nil, 0, fmt.Errorf("invalid frame size: %d", len(serializedFrame))
 	}
 
-	frameCount := binary.BigEndian.Uint32(serializedFrame)
+	symbolCount := binary.BigEndian.Uint32(serializedFrame)
 	index := uint32(4)
 
-	if len(serializedFrame) < int(index+frameCount*encoding.BYTES_PER_SYMBOL) {
+	if len(serializedFrame) < int(index+symbolCount*encoding.BYTES_PER_SYMBOL) {
 		return nil, 0, fmt.Errorf("invalid frame size: %d", len(serializedFrame))
 	}
 
-	coeffs := make([]fr.Element, frameCount)
-	for i := 0; i < int(frameCount); i++ {
+	coeffs := make([]fr.Element, symbolCount)
+	for i := 0; i < int(symbolCount); i++ {
 		coeff := fr.Element{}
 		coeff.Unmarshal(serializedFrame[index : index+encoding.BYTES_PER_SYMBOL])
 		coeffs[i] = coeff
@@ -142,4 +144,50 @@ func GnarkDecodeFrame(serializedFrame []byte) (*Frame, uint32, error) {
 	frame := &Frame{Coeffs: coeffs}
 
 	return frame, index, nil
+}
+
+// GnarkSplitBinaryFrames deserializes a serialized list of frames into slice of individually serialized frames
+// (which can be individually deserialized by GnarkDecodeFrame).
+func GnarkSplitBinaryFrames(serializedFrames []byte) ([][]byte, error) {
+	frameCount := binary.BigEndian.Uint32(serializedFrames)
+	index := uint32(4)
+
+	frameBytes := make([][]byte, frameCount)
+	for i := 0; i < int(frameCount); i++ {
+		symbolCount := binary.BigEndian.Uint32(serializedFrames[index:])
+		frameLength := 4 + symbolCount*encoding.BYTES_PER_SYMBOL
+		if len(serializedFrames) < int(index+frameLength) {
+			return nil, fmt.Errorf("invalid frame size: %d", len(serializedFrames))
+		}
+		frameBytes[i] = serializedFrames[index : index+frameLength]
+
+		index += frameLength
+	}
+
+	if index != uint32(len(serializedFrames)) {
+		return nil, fmt.Errorf("decoded size mismatch: expected %d, got %d", len(serializedFrames), index)
+	}
+
+	return frameBytes, nil
+}
+
+// CombineBinaryFrames combines a slice of serialized frames into a single serialized byte slice. This is the inverse
+// of GnarkSplitBinaryFrames, and produces bytes that can be deserialized by GnarkDecodeFrames.
+func CombineBinaryFrames(frameBytes [][]byte) []byte {
+	length := uint32(4)
+	for _, frame := range frameBytes {
+		length += uint32(len(frame))
+	}
+
+	result := make([]byte, length)
+
+	// first four bytes are the number of frames
+	binary.BigEndian.PutUint32(result, uint32(len(frameBytes)))
+	index := uint32(4)
+	for _, frame := range frameBytes {
+		copy(result[index:], frame)
+		index += uint32(len(frame))
+	}
+
+	return result
 }
