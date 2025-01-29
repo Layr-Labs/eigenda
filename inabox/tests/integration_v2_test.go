@@ -5,9 +5,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/docker/go-units"
 	"math/big"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -303,12 +304,12 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 						Y: commitY,
 					},
 					LengthCommitment: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthCommitX0, lengthCommitX1},
-						Y: [2]*big.Int{lengthCommitY0, lengthCommitY1},
+						X: [2]*big.Int{lengthCommitX1, lengthCommitX0},
+						Y: [2]*big.Int{lengthCommitY1, lengthCommitY0},
 					},
 					LengthProof: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthProofX0, lengthProofX1},
-						Y: [2]*big.Int{lengthProofY0, lengthProofY1},
+						X: [2]*big.Int{lengthProofX1, lengthProofX0},
+						Y: [2]*big.Int{lengthProofY1, lengthProofY0},
 					},
 					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
