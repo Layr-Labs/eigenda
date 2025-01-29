@@ -172,6 +172,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 				previousStatus = newStatus
 			}
 
+			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_CERTIFIED:
 				return blobStatusReply, nil
