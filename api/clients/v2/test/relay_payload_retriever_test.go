@@ -20,7 +20,6 @@ import (
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	prover2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -96,7 +95,6 @@ func buildBlobAndCert(
 	relayKeys []core.RelayKey,
 ) (core.BlobKey, []byte, *verification.EigenDACert) {
 
-	blobKey := core.BlobKey(tester.Random.Bytes(32))
 	payloadBytes := tester.Random.Bytes(payloadLength)
 	blobBytes, err := tester.Codec.EncodeBlob(payloadBytes)
 	require.NoError(t, err)
@@ -115,8 +113,7 @@ func buildBlobAndCert(
 	prover, err := prover2.NewProver(kzgConfig, nil)
 	require.NoError(t, err)
 
-	params := encoding.ParamsFromMins(16, 16)
-	commitments, _, err := prover.EncodeAndProve(blobBytes, params)
+	commitments, err := prover.GetCommitmentsForPaddedLength(blobBytes)
 	require.NoError(t, err)
 
 	commitmentsProto, err := commitments.ToProtobuf()
@@ -141,9 +138,14 @@ func buildBlobAndCert(
 	convertedInclusionInfo, err := verification.InclusionInfoProtoToBinding(inclusionInfo)
 	require.NoError(t, err)
 
-	return blobKey, blobBytes, &verification.EigenDACert{
+	eigenDACert := &verification.EigenDACert{
 		BlobInclusionInfo: *convertedInclusionInfo,
 	}
+
+	blobKey, err := eigenDACert.ComputeBlobKey()
+	require.NoError(t, err)
+
+	return *blobKey, blobBytes, eigenDACert
 }
 
 // TestGetPayloadSuccess tests that a blob is received without error in the happy case
@@ -454,11 +456,11 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
 
-	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
-	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length--
+	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) - 1
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(blobBytes, nil).Once()
 	tester.MockCertVerifier.On(
 		"VerifyCertV2",
 		mock.Anything,
@@ -484,7 +486,7 @@ func TestFailedDecoding(t *testing.T) {
 	for i := 0; i < relayCount; i++ {
 		relayKeys[i] = tester.Random.Uint32()
 	}
-	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
+	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	// intentionally cause the payload header claimed length to differ from the actual length
 	binary.BigEndian.PutUint32(blobBytes[2:6], uint32(len(blobBytes)-1))
@@ -499,7 +501,7 @@ func TestFailedDecoding(t *testing.T) {
 		Y: maliciousCommitment.Y.BigInt(new(big.Int)),
 	}
 
-	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
+	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(
 		blobBytes,
 		nil).Once()
 	tester.MockCertVerifier.On(
