@@ -36,11 +36,9 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	kzgConfig *kzg.KzgConfig, encoderCfg *encoding.Config) (*PayloadDisperser, error) {
 	
 	// 1 - verify key semantics and create signer
-	var signer core.BlobRequestSigner
-	if len(payloadDispCfg.SignerPaymentKey) == 64 {
-		signer = auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
-	} else {
-		return nil, fmt.Errorf("invalid length for signer private key")
+	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
+	if err != nil {
+		return nil, fmt.Errorf("new local blob request signer: %v", err)
 	}
 
 	// 2 - create prover
