@@ -126,7 +126,11 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	return nil
 }
 
-func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
+func (s *DispersalServerV2) validateDispersalRequest(
+	ctx context.Context,
+	req *pb.DisperseBlobRequest,
+	onchainState *OnchainState) error {
+
 	signature := req.GetSignature()
 	if len(signature) != 65 {
 		return fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
