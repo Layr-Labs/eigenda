@@ -54,7 +54,7 @@ func RandomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 			},
 			BlobCertificates: blobCertificates,
 		},
-		DisperserID: rand.Uint32(),
+		DisperserID: 0,
 		Signature:   rand.Bytes(32),
 	}
 }
