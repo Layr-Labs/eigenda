@@ -385,7 +385,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 }
 
 // Generates DA node .env
-func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, metricsPort, nodeApiPort string) OperatorVars {
+func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, metricsPort, nodeApiPort string) OperatorVars {
 
 	max, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	// max.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(max, big.NewInt(1))
@@ -412,6 +412,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
 		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
 		NODE_V2_DISPERSAL_PORT:                v2DispersalPort,
+		NODE_V2_RETRIEVAL_PORT:                v2RetrievalPort,
 		NODE_ENABLE_METRICS:                   "true",
 		NODE_METRICS_PORT:                     metricsPort,
 		NODE_ENABLE_NODE_API:                  "true",
@@ -653,8 +654,9 @@ func (env *Config) GenerateAllVariables() {
 		dispersalPort := fmt.Sprint(port + 2)
 		retrievalPort := fmt.Sprint(port + 3)
 		v2DispersalPort := fmt.Sprint(port + 4)
-		nodeApiPort := fmt.Sprint(port + 5)
-		port += 6
+		v2RetrievalPort := fmt.Sprint(port + 5)
+		nodeApiPort := fmt.Sprint(port + 6)
+		port += 7
 
 		name := fmt.Sprintf("opr%v", i)
 		logPath, dbPath, filename, envFile := env.getPaths(name)
@@ -662,7 +664,7 @@ func (env *Config) GenerateAllVariables() {
 
 		// Convert key to address
 
-		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, fmt.Sprint(metricsPort), nodeApiPort)
+		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
 		writeEnv(operatorConfig.getEnvMap(), envFile)
 		env.Operators = append(env.Operators, operatorConfig)
 

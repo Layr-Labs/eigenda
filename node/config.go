@@ -49,6 +49,7 @@ type Config struct {
 	InternalRetrievalPort          string
 	InternalDispersalPort          string
 	V2DispersalPort                string
+	V2RetrievalPort                string
 	EnableNodeApi                  bool
 	NodeApiPort                    string
 	EnableMetrics                  bool
@@ -233,13 +234,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	// check if the ports are valid integers
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
-	_, err = strconv.Atoi(dispersalPort)
+	err = core.ValidatePort(dispersalPort)
 	if err != nil {
 		return nil, fmt.Errorf("invalid dispersal port: %s", dispersalPort)
 	}
 
 	retrievalPort := ctx.GlobalString(flags.RetrievalPortFlag.Name)
-	_, err = strconv.Atoi(retrievalPort)
+	err = core.ValidatePort(retrievalPort)
 	if err != nil {
 		return nil, fmt.Errorf("invalid retrieval port: %s", retrievalPort)
 	}
@@ -252,9 +253,33 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			return nil, fmt.Errorf("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be specified if v2 is enabled")
 		}
 	} else {
-		_, err = strconv.Atoi(v2DispersalPort)
+		if !v2Enabled {
+			return nil, fmt.Errorf("enable v2 flag needs to be set when v2 dispersal port (NODE_V2_DISPERSAL_PORT) is specified")
+		}
+		if v2DispersalPort == dispersalPort {
+			return nil, fmt.Errorf("ensure to v1 and v2 dispersal ports are not the same")
+		}
+		err = core.ValidatePort(v2DispersalPort)
 		if err != nil {
 			return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
+		}
+	}
+
+	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
+	if v2RetrievalPort == "" {
+		if v2Enabled {
+			return nil, fmt.Errorf("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be specified if v2 is enabled")
+		}
+	} else {
+		if !v2Enabled {
+			return nil, fmt.Errorf("enable v2 flag needs to be set when v2 retrieval port (NODE_V2_RETRIEVAL_PORT) is specified")
+		}
+		if v2RetrievalPort == retrievalPort {
+			return nil, fmt.Errorf("ensure to v1 and v2 retrieval ports are not the same")
+		}
+		err = core.ValidatePort(v2RetrievalPort)
+		if err != nil {
+			return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
 		}
 	}
 
@@ -265,6 +290,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		InternalDispersalPort:               internalDispersalFlag,
 		InternalRetrievalPort:               internalRetrievalFlag,
 		V2DispersalPort:                     v2DispersalPort,
+		V2RetrievalPort:                     v2RetrievalPort,
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),

@@ -148,7 +148,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	for opID, op := range state.IndexedOperators {
 		opID := opID
 		op := op
-		host, _, _, v2DispersalPort, err := core.ParseOperatorSocket(op.Socket)
+		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err)
 		}
