@@ -315,13 +315,12 @@ func (c *TestClient) VerifyBlobCertification(
 	// verify that expected quorums are present
 	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
 	for _, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
-		fmt.Printf("Quorum number: %d\n", quorumNumber) // TODO
 		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
 	}
 	// There may be other quorums in the batch. No biggie as long as the expected ones are there.
-	require.True(c.t, len(expectedQuorums) >= len(quorumSet))
+	require.True(c.t, len(expectedQuorums) <= len(quorumSet))
 	for expectedQuorum := range quorumSet {
-		require.Contains(c.t, expectedQuorums, expectedQuorum)
+		require.Contains(c.t, quorumSet, expectedQuorum)
 	}
 
 	// TODO verify signed percentages by parsing byte array
