@@ -3,12 +3,13 @@ package v2
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"os"
 	"path"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -96,7 +97,8 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	privateKeyString = strings.Trim(privateKeyString, "\n \t")
 	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
 
-	signer := auth.NewLocalBlobRequestSigner(privateKeyString)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
+	require.NoError(t, err)
 	signerAccountId, err := signer.GetAccountID()
 	require.NoError(t, err)
 	accountId := gethcommon.HexToAddress(signerAccountId)

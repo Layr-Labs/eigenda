@@ -72,7 +72,8 @@ func TestV2DisperseBlob(t *testing.T) {
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	assert.NoError(t, err)
 
@@ -121,7 +122,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	assert.NoError(t, err)
@@ -530,7 +532,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
@@ -581,7 +584,8 @@ func TestInvalidLength(t *testing.T) {
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	assert.NoError(t, err)
 
