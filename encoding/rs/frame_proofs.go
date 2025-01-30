@@ -50,6 +50,10 @@ func DeserializeFrameProof(bytes []byte) (*encoding.Proof, error) {
 // DeserializeFrameProofs deserializes a slice of proofs (as found in encoding.Proof, but without the coefficients)
 // from a binary format. The inverse of SerializeFrameProofs.
 func DeserializeFrameProofs(bytes []byte) ([]*encoding.Proof, error) {
+	if len(bytes)%SerializedProofLength != 0 {
+		return nil, fmt.Errorf("input byte array is not a multiple of proof length")
+	}
+
 	proofCount := len(bytes) / SerializedProofLength
 	proofs := make([]*encoding.Proof, proofCount)
 
@@ -68,6 +72,10 @@ func DeserializeFrameProofs(bytes []byte) ([]*encoding.Proof, error) {
 // the coefficients) into a slice of byte slices, each containing a single serialized proof. Each individual
 // serialized proof can be deserialized by encoding.Proof.Unmarshal.
 func SplitSerializedFrameProofs(bytes []byte) ([][]byte, error) {
+	if len(bytes)%SerializedProofLength != 0 {
+		return nil, fmt.Errorf("input byte array is not a multiple of proof length")
+	}
+
 	proofCount := len(bytes) / SerializedProofLength
 	proofs := make([][]byte, proofCount)
 

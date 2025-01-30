@@ -21,8 +21,8 @@ func BuildBinaryFrame(binaryProof []byte, binaryCoeffs []byte) []byte {
 	return data
 }
 
-// ParseBinaryFrame parses a binary frame into an encoding.Frame (as built by BuildBinaryFrame).
-func ParseBinaryFrame(data []byte) (*encoding.Frame, error) {
+// DeserializeBinaryFrame parses a binary frame into an encoding.Frame (as built by BuildBinaryFrame).
+func DeserializeBinaryFrame(data []byte) (*encoding.Frame, error) {
 	proof, err := DeserializeFrameProof(data[:SerializedProofLength])
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize proof: %w", err)
@@ -108,7 +108,7 @@ func DeserializeBinaryFrames(data []byte) ([]*encoding.Frame, error) {
 
 	parsedFrames := make([]*encoding.Frame, len(frames))
 	for i, frame := range frames {
-		parsedFrame, err := ParseBinaryFrame(frame)
+		parsedFrame, err := DeserializeBinaryFrame(frame)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse binary frame: %w", err)
 		}

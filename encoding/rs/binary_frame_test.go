@@ -39,7 +39,7 @@ func TestParsingBinaryFrame(t *testing.T) {
 
 	binaryFrame := rs.BuildBinaryFrame(proofBytes, coeffBytes)
 
-	frame, err := rs.ParseBinaryFrame(binaryFrame)
+	frame, err := rs.DeserializeBinaryFrame(binaryFrame)
 	require.NoError(t, err)
 
 	require.True(t, proof.Equal(&frame.Proof))

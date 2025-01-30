@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // ChunkReader reads chunks written by ChunkWriter.
@@ -75,32 +74,28 @@ func (r *chunkReader) GetChunkProofs(
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
 	}
 
-	if len(bytes)%bn254.SizeOfG1AffineCompressed != 0 {
-		r.logger.Error("Invalid proof size")
-		return nil, fmt.Errorf("invalid proof size: %w", err)
-	}
-
-	proofCount := len(bytes) / bn254.SizeOfG1AffineCompressed
-	proofs := make([]*encoding.Proof, proofCount)
-
-	for i := 0; i < proofCount; i++ {
-		proof := encoding.Proof{}
-		err := proof.Unmarshal(bytes[i*bn254.SizeOfG1AffineCompressed:])
-		if err != nil {
-			r.logger.Error("Failed to unmarshal proof: %v", err)
-			return nil, fmt.Errorf("failed to unmarshal proof: %w", err)
-		}
-		proofs[i] = &proof
+	proofs, err := rs.DeserializeFrameProofs(bytes)
+	if err != nil {
+		r.logger.Error("Failed to decode proofs: %v", err)
+		return nil, fmt.Errorf("failed to decode proofs: %w", err)
 	}
 
 	return proofs, nil
 }
 
-// TODO unit test new methods
-
 func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
+	if err != nil {
+		r.logger.Error("Failed to download chunks from S3: %v", err)
+		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+	}
+
+	proofs, err := rs.SplitSerializedFrameProofs(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to split proofs: %w", err)
+	}
+
+	return proofs, nil
 }
 
 func (r *chunkReader) GetChunkCoefficients(

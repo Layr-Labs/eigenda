@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"net"
 	"strings"
 	"time"
@@ -14,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
@@ -332,14 +332,14 @@ func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error)
 
 // gatherChunkDataToSend takes the chunk data and narrows it down to the data requested in the GetChunks request.
 func gatherChunkDataToSend(
-	frames map[v2.BlobKey][]*encoding.Frame,
+	frames map[v2.BlobKey][][]byte,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
 	bytesToSend := make([][]byte, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
 
-		framesToSend := make([]*encoding.Frame, 0)
+		framesToSend := make([][]byte, 0)
 
 		if chunkRequest.GetByIndex() != nil {
 			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
@@ -377,12 +377,7 @@ func gatherChunkDataToSend(
 			framesToSend = append(framesToSend, blobFrames[startIndex:endIndex]...)
 		}
 
-		bundle := core.Bundle(framesToSend)
-		bundleBytes, err := bundle.Serialize()
-		if err != nil {
-			return nil, fmt.Errorf("error serializing bundle: %w", err)
-		}
-		bytesToSend = append(bytesToSend, bundleBytes)
+		bytesToSend = append(bytesToSend, rs.CombineBinaryFrames(framesToSend))
 	}
 
 	return bytesToSend, nil
