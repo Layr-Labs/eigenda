@@ -82,7 +82,7 @@ type BlobMetadata struct {
 	NumRetries uint
 	// BlobSize is the size of the blob in bytes
 	BlobSize uint64
-	// RequestedAt is the Unix timestamp of when the blob was requested in seconds
+	// RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds
 	RequestedAt uint64
 	// UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_
 	UpdatedAt uint64

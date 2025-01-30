@@ -52,8 +52,8 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 0xac17ec01189d04e827ea282f49077b138f0aefa5177be146a74ae51135868c57 verified in solidity
-	assert.Equal(t, "ac17ec01189d04e827ea282f49077b138f0aefa5177be146a74ae51135868c57", blobKey.Hex())
+	// 0x2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a has verified in solidity  with chisel
+	assert.Equal(t, "2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a", blobKey.Hex())
 }
 
 func TestBatchHeaderHash(t *testing.T) {
@@ -110,8 +110,9 @@ func TestBlobCertHash(t *testing.T) {
 
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
-	// 0x1db857aeead06422b8d727dc3972db6ceb04ceb87e194cb6c2389ac3015eda49 verified in solidity
-	assert.Equal(t, "1db857aeead06422b8d727dc3972db6ceb04ceb87e194cb6c2389ac3015eda49", hex.EncodeToString(hash[:]))
+
+	// afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec has verified in solidity with chisel
+	assert.Equal(t, "afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {

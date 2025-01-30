@@ -130,24 +130,31 @@ func ComputeBlobKey(
 				X: blobCommitments.Commitment.X.BigInt(new(big.Int)),
 				Y: blobCommitments.Commitment.Y.BigInt(new(big.Int)),
 			},
+			// Most cryptography library serializes a G2 point by having
+			// A0 followed by A1 for both X, Y field of G2. However, ethereum
+			// precompile assumes an ordering of A1, A0. We choose
+			// to conform with Ethereum order when serializing a blobHeaderV2
+			// for instance, gnark, https://github.com/Consensys/gnark-crypto/blob/de0d77f2b4d520350bc54c612828b19ce2146eee/ecc/bn254/marshal.go#L1078
+			// Ethereum, https://eips.ethereum.org/EIPS/eip-197#definition-of-the-groups
 			LengthCommitment: abiG2Commit{
 				X: [2]*big.Int{
-					blobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 				},
 			},
+			// Same as above
 			LengthProof: abiG2Commit{
 				X: [2]*big.Int{
-					blobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					blobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
 					blobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
 				},
 			},
 			DataLength: uint32(blobCommitments.Length),
