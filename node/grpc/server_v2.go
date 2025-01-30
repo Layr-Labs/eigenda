@@ -112,6 +112,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
+	// Validate the request parameters (which is cheap) before starting any further
+	// processing of the request.
 	batch, err := s.validateStoreChunksRequest(in)
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate store chunk request: %v", err))
