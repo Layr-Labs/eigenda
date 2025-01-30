@@ -206,7 +206,7 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	}
 
 	if len(req.GetSignature()) != 64 {
-		return nil, errors.New("signature must be 64 bytes")
+		return nil, fmt.Errorf("signature must be 64 bytes, found %d bytes", len(req.GetSignature()))
 	}
 
 	if req.GetBatch() == nil {
