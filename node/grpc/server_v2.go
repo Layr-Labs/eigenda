@@ -205,8 +205,10 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 		return nil, fmt.Errorf("disperserID is invalid: %d", req.GetDisperserID())
 	}
 
-	if len(req.GetSignature()) != 64 {
-		return nil, fmt.Errorf("signature must be 64 bytes, found %d bytes", len(req.GetSignature()))
+	// The signature is created by go-ethereum library, which contains 1 additional byte (for
+	// recovering the public key from signature), so it's 65 bytes.
+	if len(req.GetSignature()) != 65 {
+		return nil, fmt.Errorf("signature must be 65 bytes, found %d bytes", len(req.GetSignature()))
 	}
 
 	if req.GetBatch() == nil {

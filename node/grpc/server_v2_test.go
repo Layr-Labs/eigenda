@@ -53,6 +53,7 @@ var (
 		0x2e, 0x3f, 0x4a, 0x5b, 0x6c, 0x7d, 0x8e, 0x9f,
 		0x0a, 0x1b, 0x2c, 0x3d, 0x4e, 0x5f, 0x6a, 0x7b,
 		0x8c, 0x9d, 0x0e, 0x1f, 0x2a, 0x3b, 0x4c, 0x5d,
+		0x66,
 	}
 )
 
@@ -163,7 +164,7 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 		DisperserID: 0,
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
-	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "signature must be 64 bytes")
+	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "signature must be 65 bytes")
 
 	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
