@@ -20,6 +20,11 @@ type ICertVerifier interface {
 		ctx context.Context,
 		eigenDACert *EigenDACert,
 	) error
+
+	GetNonSignerStakesAndSignature(
+		ctx context.Context,
+		signedBatch *disperser.SignedBatch,
+	) (*verifierBindings.NonSignerStakesAndSignature, error)
 }
 
 // CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
@@ -103,4 +108,27 @@ func (cv *CertVerifier) VerifyCertV2(
 	}
 
 	return nil
+}
+
+// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
+// contract, and returns the resulting NonSignerStakesAndSignature object.
+func (cv *CertVerifier) GetNonSignerStakesAndSignature(
+	ctx context.Context,
+	signedBatch *disperser.SignedBatch,
+) (*verifierBindings.NonSignerStakesAndSignature, error) {
+
+	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
+	if err != nil {
+		return nil, fmt.Errorf("convert signed batch: %w", err)
+	}
+
+	nonSignerStakesAndSignature, err := cv.certVerifierCaller.GetNonSignerStakesAndSignature(
+		&bind.CallOpts{Context: ctx},
+		*signedBatchBinding)
+
+	if err != nil {
+		return nil, fmt.Errorf("get non signer stakes and signature: %w", err)
+	}
+
+	return &nonSignerStakesAndSignature, nil
 }
