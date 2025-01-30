@@ -1,9 +1,10 @@
-package rs
+package rs_test
 
 import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/crypto/ecc/bn254"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -18,6 +19,22 @@ func randomG1() (*bn254.G1Point, error) {
 	return key.PubKey, nil
 }
 
+func TestSerializeFrameProof(t *testing.T) {
+	g1, err := randomG1()
+	require.NoError(t, err)
+
+	proof := g1.G1Affine
+
+	bytes := make([]byte, rs.SerializedProofLength)
+	err = rs.SerializeFrameProof(proof, bytes)
+	require.NoError(t, err)
+
+	proof2, err := rs.DeserializeFrameProof(bytes)
+	require.NoError(t, err)
+
+	require.True(t, proof.Equal(proof2))
+}
+
 func TestSerializeFrameProofs(t *testing.T) {
 	rand := random.NewTestRandom(t)
 
@@ -30,8 +47,9 @@ func TestSerializeFrameProofs(t *testing.T) {
 		proofs[i] = g1.G1Affine
 	}
 
-	bytes := SerializeFrameProofs(proofs)
-	proofs2, err := DeserializeFrameProofs(bytes)
+	bytes, err := rs.SerializeFrameProofs(proofs)
+	require.NoError(t, err)
+	proofs2, err := rs.DeserializeFrameProofs(bytes)
 	require.NoError(t, err)
 
 	require.Equal(t, len(proofs), len(proofs2))
@@ -52,8 +70,9 @@ func TestSplitSerializedFrameProofs(t *testing.T) {
 		proofs[i] = g1.G1Affine
 	}
 
-	bytes := SerializeFrameProofs(proofs)
-	splitBytes, err := SplitSerializedFrameProofs(bytes)
+	bytes, err := rs.SerializeFrameProofs(proofs)
+	require.NoError(t, err)
+	splitBytes, err := rs.SplitSerializedFrameProofs(bytes)
 	require.NoError(t, err)
 
 	require.Equal(t, len(proofs), len(splitBytes))

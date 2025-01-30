@@ -29,8 +29,7 @@ func SerializeFrameCoeffsSlice(coeffs []FrameCoeffs) ([]byte, error) {
 	// Count the number of bytes.
 	encodedSize := uint32(4) // stores the number of coeffs
 	for _, coeff := range coeffs {
-		encodedSize += 4                // stores the size of the coeff
-		encodedSize += CoeffSize(coeff) // size of the coeff
+		encodedSize += CoeffsSize(coeff)
 	}
 
 	serializedBytes := make([]byte, encodedSize)
@@ -38,7 +37,7 @@ func SerializeFrameCoeffsSlice(coeffs []FrameCoeffs) ([]byte, error) {
 	index := uint32(4)
 
 	for _, frame := range coeffs {
-		index += frame.Serialize(serializedBytes[index:])
+		index += SerializeFrameCoeffs(frame, serializedBytes[index:])
 	}
 
 	if index != encodedSize {
@@ -49,12 +48,12 @@ func SerializeFrameCoeffsSlice(coeffs []FrameCoeffs) ([]byte, error) {
 	return serializedBytes, nil
 }
 
-// Serialize serializes a FrameCoeffs object into a byte slice.
-func (c FrameCoeffs) Serialize(target []byte) uint32 {
-	binary.BigEndian.PutUint32(target, uint32(len(c)))
+// SerializeFrameCoeffs serializes a FrameCoeffs object into a byte slice.
+func SerializeFrameCoeffs(coeffs FrameCoeffs, target []byte) uint32 {
+	binary.BigEndian.PutUint32(target, uint32(len(coeffs)))
 	index := uint32(4)
 
-	for _, coeff := range c {
+	for _, coeff := range coeffs {
 		serializedCoeff := coeff.Marshal()
 		copy(target[index:], serializedCoeff)
 		index += uint32(len(serializedCoeff))
@@ -63,9 +62,9 @@ func (c FrameCoeffs) Serialize(target []byte) uint32 {
 	return index
 }
 
-// CoeffSize returns the size of a frame in bytes.
-func CoeffSize(coeffs FrameCoeffs) uint32 { // TODO don't export this!
-	return uint32(encoding.BYTES_PER_SYMBOL * len(coeffs))
+// CoeffsSize returns the size of a frame in bytes.
+func CoeffsSize(coeffs FrameCoeffs) uint32 {
+	return 4 + uint32(encoding.BYTES_PER_SYMBOL*len(coeffs))
 }
 
 // DeserializeFrameCoeffsSlice is the inverse of SerializeFrameCoeffsSlice.

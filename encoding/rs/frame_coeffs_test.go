@@ -1,7 +1,8 @@
 package rs_test
 
 import (
-	"fmt"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -12,23 +13,25 @@ import (
 // TODO find and replace "frame" terminology
 
 func TestFrameCoeffsSerialization(t *testing.T) {
+	rand := random.NewTestRandom(t)
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	payload := rand.Bytes(1024 + rand.Intn(1024))
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
 	enc, err := rs.NewEncoder(cfg)
 	require.Nil(t, err)
 
-	coeffs, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
+	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.Nil(t, err)
 	require.NotNil(t, coeffs, err)
 
-	serializedSize := rs.CoeffSize(coeffs[0]) + 4
+	serializedSize := rs.CoeffsSize(coeffs[0])
 	bytes := make([]byte, serializedSize)
-	coeffs[0].Serialize(bytes)
-
-	fmt.Printf("\n\n\n")
+	rs.SerializeFrameCoeffs(coeffs[0], bytes)
 
 	deserializedCoeffs, bytesRead, err := rs.DeserializeFrameCoeffs(bytes)
 	require.NoError(t, err)
@@ -37,15 +40,19 @@ func TestFrameCoeffsSerialization(t *testing.T) {
 }
 
 func TestFrameCoeffsSliceSerialization(t *testing.T) {
+	rand := random.NewTestRandom(t)
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	payload := rand.Bytes(1024 + rand.Intn(1024))
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
 	enc, err := rs.NewEncoder(cfg)
 	require.Nil(t, err)
 
-	coeffs, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
+	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)
 
 	encodedCoeffs, err := rs.SerializeFrameCoeffsSlice(coeffs)
@@ -61,15 +68,19 @@ func TestFrameCoeffsSliceSerialization(t *testing.T) {
 }
 
 func TestSplitSerializedFrameCoeffs(t *testing.T) {
+	rand := random.NewTestRandom(t)
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
-	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(GETTYSBURG_ADDRESS_BYTES)))
+	payload := rand.Bytes(1024 + rand.Intn(1024))
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+
+	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(paddedPayload)))
 	cfg := encoding.DefaultConfig()
 	enc, err := rs.NewEncoder(cfg)
 	require.Nil(t, err)
 
-	coeffs, _, err := enc.EncodeBytes(GETTYSBURG_ADDRESS_BYTES, params)
+	coeffs, _, err := enc.EncodeBytes(paddedPayload, params)
 	require.NoError(t, err)
 
 	encodedCoeffs, err := rs.SerializeFrameCoeffsSlice(coeffs)

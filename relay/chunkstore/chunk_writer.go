@@ -56,8 +56,12 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes := rs.SerializeFrameProofs(proofs)
-	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
+	bytes, err := rs.SerializeFrameProofs(proofs)
+	if err != nil {
+		c.logger.Error("Failed to encode proofs", "err", err)
+		return fmt.Errorf("failed to encode proofs: %v", err)
+	}
+	err = c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
 	if err != nil {
 		c.logger.Errorf("Failed to upload chunk proofs to S3: %v", err)
 		return fmt.Errorf("failed to upload chunk proofs to S3: %v", err)
