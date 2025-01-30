@@ -36,6 +36,9 @@ var (
 	targetConfig = preprodConfig
 )
 
+// TODO test dispersing the same blob twice in a row
+// TODO test salt 0
+
 func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	// Create the test data directory if it does not exist
 	err := os.MkdirAll(config.TestDataPath, 0755)
@@ -139,7 +142,13 @@ func skipInCI(t *testing.T) {
 // - wait for it to be confirmed
 // - read the blob from the relays
 // - read the blob from the validators
-func testBasicDispersal(t *testing.T, rand *random.TestRandom, payload []byte, requestedLength int, quorums []core.QuorumID) error {
+func testBasicDispersal(
+	t *testing.T,
+	rand *random.TestRandom,
+	payload []byte,
+	requestedLength int,
+	quorums []core.QuorumID) error {
+
 	client := getClient(t)
 
 	// Make sure the payload is the correct length
@@ -149,7 +158,12 @@ func testBasicDispersal(t *testing.T, rand *random.TestRandom, payload []byte, r
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	return client.DisperseAndVerify(ctx, payload, quorums)
+	err := client.DisperseAndVerify(ctx, payload, quorums, rand.Uint32())
+	if err != nil {
+		return fmt.Errorf("failed to disperse and verify: %v", err)
+	}
+
+	return nil
 }
 
 // Disperse a 0 byte payload.
