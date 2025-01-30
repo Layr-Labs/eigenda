@@ -373,7 +373,7 @@ func (b Bundle) Size() uint64 {
 // The chunk format will depend on the encoding format. With the GnarkBundleEncodingFormat,
 // each chunk is formated as <32 bytes proof><32 bytes coeff>...<32 bytes coefff>, where the
 // proof and coeffs are all encoded with Gnark.
-func (b Bundle) Serialize() ([]byte, error) {
+func (b Bundle) Serialize() ([]byte, error) { // TODO we must use this format!
 	if len(b) == 0 {
 		return []byte{}, nil
 	}
