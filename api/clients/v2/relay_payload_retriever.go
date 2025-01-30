@@ -105,7 +105,7 @@ func NewRelayPayloadRetriever(
 // blob certificate. The relays are attempted in random order.
 //
 // If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
-// to yield the payload (the original user data), and the payload is returned.
+// to yield the payload (the original user data, with no padding or any modification), and the payload is returned.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert) ([]byte, error) {
