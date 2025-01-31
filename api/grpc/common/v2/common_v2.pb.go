@@ -33,13 +33,14 @@ type BlobHeader struct {
 	// blob's availability.
 	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// quorum_numbers is the list of quorum numbers that the blob is part of.
-	// All quorums must be specified.
+	// Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
 	//
-	// On-demand dispersal is currently limited to use the following quorums:
+	// On-demand dispersal is currently limited to using a subset of the following quorums:
 	// - 0: ETH
 	// - 1: EIGEN
 	//
-	// If the dispersal is using reservations, the quorum numbers are limited to the specification on-chain for that particular reservation.
+	// Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
+	// Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
 	// commitment is the KZG commitment to the blob
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
