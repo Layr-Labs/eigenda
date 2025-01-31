@@ -198,6 +198,14 @@ func (rc *DistributedPayloadRetrieverConfig) checkAndSetDefaults() error {
 		return err
 	}
 
+	if rc.BlsOperatorStateRetrieverAddr == "" {
+		return fmt.Errorf("BlsOperatorStateRetrieverAddr is required")
+	}
+
+	if rc.EigenDAServiceManagerAddr == "" {
+		return fmt.Errorf("EigenDAServiceManagerAddr is required")
+	}
+
 	defaultConfig := GetDefaultDistributedPayloadRetrieverConfig()
 	if rc.RetrievalTimeout == 0 {
 		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout

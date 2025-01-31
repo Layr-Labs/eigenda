@@ -24,15 +24,13 @@ import (
 // This struct is goroutine safe.
 type DistributedPayloadRetriever struct {
 	logger          logging.Logger
-	config DistributedPayloadRetrieverConfig
+	config          DistributedPayloadRetrieverConfig
 	codec           codecs.BlobCodec
 	retrievalClient RetrievalClient
 	g1Srs           []bn254.G1Affine
 }
 
 var _ PayloadRetriever = &DistributedPayloadRetriever{}
-
-// TODO: add basic constructor
 
 // BuildDistributedPayloadRetriever builds a DistributedPayloadRetriever from config structs.
 func BuildDistributedPayloadRetriever(
@@ -42,6 +40,10 @@ func BuildDistributedPayloadRetriever(
 	thegraphConfig thegraph.Config,
 	kzgConfig kzg.KzgConfig,
 ) (*DistributedPayloadRetriever, error) {
+	err := distributedPayloadRetrieverConfig.checkAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set config defaults: %w", err)
+	}
 
 	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
 	if err != nil {
@@ -85,6 +87,28 @@ func BuildDistributedPayloadRetriever(
 		codec:           codec,
 		retrievalClient: retrievalClient,
 		g1Srs:           kzgVerifier.Srs.G1,
+	}, nil
+}
+
+// NewDistributedPayloadRetriever creates a new DistributedPayloadRetriever from already constructed objects
+func NewDistributedPayloadRetriever(
+	logger logging.Logger,
+	config DistributedPayloadRetrieverConfig,
+	codec codecs.BlobCodec,
+	retrievalClient RetrievalClient,
+	g1Srs []bn254.G1Affine,
+) (*DistributedPayloadRetriever, error) {
+	err := config.checkAndSetDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("check and set config defaults: %w", err)
+	}
+
+	return &DistributedPayloadRetriever{
+		logger:          logger,
+		config:          config,
+		codec:           codec,
+		retrievalClient: retrievalClient,
+		g1Srs:           g1Srs,
 	}, nil
 }
 
