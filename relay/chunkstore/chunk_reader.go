@@ -19,8 +19,7 @@ type ChunkReader interface {
 
 	// GetBinaryChunkProofs reads a slice of proofs from the chunk store, similar to GetChunkProofs.
 	// Unlike GetChunkProofs, this method returns the raw serialized bytes of the proofs, as opposed to
-	// deserializing them into encoding.Proof structs. The serialized proofs can be deserialized individually
-	// via TODO.
+	// deserializing them into encoding.Proof structs.
 	GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error)
 
 	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
@@ -32,12 +31,11 @@ type ChunkReader interface {
 
 	// GetBinaryChunkCoefficients reads a slice of frames from the chunk store, similar to GetChunkCoefficients.
 	// Unlike GetChunkCoefficients, this method returns the raw serialized bytes of the frames, as opposed to
-	// deserializing them into rs.Frame structs. The serialized frames can be deserialized individually
-	// via rs.DeserializeFrameCoeffs.
+	// deserializing them into rs.FrameCoeffs structs. The returned uint32 is the number of elements in each frame.
 	GetBinaryChunkCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
-		fragmentInfo *encoding.FragmentInfo) ([][]byte, error)
+		fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
@@ -127,7 +125,7 @@ func (r *chunkReader) GetChunkCoefficients(
 func (r *chunkReader) GetBinaryChunkCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	fragmentInfo *encoding.FragmentInfo) ([][]byte, error) {
+	fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error) {
 
 	bytes, err := r.client.FragmentedDownloadObject(
 		ctx,
@@ -138,14 +136,14 @@ func (r *chunkReader) GetBinaryChunkCoefficients(
 
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
-		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+		return 0, nil, fmt.Errorf("failed to download chunks from S3: %w", err)
 	}
 
-	frames, err := rs.SplitSerializedFrameCoeffs(bytes)
+	elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
 	if err != nil {
 		r.logger.Error("Failed to split frames: %v", err)
-		return nil, fmt.Errorf("failed to split frames: %w", err)
+		return 0, nil, fmt.Errorf("failed to split frames: %w", err)
 	}
 
-	return frames, nil
+	return elementCount, frames, nil
 }

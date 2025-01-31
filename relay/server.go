@@ -332,55 +332,101 @@ func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error)
 
 // gatherChunkDataToSend takes the chunk data and narrows it down to the data requested in the GetChunks request.
 func gatherChunkDataToSend(
-	frames map[v2.BlobKey][][]byte,
+	frames map[v2.BlobKey]*rs.BinaryFrames,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
 	bytesToSend := make([][]byte, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
-
-		framesToSend := make([][]byte, 0)
+		var framesSubset *rs.BinaryFrames
+		var err error
 
 		if chunkRequest.GetByIndex() != nil {
-			key := v2.BlobKey(chunkRequest.GetByIndex().GetBlobKey())
-			blobFrames := (frames)[key]
-
-			for index := range chunkRequest.GetByIndex().ChunkIndices {
-
-				if index >= len(blobFrames) {
-					return nil, fmt.Errorf(
-						"chunk index %d out of range for key %s, chunk count %d",
-						index, key.Hex(), len(blobFrames))
-				}
-
-				framesToSend = append(framesToSend, blobFrames[index])
-			}
-
+			framesSubset, err = selectFrameSubsetByIndex(chunkRequest.GetByIndex(), frames)
 		} else {
-			key := v2.BlobKey(chunkRequest.GetByRange().GetBlobKey())
-			startIndex := chunkRequest.GetByRange().StartIndex
-			endIndex := chunkRequest.GetByRange().EndIndex
-
-			blobFrames := (frames)[key]
-
-			if startIndex > endIndex {
-				return nil, fmt.Errorf(
-					"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
-					startIndex, endIndex, key.Hex())
-			}
-			if endIndex > uint32(len((frames)[key])) {
-				return nil, fmt.Errorf(
-					"chunk range %d-%d is invald for key %s, chunk count %d",
-					chunkRequest.GetByRange().StartIndex, chunkRequest.GetByRange().EndIndex, key, len(blobFrames))
-			}
-
-			framesToSend = append(framesToSend, blobFrames[startIndex:endIndex]...)
+			framesSubset, err = selectFrameSubsetByRange(chunkRequest.GetByRange(), frames)
 		}
 
-		bytesToSend = append(bytesToSend, rs.CombineBinaryFrames(framesToSend))
+		if err != nil {
+			return nil, fmt.Errorf("error selecting frame subset: %v", err)
+		}
+
+		subsetBytes, err := framesSubset.SerializeAsBundle()
+		if err != nil {
+			return nil, fmt.Errorf("error serializing frame subset: %v", err)
+		}
+
+		bytesToSend = append(bytesToSend, subsetBytes)
 	}
 
 	return bytesToSend, nil
+}
+
+// selectFrameSubsetByRange selects a subset of frames from a BinaryFrames object based on a range
+func selectFrameSubsetByRange(
+	request *pb.ChunkRequestByRange,
+	allFrames map[v2.BlobKey]*rs.BinaryFrames) (*rs.BinaryFrames, error) {
+
+	key := v2.BlobKey(request.GetBlobKey())
+	startIndex := request.StartIndex
+	endIndex := request.EndIndex
+
+	frames, ok := allFrames[key]
+	if !ok {
+		return nil, fmt.Errorf("frames not found for key %s", key.Hex())
+	}
+
+	if startIndex > endIndex {
+		return nil, fmt.Errorf(
+			"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
+			startIndex, endIndex, key.Hex())
+	}
+	if endIndex > uint32(len(frames.Frames)) {
+		return nil, fmt.Errorf(
+			"chunk range %d-%d is invald for key %s, chunk count %d",
+			startIndex, endIndex, key, len(frames.Frames))
+	}
+
+	framesSubset := &rs.BinaryFrames{
+		ElementCount: frames.ElementCount,
+		Frames:       frames.Frames[startIndex:endIndex],
+	}
+
+	return framesSubset, nil
+}
+
+// selectFrameSubsetByIndex selects a subset of frames from a BinaryFrames object based on a list of indices
+func selectFrameSubsetByIndex(
+	request *pb.ChunkRequestByIndex,
+	allFrames map[v2.BlobKey]*rs.BinaryFrames) (*rs.BinaryFrames, error) {
+
+	key := v2.BlobKey(request.GetBlobKey())
+	frames, ok := allFrames[key]
+	if !ok {
+		return nil, fmt.Errorf("frames not found for key %s", key.Hex())
+	}
+
+	if len(request.ChunkIndices) > len(frames.Frames) {
+		return nil, fmt.Errorf("too many requested chunks for key %s, chunk count %d",
+			key.Hex(), len(frames.Frames))
+	}
+
+	framesSubset := &rs.BinaryFrames{
+		ElementCount: frames.ElementCount,
+		Frames:       make([][]byte, 0, len(request.ChunkIndices)),
+	}
+
+	for index := range request.ChunkIndices {
+		if index >= len(frames.Frames) {
+			return nil, fmt.Errorf(
+				"chunk index %d out of range for key %s, chunk count %d",
+				index, key.Hex(), len(frames.Frames))
+		}
+
+		framesSubset.Frames = append(framesSubset.Frames, frames.Frames[index])
+	}
+
+	return framesSubset, nil
 }
 
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.

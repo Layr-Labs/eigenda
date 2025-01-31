@@ -21,7 +21,7 @@ type chunkProvider struct {
 
 	// frameCache contains encoding.Frame objects in a serialized form. This is much more memory efficient than
 	// storing the frames in their parsed form. These frames can be deserialized via rs.DeserializeBinaryFrame().
-	frameCache cache.CacheAccessor[blobKeyWithMetadata, [][]byte]
+	frameCache cache.CacheAccessor[blobKeyWithMetadata, *rs.BinaryFrames]
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
@@ -62,8 +62,8 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, [][]byte](
-		cache.NewFIFOCache[blobKeyWithMetadata, [][]byte](cacheSize, server.computeFramesCacheWeight),
+	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, *rs.BinaryFrames](
+		cache.NewFIFOCache[blobKeyWithMetadata, *rs.BinaryFrames](cacheSize, server.computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)
@@ -76,13 +76,13 @@ func newChunkProvider(
 }
 
 // frameMap is a map of blob keys to binary frames.
-type frameMap map[v2.BlobKey][][]byte
+type frameMap map[v2.BlobKey]*rs.BinaryFrames
 
 // computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
 // is equal to the size required to store the data, in bytes.
-func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames [][]byte) uint64 {
+func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames *rs.BinaryFrames) uint64 {
 	// it is safe to assume that all frames for a particular blob have the same size
-	return uint64(len(frames) * len(frames[0]))
+	return frames.GetApproximateSize()
 }
 
 // GetFrames retrieves the frames for a blob.
@@ -99,7 +99,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 
 	type framesResult struct {
 		key  v2.BlobKey
-		data [][]byte
+		data *rs.BinaryFrames
 		err  error
 	}
 
@@ -140,7 +140,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([][]byte, error) {
+func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*rs.BinaryFrames, error) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -166,7 +166,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([][]byte, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
 	defer cancel()
 
-	coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
+	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -176,24 +176,10 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([][]byte, error) {
 		return nil, proofsErr
 	}
 
-	frames, err := assembleFrames(proofs, coefficients)
+	frames, err := rs.BuildBinaryFrames(proofs, elementCount, coefficients)
 	if err != nil {
 		return nil, err
 	}
 
 	return frames, nil
-}
-
-// assembleFrames assembles a slice of binary frames from its composite binary proofs and binary coefficients.
-func assembleFrames(proofs [][]byte, coeffs [][]byte) ([][]byte, error) {
-	if len(coeffs) != len(proofs) {
-		return nil, fmt.Errorf("number of coeffs and proofs must be equal (%d != %d)", len(coeffs), len(proofs))
-	}
-
-	binaryFrames := make([][]byte, len(coeffs))
-	for i := range coeffs {
-		binaryFrames[i] = rs.BuildBinaryFrame(proofs[i], coeffs[i])
-	}
-
-	return binaryFrames, nil
 }

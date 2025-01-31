@@ -15,7 +15,7 @@ import (
 // the coefficient of the interpolating polynomina, hence interpolation is needed before
 // recovery.
 // maxInputSize is the upper bound of the original data size. This is needed because
-// the frames and indices don't encode the length of the original data. If maxInputSize
+// the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
 func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
 	// Get encoder

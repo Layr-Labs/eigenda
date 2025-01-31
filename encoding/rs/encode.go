@@ -23,7 +23,7 @@ func (g *Encoder) EncodeBytes(inputBytes []byte, params encoding.EncodingParams)
 	return g.Encode(inputFr, params)
 }
 
-// Encode function takes input in unit of Fr Element, creates a kzg commit and a list of frames
+// Encode function takes input in unit of Fr Element, creates a kzg commit and a list of Frames
 // which contains a list of multireveal interpolating polynomial coefficients, a G1 proof and a
 // low degree proof corresponding to the interpolating polynomial. Each frame is an independent
 // group of data verifiable to the kzg commitment. The encoding functions ensures that in each
@@ -56,7 +56,7 @@ func (g *Encoder) Encode(inputFr []fr.Element, params encoding.EncodingParams) (
 
 	intermediate = time.Now()
 
-	// create frames to group relevant info
+	// create Frames to group relevant info
 	frames, indices, err := encoder.MakeFrames(polyEvals)
 	if err != nil {
 		return nil, nil, err
