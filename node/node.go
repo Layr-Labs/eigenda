@@ -302,7 +302,7 @@ func (n *Node) Start(ctx context.Context) error {
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort))
+	socket := core.NewOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort)
 	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
@@ -314,7 +314,7 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 		operator = &Operator{
 			Address:             crypto.PubkeyToAddress(privateKey.PublicKey).Hex(),
-			Socket:              socket,
+			Socket:              socket.Encode(),
 			Timeout:             10 * time.Second,
 			PrivKey:             privateKey,
 			Signer:              n.BLSSigner,
@@ -333,7 +333,7 @@ func (n *Node) Start(ctx context.Context) error {
 		if err != nil {
 			n.Logger.Warnf("failed to get operator socket: %w", err)
 		}
-		if registeredSocket != socket {
+		if registeredSocket != socket.Encode() {
 			n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
 		}
 
@@ -355,7 +355,7 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 	}
 
-	n.CurrentSocket = socket
+	n.CurrentSocket = socket.Encode()
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
 	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
 		go n.checkRegisteredNodeIpOnChain(ctx)

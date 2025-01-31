@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"slices"
 	"time"
 
@@ -161,7 +162,8 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	for opID, op := range state.IndexedOperators {
 		opID := opID
 		op := op
-		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
+
+		operatorSocket, err := core.ParseOperatorSocket(op.Socket)
 		if err != nil {
 			d.logger.Warn("failed to parse operator socket, check if the socket format is correct", "operator", opID.Hex(), "socket", op.Socket, "err", err)
 			sigChan <- core.SigningMessage{
@@ -170,6 +172,19 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 				BatchHeaderHash:      batchData.BatchHeaderHash,
 				AttestationLatencyMs: 0,
 				Err:                  fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+			}
+			continue
+		}
+
+		host, v2DispersalPort, err := net.SplitHostPort(operatorSocket.GetV2DispersalSocket())
+		if err != nil {
+			d.logger.Error("failed to get node client; incorrect operator socket format", "operator", opID.Hex(), "host", host, "v2DispersalPort", v2DispersalPort, "err", err)
+			sigChan <- core.SigningMessage{
+				Signature:            nil,
+				Operator:             opID,
+				BatchHeaderHash:      batchData.BatchHeaderHash,
+				AttestationLatencyMs: 0,
+				Err:                  err,
 			}
 			continue
 		}

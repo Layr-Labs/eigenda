@@ -175,8 +175,9 @@ func (r *retrievalClient) getChunksFromOperator(
 	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
 	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
 
+
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
+		opInfo.Socket.GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)

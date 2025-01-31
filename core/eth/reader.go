@@ -509,10 +509,16 @@ func (t *Reader) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quor
 		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStakeWithSocket, len(result.Operators[i]))
 		for j, op := range result.Operators[i] {
 			operatorIndex := core.OperatorIndex(j)
+			operatorSocket, err := core.ParseOperatorSocket(result.Sockets[i][j])
+			if err != nil {
+				t.logger.Errorf("failed to parse operator socket from: %v, err: %v", result.Sockets[i][j], err)
+				return nil, fmt.Errorf("failed to parse operator socket from: %v, err: %v", result.Sockets[i][j], err)
+
+			}
 			state[quorumID][operatorIndex] = core.OperatorStakeWithSocket{
 				Stake:      op.Stake,
 				OperatorID: op.OperatorId,
-				Socket:     core.OperatorSocket(result.Sockets[i][j]),
+				Socket:     operatorSocket,
 			}
 		}
 	}

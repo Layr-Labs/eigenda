@@ -13,78 +13,84 @@ import (
 
 // Operators
 
-// OperatorSocket is formatted as "host:dispersalPort;retrievalPort;v2DispersalPort"
-type OperatorSocket string
+// OperatorSocket is formatted as follows:
+// v1-only 	  "host:dispersalPort;retrievalPort"
+// v1-and-v2  "host:dispersalPort;retrievalPort;v2DispersalPort;v2RetrievalPort"
+// v2-only    "host:dispersalPort;retrievalPort;v2DispersalPort;v2RetrievalPort" (currently v2 only mandates running v1)
 
-func (s OperatorSocket) String() string {
-	return string(s)
+type OperatorSocket struct {
+	host            string
+	v1DispersalPort string
+	v1RetrievalPort string
+	v2DispersalPort string
+	v2RetrievalPort string
 }
 
-func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) OperatorSocket {
-	//TODO:  Add config checks for invalid v1/v2 configs -- for v1, both v2 ports must be empty and for v2, both ports must be valid, reject any other combinations.
-	if v2DispersalPort == "" && v2RetrievalPort == "" {
-		return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+// NewOperatorSocket returns new OperatorSocket struct
+func NewOperatorSocket(host, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) OperatorSocket {
+	return OperatorSocket{
+		host:            host,
+		v1DispersalPort: dispersalPort,
+		v1RetrievalPort: retrievalPort,
+		v2DispersalPort: v2DispersalPort,
+		v2RetrievalPort: v2RetrievalPort,
 	}
-	return OperatorSocket(fmt.Sprintf("%s:%s;%s;%s;%s", nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort))
 }
+
+func (s OperatorSocket) Encode() string {
+	if s.v2DispersalPort == "" && s.v2RetrievalPort == "" {
+		return fmt.Sprintf("%s:%s;%s", s.host, s.v1DispersalPort, s.v1RetrievalPort)
+	}
+	return fmt.Sprintf("%s:%s;%s;%s;%s", s.host, s.v1DispersalPort, s.v1RetrievalPort, s.v2DispersalPort, s.v2RetrievalPort)
+}
+
 
 type StakeAmount = *big.Int
 
-func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort string, err error) {
+func ParseOperatorSocket(opSocketStr string) (opSocket OperatorSocket, err error) {
 
-	s := strings.Split(socket, ";")
+	operatorSocket := OperatorSocket{}
+	s := strings.Split(opSocketStr, ";")
 
-	host, v1DispersalPort, err = net.SplitHostPort(s[0])
+	host, v1DispersalPort, err := net.SplitHostPort(s[0])
 	if err != nil {
-		err = fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
-
+		err = fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
 		return
 	}
 	if _, err = net.LookupHost(host); err != nil {
-		//Invalid host
-		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-			"", "", "", "", "",
-			fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		err = fmt.Errorf("invalid host address format in %s: unable to lookup host)", opSocketStr)
 		return
 	}
 	if err = ValidatePort(v1DispersalPort); err != nil {
-		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-			"", "", "", "", "",
-			fmt.Errorf("invalid v1 dispersal port format in %s: it must specify valid v1 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		err = fmt.Errorf("invalid v1 dispersal port format in %s: it must specify valid v1 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
 		return
 	}
 
 	switch len(s) {
 	case 4:
-		v2DispersalPort = s[2]
-		if err = ValidatePort(v2DispersalPort); err != nil {
-			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-				"", "", "", "", "",
-				fmt.Errorf("invalid v2 dispersal port format in %s: it must specify valid v2 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		if err = ValidatePort(s[2]); err != nil {
+			err = fmt.Errorf("invalid v2 dispersal port format in %s: it must specify valid v2 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
 			return
 		}
 
-		v2RetrievalPort = s[3]
-		if err = ValidatePort(v2RetrievalPort); err != nil {
-			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-				"", "", "", "", "",
-				fmt.Errorf("invalid v2 retrieval port format in %s: it must specify valid v2 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		if err = ValidatePort(s[3]); err != nil {
+			err = fmt.Errorf("invalid v2 retrieval port format in %s: it must specify valid v2 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
 			return
 		}
+		operatorSocket.v2DispersalPort = s[2]
+		operatorSocket.v2RetrievalPort = s[3]
 		fallthrough
 	case 2:
-		// V1 Parsing
-		v1RetrievalPort = s[1]
-		if err = ValidatePort(v1RetrievalPort); err != nil {
-			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-				"", "", "", "", "",
-				fmt.Errorf("invalid v1 retrieval port format in %s: it must specify valid v1 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		operatorSocket.host = host
+		operatorSocket.v1DispersalPort = v1DispersalPort
+		if err = ValidatePort(s[1]); err != nil {
+			err = fmt.Errorf("invalid v1 retrieval port format in %s: it must specify valid v1 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
+			return
 		}
-		return
+		operatorSocket.v1RetrievalPort = s[1]
+		return operatorSocket, nil
 	default:
-		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
-			"", "", "", "", "",
-			fmt.Errorf("invalid socket address format %s: it must specify v1 dispersal/retrieval ports, or v2 dispersal/retrieval ports (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		err = fmt.Errorf("invalid opSocketStr address format %s: it must specify v1 dispersal/retrieval ports, or v2 dispersal/retrieval ports (ex. 0.0.0.0:32004;32005;32006;32007)", opSocketStr)
 		return
 	}
 }
@@ -97,7 +103,7 @@ type OperatorInfo struct {
 	// Index is the index of the operator within the quorum
 	Index OperatorIndex
 	// Socket is the socket address of the operator
-	// Populated only when using GetOperatorStateWithSocket; otherwise it is an empty string
+	// Populated only when using GetOperatorStateWithSocket; otherwise it is an default zero operator socket struct
 	Socket OperatorSocket
 }
 

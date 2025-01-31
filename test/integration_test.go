@@ -387,8 +387,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
 		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
-		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort, config.V2RetrievalPort)
-		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
+		socket := core.NewOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort, config.V2RetrievalPort)
+		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.Encode(), nil)
 
 		noopMetrics := metrics.NewNoopMetrics()
 		reg := prometheus.NewRegistry()

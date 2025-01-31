@@ -118,7 +118,7 @@ func getOperatorStateWithSocket(operatorsByQuorum core.OperatorStakesWithSocket,
 		totals[quorumID] = &core.OperatorInfo{
 			Stake:  totalStake,
 			Index:  core.OperatorIndex(len(quorum)),
-			Socket: core.OperatorSocket(""),
+			Socket: core.OperatorSocket{},
 		}
 	}
 
