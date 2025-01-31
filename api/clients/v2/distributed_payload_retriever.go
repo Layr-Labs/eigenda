@@ -156,9 +156,16 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 			pr.logger.Warn("check blob length", "blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
 			continue
 		}
-		err = verification.VerifyBlobAgainstCert(blobKey, blobBytes, convertedCommitment.Commitment, pr.g1Srs)
+
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blobBytes, convertedCommitment.Commitment)
 		if err != nil {
-			pr.logger.Warn("verify blob against cert", "blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
+			pr.logger.Warn(
+				"generate and compare blob commitment",
+				"blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
+			continue
+		}
+		if !valid {
+			pr.logger.Warn("cert is invalid", "blobKey", blobKey.Hex(), "quorumID", quorumID)
 			continue
 		}
 

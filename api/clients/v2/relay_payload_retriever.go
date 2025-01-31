@@ -157,9 +157,16 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			pr.log.Warn("check blob length", "blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
 			continue
 		}
-		err = verification.VerifyBlobAgainstCert(blobKey, blob, blobCommitments.Commitment, pr.g1Srs)
+
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
 		if err != nil {
-			pr.log.Warn("verify blob against cert", "blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			pr.log.Warn(
+				"generate and compare blob commitment",
+				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			continue
+		}
+		if !valid {
+			pr.log.Warn("cert is invalid", "blobKey", blobKey.Hex(), "relayKey", relayKey)
 			continue
 		}
 
