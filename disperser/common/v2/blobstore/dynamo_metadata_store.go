@@ -59,11 +59,12 @@ const (
 
 var (
 	statusUpdatePrecondition = map[v2.BlobStatus][]v2.BlobStatus{
-		v2.Queued:                 {},
-		v2.Encoded:                {v2.Queued},
-		v2.Certified:              {v2.Encoded},
-		v2.Failed:                 {v2.Queued, v2.Encoded},
-		v2.InsufficientSignatures: {v2.Encoded},
+		v2.Queued:              {},
+		v2.Encoded:             {v2.Queued},
+		v2.GatheringSignatures: {v2.Encoded},
+		// TODO: when GatheringSignatures is fully supported, remove v2.Encoded from below
+		v2.Complete: {v2.Encoded, v2.GatheringSignatures},
+		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )

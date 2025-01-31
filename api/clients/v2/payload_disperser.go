@@ -213,7 +213,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 		case <-ctx.Done():
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
-				dispgrpc.BlobStatus_CERTIFIED.Descriptor(),
+				dispgrpc.BlobStatus_COMPLETE.Descriptor(),
 				previousStatus.Descriptor(),
 				ctx.Err())
 		case <-ticker.C:
@@ -237,7 +237,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
-			case dispgrpc.BlobStatus_CERTIFIED:
+			case dispgrpc.BlobStatus_COMPLETE:
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				continue

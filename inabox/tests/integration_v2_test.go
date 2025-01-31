@@ -93,7 +93,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
 				Expect(err).To(BeNil())
 
-				if status1 != dispv2.Certified || status2 != dispv2.Certified {
+				if status1 != dispv2.Complete || status2 != dispv2.Complete {
 					continue
 				}
 
