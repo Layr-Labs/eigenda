@@ -11,11 +11,13 @@ message BlobHeader {
   // blob's availability.
   uint32 version = 1;
   // quorum_numbers is the list of quorum numbers that the blob is part of.
-  // All quorums must be specified (including required quorums).
+  // All quorums must be specified.
   //
-  // The following quorums are currently required:
+  // On-demand dispersal is currently limited to use the following quorums:
   // - 0: ETH
   // - 1: EIGEN
+  // 
+  // If the dispersal is using reservations, the quorum numbers are limited to the specification on-chain for that particular reservation.
   repeated uint32 quorum_numbers = 2;
   // commitment is the KZG commitment to the blob
   common.BlobCommitment commitment = 3;
