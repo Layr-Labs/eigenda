@@ -20,7 +20,8 @@ func TestGetAccountID(t *testing.T) {
 	expectedAccountID := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
 
 	// Create signer instance
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 
 	// Get account ID
 	accountID, err := signer.GetAccountID()
@@ -30,7 +31,8 @@ func TestGetAccountID(t *testing.T) {
 
 func TestSignBlobRequest(t *testing.T) {
 	privateKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)
 	require.Equal(t, "0x1aa8226f6d354380dDE75eE6B634875c4203e522", accountID)
@@ -99,7 +101,8 @@ func TestSignBlobRequest(t *testing.T) {
 
 func TestSignPaymentStateRequest(t *testing.T) {
 	privateKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 	expectedAddr := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)

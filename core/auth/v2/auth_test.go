@@ -19,7 +19,8 @@ var (
 )
 
 func TestAuthentication(t *testing.T) {
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator()
 
 	accountId, err := signer.GetAccountID()
@@ -36,7 +37,8 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestAuthenticationFail(t *testing.T) {
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator()
 
 	accountId, err := signer.GetAccountID()
@@ -45,7 +47,8 @@ func TestAuthenticationFail(t *testing.T) {
 	header := testHeader(t, accountId)
 
 	wrongPrivateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer = auth.NewLocalBlobRequestSigner(wrongPrivateKeyHex)
+	signer, err = auth.NewLocalBlobRequestSigner(wrongPrivateKeyHex)
+	assert.NoError(t, err)
 
 	// Sign the header
 	signature, err := signer.SignBlobRequest(header)
@@ -113,7 +116,8 @@ func testHeader(t *testing.T, accountID string) *corev2.BlobHeader {
 }
 
 func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator()
 
 	signature, err := signer.SignPaymentStateRequest()
@@ -143,11 +147,13 @@ func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 }
 
 func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator()
 
 	// Create a different signer with wrong private key
-	wrongSigner := auth.NewLocalBlobRequestSigner("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded")
+	wrongSigner, err := auth.NewLocalBlobRequestSigner("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded")
+	assert.NoError(t, err)
 
 	// Sign with wrong key
 	accountId, err := signer.GetAccountID()
@@ -162,7 +168,8 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 }
 
 func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator()
 
 	accountId, err := signer.GetAccountID()

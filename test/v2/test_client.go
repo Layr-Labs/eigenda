@@ -97,7 +97,8 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	privateKeyString = strings.Trim(privateKeyString, "\n \t")
 	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
 
-	signer := auth.NewLocalBlobRequestSigner(privateKeyString)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
+	require.NoError(t, err)
 	signerAccountId, err := signer.GetAccountID()
 	require.NoError(t, err)
 	accountId := gethcommon.HexToAddress(signerAccountId)

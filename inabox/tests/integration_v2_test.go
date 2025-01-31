@@ -32,7 +32,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
