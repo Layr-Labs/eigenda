@@ -3,10 +3,8 @@ package verification
 import (
 	"context"
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/common/geth"
-
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
