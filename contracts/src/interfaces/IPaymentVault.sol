@@ -34,6 +34,12 @@ interface IPaymentVault {
         uint64 previousPriceUpdateCooldown, 
         uint64 newPriceUpdateCooldown
     );
+    /// @notice Emitted when maxAdvanceWindow is updated
+    event MaxAdvanceWindowUpdated(uint256 oldWindow, uint256 newWindow);
+    /// @notice Emitted when maxPermissionlessReservationSymbolsPerSecond is updated
+    event MaxSymbolsPerSecondUpdated(uint256 oldRate, uint256 newRate);
+    /// @notice Emitted when reservationPricePerSymbol is updated
+    event ReservationPricePerSymbolUpdated(uint256 oldPrice, uint256 newPrice);
 
     /**
      * @notice This function is called by EigenDA governance to store reservations
@@ -41,6 +47,16 @@ interface IPaymentVault {
      * @param _reservation is the Reservation struct containing details of the reservation
      */
     function setReservation(
+        address _account, 
+        Reservation memory _reservation
+    ) external;
+
+    /**
+     * @notice This function is called by anyone to submit a permissionless reservation
+     * @param _account is the address to submit the reservation for
+     * @param _reservation is the Reservation struct containing details of the reservation
+     */
+    function scheduleReservation(
         address _account, 
         Reservation memory _reservation
     ) external;

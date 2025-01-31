@@ -21,6 +21,26 @@ abstract contract PaymentVaultStorage is IPaymentVault {
     /// @notice global rate period interval
     uint64 public globalRatePeriodInterval;
 
+
+    /// @notice Maximum number of future periods users can schedule
+    uint256 public maxAdvanceWindow;
+    /// @notice Maximum symbols per second for the network
+    uint256 public maxPermissionlessReservationSymbolsPerSecond;
+    /// @notice Price per symbol per second for reservations
+    uint256 public reservationPricePerSymbol;    
+
+
+    /// @notice Tracks total symbols per second reserved for each period
+    mapping(uint256 => uint256) public scheduledSymbolsPerPeriod;
+
+    /// @notice Emitted when symbols per second are scheduled
+    event SymbolsScheduled(
+        address indexed user,
+        uint256 period,
+        uint256 symbolsPerSecond,
+        uint256 payment
+    );
+
     /// @notice mapping from user address to current reservation 
     mapping(address => Reservation) public reservations;
     /// @notice mapping from user address to current on-demand payment
