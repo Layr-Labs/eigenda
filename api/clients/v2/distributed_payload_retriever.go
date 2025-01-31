@@ -114,8 +114,9 @@ func NewDistributedPayloadRetriever(
 
 // GetPayload iteratively attempts to retrieve a given blob from the quorums listed in the EigenDACert.
 //
-// If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
-// to yield the payload (the original user data, with no padding or any modification), and the payload is returned.
+// If the blob is successfully retrieved, then the blob verified against the EigenDACert. If the verification succeeds,
+// the blob is decoded to yield the payload (the original user data, with no padding or any modification), and the
+// payload is returned.
 func (pr *DistributedPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
@@ -127,7 +128,7 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	convertedCommitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("convert commitments binding to internal: %w", err)
 	}
@@ -138,7 +139,7 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 			ctx,
 			*blobKey,
 			blobHeader.Version,
-			*convertedCommitment,
+			*commitment,
 			eigenDACert.BatchHeader.ReferenceBlockNumber,
 			quorumID)
 
@@ -151,13 +152,13 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 			continue
 		}
 
-		err = verification.CheckBlobLength(blobBytes, convertedCommitment.Length)
+		err = verification.CheckBlobLength(blobBytes, commitment.Length)
 		if err != nil {
 			pr.logger.Warn("check blob length", "blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
 			continue
 		}
 
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blobBytes, convertedCommitment.Commitment)
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blobBytes, commitment.Commitment)
 		if err != nil {
 			pr.logger.Warn(
 				"generate and compare blob commitment",
@@ -187,7 +188,7 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", blobHeader.QuorumNumbers)
 }
 
-// getBlobWithTimeout attempts to get a blob from a given quorum, and times out based on config.FetchTimeout
+// getBlobWithTimeout attempts to get a blob from a given quorum, and times out based on config.RetrievalTimeout
 func (pr *DistributedPayloadRetriever) getBlobWithTimeout(
 	ctx context.Context,
 	blobKey corev2.BlobKey,

@@ -1,7 +1,7 @@
 package clients
 
 import (
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -123,11 +123,11 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
 
 	if cc.EthRpcUrl == "" {
-		return fmt.Errorf("EthRpcUrl is required")
+		return errors.New("EthRpcUrl is required")
 	}
 
 	if cc.EigenDACertVerifierAddr == "" {
-		return fmt.Errorf("EigenDACertVerifierAddr is required")
+		return errors.New("EigenDACertVerifierAddr is required")
 	}
 
 	// Nothing to do for PayloadPolynomialForm
@@ -199,11 +199,11 @@ func (rc *DistributedPayloadRetrieverConfig) checkAndSetDefaults() error {
 	}
 
 	if rc.BlsOperatorStateRetrieverAddr == "" {
-		return fmt.Errorf("BlsOperatorStateRetrieverAddr is required")
+		return errors.New("BlsOperatorStateRetrieverAddr is required")
 	}
 
 	if rc.EigenDAServiceManagerAddr == "" {
-		return fmt.Errorf("EigenDAServiceManagerAddr is required")
+		return errors.New("EigenDAServiceManagerAddr is required")
 	}
 
 	defaultConfig := GetDefaultDistributedPayloadRetrieverConfig()
