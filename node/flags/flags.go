@@ -277,7 +277,7 @@ var (
 		Usage:    "The duration for which a disperser authentication is valid",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
-		Value:    time.Minute,
+		Value:    0, // TODO (cody-littley) remove this feature
 	}
 	RelayMaxGRPCMessageSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "relay-max-grpc-message-size"),

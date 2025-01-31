@@ -231,7 +231,7 @@ var (
 	AuthenticationDisabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),
 		Usage:    "Disable GetChunks() authentication",
-		Required: false,
+		Required: true, // TODO(cody-littley) remove this feature
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_DISABLED"),
 	}
 	GetChunksTimeoutFlag = cli.DurationFlag{
