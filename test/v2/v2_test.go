@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/docker/go-units"
 	"os"
 	"os/exec"
@@ -36,9 +37,6 @@ var (
 
 	targetConfig = preprodConfig
 )
-
-// TODO test dispersing the same blob twice in a row
-// TODO test salt 0
 
 func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	// Create the test data directory if it does not exist
@@ -284,4 +282,36 @@ func TestDoubleDispersal(t *testing.T) {
 	err = c.DisperseAndVerify(ctx, paddedPayload, []core.QuorumID{0, 1}, salt)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
+}
+
+func TestUnauthorizedGetChunks(t *testing.T) {
+	t.Skip("this test is not working due to a bug")
+
+	rand := random.NewTestRandom(t)
+	c := getClient(t)
+
+	dataLength := 1024 + rand.Intn(1024)
+	payload := rand.Bytes(dataLength)
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	key, err := c.DispersePayload(ctx, paddedPayload, []core.QuorumID{0, 1}, rand.Uint32())
+	require.NoError(t, err)
+
+	// Wait for blob to become certified
+	cert := c.WaitForCertification(ctx, *key, []core.QuorumID{0, 1})
+
+	targetRelay := cert.RelayKeys[0]
+
+	chunkRequests := make([]*clients.ChunkRequestByRange, 1)
+	chunkRequests[0] = &clients.ChunkRequestByRange{
+		BlobKey: *key,
+		Start:   0,
+		End:     1,
+	}
+	_, err = c.RelayClient.GetChunksByRange(ctx, targetRelay, chunkRequests)
+	require.Error(t, err)
+	// TODO (cody-littley) once this is properly returning an error, validate the error message
 }

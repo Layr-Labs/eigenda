@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/docker/go-units"
 	"os"
 	"path"
@@ -134,10 +135,20 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	relayURLS, err := ethReader.GetRelayURLs(context.Background())
 	require.NoError(t, err)
 
+	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
+	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
+	rand := random.NewTestRandom(t)
+	keypair := rand.BLS()
+	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+		return keypair.SignMessage(data), nil
+	}
+
 	relayConfig := &clients.RelayClientConfig{
 		Sockets:            relayURLS,
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
+		OperatorID:         &core.OperatorID{0},
+		MessageSigner:      fakeSigner,
 	}
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
@@ -323,9 +334,9 @@ func (c *TestClient) VerifyBlobCertification(
 		require.Contains(c.t, quorumSet, expectedQuorum)
 	}
 
-	// TODO verify signed percentages by parsing byte array
+	// TODO (cody-littley) verify signed percentages by parsing byte array
 
-	// TODO
+	// TODO (cody-littley) enable this once it is properly working
 	// On-chain verification
 	//err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
 	//require.NoError(c.t, err)
