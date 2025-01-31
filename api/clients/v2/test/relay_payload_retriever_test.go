@@ -50,9 +50,9 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		EigenDACertVerifierAddr: "y",
 	}
 
-	clientConfig := clients.PayloadRetrieverConfig{
+	clientConfig := clients.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: payloadClientConfig,
-		FetchTimeout: 50 * time.Millisecond,
+		RelayTimeout: 50 * time.Millisecond,
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}

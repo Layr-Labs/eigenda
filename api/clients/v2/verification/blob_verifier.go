@@ -14,8 +14,7 @@ import (
 // If verification succeeds, the method returns nil. Otherwise, it returns an error.
 //
 // TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
-//
-//	regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
+//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
 func VerifyBlobAgainstCert(
 	blobKey *core.BlobKey,
 	blobBytes []byte,

@@ -45,13 +45,31 @@ type PayloadClientConfig struct {
 	BlobVersion v2.BlobVersion
 }
 
-// PayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
-// by a PayloadRetriever
-type PayloadRetrieverConfig struct {
+// RelayPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
+// by a RelayPayloadRetriever
+type RelayPayloadRetrieverConfig struct {
 	PayloadClientConfig
 
-	// The timeout duration for calls to retrieve blobs.
-	FetchTimeout time.Duration
+	// The timeout duration for relay calls to retrieve blobs.
+	RelayTimeout time.Duration
+}
+
+// DistributedPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values
+// needed by a DistributedPayloadRetriever
+type DistributedPayloadRetrieverConfig struct {
+	PayloadClientConfig
+
+	// The timeout duration for calls to retrieve blobs from a given quorum.
+	RetrievalTimeout time.Duration
+
+	// The address of the BlsOperatorStateRetriever contract
+	BlsOperatorStateRetrieverAddr string
+
+	// The address of the EigenDAServiceManager contract
+	EigenDAServiceManagerAddr string
+
+	// The number of simultaneous connections to use when fetching chunks during distributed retrieval
+	ConnectionCount uint
 }
 
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -125,13 +143,13 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	return nil
 }
 
-// GetDefaultPayloadRetrieverConfig creates a GetDefaultPayloadRetrieverConfig with default values
+// GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
 //
 // NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
-func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
-	return &PayloadRetrieverConfig{
+func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
+	return &RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
-		FetchTimeout: 5 * time.Second,
+		RelayTimeout: 5 * time.Second,
 	}
 }
 
@@ -140,15 +158,52 @@ func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
 // 1. If a config value is 0, and a 0 value makes sense, do nothing.
 // 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
 // 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
-func (rc *PayloadRetrieverConfig) checkAndSetDefaults() error {
+func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
 		return err
 	}
 
-	defaultConfig := GetDefaultPayloadRetrieverConfig()
-	if rc.FetchTimeout == 0 {
-		rc.FetchTimeout = defaultConfig.FetchTimeout
+	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
+	if rc.RelayTimeout == 0 {
+		rc.RelayTimeout = defaultConfig.RelayTimeout
+	}
+
+	return nil
+}
+
+// GetDefaultDistributedPayloadRetrieverConfig creates a DistributedPayloadRetrieverConfig with default values
+//
+// NOTE: The following fields do not have defined defaults and must always be specifically configured:
+// - EthRpcUrl
+// - EigenDACertVerifierAddr
+// - BlsOperatorStateRetrieverAddr
+// - EigenDAServiceManagerAddr
+func GetDefaultDistributedPayloadRetrieverConfig() *DistributedPayloadRetrieverConfig {
+	return &DistributedPayloadRetrieverConfig{
+		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		RetrievalTimeout:    20 * time.Second,
+		ConnectionCount:     10,
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct and performs the following actions:
+//
+// 1. If a config value is 0, and a 0 value makes sense, do nothing.
+// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
+// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+func (rc *DistributedPayloadRetrieverConfig) checkAndSetDefaults() error {
+	err := rc.PayloadClientConfig.checkAndSetDefaults()
+	if err != nil {
+		return err
+	}
+
+	defaultConfig := GetDefaultDistributedPayloadRetrieverConfig()
+	if rc.RetrievalTimeout == 0 {
+		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
+	}
+	if rc.ConnectionCount == 0 {
+		rc.ConnectionCount = defaultConfig.ConnectionCount
 	}
 
 	return nil

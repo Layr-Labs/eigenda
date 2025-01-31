@@ -24,7 +24,7 @@ type RelayPayloadRetriever struct {
 	// Not all methods on Rand are guaranteed goroutine safe: if additional usages of random are added, they
 	// must be evaluated for thread safety.
 	random       *rand.Rand
-	config       PayloadRetrieverConfig
+	config       RelayPayloadRetrieverConfig
 	codec        codecs.BlobCodec
 	relayClient  RelayClient
 	g1Srs        []bn254.G1Affine
@@ -36,7 +36,7 @@ var _ PayloadRetriever = &RelayPayloadRetriever{}
 // BuildRelayPayloadRetriever builds a RelayPayloadRetriever from config structs.
 func BuildRelayPayloadRetriever(
 	log logging.Logger,
-	payloadRetrieverConfig PayloadRetrieverConfig,
+	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
 	relayClientConfig *RelayClientConfig,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
@@ -51,14 +51,14 @@ func BuildRelayPayloadRetriever(
 		return nil, fmt.Errorf("new eth client: %w", err)
 	}
 
-	certVerifier, err := verification.NewCertVerifier(*ethClient, payloadRetrieverConfig.EigenDACertVerifierAddr)
+	certVerifier, err := verification.NewCertVerifier(*ethClient, relayPayloadRetrieverConfig.EigenDACertVerifierAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
 	codec, err := codecs.CreateCodec(
-		payloadRetrieverConfig.PayloadPolynomialForm,
-		payloadRetrieverConfig.BlobEncodingVersion)
+		relayPayloadRetrieverConfig.PayloadPolynomialForm,
+		relayPayloadRetrieverConfig.BlobEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func BuildRelayPayloadRetriever(
 	return NewRelayPayloadRetriever(
 		log,
 		rand.New(rand.NewSource(rand.Int63())),
-		payloadRetrieverConfig,
+		relayPayloadRetrieverConfig,
 		relayClient,
 		certVerifier,
 		codec,
@@ -77,21 +77,21 @@ func BuildRelayPayloadRetriever(
 func NewRelayPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
-	payloadRetrieverConfig PayloadRetrieverConfig,
+	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	relayClient RelayClient,
 	certVerifier verification.ICertVerifier,
 	codec codecs.BlobCodec,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
-	err := payloadRetrieverConfig.checkAndSetDefaults()
+	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
 	if err != nil {
-		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
+		return nil, fmt.Errorf("check and set RelayRelayPayloadRetrieverConfig config: %w", err)
 	}
 
 	return &RelayPayloadRetriever{
 		log:          log,
 		random:       random,
-		config:       payloadRetrieverConfig,
+		config:       relayPayloadRetrieverConfig,
 		codec:        codec,
 		relayClient:  relayClient,
 		certVerifier: certVerifier,
@@ -187,7 +187,7 @@ func (pr *RelayPayloadRetriever) getBlobWithTimeout(
 	relayKey core.RelayKey,
 	blobKey *core.BlobKey) ([]byte, error) {
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.FetchTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
 	return pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
@@ -195,7 +195,7 @@ func (pr *RelayPayloadRetriever) getBlobWithTimeout(
 
 // verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyCertV2.
 //
-// This method times out after the duration configured in relayPayloadRetrieverConfig.ContractCallTimeout
+// This method times out after the duration configured in RelayPayloadRetrieverConfig.ContractCallTimeout
 func (pr *RelayPayloadRetriever) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,

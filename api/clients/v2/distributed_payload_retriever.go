@@ -6,11 +6,17 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // DistributedPayloadRetriever provides the ability to get payloads from the EigenDA nodes directly
@@ -18,13 +24,66 @@ import (
 // This struct is goroutine safe.
 type DistributedPayloadRetriever struct {
 	logger          logging.Logger
-	config          PayloadRetrieverConfig
+	config DistributedPayloadRetrieverConfig
 	codec           codecs.BlobCodec
 	retrievalClient RetrievalClient
 	g1Srs           []bn254.G1Affine
 }
 
 var _ PayloadRetriever = &DistributedPayloadRetriever{}
+
+// TODO: add basic constructor
+
+// BuildDistributedPayloadRetriever builds a DistributedPayloadRetriever from config structs.
+func BuildDistributedPayloadRetriever(
+	logger logging.Logger,
+	distributedPayloadRetrieverConfig DistributedPayloadRetrieverConfig,
+	ethConfig geth.EthClientConfig,
+	thegraphConfig thegraph.Config,
+	kzgConfig kzg.KzgConfig,
+) (*DistributedPayloadRetriever, error) {
+
+	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
+	if err != nil {
+		return nil, fmt.Errorf("new eth client: %w", err)
+	}
+
+	reader, err := eth.NewReader(
+		logger,
+		ethClient,
+		distributedPayloadRetrieverConfig.BlsOperatorStateRetrieverAddr,
+		distributedPayloadRetrieverConfig.EigenDAServiceManagerAddr)
+
+	chainState := eth.NewChainState(reader, ethClient)
+	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
+
+	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("new verifier: %w", err)
+	}
+
+	retrievalClient := NewRetrievalClient(
+		logger,
+		reader,
+		indexedChainState,
+		kzgVerifier,
+		int(distributedPayloadRetrieverConfig.ConnectionCount))
+
+	codec, err := codecs.CreateCodec(
+		distributedPayloadRetrieverConfig.PayloadPolynomialForm,
+		distributedPayloadRetrieverConfig.BlobEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DistributedPayloadRetriever{
+		logger:          logger,
+		config:          distributedPayloadRetrieverConfig,
+		codec:           codec,
+		retrievalClient: retrievalClient,
+		g1Srs:           kzgVerifier.Srs.G1,
+	}, nil
+}
 
 // GetPayload iteratively attempts to retrieve a given blob from the quorums listed in the EigenDACert.
 //
@@ -103,7 +162,7 @@ func (pr *DistributedPayloadRetriever) getBlobWithTimeout(
 	referenceBlockNumber uint32,
 	quorumID core.QuorumID) ([]byte, error) {
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.FetchTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
 
 	return pr.retrievalClient.GetBlob(
