@@ -30,7 +30,10 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         uint64 _priceUpdateCooldown,
         uint64 _globalSymbolsPerPeriod,
         uint64 _reservationPeriodInterval,
-        uint64 _globalRatePeriodInterval
+        uint64 _globalRatePeriodInterval,
+        uint256 _maxAdvanceWindow,
+        uint256 _maxPermissionlessReservationSymbolsPerSecond,
+        uint256 _reservationPricePerSymbol
     ) public initializer {
         _transferOwnership(_initialOwner);
         
@@ -42,6 +45,10 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         globalSymbolsPerPeriod = _globalSymbolsPerPeriod;
         reservationPeriodInterval = _reservationPeriodInterval;
         globalRatePeriodInterval = _globalRatePeriodInterval;
+
+        maxAdvanceWindow = _maxAdvanceWindow;
+        maxPermissionlessReservationSymbolsPerSecond = _maxPermissionlessReservationSymbolsPerSecond;
+        reservationPricePerSymbol = _reservationPricePerSymbol;
     }
 
     /**
@@ -57,6 +64,77 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         require(_reservation.endTimestamp > _reservation.startTimestamp, "end timestamp must be greater than start timestamp");
         reservations[_account] = _reservation;
         emit ReservationUpdated(_account, _reservation);
+    }
+
+    /**
+     * @notice Calculate required payment for symbol rate reservation
+     * @param symbolsPerSecond Number of symbols per second to reserve
+     * @return payment Required payment in wei
+     */
+    function calculateReservationPayment(uint256 symbolsPerSecond, uint256 numPeriods) public view returns (uint256) {
+        return symbolsPerSecond * reservationPeriodInterval * numPeriods * reservationPricePerSymbol;
+    }
+
+
+    /**
+     * @notice Schedule symbols per second for a single period
+     * @param _account address of the user making the reservation
+     * @param _reservation Reservation struct containing details of the reservation
+     * TODO: add offset for multiple reservations per account
+     */
+    function scheduleReservation(address _account, Reservation memory _reservation) 
+        external 
+        payable  
+    {
+        require(_reservation.startTimestamp >= block.timestamp, "Cannot schedule past periods");
+        require(_reservation.endTimestamp >= _reservation.startTimestamp, "end timestamp must be greater than start timestamp");
+        require(
+            _reservation.endTimestamp <= block.timestamp + maxAdvanceWindow,
+            "Period too far in future"
+        );
+        uint256 payment = calculateReservationPayment(_reservation.symbolsPerSecond, _reservation.endTimestamp - _reservation.startTimestamp);
+        require(msg.value == payment, "Incorrect payment amount");
+
+        // identify period loop from the timestamps 
+        uint256 startPeriod = _reservation.startTimestamp / reservationPeriodInterval;
+        uint256 endPeriod = _reservation.endTimestamp / reservationPeriodInterval;
+        for (uint256 period = startPeriod; period <= endPeriod; period++) {
+            require(
+                scheduledSymbolsPerPeriod[period] + _reservation.symbolsPerSecond <= maxPermissionlessReservationSymbolsPerSecond,
+                "Exceeds max symbols per second"
+            );
+        }
+
+        // update the scheduled map
+        for (uint256 period = startPeriod; period <= endPeriod; period++) {
+            scheduledSymbolsPerPeriod[period] += _reservation.symbolsPerSecond;
+        }
+        reservations[_account] = _reservation;
+
+        emit ReservationUpdated(_account, _reservation);
+    }
+
+    function setPricePerSymbol(uint256 newPrice) external onlyOwner {
+        require(newPrice > 0, "Price must be positive");
+        uint256 oldPrice = reservationPricePerSymbol;
+        reservationPricePerSymbol = newPrice;
+        emit ReservationPricePerSymbolUpdated(oldPrice, newPrice);
+    }
+
+    function setMaxAdvanceWindow(uint256 newWindow) external onlyOwner {
+        uint256 oldWindow = maxAdvanceWindow;
+        maxAdvanceWindow = newWindow;
+        emit MaxAdvanceWindowUpdated(oldWindow, newWindow);
+    }
+
+    function setMaxSymbolsPerSecond(uint256 newRate) external onlyOwner {
+        uint256 oldRate = maxPermissionlessReservationSymbolsPerSecond;
+        maxPermissionlessReservationSymbolsPerSecond = newRate;
+        emit MaxSymbolsPerSecondUpdated(oldRate, newRate);
+    }
+
+    function getCurrentPeriod() public view returns (uint256) {
+        return block.timestamp / reservationPeriodInterval;
     }
 
     /**
