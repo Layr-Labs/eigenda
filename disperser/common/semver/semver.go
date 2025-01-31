@@ -28,7 +28,10 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, oper
 	operatorChan := make(chan core.OperatorID, len(operators))
 	worker := func() {
 		for operatorId := range operatorChan {
-			operatorSocket := core.OperatorSocket(operators[operatorId].Socket)
+			operatorSocket, err := core.ParseOperatorSocket(operators[operatorId].Socket)
+			if err != nil {
+				logger.Warnf("Failed to parse operator socket: %v", err)
+			}
 			var socket string
 			if useRetrievalSocket {
 				socket = operatorSocket.GetV1RetrievalSocket()

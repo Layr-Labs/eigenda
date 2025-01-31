@@ -95,7 +95,11 @@ func (oh *OperatorHandler) ProbeV2OperatorPorts(ctx context.Context, operatorId 
 		return &OperatorPortCheckResponse{}, err
 	}
 
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
+	operatorSocket, err := core.ParseOperatorSocket(operatorInfo.Socket)
+	if err != nil {
+		oh.logger.Warn("failed to parse operator socket", "operatorId", operatorId, "error", err)
+		return &OperatorPortCheckResponse{}, err
+	}
 
 	retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
 	retrievalSocket := operatorSocket.GetV2RetrievalSocket()
@@ -144,7 +148,12 @@ func (oh *OperatorHandler) ProbeV1OperatorPorts(ctx context.Context, operatorId 
 		return &OperatorPortCheckResponse{}, err
 	}
 
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
+	operatorSocket, err := core.ParseOperatorSocket(operatorInfo.Socket)
+	if err != nil {
+		oh.logger.Warn("failed to parse operator socket", "operatorId", operatorId, "error", err)
+		return &OperatorPortCheckResponse{}, err
+	}
+	
 	retrievalSocket := operatorSocket.GetV1RetrievalSocket()
 	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
 	retrievalOnline, retrievalStatus := false, "v1 retrieval port closed or unreachable"

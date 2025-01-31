@@ -120,13 +120,18 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 
 func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.EncodedBlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) (*core.Signature, error) {
 	// TODO Add secure Grpc
+	operatorSocket, err := core.ParseOperatorSocket(op.Socket)
+	if err != nil {
+		c.logger.Warn("Disperser failed to parse socket", "socket", op.Socket, "err", err)
+		return nil, err
+	}
 
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(op.Socket).GetV1DispersalSocket(),
+		operatorSocket.GetV1DispersalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		c.logger.Warn("Disperser cannot connect to operator dispersal socket", "dispersal_socket", core.OperatorSocket(op.Socket).GetV1DispersalSocket(), "err", err)
+		c.logger.Warn("Disperser cannot connect to operator dispersal socket", "dispersal_socket", operatorSocket.GetV1DispersalSocket(), "err", err)
 		return nil, err
 	}
 	defer conn.Close()
