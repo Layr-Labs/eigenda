@@ -198,7 +198,7 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	var isOnline bool
 	var socket string
 	if operatorStatus.IndexedOperatorInfo != nil {
-		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
+		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetV1RetrievalSocket()
 		isOnline = checkIsOperatorPortOpen(socket, 10, logger)
 	}
 
