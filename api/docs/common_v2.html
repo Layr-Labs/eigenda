@@ -346,11 +346,13 @@ blob&#39;s availability. </p></td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
                   <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
-All quorums must be specified (including required quorums).
+All quorums must be specified.
 
-The following quorums are currently required:
+On-demand dispersal is currently limited to use the following quorums:
 - 0: ETH
-- 1: EIGEN </p></td>
+- 1: EIGEN
+
+If the dispersal is using reservations, the quorum numbers are limited to the specification on-chain for that particular reservation. </p></td>
                 </tr>
               
                 <tr>

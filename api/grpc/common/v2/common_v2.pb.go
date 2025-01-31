@@ -33,11 +33,13 @@ type BlobHeader struct {
 	// blob's availability.
 	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// quorum_numbers is the list of quorum numbers that the blob is part of.
-	// All quorums must be specified (including required quorums).
+	// All quorums must be specified.
 	//
-	// The following quorums are currently required:
+	// On-demand dispersal is currently limited to use the following quorums:
 	// - 0: ETH
 	// - 1: EIGEN
+	//
+	// If the dispersal is using reservations, the quorum numbers are limited to the specification on-chain for that particular reservation.
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
 	// commitment is the KZG commitment to the blob
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
