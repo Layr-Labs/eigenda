@@ -66,6 +66,12 @@ func (r *TestRandom) Bytes(length int) []byte {
 	return bytes
 }
 
+// VariableBytes generates a random byte slice of a length between min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableBytes(min int, max int) []byte {
+	length := r.Intn(max-min) + min
+	return r.Bytes(length)
+}
+
 // Time generates a random time.
 func (r *TestRandom) Time() time.Time {
 	return time.Unix(r.Int63(), r.Int63())

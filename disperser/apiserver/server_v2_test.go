@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"math/big"
 	"net"
 	"testing"
@@ -517,7 +518,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		meterer,
 		auth.NewAuthenticator(),
 		prover,
-		10,
+		1034,
 		time.Hour,
 		logger,
 		prometheus.NewRegistry(),
@@ -595,11 +596,12 @@ func TestInvalidLength(t *testing.T) {
 	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
 }
 
-// TODO finish this test
 func TestTooShortCommitment(t *testing.T) {
+	rand := random.NewTestRandom(t)
+
 	c := newTestServerV2(t)
 	ctx := peer.NewContext(context.Background(), c.Peer)
-	data := make([]byte, 50)
+	data := rand.VariableBytes(1024, 4096)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
@@ -610,11 +612,9 @@ func TestTooShortCommitment(t *testing.T) {
 	// Length we are commiting to should be a power of 2.
 	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
 
-	fmt.Printf("correct commitment: %d\n", commitments.Length) // TODO
-
 	// Choose a smaller commitment length than is legal. Make sure it's a power of 2 so that it doesn't
 	// fail prior to the commitment length check.
-	//commitments.Length /= 2
+	commitments.Length /= 2
 
 	accountID, err := c.Signer.GetAccountID()
 	assert.NoError(t, err)
@@ -643,5 +643,5 @@ func TestTooShortCommitment(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
+	require.Contains(t, err.Error(), "is less than blob length")
 }

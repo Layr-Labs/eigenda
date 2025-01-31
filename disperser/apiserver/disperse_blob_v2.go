@@ -157,8 +157,9 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if commitmentLength == 0 || commitmentLength != encoding.NextPowerOf2(commitmentLength) {
 		return errors.New("invalid commitment length, must be a power of 2")
 	}
-	if encoding.GetBlobLengthPowerOf2(uint(blobSize)) < uint(commitmentLength) {
-		return fmt.Errorf("commitment length %d is less than blob length %d", commitmentLength, len(req.Blob))
+	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
+	if lengthPowerOf2 > uint(commitmentLength) {
+		return fmt.Errorf("commitment length %d is less than blob length %d", commitmentLength, lengthPowerOf2)
 	}
 
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
