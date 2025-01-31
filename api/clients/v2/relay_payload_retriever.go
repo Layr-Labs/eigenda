@@ -85,7 +85,7 @@ func NewRelayPayloadRetriever(
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
 	if err != nil {
-		return nil, fmt.Errorf("check and set RelayRelayPayloadRetrieverConfig config: %w", err)
+		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
 	}
 
 	return &RelayPayloadRetriever{

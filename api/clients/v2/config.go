@@ -149,7 +149,7 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	return &RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
-		RelayTimeout: 5 * time.Second,
+		RelayTimeout:        5 * time.Second,
 	}
 }
 

@@ -53,6 +53,9 @@ func BuildDistributedPayloadRetriever(
 		ethClient,
 		distributedPayloadRetrieverConfig.BlsOperatorStateRetrieverAddr,
 		distributedPayloadRetrieverConfig.EigenDAServiceManagerAddr)
+	if err != nil {
+		return nil, fmt.Errorf("new reader: %w", err)
+	}
 
 	chainState := eth.NewChainState(reader, ethClient)
 	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
@@ -73,7 +76,7 @@ func BuildDistributedPayloadRetriever(
 		distributedPayloadRetrieverConfig.PayloadPolynomialForm,
 		distributedPayloadRetrieverConfig.BlobEncodingVersion)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create codec: %w", err)
 	}
 
 	return &DistributedPayloadRetriever{
