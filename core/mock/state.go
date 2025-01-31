@@ -145,7 +145,7 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		socket := core.MakeOperatorSocket(host, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 
 		indexed := &core.IndexedOperatorInfo{
-			Socket:   string(socket),
+			Socket:   socket.String(),
 			PubkeyG1: d.KeyPairs[id].GetPubKeyG1(),
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
 		}
