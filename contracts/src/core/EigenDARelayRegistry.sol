@@ -12,6 +12,10 @@ import "../interfaces/IEigenDAStructs.sol";
  */
 contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage, IEigenDARelayRegistry {
 
+
+    // Add mapping to track owner-created relays
+    mapping(uint32 => bool) public isOwnerCreatedRelay;
+
     constructor() {
         _disableInitializers();
     }
@@ -22,8 +26,14 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
         _transferOwnership(_initialOwner);
     }
 
-    function addRelayInfo(RelayInfo memory relayInfo) external onlyOwner returns (uint32) {
+    function addRelayInfo(RelayInfo memory relayInfo) external returns (uint32) {
         relayKeyToInfo[nextRelayKey] = relayInfo;
+        
+        // Track if the relay was created by the owner
+        if (msg.sender == owner()) {
+            isOwnerCreatedRelay[nextRelayKey] = true;
+        }
+        
         emit RelayAdded(relayInfo.relayAddress, nextRelayKey, relayInfo.relayURL);
         return nextRelayKey++;
     }
