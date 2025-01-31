@@ -45,13 +45,13 @@ type PayloadClientConfig struct {
 	BlobVersion v2.BlobVersion
 }
 
-// RelayPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
-// by a RelayPayloadRetriever
-type RelayPayloadRetrieverConfig struct {
+// PayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
+// by a PayloadRetriever
+type PayloadRetrieverConfig struct {
 	PayloadClientConfig
 
-	// The timeout duration for relay calls to retrieve blobs.
-	RelayTimeout time.Duration
+	// The timeout duration for calls to retrieve blobs.
+	FetchTimeout time.Duration
 }
 
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -125,13 +125,13 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	return nil
 }
 
-// GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
+// GetDefaultPayloadRetrieverConfig creates a GetDefaultPayloadRetrieverConfig with default values
 //
 // NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
-func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
-	return &RelayPayloadRetrieverConfig{
+func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
+	return &PayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
-		RelayTimeout:        5 * time.Second,
+		FetchTimeout: 5 * time.Second,
 	}
 }
 
@@ -140,15 +140,15 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 // 1. If a config value is 0, and a 0 value makes sense, do nothing.
 // 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
 // 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
-func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
+func (rc *PayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
 		return err
 	}
 
-	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
-	if rc.RelayTimeout == 0 {
-		rc.RelayTimeout = defaultConfig.RelayTimeout
+	defaultConfig := GetDefaultPayloadRetrieverConfig()
+	if rc.FetchTimeout == 0 {
+		rc.FetchTimeout = defaultConfig.FetchTimeout
 	}
 
 	return nil

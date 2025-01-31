@@ -3,12 +3,13 @@ package v2
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"os"
 	"path"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -299,7 +300,16 @@ func (c *TestClient) ReadBlobFromValidators(
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
 		require.NoError(c.t, err)
 
-		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
+		blobKey, err := header.BlobKey()
+		require.NoError(c.t, err)
+
+		retrievedBlob, err := c.RetrievalClient.GetBlob(
+			ctx,
+			blobKey,
+			header.BlobVersion,
+			header.BlobCommitments,
+			uint64(currentBlockNumber),
+			quorumID)
 		require.NoError(c.t, err)
 
 		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
