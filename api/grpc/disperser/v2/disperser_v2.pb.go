@@ -319,7 +319,7 @@ type BlobStatusReply struct {
 	// The client can use this intermediate attestation to verify a blob if it has gathered enough signatures.
 	// Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
 	// When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
-	// If the final attestation does not meet the client's requirement, the client should try a new dispersal with a different salt.
+	// If the final attestation does not meet the client's requirement, the client should try a new dispersal.
 	SignedBatch *SignedBatch `protobuf:"bytes,2,opt,name=signed_batch,json=signedBatch,proto3" json:"signed_batch,omitempty"`
 	// BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
 	// Only set if the blob status is GATHERING_SIGNATURES or COMPLETE.

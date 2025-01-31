@@ -2136,7 +2136,7 @@ at the point in time. As it gathers more signatures, attestation object will be 
 The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
 Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
 When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
-If the final attestation does not meet the client&#39;s requirement, the client should try a new dispersal with a different salt. </p></td>
+If the final attestation does not meet the client&#39;s requirement, the client should try a new dispersal. </p></td>
                 </tr>
               
                 <tr>
