@@ -98,10 +98,10 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	// Test that the blob metadata status are updated
 	bm0, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[0])
 	require.NoError(t, err)
-	require.Equal(t, v2.Certified, bm0.BlobStatus)
+	require.Equal(t, v2.Complete, bm0.BlobStatus)
 	bm1, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[1])
 	require.NoError(t, err)
-	require.Equal(t, v2.Certified, bm1.BlobStatus)
+	require.Equal(t, v2.Complete, bm1.BlobStatus)
 
 	// Get batch header
 	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objs.blobKeys[0])
@@ -173,12 +173,12 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	for _, blobKey := range failedObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range successfulObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Certified, bm.BlobStatus)
+		require.Equal(t, v2.Complete, bm.BlobStatus)
 	}
 
 	// Get batch header
@@ -245,12 +245,12 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	for _, blobKey := range objsInBothQuorum.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range objsInQuorum1.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 
 	// Get batch header

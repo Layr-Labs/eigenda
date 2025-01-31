@@ -32,7 +32,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
@@ -93,7 +94,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
 				Expect(err).To(BeNil())
 
-				if status1 != dispv2.Certified || status2 != dispv2.Certified {
+				if status1 != dispv2.Complete || status2 != dispv2.Complete {
 					continue
 				}
 

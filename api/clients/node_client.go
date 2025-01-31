@@ -41,7 +41,7 @@ func (c client) GetBlobHeader(
 	blobIndex uint32,
 ) (*core.BlobHeader, *merkletree.Proof, error) {
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(socket).GetRetrievalSocket(),
+		core.OperatorSocket(socket).GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -86,7 +86,7 @@ func (c client) GetChunks(
 	chunksChan chan RetrievedChunks,
 ) {
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
+		core.OperatorSocket(opInfo.Socket).GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

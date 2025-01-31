@@ -200,7 +200,7 @@ func computeNumFailed(batches []*BatchNonSigningInfo, operatorQuorumIntervals Op
 func computeNumResponsible(batches []*BatchNonSigningInfo, operatorQuorumIntervals OperatorQuorumIntervals) map[string]map[uint8]int {
 	// Create quorumBatches, where quorumBatches[q].AccuBatches is the total number of
 	// batches in block interval [startBlock, b] for quorum "q".
-	quorumBatches := CreatQuorumBatches(batches)
+	quorumBatches := CreatQuorumBatches(CreateQuorumBatchMap(batches))
 
 	numResponsible := make(map[string]map[uint8]int)
 	for op, val := range operatorQuorumIntervals {

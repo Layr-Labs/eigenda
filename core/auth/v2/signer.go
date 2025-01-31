@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"log"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -17,16 +16,16 @@ type LocalBlobRequestSigner struct {
 
 var _ core.BlobRequestSigner = &LocalBlobRequestSigner{}
 
-func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
+func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, error) {
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
-		log.Fatalf("Failed to parse private key: %v", err)
+		return nil, fmt.Errorf("create ECDSA private key: %w", err)
 	}
 
 	return &LocalBlobRequestSigner{
 		PrivateKey: privateKey,
-	}
+	}, nil
 }
 
 func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {

@@ -165,7 +165,7 @@ func (r *retrievalClient) getChunksFromOperator(
 	chunksChan chan clients.RetrievedChunks,
 ) {
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
+		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	defer func() {

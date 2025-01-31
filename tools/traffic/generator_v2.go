@@ -57,12 +57,9 @@ func NewTrafficGeneratorV2(config *config.Config) (*Generator, error) {
 		return nil, err
 	}
 
-	var signer *auth.LocalBlobRequestSigner
-	if config.SignerPrivateKey != "" {
-		signer = auth.NewLocalBlobRequestSigner(config.SignerPrivateKey)
-	} else {
-		logger.Error("signer private key is required")
-		return nil, fmt.Errorf("signer private key is required")
+	signer, err := auth.NewLocalBlobRequestSigner(config.SignerPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("new local blob request signer: %w", err)
 	}
 
 	signerAccountId, err := signer.GetAccountID()
