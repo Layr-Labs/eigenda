@@ -47,6 +47,10 @@ type requestAuthenticator struct {
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
+	// ondemandAuthenticatedDisperser is a specific disperser address that has been authenticated
+	// for serving on-demand requests
+	ondemandAuthenticatedDisperser string
+
 	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
 	disperserIDFilter func(uint32) bool
 }
@@ -66,10 +70,11 @@ func NewRequestAuthenticator(
 	}
 
 	authenticator := &requestAuthenticator{
-		chainReader:        chainReader,
-		keyCache:           keyCache,
-		keyTimeoutDuration: keyTimeoutDuration,
-		disperserIDFilter:  disperserIDFilter,
+		chainReader:                    chainReader,
+		keyCache:                       keyCache,
+		keyTimeoutDuration:             keyTimeoutDuration,
+		ondemandAuthenticatedDisperser: "", //TODO: set this to the EigenDA disperser address
+		disperserIDFilter:              disperserIDFilter,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
