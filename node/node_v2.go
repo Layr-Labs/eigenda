@@ -246,6 +246,7 @@ func (n *Node) validateDispersalRequest(ctx context.Context, blobCert *corev2.Bl
 		CumulativePayment: cumulativePayment,
 	}
 
+	// TODO: meterer must be updated to limit on-demand requests to the EigenDA disperser
 	if err := n.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers); err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}

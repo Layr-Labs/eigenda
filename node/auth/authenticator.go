@@ -3,12 +3,13 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"time"
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
@@ -52,6 +53,10 @@ type requestAuthenticator struct {
 	// to the time when that cached authentication will expire.
 	authenticatedDispersers *lru.Cache[string, time.Time]
 
+	// ondemandAuthenticatedDisperser is a specific disperser address that has been authenticated
+	// for serving on-demand requests
+	ondemandAuthenticatedDisperser string
+
 	// authenticationTimeoutDuration is the duration for which an auth is valid.
 	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
 	authenticationTimeoutDuration time.Duration
@@ -81,12 +86,13 @@ func NewRequestAuthenticator(
 	}
 
 	authenticator := &requestAuthenticator{
-		chainReader:                   chainReader,
-		keyCache:                      keyCache,
-		keyTimeoutDuration:            keyTimeoutDuration,
-		authenticatedDispersers:       authenticatedDispersers,
-		authenticationTimeoutDuration: authenticationTimeoutDuration,
-		disperserIDFilter:             disperserIDFilter,
+		chainReader:                    chainReader,
+		keyCache:                       keyCache,
+		keyTimeoutDuration:             keyTimeoutDuration,
+		authenticatedDispersers:        authenticatedDispersers,
+		ondemandAuthenticatedDisperser: "", //TODO: set this to the EigenDA disperser address
+		authenticationTimeoutDuration:  authenticationTimeoutDuration,
+		disperserIDFilter:              disperserIDFilter,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
