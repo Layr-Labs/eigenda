@@ -20,7 +20,7 @@ func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, e
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
-		return nil, fmt.Errorf("create ECDSA private key: %v", err)
+		return nil, fmt.Errorf("create ECDSA private key: %w", err)
 	}
 
 	return &LocalBlobRequestSigner{

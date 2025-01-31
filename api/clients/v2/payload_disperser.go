@@ -38,7 +38,7 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	// 1 - verify key semantics and create signer
 	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
 	if err != nil {
-		return nil, fmt.Errorf("new local blob request signer: %v", err)
+		return nil, fmt.Errorf("new local blob request signer: %w", err)
 	}
 
 	// 2 - create prover
