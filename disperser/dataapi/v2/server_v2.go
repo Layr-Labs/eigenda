@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	docsv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
@@ -42,6 +44,9 @@ const (
 	// The max number of batches to return from batch feed API, regardless of the time
 	// range or "limit" param.
 	maxNumBatchesPerBatchFeedResponse = 1000
+
+	// The quorum IDs that are allowed to query for signing info are [0, maxQuorumIDAllowed]
+	maxQuorumIDAllowed = 2
 
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
@@ -107,6 +112,20 @@ type (
 
 	MetricSummary struct {
 		AvgThroughput float64 `json:"avg_throughput"`
+	}
+
+	OperatorSigningInfo struct {
+		OperatorId              string  `json:"operator_id"`
+		OperatorAddress         string  `json:"operator_address"`
+		QuorumId                uint8   `json:"quorum_id"`
+		TotalUnsignedBatches    int     `json:"total_unsigned_batches"`
+		TotalResponsibleBatches int     `json:"total_responsible_batches"`
+		TotalBatches            int     `json:"total_batches"`
+		SigningPercentage       float64 `json:"signing_percentage"`
+		StakePercentage         float64 `json:"stake_percentage"`
+	}
+	OperatorsSigningInfoResponse struct {
+		OperatorSigningInfo []*OperatorSigningInfo `json:"operator_signing_info"`
 	}
 
 	OperatorStake struct {
@@ -254,7 +273,7 @@ func (s *ServerV2) Start() error {
 		}
 		operators := v2.Group("/operators")
 		{
-			operators.GET("/nonsigners", s.FetchNonSingers)
+			operators.GET("/signing-info", s.FetchSigningInfo)
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
 			operators.GET("/reachability", s.CheckOperatorsReachability)
@@ -388,7 +407,7 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 		}
 		if endTime.Before(oldestTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedHandler")
-			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days ago from now, found: %s", c.Query("end")))
+			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days in the past, found: %s", c.Query("end")))
 			return
 		}
 	}
@@ -594,6 +613,117 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// FetchSigningInfo godoc
+//
+//	@Summary	Fetch operators signing info
+//	@Tags		Operators
+//	@Produce	json
+//	@Param		end			query		string	false	"Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval	query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		quorums query		string false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
+//	@Param		nonsigner_only query		string false	"Whether return only operators with signing rate less than 100% [default: true]"
+//	@Success	200			{object}	OperatorsSigningInfoResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/operators/signing-info [get]
+func (s *ServerV2) FetchSigningInfo(c *gin.Context) {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
+		s.metrics.ObserveLatency("FetchSigningInfo", f*1000) // make milliseconds
+	}))
+	defer timer.ObserveDuration()
+
+	var err error
+
+	now := time.Now()
+	oldestTime := now.Add(-maxBlobAge)
+
+	endTime := now
+	if c.Query("end") != "" {
+		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			return
+		}
+		if endTime.Before(oldestTime) {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days in the past, found: %s", c.Query("end")))
+			return
+		}
+	}
+
+	interval := 3600
+	if c.Query("interval") != "" {
+		interval, err = strconv.Atoi(c.Query("interval"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			return
+		}
+		if interval <= 0 {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("interval must be greater than 0, found: %d", interval))
+			return
+		}
+	}
+
+	quorumStr := "0,1"
+	if c.Query("quorums") != "" {
+		quorumStr = c.Query("quorums")
+	}
+	quorums := strings.Split(quorumStr, ",")
+	quorumsSeen := make(map[uint8]struct{}, 0)
+	for _, idStr := range quorums {
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the provided quorum: %s", quorumStr))
+			return
+		}
+		if id < 0 || id > maxQuorumIDAllowed {
+			s.metrics.IncrementInvalidArgRequestNum("FetchSigningInfo")
+			invalidParamsErrorResponse(c, fmt.Errorf("the quorumID must be in range [0, %d], found: %d", maxQuorumIDAllowed, id))
+			return
+		}
+		quorumsSeen[uint8(id)] = struct{}{}
+	}
+	quorumIds := make([]uint8, 0, len(quorumsSeen))
+	for q := range quorumsSeen {
+		quorumIds = append(quorumIds, q)
+	}
+
+	nonsignerOnly := "true"
+	if c.Query("nonsigner_only") != "" {
+		nonsignerOnly = c.Query("nonsigner_only")
+		if nonsignerOnly != "true" && nonsignerOnly != "false" {
+			invalidParamsErrorResponse(c, errors.New("the nonsigner_only param must be \"true\" or \"false\""))
+			return
+		}
+	}
+
+	startTime := endTime.Add(-time.Duration(interval) * time.Second)
+	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchSigningInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch attestation feed from blob metadata store: %w", err))
+		return
+	}
+
+	signingInfo, err := s.computeOperatorsSigningInfo(c.Request.Context(), attestations, quorumIds, nonsignerOnly == "true")
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchSigningInfo")
+		errorResponse(c, fmt.Errorf("failed to compute the operators signing info: %w", err))
+		return
+	}
+	response := OperatorsSigningInfoResponse{
+		OperatorSigningInfo: signingInfo,
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchSigningInfo")
+	c.JSON(http.StatusOK, response)
+}
+
 // FetchBatchFeedHandler godoc
 //
 //	@Summary	Fetch batch feed
@@ -628,7 +758,7 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 		}
 		if endTime.Before(oldestTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBatchFeedHandler")
-			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days ago from now, found: %s", c.Query("end")))
+			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days in the past, found: %s", c.Query("end")))
 			return
 		}
 	}
@@ -883,10 +1013,6 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 	c.JSON(http.StatusOK, portCheckResponse)
 }
 
-func (s *ServerV2) FetchNonSingers(c *gin.Context) {
-	errorResponse(c, errors.New("FetchNonSingers unimplemented"))
-}
-
 // FetchMetricsSummaryHandler godoc
 //
 //	@Summary	Fetch metrics summary
@@ -971,4 +1097,220 @@ func (s *ServerV2) FetchMetricsThroughputTimeseriesHandler(c *gin.Context) {
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsThroughputTimeseriesHandler")
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
 	c.JSON(http.StatusOK, ths)
+}
+
+func (s *ServerV2) computeOperatorsSigningInfo(ctx context.Context, attestations []*corev2.Attestation, quorumIDs []uint8, nonsignerOnly bool) ([]*OperatorSigningInfo, error) {
+	if len(attestations) == 0 {
+		return nil, errors.New("no attestations to compute signing info")
+	}
+
+	// Compute the block number range [startBlock, endBlock] (both inclusive) when the
+	// attestations have happened.
+	startBlock := attestations[0].ReferenceBlockNumber
+	endBlock := attestations[0].ReferenceBlockNumber
+	for i := range attestations {
+		if startBlock > attestations[i].ReferenceBlockNumber {
+			startBlock = attestations[i].ReferenceBlockNumber
+		}
+		if endBlock < attestations[i].ReferenceBlockNumber {
+			endBlock = attestations[i].ReferenceBlockNumber
+		}
+	}
+
+	// Get quorum change events in range [startBlock+1, endBlock].
+	// We don't need the events at startBlock because we'll fetch all active operators and
+	// quorums at startBlock.
+	operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, uint32(startBlock+1), uint32(endBlock))
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute operators that we care about signing info, which has two parts:
+	// - the operators that were active at the startBlock
+	// - the operators that joined after startBlock
+	operatorList := dataapi.NewOperatorList()
+
+	// The first part: active operators at startBlock
+	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, quorumIDs, uint32(startBlock))
+	if err != nil {
+		return nil, err
+	}
+	operatorsSeen := make(map[core.OperatorID]struct{}, 0)
+	for _, ops := range operatorsByQuorum {
+		for _, op := range ops {
+			operatorsSeen[op.OperatorID] = struct{}{}
+		}
+	}
+	operatorIDs := make([]core.OperatorID, 0)
+	for id := range operatorsSeen {
+		operatorIDs = append(operatorIDs, id)
+	}
+	// Get the address for the operators.
+	// operatorAddresses[i] is the address for operatorIDs[i].
+	operatorAddresses, err := s.chainReader.BatchOperatorIDToAddress(ctx, operatorIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range operatorIDs {
+		operatorList.Add(operatorIDs[i], operatorAddresses[i].Hex())
+	}
+
+	// The second part: new operators after startBlock.
+	newAddresses := make(map[string]struct{}, 0)
+	for op := range operatorQuorumEvents.AddedToQuorum {
+		if _, exist := operatorList.GetID(op); !exist {
+			newAddresses[op] = struct{}{}
+		}
+	}
+	for op := range operatorQuorumEvents.RemovedFromQuorum {
+		if _, exist := operatorList.GetID(op); !exist {
+			newAddresses[op] = struct{}{}
+		}
+	}
+	addresses := make([]gethcommon.Address, 0, len(newAddresses))
+	for addr := range newAddresses {
+		addresses = append(addresses, gethcommon.HexToAddress(addr))
+	}
+	operatorIds, err := s.chainReader.BatchOperatorAddressToID(ctx, addresses)
+	if err != nil {
+		return nil, err
+	}
+	// We merge the new operators observed in AddedToQuorum and RemovedFromQuorum
+	// into the operator set.
+	for i := 0; i < len(operatorIds); i++ {
+		operatorList.Add(operatorIds[i], addresses[i].Hex())
+	}
+
+	// Create operators' quorum intervals
+	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(ctx, operatorList, operatorQuorumEvents, uint32(startBlock), uint32(endBlock))
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute num batches failed, where numFailed[op][q] is the number of batches
+	// failed to sign for quorum "q" by operator "op".
+	numFailed := computeNumFailed(attestations, operatorQuorumIntervals)
+
+	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
+	// that operator "op" and quorum "q" are responsible for.
+	numResponsible := computeNumResponsible(attestations, operatorQuorumIntervals)
+
+	signingInfo := make([]*OperatorSigningInfo, 0)
+	for _, op := range operatorList.GetOperatorIds() {
+		for _, q := range quorumIDs {
+			operatorId := op.Hex()
+
+			numShouldHaveSigned := 0
+			if num, exist := safeAccess(numResponsible, operatorId, q); exist {
+				numShouldHaveSigned = num
+			}
+			// The operator op received no batch that it should sign.
+			if numShouldHaveSigned == 0 {
+				continue
+			}
+
+			numFailedToSign := 0
+			if num, exist := safeAccess(numFailed, operatorId, q); exist {
+				numFailedToSign = num
+			}
+
+			operatorAddress, ok := operatorList.GetAddress(operatorId)
+			if !ok {
+				// This should never happen (becuase OperatorList ensures the 1:1 mapping
+				// between ID and address), but we don't fail the entire request, just
+				// mark internal error for the address field to signal the issue.
+				operatorAddress = "Unexpected internal error"
+			}
+
+			ps := fmt.Sprintf("%.2f", (float64(numShouldHaveSigned-numFailedToSign)/float64(numShouldHaveSigned))*100)
+			signingRate, err := strconv.ParseFloat(ps, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			si := &OperatorSigningInfo{
+				OperatorId:              operatorId,
+				OperatorAddress:         operatorAddress,
+				QuorumId:                q,
+				TotalUnsignedBatches:    numFailedToSign,
+				TotalResponsibleBatches: numShouldHaveSigned,
+				TotalBatches:            len(attestations),
+				SigningPercentage:       signingRate,
+				StakePercentage:         0,
+			}
+			signingInfo = append(signingInfo, si)
+		}
+	}
+
+	// Sort by descending order of <signing rate, quorumId, operatorId>.
+	sort.Slice(signingInfo, func(i, j int) bool {
+		if signingInfo[i].SigningPercentage == signingInfo[j].SigningPercentage {
+			if signingInfo[i].OperatorId == signingInfo[j].OperatorId {
+				return signingInfo[i].QuorumId < signingInfo[j].QuorumId
+			}
+			return signingInfo[i].OperatorId < signingInfo[j].OperatorId
+		}
+		return signingInfo[i].SigningPercentage > signingInfo[j].SigningPercentage
+	})
+
+	return signingInfo, nil
+}
+
+func safeAccess(data map[string]map[uint8]int, i string, j uint8) (int, bool) {
+	innerMap, ok := data[i]
+	if !ok {
+		return 0, false // Key i does not exist
+	}
+	val, ok := innerMap[j]
+	if !ok {
+		return 0, false // Key j does not exist in the inner map
+	}
+	return val, true
+}
+
+func computeNumFailed(attestations []*corev2.Attestation, operatorQuorumIntervals dataapi.OperatorQuorumIntervals) map[string]map[uint8]int {
+	numFailed := make(map[string]map[uint8]int)
+	for _, at := range attestations {
+		for _, pubkey := range at.NonSignerPubKeys {
+			op := pubkey.GetOperatorID().Hex()
+			// Note: avg number of quorums per operator is a small number, so use brute
+			// force here (otherwise, we can create a map to make it more efficient)
+			for _, operatorQuorum := range operatorQuorumIntervals.GetQuorums(op, uint32(at.ReferenceBlockNumber)) {
+				for _, batchQuorum := range at.QuorumNumbers {
+					if operatorQuorum == batchQuorum {
+						if _, ok := numFailed[op]; !ok {
+							numFailed[op] = make(map[uint8]int)
+						}
+						numFailed[op][operatorQuorum]++
+						break
+					}
+				}
+			}
+		}
+	}
+	return numFailed
+}
+
+func computeNumResponsible(attestations []*corev2.Attestation, operatorQuorumIntervals dataapi.OperatorQuorumIntervals) map[string]map[uint8]int {
+	// Create quorumBatches, where quorumBatches[q].AccuBatches is the total number of
+	// batches in block interval [startBlock, b] for quorum "q".
+	quorumBatches := dataapi.CreatQuorumBatches(dataapi.CreateQuorumBatchMapV2(attestations))
+
+	numResponsible := make(map[string]map[uint8]int)
+	for op, val := range operatorQuorumIntervals {
+		if _, ok := numResponsible[op]; !ok {
+			numResponsible[op] = make(map[uint8]int)
+		}
+		for q, intervals := range val {
+			numBatches := 0
+			if _, ok := quorumBatches[q]; ok {
+				for _, interval := range intervals {
+					numBatches = numBatches + dataapi.ComputeNumBatches(quorumBatches[q], interval.StartBlock, interval.EndBlock)
+				}
+			}
+			numResponsible[op][q] = numBatches
+		}
+	}
+
+	return numResponsible
 }

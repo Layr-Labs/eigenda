@@ -3,6 +3,7 @@ package v2_test
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
@@ -38,6 +39,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
@@ -285,6 +287,14 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	bk, err := blobHeader.BlobKey()
 	assert.Nil(t, err)
 	assert.Equal(t, blobKey, bk)
+}
+
+func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.OperatorSigningInfo) {
+	assert.Equal(t, expected.OperatorId, actual.OperatorId)
+	assert.Equal(t, expected.OperatorAddress, actual.OperatorAddress)
+	assert.Equal(t, expected.QuorumId, actual.QuorumId)
+	assert.Equal(t, expected.TotalUnsignedBatches, actual.TotalUnsignedBatches)
+	assert.Equal(t, expected.TotalResponsibleBatches, actual.TotalResponsibleBatches)
 }
 
 func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
@@ -752,6 +762,305 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	})
 }
 
+func TestFetchSigningInfo(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	/*
+		Test data setup
+
+		Column definitions:
+		- Batch:            Batch number
+		- AttestedAt:       Timestamp of attestation (sortkey)
+		- RefBlockNum:      Reference block number
+		- Quorums:          Quorum numbers used by the batch
+		- Nonsigners:       Operators that didn't sign for the batch
+		- Active operators: Mapping of operator ID to their quorum assignments at the block
+
+		Data:
+			+-------+------------+-------------+---------+------------+------------------------+
+			| Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     1 |          1 |           1 | 0,1     | 3          | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     2 |          2 |           3 | 1       | 4          | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			|       |            |             |         |            | 4: {0,1}              |
+			|       |            |             |         |            | 5: {0}                |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     3 |          3 |           2 | 0       | 3          | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			|       |            |             |         |            | 4: {0,1}              |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     4 |          4 |           2 | 0,1     | None       | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			|       |            |             |         |            | 4: {0,1}              |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			|       |            |             |         |            | 5: {0}                |
+			+-------+------------+-------------+---------+------------+------------------------+
+			|     6 |          6 |           5 | 0       | 5          | 1: {2}                |
+			|       |            |             |         |            | 2: {0,1}              |
+			|       |            |             |         |            | 3: {0,1}              |
+			|       |            |             |         |            | 5: {0}                |
+			+-------+------------+-------------+---------+------------+------------------------+
+	*/
+
+	/*
+		Resulting Operator SigningInfo
+
+		Column definitions:
+		- <operator, quorum>:    Operator ID and quorum pair
+		- Total responsible:     Total number of batches the operator was responsible for
+		- Total nonsigning:      Number of batches where operator did not sign
+		- Signing rate:          Percentage of batches signed by <operator, quorum>
+
+		Data:
+		+------------------+-------------------+------------------+--------------+
+		| <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 0>          |                 5 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 1>          |                 4 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 0>          |                 5 |                3 |         40% |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 1>          |                 4 |                2 |         50% |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 0>          |                 2 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 1>          |                 2 |                1 |         50% |
+		+------------------+-------------------+------------------+--------------+
+		| <5, 0>          |                 2 |                2 |          0% |
+		+------------------+-------------------+------------------+--------------+
+	*/
+
+	// Create test operators
+	numOperators := 5
+	operatorIds := make([]core.OperatorID, numOperators)
+	operatorAddresses := make([]gethcommon.Address, numOperators)
+	operatorG1s := make([]*core.G1Point, numOperators)
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	operatorAddrToID := make(map[string]core.OperatorID)
+	for i := 0; i < numOperators; i++ {
+		operatorG1s[i] = core.NewG1Point(big.NewInt(int64(i)), big.NewInt(int64(i+1)))
+		operatorIds[i] = operatorG1s[i].GetOperatorID()
+		privateKey, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+		require.NoError(t, err)
+		publicKey := privateKey.Public().(*ecdsa.PublicKey)
+		operatorAddresses[i] = crypto.PubkeyToAddress(*publicKey)
+
+		operatorIDToAddr[operatorIds[i].Hex()] = operatorAddresses[i]
+		operatorAddrToID[operatorAddresses[i].Hex()] = operatorIds[i]
+	}
+
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+	mockTx.On("BatchOperatorAddressToID").Return(
+		func(addrs []gethcommon.Address) []core.OperatorID {
+			result := make([]core.OperatorID, len(addrs))
+			for i, addr := range addrs {
+				result[i] = operatorAddrToID[addr.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
+	mockTx.On("GetOperatorStakesForQuorums").Return(core.OperatorStakes{
+		0: {
+			0: {
+				OperatorID: operatorIds[1],
+				Stake:      big.NewInt(2),
+			},
+			1: {
+				OperatorID: operatorIds[2],
+				Stake:      big.NewInt(2),
+			},
+		},
+		1: {
+			0: {
+				OperatorID: operatorIds[1],
+				Stake:      big.NewInt(2),
+			},
+			1: {
+				OperatorID: operatorIds[2],
+				Stake:      big.NewInt(2),
+			},
+		},
+		2: {
+			1: {
+				OperatorID: operatorIds[0],
+				Stake:      big.NewInt(2),
+			},
+		},
+	}, nil)
+
+	operatorIntialQuorums := map[core.OperatorID]*big.Int{
+		operatorIds[0]: big.NewInt(4), // quorum 2
+		operatorIds[1]: big.NewInt(3), // quorum 0,1
+		operatorIds[2]: big.NewInt(3), // quorum 0,1
+		operatorIds[3]: big.NewInt(0), // no quorum
+		operatorIds[4]: big.NewInt(0), // no quorum
+	}
+
+	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return(
+		func(ids []core.OperatorID, blockNum uint32) []*big.Int {
+			bitmaps := make([]*big.Int, len(ids))
+			for i, id := range ids {
+				bitmaps[i] = operatorIntialQuorums[id] // Use map access syntax [] instead of ()
+			}
+			return bitmaps
+		},
+		nil,
+	)
+
+	operatorAddedToQuorum := []*subgraph.OperatorQuorum{
+		{
+			Operator:       graphql.String(operatorAddresses[3].Hex()),
+			QuorumNumbers:  "0x0001",
+			BlockNumber:    "2",
+			BlockTimestamp: "1702666070",
+		},
+		{
+			Operator:       graphql.String(operatorAddresses[4].Hex()),
+			QuorumNumbers:  "0x00",
+			BlockNumber:    "3",
+			BlockTimestamp: "1702666070",
+		},
+	}
+	operatorRemovedFromQuorum := []*subgraph.OperatorQuorum{
+		{
+			Operator:       graphql.String(operatorAddresses[3].Hex()),
+			QuorumNumbers:  "0x0001",
+			BlockNumber:    "4",
+			BlockTimestamp: "1702666058",
+		},
+	}
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
+
+	// Create a timeline of test batches
+	numBatches := 6
+	now := uint64(time.Now().UnixNano())
+	firstBatchTime := now - uint64(32*time.Minute.Nanoseconds())
+	nanoSecsPerBatch := uint64(5 * time.Minute.Nanoseconds()) // 1 batch per 5 minutes
+	attestedAt := make([]uint64, numBatches)
+	for i := 0; i < numBatches; i++ {
+		attestedAt[i] = firstBatchTime + uint64(i)*nanoSecsPerBatch
+	}
+	referenceBlockNum := []uint64{1, 3, 2, 2, 4, 5}
+	quorums := [][]uint8{{0, 1}, {1}, {0}, {0, 1}, {0, 1}, {0}}
+	nonsigners := [][]*core.G1Point{
+		{operatorG1s[2]},
+		{operatorG1s[3]},
+		{operatorG1s[2]},
+		{},
+		{operatorG1s[2], operatorG1s[4]},
+		{operatorG1s[4]},
+	}
+
+	for i := 0; i < numBatches; i++ {
+		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
+		err := blobMetadataStore.PutAttestation(ctx, attestation)
+		require.NoError(t, err)
+	}
+
+	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchSigningInfo)
+
+	t.Run("invalid params", func(t *testing.T) {
+		reqUrls := []string{
+			"/v2/operators/signing-info?interval=abc",
+			"/v2/operators/signing-info?interval=-1",
+			"/v2/operators/signing-info?end=2006-01-02T15:04:05",
+			"/v2/operators/signing-info?end=2006-01-02T15:04:05Z",
+			"/v2/operators/signing-info?quorums=-1",
+			"/v2/operators/signing-info?quorums=abc",
+			"/v2/operators/signing-info?quorums=10000000",
+			"/v2/operators/signing-info?quorums=-1",
+			"/v2/operators/signing-info?nonsigner_only=-1",
+			"/v2/operators/signing-info?nonsigner_only=deadbeef",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
+	})
+
+	t.Run("signing info computing", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 7, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[5], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    3,
+			TotalResponsibleBatches: 5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[6], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+		})
+	})
+}
+
 func TestCheckOperatorsReachability(t *testing.T) {
 	r := setUpRouter()
 
@@ -920,4 +1229,41 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func createAttestation(
+	t *testing.T,
+	refBlockNumber uint64,
+	attestedAt uint64,
+	nonsigners []*core.G1Point,
+	quorums []uint8,
+) *corev2.Attestation {
+	br := make([]byte, 32)
+	_, err := rand.Read(br)
+	require.NoError(t, err)
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            ([32]byte)(br),
+		ReferenceBlockNumber: refBlockNumber,
+	}
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	return &corev2.Attestation{
+		BatchHeader:      batchHeader,
+		AttestedAt:       attestedAt,
+		NonSignerPubKeys: nonsigners,
+		APKG2:            apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: quorums,
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
 }

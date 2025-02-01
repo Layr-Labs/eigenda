@@ -46,6 +46,10 @@ func NewOperatorList() *OperatorList {
 	}
 }
 
+func (o *OperatorList) GetOperatorIds() []core.OperatorID {
+	return o.operatorIds
+}
+
 func (o *OperatorList) Add(id core.OperatorID, address string) {
 	if _, exists := o.idToAddress[id]; exists {
 		return
