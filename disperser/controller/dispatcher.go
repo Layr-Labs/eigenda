@@ -150,7 +150,15 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 		op := op
 		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err)
+			d.logger.Warn("failed to parse operator socket, check if the socket format is correct", "operator", opID.Hex(), "socket", op.Socket, "err", err)
+			sigChan <- core.SigningMessage{
+				Signature:            nil,
+				Operator:             opID,
+				BatchHeaderHash:      batchData.BatchHeaderHash,
+				AttestationLatencyMs: 0,
+				Err:                  fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+			}
+			continue
 		}
 
 		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
