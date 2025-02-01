@@ -762,7 +762,7 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchSigningInfo(t *testing.T) {
+func FetchOperatorSigningInfo(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -778,39 +778,39 @@ func TestFetchSigningInfo(t *testing.T) {
 		- Active operators: Mapping of operator ID to their quorum assignments at the block
 
 		Data:
-			+-------+------------+-------------+---------+------------+------------------------+
-			| Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     1 |          1 |           1 | 0,1     | 3          | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     2 |          2 |           3 | 1       | 4          | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			|       |            |             |         |            | 4: {0,1}              |
-			|       |            |             |         |            | 5: {0}                |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     3 |          3 |           2 | 0       | 3          | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			|       |            |             |         |            | 4: {0,1}              |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     4 |          4 |           2 | 0,1     | None       | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			|       |            |             |         |            | 4: {0,1}              |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			|       |            |             |         |            | 5: {0}                |
-			+-------+------------+-------------+---------+------------+------------------------+
-			|     6 |          6 |           5 | 0       | 5          | 1: {2}                |
-			|       |            |             |         |            | 2: {0,1}              |
-			|       |            |             |         |            | 3: {0,1}              |
-			|       |            |             |         |            | 5: {0}                |
-			+-------+------------+-------------+---------+------------+------------------------+
+		+-------+------------+-------------+---------+------------+------------------------+
+		| Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     1 |          1 |           1 | 0,1     | 3          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     2 |          2 |           3 | 1       | 4          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     3 |          3 |           2 | 0       | 3          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     4 |          4 |           2 | 0,1     | None       | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     6 |          6 |           5 | 0       | 5          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
 	*/
 
 	/*
@@ -843,6 +843,8 @@ func TestFetchSigningInfo(t *testing.T) {
 	*/
 
 	// Create test operators
+	// Note: the operator numbered 1-5 in the above tables are corresponding to the
+	// operatorIds[0], ..., operatorIds[4] here
 	numOperators := 5
 	operatorIds := make([]core.OperatorID, numOperators)
 	operatorAddresses := make([]gethcommon.Address, numOperators)
@@ -861,6 +863,8 @@ func TestFetchSigningInfo(t *testing.T) {
 		operatorAddrToID[operatorAddresses[i].Hex()] = operatorIds[i]
 	}
 
+	// Mocking using a map function so we can always maintain the ID and address mapping
+	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
 	mockTx.On("BatchOperatorIDToAddress").Return(
 		func(ids []core.OperatorID) []gethcommon.Address {
 			result := make([]gethcommon.Address, len(ids))
@@ -882,6 +886,28 @@ func TestFetchSigningInfo(t *testing.T) {
 		nil,
 	)
 
+	// Mocking using a map function so we can always maintain the ID and address mapping
+	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
+	operatorIntialQuorums := map[core.OperatorID]*big.Int{
+		operatorIds[0]: big.NewInt(4), // quorum 2
+		operatorIds[1]: big.NewInt(3), // quorum 0,1
+		operatorIds[2]: big.NewInt(3), // quorum 0,1
+		operatorIds[3]: big.NewInt(0), // no quorum
+		operatorIds[4]: big.NewInt(0), // no quorum
+	}
+	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return(
+		func(ids []core.OperatorID, blockNum uint32) []*big.Int {
+			bitmaps := make([]*big.Int, len(ids))
+			for i, id := range ids {
+				bitmaps[i] = operatorIntialQuorums[id]
+			}
+			return bitmaps
+		},
+		nil,
+	)
+
+	// operatorIds[0], operatorIds[1] and operatorIds[2] were active at the startBlock
+	// (see the above table)
 	mockTx.On("GetOperatorStakesForQuorums").Return(core.OperatorStakes{
 		0: {
 			0: {
@@ -911,25 +937,8 @@ func TestFetchSigningInfo(t *testing.T) {
 		},
 	}, nil)
 
-	operatorIntialQuorums := map[core.OperatorID]*big.Int{
-		operatorIds[0]: big.NewInt(4), // quorum 2
-		operatorIds[1]: big.NewInt(3), // quorum 0,1
-		operatorIds[2]: big.NewInt(3), // quorum 0,1
-		operatorIds[3]: big.NewInt(0), // no quorum
-		operatorIds[4]: big.NewInt(0), // no quorum
-	}
-
-	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return(
-		func(ids []core.OperatorID, blockNum uint32) []*big.Int {
-			bitmaps := make([]*big.Int, len(ids))
-			for i, id := range ids {
-				bitmaps[i] = operatorIntialQuorums[id] // Use map access syntax [] instead of ()
-			}
-			return bitmaps
-		},
-		nil,
-	)
-
+	// operatorIds[3], operatorIds[4] were not active at the startBlock, but were added to
+	// quorums after startBlock (see the above table).
 	operatorAddedToQuorum := []*subgraph.OperatorQuorum{
 		{
 			Operator:       graphql.String(operatorAddresses[3].Hex()),
@@ -956,6 +965,8 @@ func TestFetchSigningInfo(t *testing.T) {
 	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
 
 	// Create a timeline of test batches
+	// See the above table for the choices of reference block number, quorums and nonsigners
+	// for each batch
 	numBatches := 6
 	now := uint64(time.Now().UnixNano())
 	firstBatchTime := now - uint64(32*time.Minute.Nanoseconds())
@@ -974,14 +985,13 @@ func TestFetchSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
-
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
 	}
 
-	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchSigningInfo)
+	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
