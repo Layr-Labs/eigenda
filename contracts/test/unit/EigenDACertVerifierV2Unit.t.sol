@@ -11,6 +11,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     address relay1 = address(uint160(uint256(keccak256(abi.encodePacked("relay1")))));
 
     function setUp() virtual public {
+        quorumNumbersRequired = hex"00";
         _deployDA();
     }
 
@@ -86,8 +87,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
         vm.store(
-            address(eigenDAThresholdRegistry),
-            bytes32(uint256(5)),
+            address(eigenDACertVerifier),
+            bytes32(uint256(0)),
             bytes32(uint256(14113))
         );
 
@@ -99,7 +100,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertSecurityParams() public {
         VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
-        SecurityThresholds memory securityThresholds = eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
+        SecurityThresholds memory securityThresholds = eigenDACertVerifier.getSecurityThresholdsV2();
         eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
         eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
     }

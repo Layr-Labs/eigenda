@@ -21,13 +21,18 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     OperatorStateRetriever public immutable operatorStateRetriever;
     IRegistryCoordinator public immutable registryCoordinator;
 
+    SecurityThresholds public securityThresholdsV2;
+    bytes public quorumNumbersRequiredV2;
+
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage _eigenDABatchMetadataStorage,
         IEigenDASignatureVerifier _eigenDASignatureVerifier,
         IEigenDARelayRegistry _eigenDARelayRegistry,
         OperatorStateRetriever _operatorStateRetriever,
-        IRegistryCoordinator _registryCoordinator
+        IRegistryCoordinator _registryCoordinator,
+        SecurityThresholds memory _securityThresholdsV2,
+        bytes memory _quorumNumbersRequiredV2
     ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDABatchMetadataStorage = _eigenDABatchMetadataStorage;
@@ -35,6 +40,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         eigenDARelayRegistry = _eigenDARelayRegistry;
         operatorStateRetriever = _operatorStateRetriever;
         registryCoordinator = _registryCoordinator;
+
+        securityThresholdsV2 = _securityThresholdsV2;
+        quorumNumbersRequiredV2 = _quorumNumbersRequiredV2;
     }
 
     ///////////////////////// V1 ///////////////////////////////
@@ -95,8 +103,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
-            getDefaultSecurityThresholdsV2(),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
+            securityThresholdsV2,
+            quorumNumbersRequiredV2
         );
     }
 
@@ -117,10 +125,20 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             registryCoordinator,
             signedBatch,
             blobInclusionInfo,
-            getDefaultSecurityThresholdsV2(),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
+            securityThresholdsV2,
+            quorumNumbersRequiredV2
         );
     }
+
+    /*
+    function verifyDACertV2ForZKProof(
+        BatchHeaderV2 calldata batchHeader,
+        BlobInclusionInfo calldata blobInclusionInfo,
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+    ) external view returns (bool) {
+        
+    }
+    */
 
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 
@@ -202,8 +220,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }
 
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() public view returns (SecurityThresholds memory) {
-        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
+    /// @notice Gets the security thresholds for V2 cert verification
+    function getSecurityThresholdsV2() public view returns (SecurityThresholds memory) {
+        return securityThresholdsV2;
+    }
+
+    /// @notice Gets the quorum numbers required for V2 cert verification
+    function getQuorumNumbersRequiredV2() public view returns (bytes memory) {
+        return quorumNumbersRequiredV2;
     }
 }
