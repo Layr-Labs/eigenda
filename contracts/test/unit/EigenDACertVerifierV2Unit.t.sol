@@ -146,7 +146,11 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertSecurityParams() public {
         VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
-        SecurityThresholds memory securityThresholds = eigenDACertVerifier.getSecurityThresholdsV2();
+        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDACertVerifier.securityThresholdsV2();
+        SecurityThresholds memory securityThresholds = SecurityThresholds({
+            confirmationThreshold: confirmationThreshold,
+            adversaryThreshold: adversaryThreshold
+        });
         eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
         eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
     }

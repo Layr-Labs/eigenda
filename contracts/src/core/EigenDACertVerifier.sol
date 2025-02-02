@@ -11,6 +11,11 @@ import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordi
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
+/**
+ * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates 
+ * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
+ *         to change these values or verification behavior a new CertVerifier must be deployed
+ */
 contract EigenDACertVerifier is IEigenDACertVerifier {
 
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
@@ -41,7 +46,10 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         operatorStateRetriever = _operatorStateRetriever;
         registryCoordinator = _registryCoordinator;
 
+        // confirmation and adversary signing thresholds that must be met for all quorums in a V2 certificate
         securityThresholdsV2 = _securityThresholdsV2;
+
+        // quorum numbers that must be validated in a V2 certificate
         quorumNumbersRequiredV2 = _quorumNumbersRequiredV2;
     }
 
@@ -86,7 +94,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V2 ///////////////////////////////
 
     /**
-     * @notice Verifies a blob cert for the set required quorums with the set security thresholds
+     * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
@@ -109,7 +117,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies a blob cert for the set required quorums with the set security thresholds
+     * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
      * @param signedBatch The signed batch to verify the blob cert against
      * @param blobInclusionInfo The inclusion proof for the blob cert
      */
@@ -131,7 +139,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies a blob cert for the set required quorums with the set security thresholds and returns a boolean
+     * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
+     * @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel) 
+     *      currently has a limitation that it can only create zk proofs for functions that return a value
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
@@ -235,15 +245,5 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
-    }
-
-    /// @notice Gets the security thresholds for V2 cert verification
-    function getSecurityThresholdsV2() public view returns (SecurityThresholds memory) {
-        return securityThresholdsV2;
-    }
-
-    /// @notice Gets the quorum numbers required for V2 cert verification
-    function getQuorumNumbersRequiredV2() public view returns (bytes memory) {
-        return quorumNumbersRequiredV2;
     }
 }
