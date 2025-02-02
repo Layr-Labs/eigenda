@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+const GlobalPrefix = "EIGENDA_PROXY"
+
+func PrefixEnvVar(prefix, suffix string) []string {
+	return []string{prefix + "_" + suffix}
+}
+
 // Helper utility functions //
 
 func ContainsDuplicates[P comparable](s []P) bool {

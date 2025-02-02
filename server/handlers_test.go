@@ -16,12 +16,16 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
 	"github.com/Layr-Labs/eigenda/api"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+var (
+	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 )
 
 const (
@@ -94,9 +98,7 @@ func TestHandlerGet(t *testing.T) {
 			// we need to create a router through which we can pass the request.
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
-			// logger := log.NewLogger(log.NewTerminalHandler(os.Stderr, true)).With("test_name", t.Name())
-			noopLogger := log.NewLogger(log.DiscardHandler())
-			server := NewServer("localhost", 0, mockStorageMgr, noopLogger, metrics.NoopMetrics)
+			server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
 			server.registerRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -167,9 +169,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			// we need to create a router through which we can pass the request.
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
-			// logger := log.NewLogger(log.NewTerminalHandler(os.Stderr, true)).With("test_name", t.Name())
-			noopLogger := log.NewLogger(log.DiscardHandler())
-			server := NewServer("localhost", 0, mockStorageMgr, noopLogger, metrics.NoopMetrics)
+			server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
 			server.registerRoutes(r)
 			r.ServeHTTP(rec, req)
 
@@ -254,9 +254,7 @@ func TestHandlerPutErrors(t *testing.T) {
 				// we need to create a router through which we can pass the request.
 				r := mux.NewRouter()
 				// enable this logger to help debug tests
-				logger := log.NewLogger(log.NewTerminalHandler(os.Stdout, true)).With("test_name", t.Name())
-				// noopLogger := log.NewLogger(log.DiscardHandler())
-				server := NewServer("localhost", 0, mockStorageMgr, logger, metrics.NoopMetrics)
+				server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
 				server.registerRoutes(r)
 				r.ServeHTTP(rec, req)
 

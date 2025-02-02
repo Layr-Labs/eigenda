@@ -3,7 +3,7 @@ package verify
 import (
 	"encoding/binary"
 
-	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	geth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -11,7 +11,7 @@ import (
 
 // HashBatchMetadata regenerates a batch data hash
 // replicates: https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L46-L54
-func HashBatchMetadata(bh *binding.IEigenDAServiceManagerBatchHeader, sigHash [32]byte, blockNum uint32) (geth_common.Hash, error) {
+func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, blockNum uint32) (geth_common.Hash, error) {
 	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
 			Name: "blobHeadersRoot",

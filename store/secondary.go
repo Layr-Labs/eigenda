@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -42,7 +43,7 @@ type PutNotify struct {
 
 // SecondaryManager ... routing abstraction for secondary storage backends
 type SecondaryManager struct {
-	log log.Logger
+	log logging.Logger
 	m   metrics.Metricer
 
 	caches    []common.PrecomputedKeyStore
@@ -54,7 +55,7 @@ type SecondaryManager struct {
 }
 
 // NewSecondaryManager ... creates a new secondary storage manager
-func NewSecondaryManager(log log.Logger, m metrics.Metricer, caches []common.PrecomputedKeyStore, fallbacks []common.PrecomputedKeyStore) ISecondary {
+func NewSecondaryManager(log logging.Logger, m metrics.Metricer, caches []common.PrecomputedKeyStore, fallbacks []common.PrecomputedKeyStore) ISecondary {
 	return &SecondaryManager{
 		topic:      make(chan PutNotify), // channel is un-buffered which dispersing consumption across routines helps alleviate
 		log:        log,

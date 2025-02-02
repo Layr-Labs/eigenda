@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
@@ -16,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -41,7 +41,7 @@ type MemStore struct {
 	sync.RWMutex
 
 	config    Config
-	l         log.Logger
+	log       logging.Logger
 	keyStarts map[string]time.Time
 	store     map[string][]byte
 	verifier  *verify.Verifier
@@ -54,10 +54,10 @@ var _ common.GeneratedKeyStore = (*MemStore)(nil)
 
 // New ... constructor
 func New(
-	ctx context.Context, verifier *verify.Verifier, l log.Logger, config Config,
+	ctx context.Context, verifier *verify.Verifier, log logging.Logger, config Config,
 ) (*MemStore, error) {
 	store := &MemStore{
-		l:         l,
+		log:       log,
 		config:    config,
 		keyStarts: make(map[string]time.Time),
 		store:     make(map[string][]byte),
@@ -66,7 +66,7 @@ func New(
 	}
 
 	if store.config.BlobExpiration != 0 {
-		l.Info("memstore expiration enabled", "time", store.config.BlobExpiration)
+		log.Info("memstore expiration enabled", "time", store.config.BlobExpiration)
 		go store.pruningLoop(ctx)
 	}
 
@@ -98,7 +98,7 @@ func (e *MemStore) pruneExpired() {
 			delete(e.keyStarts, commit)
 			delete(e.store, commit)
 
-			e.l.Debug("blob pruned", "commit", commit)
+			e.log.Debug("blob pruned", "commit", commit)
 		}
 	}
 }

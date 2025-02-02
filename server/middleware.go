@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // Used to capture the status code of the response, so that we can use it in middlewares.
@@ -75,7 +75,7 @@ func withMetrics(
 // TODO: implement a ResponseWriter wrapper that saves the status code: see https://github.com/golang/go/issues/18997
 func withLogging(
 	handleFn func(http.ResponseWriter, *http.Request) error,
-	log log.Logger,
+	log logging.Logger,
 ) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

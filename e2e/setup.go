@@ -18,13 +18,11 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/exp/rand"
-
-	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	opmetrics "github.com/ethereum-optimism/optimism/op-service/metrics"
 
 	miniotc "github.com/testcontainers/testcontainers-go/modules/minio"
 	redistc "github.com/testcontainers/testcontainers-go/modules/redis"
@@ -243,7 +241,7 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 	default:
 		cfg = server.CLIConfig{
 			EigenDAConfig: eigendaCfg,
-			MetricsCfg:    opmetrics.CLIConfig{},
+			MetricsCfg:    metrics.CLIConfig{},
 		}
 	}
 
@@ -252,17 +250,13 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 
 type TestSuite struct {
 	Ctx     context.Context
-	Log     log.Logger
+	Log     logging.Logger
 	Server  *server.Server
 	Metrics *metrics.EmulatedMetricer
 }
 
 func CreateTestSuite(testSuiteCfg server.CLIConfig) (TestSuite, func()) {
-	log := oplog.NewLogger(os.Stdout, oplog.CLIConfig{
-		Level:  log.LevelDebug,
-		Format: oplog.FormatLogFmt,
-		Color:  true,
-	}).New("role", svcName)
+	log := logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
 
 	m := metrics.NewEmulatedMetricer()
 	ctx := context.Background()

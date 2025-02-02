@@ -5,26 +5,35 @@ import (
 	"encoding/json"
 	"fmt"
 
+	proxy_logging "github.com/Layr-Labs/eigenda-proxy/logging"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+
 	"github.com/Layr-Labs/eigenda-proxy/flags"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
-	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 )
 
 func StartProxySvr(cliCtx *cli.Context) error {
-	log := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.ReadCLIConfig(cliCtx)).New("role", "eigenda_proxy")
-	oplog.SetGlobalLogHandler(log.Handler())
+	logCfg, err := proxy_logging.ReadLoggerCLIConfig(cliCtx)
+	if err != nil {
+		return err
+	}
+
+	log, err := proxy_logging.NewLogger(*logCfg)
+	if err != nil {
+		return err
+	}
+
 	log.Info("Starting EigenDA Proxy Server", "version", Version, "date", Date, "commit", Commit)
 
 	cfg := server.ReadCLIConfig(cliCtx)
 	if err := cfg.Check(); err != nil {
 		return err
 	}
-	err := prettyPrintConfig(cliCtx, log)
+	err = prettyPrintConfig(cliCtx, log)
 	if err != nil {
 		return fmt.Errorf("failed to pretty print config: %w", err)
 	}
@@ -73,7 +82,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 }
 
 // TODO: we should probably just change EdaClientConfig struct definition in eigenda-client
-func prettyPrintConfig(cliCtx *cli.Context, log log.Logger) error {
+func prettyPrintConfig(cliCtx *cli.Context, log logging.Logger) error {
 	// we read a new config which we modify to hide private info in order to log the rest
 	cfg := server.ReadCLIConfig(cliCtx)
 	if cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex != "" {

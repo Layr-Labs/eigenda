@@ -9,9 +9,9 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,13 +35,13 @@ type Store struct {
 	client   *clients.EigenDAClient
 	verifier *verify.Verifier
 	cfg      *StoreConfig
-	log      log.Logger
+	log      logging.Logger
 }
 
 var _ common.GeneratedKeyStore = (*Store)(nil)
 
 func NewStore(client *clients.EigenDAClient,
-	v *verify.Verifier, log log.Logger, cfg *StoreConfig) (*Store, error) {
+	v *verify.Verifier, log logging.Logger, cfg *StoreConfig) (*Store, error) {
 	return &Store{
 		client:   client,
 		verifier: v,

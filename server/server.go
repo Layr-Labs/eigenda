@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
 
@@ -28,7 +28,7 @@ const (
 )
 
 type Server struct {
-	log        log.Logger
+	log        logging.Logger
 	endpoint   string
 	sm         store.IManager
 	m          metrics.Metricer
@@ -36,7 +36,7 @@ type Server struct {
 	listener   net.Listener
 }
 
-func NewServer(host string, port int, sm store.IManager, log log.Logger,
+func NewServer(host string, port int, sm store.IManager, log logging.Logger,
 	m metrics.Metricer) *Server {
 	endpoint := net.JoinHostPort(host, strconv.Itoa(port))
 	return &Server{

@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // TODO - create structured abstraction for dependency injection vs. overloading stateless functions
@@ -53,7 +53,7 @@ func populateTargets(targets []string, s3 common.PrecomputedKeyStore, redis *red
 }
 
 // LoadStoreManager ... creates storage backend clients and instruments them into a storage routing abstraction
-func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metrics.Metricer) (store.IManager, error) {
+func LoadStoreManager(ctx context.Context, cfg CLIConfig, log logging.Logger, m metrics.Metricer) (store.IManager, error) {
 	// create S3 backend store (if enabled)
 	var err error
 	var s3Store *s3.Store

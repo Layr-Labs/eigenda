@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/ethereum/go-ethereum/log"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // IManager ... read/write interface
@@ -20,7 +20,7 @@ type IManager interface {
 
 // Manager ... storage backend routing layer
 type Manager struct {
-	log log.Logger
+	log logging.Logger
 	// primary storage backends
 	eigenda common.GeneratedKeyStore   // ALT DA commitment type for OP mode && std commitment mode for standard /client
 	s3      common.PrecomputedKeyStore // OP commitment mode && keccak256 commitment type
@@ -30,7 +30,7 @@ type Manager struct {
 }
 
 // NewManager ... Init
-func NewManager(eigenda common.GeneratedKeyStore, s3 common.PrecomputedKeyStore, l log.Logger,
+func NewManager(eigenda common.GeneratedKeyStore, s3 common.PrecomputedKeyStore, l logging.Logger,
 	secondary ISecondary) (IManager, error) {
 	return &Manager{
 		log:       l,

@@ -6,7 +6,7 @@ import (
 
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +46,7 @@ func TestHashBatchHashedMetadata(t *testing.T) {
 func TestHashBatchMetadata(t *testing.T) {
 	testHash := crypto.Keccak256Hash([]byte("batchHeader"))
 
-	header := &binding.IEigenDAServiceManagerBatchHeader{
+	header := &binding.BatchHeader{
 		BlobHeadersRoot:       testHash,
 		QuorumNumbers:         testHash.Bytes(),
 		SignedStakeForQuorums: testHash.Bytes(),
