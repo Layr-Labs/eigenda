@@ -33,7 +33,7 @@ type ISecondary interface {
 	WriteSubscriptionLoop(ctx context.Context)
 }
 
-// PutNotify ... notification received by primary router to perform insertion across
+// PutNotify ... notification received by primary manager to perform insertion across
 // secondary storage backends
 type PutNotify struct {
 	Commitment []byte
@@ -53,7 +53,7 @@ type SecondaryManager struct {
 	concurrentWrites bool
 }
 
-// NewSecondaryManager ... creates a new secondary storage router
+// NewSecondaryManager ... creates a new secondary storage manager
 func NewSecondaryManager(log log.Logger, m metrics.Metricer, caches []common.PrecomputedKeyStore, fallbacks []common.PrecomputedKeyStore) ISecondary {
 	return &SecondaryManager{
 		topic:      make(chan PutNotify), // channel is un-buffered which dispersing consumption across routines helps alleviate
@@ -92,6 +92,7 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 	successes := 0
 
 	for _, src := range sources {
+		sm.log.Debug("Attempting to write to secondary storage", "backend", src.BackendType())
 		cb := sm.m.RecordSecondaryRequest(src.BackendType().String(), http.MethodPut)
 
 		// for added safety - we retry the insertion 5x using a default exponential backoff
@@ -115,12 +116,12 @@ func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitmen
 	return nil
 }
 
-// AsyncWriteEntry ... subscribes to put notifications posted to shared topic with primary router
+// AsyncWriteEntry ... subscribes to put notifications posted to shared topic with primary manager
 func (sm *SecondaryManager) AsyncWriteEntry() bool {
 	return sm.concurrentWrites
 }
 
-// WriteSubscriptionLoop ... subscribes to put notifications posted to shared topic with primary router
+// WriteSubscriptionLoop ... subscribes to put notifications posted to shared topic with primary manager
 func (sm *SecondaryManager) WriteSubscriptionLoop(ctx context.Context) {
 	sm.concurrentWrites = true
 

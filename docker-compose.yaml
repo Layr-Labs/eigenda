@@ -1,22 +1,82 @@
+## The following is a proxy instance 
+## pointed to redis for storage caching and S3
+## for storage failovers
+
 services:
+  ## Used as secondary read failover target
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    ## Seed test bucket
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-c", "/usr/bin/create-bucket.sh"]
+    volumes:
+      - ./scripts/create-test-s3-bucket.sh:/usr/bin/create-bucket.sh
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --requirepass redispassword
+    environment:
+      - REDIS_PASSWORD=redispassword
+    ports:
+      - "6379:6379"
+
   eigenda_proxy:
+    depends_on:
+      - minio-init
     build:
       context: .
       dockerfile: Dockerfile
     container_name: eigenda-proxy
     environment:
+      - EIGENDA_PROXY_LOG_LEVEL=debug
       - EIGENDA_PROXY_ADDR=0.0.0.0
       - EIGENDA_PROXY_PORT=4242
-      - EIGENDA_PROXY_MEMSTORE_ENABLED=false
+      ## Turn this off to talk to actual eigenda network
+      - EIGENDA_PROXY_MEMSTORE_ENABLED=true
       - EIGENDA_PROXY_MEMSTORE_EXPIRATION=45m
-      - EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX=$PRIVATE_KEY
+      - EIGENDA_PROXY_EIGENDA_CERT_VERIFICATION_DISABLED=true
+      - EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX=${PRIVATE_KEY}
       - EIGENDA_PROXY_EIGENDA_DISPERSER_RPC=disperser-holesky.eigenda.xyz:443
       - EIGENDA_PROXY_EIGENDA_SERVICE_MANAGER_ADDR=0xD4A7E1Bd8015057293f0D0A557088c286942e84b
-      - EIGENDA_PROXY_EIGENDA_ETH_RPC=$ETH_RPC
+      - EIGENDA_PROXY_EIGENDA_ETH_RPC=https://ethereum-holesky-rpc.publicnode.com
       - EIGENDA_PROXY_EIGENDA_ETH_CONFIRMATION_DEPTH=0
       - EIGENDA_PROXY_METRICS_ADDR=0.0.0.0
       - EIGENDA_PROXY_METRICS_ENABLED=true
       - EIGENDA_PROXY_METRICS_PORT=7300
+      ## S3
+      - EIGENDA_PROXY_S3_CREDENTIAL_TYPE=static
+      - EIGENDA_PROXY_S3_ACCESS_KEY_ID=minioadmin
+      - EIGENDA_PROXY_S3_ACCESS_KEY_SECRET=minioadmin
+      - EIGENDA_PROXY_S3_BUCKET=eigenda-proxy-test
+      - EIGENDA_PROXY_S3_PATH=""
+      - EIGENDA_PROXY_S3_ENDPOINT=minio:9000
+      - EIGENDA_PROXY_S3_ENABLE_TLS=false
+
+      # Redis Configuration
+      - EIGENDA_PROXY_REDIS_DB=0
+      - EIGENDA_PROXY_REDIS_ENDPOINT=redis:6379
+      - EIGENDA_PROXY_REDIS_PASSWORD=redispassword
+      - EIGENDA_PROXY_REDIS_EVICTION=24h0m0s
+
+      ## Secondary routing
+      - EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS=s3
+      - EIGENDA_PROXY_STORAGE_CACHE_TARGETS=redis
+
     ports:
       - 4242:4242
       - 7300:7300
@@ -44,14 +104,6 @@ services:
     depends_on:
       - prometheus
 
-  traffic-generator:
-    image: alpine:latest
-    build: scripts/
-    container_name: traffic_generator
-    depends_on:
-      - eigenda_proxy
-    volumes:
-      - ./scripts/:/scripts/
-
 volumes:
   grafana-data:
+  minio_data:

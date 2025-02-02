@@ -121,7 +121,7 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metr
 		return nil, err
 	}
 
-	// create secondary storage router
+	// create secondary storage manager
 	fallbacks := populateTargets(cfg.EigenDAConfig.StorageConfig.FallbackTargets, s3Store, redisStore)
 	caches := populateTargets(cfg.EigenDAConfig.StorageConfig.CacheTargets, s3Store, redisStore)
 	secondary := store.NewSecondaryManager(log, m, caches, fallbacks)
@@ -135,6 +135,10 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log log.Logger, m metr
 		}
 	}
 
-	log.Info("Creating storage router", "eigenda backend type", eigenDA != nil, "s3 backend type", s3Store != nil)
+	log.Info("Created storage backends",
+		"eigenda", eigenDA != nil,
+		"s3", s3Store != nil,
+		"redis", redisStore != nil,
+	)
 	return store.NewManager(eigenDA, s3Store, log, secondary)
 }

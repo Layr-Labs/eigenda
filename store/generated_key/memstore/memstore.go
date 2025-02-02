@@ -83,7 +83,6 @@ func (e *MemStore) pruningLoop(ctx context.Context) {
 			return
 
 		case <-timer.C:
-			e.l.Debug("pruning expired blobs")
 			e.pruneExpired()
 		}
 	}
@@ -99,7 +98,7 @@ func (e *MemStore) pruneExpired() {
 			delete(e.keyStarts, commit)
 			delete(e.store, commit)
 
-			e.l.Info("blob pruned", "commit", commit)
+			e.l.Debug("blob pruned", "commit", commit)
 		}
 	}
 }
