@@ -42,6 +42,52 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
     }
 
+    function test_verifyDACertV2ZK_True(uint256 pseudoRandomNumber) public {
+        (
+            SignedBatch memory signedBatch, 
+            BlobInclusionInfo memory blobInclusionInfo, 
+            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
+        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
+        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
+        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
+        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
+        nonSignerStakesAndSignature.sigma = nssas.sigma;
+        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
+        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
+        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
+
+        _registerRelayKeys();
+
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        assert(zk);
+    }
+
+    function test_verifyDACertV2ZK_False(uint256 pseudoRandomNumber) public {
+        (
+            SignedBatch memory signedBatch, 
+            BlobInclusionInfo memory blobInclusionInfo, 
+            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
+        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
+        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
+        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
+        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
+        nonSignerStakesAndSignature.sigma = nssas.sigma;
+        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
+        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
+        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
+
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        assert(!zk);
+    }
+
     function test_verifyDACertV2_revert_RelayKeysNotSet(uint256 pseudoRandomNumber) public {
         (
             SignedBatch memory signedBatch, 

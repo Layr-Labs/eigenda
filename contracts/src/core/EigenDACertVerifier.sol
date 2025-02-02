@@ -86,7 +86,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V2 ///////////////////////////////
 
     /**
-     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @notice Verifies a blob cert for the set required quorums with the set security thresholds
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
@@ -109,7 +109,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @notice Verifies a blob cert for the set required quorums with the set security thresholds
      * @param signedBatch The signed batch to verify the blob cert against
      * @param blobInclusionInfo The inclusion proof for the blob cert
      */
@@ -130,15 +130,32 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         );
     }
 
-    /*
+    /**
+     * @notice Verifies a blob cert for the set required quorums with the set security thresholds and returns a boolean
+     * @param batchHeader The batch header of the blob 
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     */
     function verifyDACertV2ForZKProof(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
     ) external view returns (bool) {
-        
+        try EigenDACertVerificationUtils.verifyDACertV2ForQuorumsExternal(
+            eigenDAThresholdRegistry,
+            eigenDASignatureVerifier,
+            eigenDARelayRegistry,
+            batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            securityThresholdsV2,
+            quorumNumbersRequiredV2
+        ) {
+            return true;
+        } catch {
+            return false;
+        }
     }
-    */
 
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 

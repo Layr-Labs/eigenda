@@ -223,6 +223,28 @@ library EigenDACertVerificationUtils {
         );
     }
 
+    function verifyDACertV2ForQuorumsExternal(
+        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier _signatureVerifier,
+        IEigenDARelayRegistry _eigenDARelayRegistry,
+        BatchHeaderV2 memory _batchHeader,
+        BlobInclusionInfo memory _blobInclusionInfo,
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature,
+        SecurityThresholds memory _securityThresholds,
+        bytes memory _requiredQuorumNumbers
+    ) external view {
+        EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
+            _eigenDAThresholdRegistry,
+            _signatureVerifier,
+            _eigenDARelayRegistry,
+            _batchHeader,
+            _blobInclusionInfo,
+            _nonSignerStakesAndSignature,
+            _securityThresholds,
+            _requiredQuorumNumbers
+        );
+    }
+
     function _verifyDACertV2ForQuorumsForThresholds(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
