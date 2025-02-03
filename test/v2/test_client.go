@@ -339,8 +339,8 @@ func (c *TestClient) VerifyBlobCertification(
 
 	// TODO (cody-littley) enable this once it is properly working
 	// On-chain verification
-	//err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
-	//require.NoError(c.t, err)
+	err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
+	require.NoError(c.t, err)
 }
 
 // ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.
