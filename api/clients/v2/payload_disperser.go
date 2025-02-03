@@ -41,10 +41,20 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 		return nil, fmt.Errorf("new local blob request signer: %w", err)
 	}
 
-	// 2 - create prover
-	kzgProver, err := prover.NewProver(kzgConfig, encoderCfg)
-	if err != nil {
-		return nil, fmt.Errorf("new kzg prover: %w", err)
+	// 2 - create prover (if applicable)
+	
+	var kzgProver *prover.Prover
+	if kzgConfig != nil {
+		if encoderCfg == nil {
+			encoderCfg = encoding.DefaultConfig()
+		}
+
+		kzgProver, err = prover.NewProver(kzgConfig, encoderCfg)
+		if err != nil {
+			return nil, fmt.Errorf("new kzg prover: %w", err)
+		}
+	} else {
+		log.Warn("No prover provided, using disperser for blob commitment generation")
 	}
 
 	// 3 - create disperser client & set accountant to nil
