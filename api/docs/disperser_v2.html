@@ -310,8 +310,11 @@ The order of the quorum_apks should match the order of the quorum_numbers </p></
                   <td>quorum_signed_percentages</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The attestation rate for each quorum.
-The order of the quorum_signed_percentages should match the order of the quorum_numbers </p></td>
+                  <td><p>The attestation rate for each quorum. Each quorum&#39;s signing percentage is represented by
+an 8 byte unsigned integer in big endian format. The integer is the fraction of the quorum that has signed, with
+100 representing 100% of the quorum signing, and 0 representing 0% of the quorum signing. The first
+byte in the byte array corresponds to the first quorum in the quorum_numbers array, the second byte
+corresponds to the second quorum, and so on. </p></td>
                 </tr>
               
             </tbody>

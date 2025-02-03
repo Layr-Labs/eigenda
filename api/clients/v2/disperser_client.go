@@ -205,8 +205,6 @@ func (c *disperserClient) DisperseBlob(
 		BlobHeader: blobHeaderProto,
 	}
 
-	fmt.Printf("request: %v\n", request) // TODO
-
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)

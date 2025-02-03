@@ -763,8 +763,11 @@ type Attestation struct {
 	Sigma []byte `protobuf:"bytes,4,opt,name=sigma,proto3" json:"sigma,omitempty"`
 	// Relevant quorum numbers for the attestation
 	QuorumNumbers []uint32 `protobuf:"varint,5,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// The attestation rate for each quorum.
-	// The order of the quorum_signed_percentages should match the order of the quorum_numbers
+	// The attestation rate for each quorum. Each quorum's signing percentage is represented by
+	// an 8 byte unsigned integer in big endian format. The integer is the fraction of the quorum that has signed, with
+	// 100 representing 100% of the quorum signing, and 0 representing 0% of the quorum signing. The first
+	// byte in the byte array corresponds to the first quorum in the quorum_numbers array, the second byte
+	// corresponds to the second quorum, and so on.
 	QuorumSignedPercentages []byte `protobuf:"bytes,6,opt,name=quorum_signed_percentages,json=quorumSignedPercentages,proto3" json:"quorum_signed_percentages,omitempty"`
 }
 
