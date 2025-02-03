@@ -26,6 +26,7 @@ var (
 		EthRPCURLs:                    []string{"https://ethereum-holesky-rpc.publicnode.com"},
 		BLSOperatorStateRetrieverAddr: "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
 		EigenDAServiceManagerAddr:     "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
+		EigenDACertVerifierAddress:    "0x5c33Ce64EE04400fD593F960d63336F1B65bF77B",
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
 		SRSOrder:                      268435456,
 		SRSNumberToLoad:               2097152,
@@ -245,7 +246,6 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength]
 
-	//require.Equal(t, calculateExpectedPaddedSize(dataLength), len(paddedPayload))
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
 }
@@ -257,7 +257,6 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength+1]
 
-	//require.Equal(t, calculateExpectedPaddedSize(dataLength), len(paddedPayload))
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob size cannot exceed"))

@@ -57,6 +57,7 @@ type TestClientConfig struct {
 	EthRPCURLs                    []string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDACertVerifierAddress    string
 	SubgraphURL                   string
 	SRSOrder                      uint64
 	SRSNumberToLoad               uint64
@@ -192,7 +193,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	}
 	gethClient, err := geth.NewClient(gethClientConfig, gethcommon.Address{}, 0, logger)
 	require.NoError(t, err)
-	certVerifier, err := verification.NewCertVerifier(*gethClient, config.EigenDAServiceManagerAddr)
+	certVerifier, err := verification.NewCertVerifier(*gethClient, config.EigenDACertVerifierAddress)
 	require.NoError(t, err)
 
 	return &TestClient{
