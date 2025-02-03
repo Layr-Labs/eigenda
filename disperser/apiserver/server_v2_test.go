@@ -264,7 +264,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Signature:  sig,
 		BlobHeader: invalidReqProto,
 	})
-	assert.ErrorContains(t, err, "invalid blob commitment")
+	assert.ErrorContains(t, err, "is less than blob length")
 
 	// request with blob size exceeding the limit
 	data = make([]byte, 321)
@@ -518,7 +518,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		meterer,
 		auth.NewAuthenticator(),
 		prover,
-		1034,
+		10,
 		time.Hour,
 		logger,
 		prometheus.NewRegistry(),
@@ -601,7 +601,7 @@ func TestTooShortCommitment(t *testing.T) {
 
 	c := newTestServerV2(t)
 	ctx := peer.NewContext(context.Background(), c.Peer)
-	data := rand.VariableBytes(1024, 4096)
+	data := rand.VariableBytes(2, 100)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
 
