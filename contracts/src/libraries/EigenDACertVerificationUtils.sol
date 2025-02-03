@@ -167,7 +167,8 @@ library EigenDACertVerificationUtils {
         BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
+        bytes memory requiredQuorumNumbers,
+        bytes memory signedQuorumNumbers
     ) internal view {
         require(
             Merkle.verifyInclusionKeccak(
@@ -184,7 +185,7 @@ library EigenDACertVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
+            signedQuorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
@@ -201,7 +202,7 @@ library EigenDACertVerificationUtils {
 
         uint256 confirmedQuorumsBitmap;
 
-        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+        for (uint i = 0; i < signedQuorumNumbers.length; i++) {
             require(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >= 
                 quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold,
@@ -210,16 +211,24 @@ library EigenDACertVerificationUtils {
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(signedQuorumNumbers[i])
             );
         }
 
         require(
             BitmapUtils.isSubsetOf(
-                BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
+                BitmapUtils.orderedBytesArrayToBitmap(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers),
                 confirmedQuorumsBitmap
             ),
-            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: blob quorums are not a subset of the confirmed quorums"
+        );
+
+        require(
+            BitmapUtils.isSubsetOf(
+                BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
+                BitmapUtils.orderedBytesArrayToBitmap(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers)  
+            ),
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the blob quorums"
         );
     }
 
@@ -232,7 +241,8 @@ library EigenDACertVerificationUtils {
         BlobInclusionInfo memory _blobInclusionInfo,
         NonSignerStakesAndSignature memory _nonSignerStakesAndSignature,
         SecurityThresholds memory _securityThresholds,
-        bytes memory _requiredQuorumNumbers
+        bytes memory _requiredQuorumNumbers,
+        bytes memory _signedQuorumNumbers
     ) external view {
         EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
             _eigenDAThresholdRegistry,
@@ -242,7 +252,8 @@ library EigenDACertVerificationUtils {
             _blobInclusionInfo,
             _nonSignerStakesAndSignature,
             _securityThresholds,
-            _requiredQuorumNumbers
+            _requiredQuorumNumbers,
+            _signedQuorumNumbers
         );
     }
 
@@ -254,7 +265,8 @@ library EigenDACertVerificationUtils {
         BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         SecurityThresholds[] memory securityThresholds,
-        bytes memory requiredQuorumNumbers
+        bytes memory requiredQuorumNumbers,
+        bytes memory signedQuorumNumbers
     ) internal view {
         require(
             securityThresholds.length == blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length,
@@ -276,7 +288,7 @@ library EigenDACertVerificationUtils {
             bytes32 signatoryRecordHash
         ) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers,
+            signedQuorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature
         );
@@ -289,7 +301,7 @@ library EigenDACertVerificationUtils {
         uint256 confirmedQuorumsBitmap;
         VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version);
 
-        for (uint i = 0; i < blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers.length; i++) {
+        for (uint i = 0; i < signedQuorumNumbers.length; i++) {
             _verifyDACertSecurityParams(
                 blobParams,
                 securityThresholds[i]
@@ -303,16 +315,24 @@ library EigenDACertVerificationUtils {
 
             confirmedQuorumsBitmap = BitmapUtils.setBit(
                 confirmedQuorumsBitmap, 
-                uint8(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers[i])
+                uint8(signedQuorumNumbers[i])
             );
         }
 
         require(
             BitmapUtils.isSubsetOf(
-                BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
+                BitmapUtils.orderedBytesArrayToBitmap(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers),
                 confirmedQuorumsBitmap
             ),
-            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: blob quorums are not a subset of the confirmed quorums"
+        );
+
+        require(
+            BitmapUtils.isSubsetOf(
+                BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
+                BitmapUtils.orderedBytesArrayToBitmap(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers)  
+            ),
+            "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the blob quorums"
         );
     }
 
@@ -327,7 +347,10 @@ library EigenDACertVerificationUtils {
         SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
+        (
+            NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+            bytes memory signedQuorumNumbers
+        ) = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
             signedBatch
@@ -341,7 +364,8 @@ library EigenDACertVerificationUtils {
             blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
-            requiredQuorumNumbers
+            requiredQuorumNumbers,
+            signedQuorumNumbers
         );
     }
 
@@ -356,7 +380,10 @@ library EigenDACertVerificationUtils {
         SecurityThresholds[] memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
+        (
+            NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+            bytes memory signedQuorumNumbers
+        ) = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
             signedBatch
@@ -370,7 +397,8 @@ library EigenDACertVerificationUtils {
             blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholds,
-            requiredQuorumNumbers
+            requiredQuorumNumbers,
+            signedQuorumNumbers
         );
     }
 
@@ -378,21 +406,20 @@ library EigenDACertVerificationUtils {
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch
-    ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature) {
+    ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](signedBatch.attestation.nonSignerPubkeys.length);
         for (uint i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {
             nonSignerOperatorIds[i] = BN254.hashG1Point(signedBatch.attestation.nonSignerPubkeys[i]);
         }
 
-        bytes memory quorumNumbers;
         for (uint i = 0; i < signedBatch.attestation.quorumNumbers.length; ++i) {
-            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
+            signedQuorumNumbers = abi.encodePacked(signedQuorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
         OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever.getCheckSignaturesIndices(
             registryCoordinator,
             signedBatch.batchHeader.referenceBlockNumber,
-            quorumNumbers,
+            signedQuorumNumbers,
             nonSignerOperatorIds
         );
 
