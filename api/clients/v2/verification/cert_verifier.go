@@ -33,11 +33,11 @@ type ICertVerifier interface {
 //
 // The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol
 type CertVerifier struct {
+	logger logging.Logger
 	// go binding around the EigenDACertVerifier ethereum contract
 	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
 	ethClient          geth.EthClient
 	pollInterval       time.Duration
-	logger             logging.Logger
 }
 
 var _ ICertVerifier = &CertVerifier{}
