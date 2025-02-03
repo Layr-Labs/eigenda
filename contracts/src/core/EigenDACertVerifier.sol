@@ -170,16 +170,39 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 
     /**
-     * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
+     * @notice Returns the nonSignerStakesAndSignature for a given signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
     ) external view returns (NonSignerStakesAndSignature memory) {
+        bytes memory quorumNumbers;
+        for (uint i = 0; i < signedBatch.attestation.quorumNumbers.length; ++i) {
+            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
+        }
+    
         return EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
             operatorStateRetriever, 
             registryCoordinator, 
-            signedBatch
+            signedBatch,
+            quorumNumbers
+        );
+    }
+
+    /**
+     * @notice Returns the nonSignerStakesAndSignature for a given signed batch with specific quorum numbers
+     * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
+     * @param quorumNumbers The quorum numbers to get the nonSignerStakesAndSignature for
+     */
+    function getNonSignerStakesAndSignature(
+        SignedBatch calldata signedBatch,
+        bytes memory quorumNumbers
+    ) external view returns (NonSignerStakesAndSignature memory) {
+        return EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever, 
+            registryCoordinator, 
+            signedBatch,
+            quorumNumbers
         );
     }
 

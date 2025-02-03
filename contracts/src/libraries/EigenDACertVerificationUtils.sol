@@ -330,7 +330,8 @@ library EigenDACertVerificationUtils {
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
-            signedBatch
+            signedBatch,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
         );
 
         _verifyDACertV2ForQuorums(
@@ -359,7 +360,8 @@ library EigenDACertVerificationUtils {
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature = _getNonSignerStakesAndSignature(
             operatorStateRetriever,
             registryCoordinator,
-            signedBatch
+            signedBatch,
+            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
         );
 
         _verifyDACertV2ForQuorumsForThresholds(
@@ -377,16 +379,12 @@ library EigenDACertVerificationUtils {
     function _getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        SignedBatch memory signedBatch
+        SignedBatch memory signedBatch,
+        bytes memory quorumNumbers
     ) internal view returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature) {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](signedBatch.attestation.nonSignerPubkeys.length);
         for (uint i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {
             nonSignerOperatorIds[i] = BN254.hashG1Point(signedBatch.attestation.nonSignerPubkeys[i]);
-        }
-
-        bytes memory quorumNumbers;
-        for (uint i = 0; i < signedBatch.attestation.quorumNumbers.length; ++i) {
-            quorumNumbers = abi.encodePacked(quorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
         OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever.getCheckSignaturesIndices(
