@@ -132,7 +132,7 @@ definitions:
         - $ref: '#/definitions/core.G2Point'
         description: APKG2 is the aggregate public key of all signers
       attestedAt:
-        description: AttestedAt is the time the attestation was made
+        description: AttestedAt is the time the attestation was made in nanoseconds
         type: integer
       batchRoot:
         description: BatchRoot is the root of a Merkle tree whose leaves are the keys
@@ -160,7 +160,8 @@ definitions:
       quorumResults:
         additionalProperties:
           type: integer
-        description: QuorumResults contains the results of the quorum verification
+        description: QuorumResults contains the operators' total signing percentage
+          of the quorum
         type: object
       referenceBlockNumber:
         description: ReferenceBlockNumber is the block number at which all operator
@@ -255,9 +256,9 @@ definitions:
     x-enum-varnames:
     - Queued
     - Encoded
-    - Certified
+    - GatheringSignatures
+    - Complete
     - Failed
-    - InsufficientSignatures
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
       attestation:
@@ -377,7 +378,7 @@ definitions:
         type: integer
       requestedAt:
         description: RequestedAt is the Unix timestamp of when the blob was requested
-          in seconds
+          in nanoseconds
         type: integer
       signature:
         items:

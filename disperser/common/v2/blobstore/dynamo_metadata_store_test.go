@@ -201,7 +201,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	metadata2 := &v2.BlobMetadata{
 		BlobHeader: blobHeader2,
 		Signature:  []byte{4, 5, 6},
-		BlobStatus: v2.Certified,
+		BlobStatus: v2.Complete,
 		Expiry:     uint64(now.Add(time.Hour).Unix()),
 		NumRetries: 0,
 		UpdatedAt:  uint64(now.UnixNano()),
@@ -227,10 +227,10 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queued, 0)
 
-	certified, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Certified, 0)
+	complete, err := blobMetadataStore.GetBlobMetadataByStatus(ctx, v2.Complete, 0)
 	assert.NoError(t, err)
-	assert.Len(t, certified, 1)
-	assert.Equal(t, metadata2, certified[0])
+	assert.Len(t, complete, 1)
+	assert.Equal(t, metadata2, complete[0])
 
 	queuedCount, err := blobMetadataStore.GetBlobMetadataCountByStatus(ctx, v2.Queued)
 	assert.NoError(t, err)
@@ -914,7 +914,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Update the blob status to invalid status
-	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
+	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Complete)
 	assert.ErrorIs(t, err, blobstore.ErrInvalidStateTransition)
 
 	// Update the blob status to a valid status

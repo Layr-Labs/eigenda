@@ -46,3 +46,26 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 
 	return data, nil
 }
+
+// CreateCodec creates a new BlobCodec based on the defined polynomial form of payloads, and the desired
+// BlobEncodingVersion
+func CreateCodec(payloadPolynomialForm PolynomialForm, version BlobEncodingVersion) (BlobCodec, error) {
+	lowLevelCodec, err := BlobEncodingVersionToCodec(version)
+	if err != nil {
+		return nil, fmt.Errorf("create low level codec: %w", err)
+	}
+
+	switch payloadPolynomialForm {
+	case PolynomialFormCoeff:
+		// Data must NOT be IFFTed during blob construction, since the payload is already in PolynomialFormCoeff after
+		// being encoded.
+		return NewNoIFFTCodec(lowLevelCodec), nil
+	case PolynomialFormEval:
+		// Data MUST be IFFTed during blob construction, since the payload is in PolynomialFormEval after being encoded,
+		// but must be in PolynomialFormCoeff to produce a valid blob.
+		return NewIFFTCodec(lowLevelCodec), nil
+	default:
+		return nil, fmt.Errorf("unsupported polynomial form: %d", payloadPolynomialForm)
+	}
+
+}

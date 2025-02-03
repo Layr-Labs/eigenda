@@ -185,6 +185,9 @@ type (
 		V2DispersalSocket string `json:"v2_dispersal_socket"`
 		V2DispersalOnline bool   `json:"v2_dispersal_online"`
 		V2DispersalStatus string `json:"v2_dispersal_status"`
+		V2RetrievalSocket string `json:"v2_retrieval_socket"`
+		V2RetrievalOnline bool   `json:"v2_retrieval_online"`
+		V2RetrievalStatus string `json:"v2_retrieval_status"`
 	}
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`

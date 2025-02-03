@@ -310,8 +310,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 hex"212121",
                 hex"373737",
                 hex"0001",
-                versionedBlobParams,
-                defaultSecurityThresholds
+                versionedBlobParams
             )
         );
 
@@ -323,7 +322,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IEigenDARelayRegistry(address(eigenDARelayRegistry)),
             OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator))
+            IRegistryCoordinator(address(registryCoordinator)),
+            defaultSecurityThresholds,
+            hex"0001"
         );
 
         eigenDARelayRegistryImplementation = new EigenDARelayRegistry();

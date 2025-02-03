@@ -346,6 +346,8 @@ type OperatorVars struct {
 
 	NODE_V2_DISPERSAL_PORT string
 
+	NODE_V2_RETRIEVAL_PORT string
+
 	NODE_ENABLE_METRICS string
 
 	NODE_METRICS_PORT string

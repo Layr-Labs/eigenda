@@ -92,11 +92,11 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 	}
 
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-	retrievalSocket := operatorSocket.GetRetrievalSocket()
-	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-	retrievalOnline, retrievalStatus := false, "port closed or unreachable"
-	if retrievalPortOpen {
-		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
+	v1RetrievalSocket := operatorSocket.GetV1RetrievalSocket()
+	v1RetrievalPortOpen := checkIsOperatorPortOpen(v1RetrievalSocket, 3, oh.logger)
+	v1RetrievalOnline, v1RetrievalStatus := false, "port closed or unreachable"
+	if v1RetrievalPortOpen {
+		v1RetrievalOnline, v1RetrievalStatus = checkServiceOnline(ctx, "node.Retrieval", v1RetrievalSocket, 3*time.Second)
 	}
 
 	v1DispersalSocket := operatorSocket.GetV1DispersalSocket()
@@ -119,6 +119,19 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 		}
 	}
 
+	v2RetrievalOnline, v2RetrievalStatus := false, ""
+	v2RetrievalSocket := operatorSocket.GetV2RetrievalSocket()
+	if v2RetrievalSocket == "" {
+		v2RetrievalStatus = "v2 retrieval port is not registered"
+	} else {
+		v2RetrievalPortOpen := checkIsOperatorPortOpen(v2RetrievalSocket, 3, oh.logger)
+		if !v2RetrievalPortOpen {
+			v2RetrievalStatus = "port closed or unreachable"
+		} else {
+			v2RetrievalOnline, v2RetrievalStatus = checkServiceOnline(ctx, "node.v2.Retrieval", v2RetrievalSocket, 3*time.Second)
+		}
+	}
+
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
 		OperatorId:        operatorId,
@@ -128,9 +141,12 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 		V2DispersalSocket: v2DispersalSocket,
 		V2DispersalOnline: v2DispersalOnline,
 		V2DispersalStatus: v2DispersalStatus,
-		RetrievalSocket:   retrievalSocket,
-		RetrievalOnline:   retrievalOnline,
-		RetrievalStatus:   retrievalStatus,
+		RetrievalSocket:   v1RetrievalSocket,
+		RetrievalOnline:   v1RetrievalOnline,
+		RetrievalStatus:   v1RetrievalStatus,
+		V2RetrievalSocket: v2RetrievalSocket,
+		V2RetrievalOnline: v2RetrievalOnline,
+		V2RetrievalStatus: v2RetrievalStatus,
 	}
 
 	// Log the online status

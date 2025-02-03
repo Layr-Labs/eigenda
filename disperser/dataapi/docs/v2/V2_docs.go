@@ -789,7 +789,7 @@ const docTemplateV2 = `{
                     ]
                 },
                 "attestedAt": {
-                    "description": "AttestedAt is the time the attestation was made",
+                    "description": "AttestedAt is the time the attestation was made in nanoseconds",
                     "type": "integer"
                 },
                 "batchRoot": {
@@ -821,7 +821,7 @@ const docTemplateV2 = `{
                     }
                 },
                 "quorumResults": {
-                    "description": "QuorumResults contains the results of the quorum verification",
+                    "description": "QuorumResults contains the operators' total signing percentage of the quorum",
                     "type": "object",
                     "additionalProperties": {
                         "type": "integer"
@@ -952,9 +952,9 @@ const docTemplateV2 = `{
             "x-enum-varnames": [
                 "Queued",
                 "Encoded",
-                "Certified",
-                "Failed",
-                "InsufficientSignatures"
+                "GatheringSignatures",
+                "Complete",
+                "Failed"
             ]
         },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
@@ -1137,7 +1137,7 @@ const docTemplateV2 = `{
                     "type": "integer"
                 },
                 "requestedAt": {
-                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in seconds",
+                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds",
                     "type": "integer"
                 },
                 "signature": {
