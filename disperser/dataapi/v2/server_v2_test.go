@@ -20,6 +20,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
@@ -36,6 +37,7 @@ import (
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -59,6 +61,8 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
@@ -69,6 +73,8 @@ var (
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
+
+	dynamoClient dynamodb.Client
 
 	mockLogger        = testutils.GetLogger()
 	blobstore         = inmem.NewBlobStore()
@@ -185,7 +191,6 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
-	metadataTableName := fmt.Sprintf("test-BlobMetadata-%v", uuid.New())
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
@@ -193,7 +198,7 @@ func setup(m *testing.M) {
 	}
 
 	// Create BlobMetadataStore
-	dynamoClient, err := dynamodb.NewClient(cfg, logger)
+	dynamoClient, err = dynamodb.NewClient(cfg, logger)
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
@@ -302,6 +307,12 @@ func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKe
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
 	require.NoError(t, err)
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
+}
+
+func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
+	assert.NoError(t, err)
+	assert.Len(t, failed, 0)
 }
 
 func TestFetchBlobHandlerV2(t *testing.T) {
@@ -634,6 +645,11 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	}
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
+	dk := commondynamodb.Key{
+		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+	}
+	defer deleteItems(t, []commondynamodb.Key{dk})
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
 
@@ -658,11 +674,14 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
 			ReferenceBlockNumber: uint64(i + 1),
 		}
+		bhh, err := batchHeaders[i].Hash()
+		require.NoError(t, err)
 		keyPair, err := core.GenRandomBlsKeys()
 		assert.NoError(t, err)
 		apk := keyPair.GetPubKeyG2()
@@ -689,8 +708,13 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 			},
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
 	}
+	defer deleteItems(t, dynamoKeys)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeedHandler)
 
@@ -1006,11 +1030,19 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
+		bhh, err := attestation.BatchHeader.Hash()
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
 	}
+	defer deleteItems(t, dynamoKeys)
 
 	/*
 		Resulting Operator SigningInfo (for block range [1, 5]
