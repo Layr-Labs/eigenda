@@ -126,7 +126,11 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	return nil
 }
 
-func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
+func (s *DispersalServerV2) validateDispersalRequest(
+	ctx context.Context,
+	req *pb.DisperseBlobRequest,
+	onchainState *OnchainState) error {
+
 	signature := req.GetSignature()
 	if len(signature) != 65 {
 		return fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
@@ -152,6 +156,10 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	commitmentLength := blobHeaderProto.GetCommitment().GetLength()
 	if commitmentLength == 0 || commitmentLength != encoding.NextPowerOf2(commitmentLength) {
 		return errors.New("invalid commitment length, must be a power of 2")
+	}
+	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
+	if lengthPowerOf2 > uint(commitmentLength) {
+		return fmt.Errorf("commitment length %d is less than blob length %d", commitmentLength, lengthPowerOf2)
 	}
 
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
