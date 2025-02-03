@@ -48,10 +48,12 @@ const (
 	BlobStatus_QUEUED BlobStatus = 1
 	// ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
 	BlobStatus_ENCODED BlobStatus = 2
-	// GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,requesting for signatures.
+	// GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,
+	// and in doing so requesting that the validators sign to acknowledge receipt of the blob.
 	// Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser,
 	// after which the BlobStatus becomes COMPLETE.
-	// This status is not currently implemented, and is a placeholder for future functionality.
+	//
+	// Note: this status is not currently implemented, and is a placeholder for future functionality.
 	BlobStatus_GATHERING_SIGNATURES BlobStatus = 3
 	// COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed.
 	// This status does not guarantee any signer percentage, so a client should check that the signature has met

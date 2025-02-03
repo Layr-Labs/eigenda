@@ -264,6 +264,8 @@ func (c *TestClient) WaitForCertification(
 			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
 			require.NoError(c.t, err)
 
+			fmt.Printf("reply: %v\n", reply) // TODO
+
 			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
 				totalElapsed := time.Since(start)
@@ -336,7 +338,7 @@ func (c *TestClient) VerifyBlobCertification(
 
 	// TODO (cody-littley) verify signed percentages by parsing byte array
 
-	// TODO (cody-littley) enable this once it is properly working
+	// TODO This currently does not pass!
 	// On-chain verification
 	err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
 	require.NoError(c.t, err)
