@@ -166,7 +166,9 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 			continue
 		}
 		if !valid {
-			pr.logger.Warn("cert is invalid", "blobKey", blobKey.Hex(), "quorumID", quorumID)
+			pr.logger.Warn(
+				"generated commitment doesn't match cert commitment",
+				"blobKey", blobKey.Hex(), "quorumID", quorumID)
 			continue
 		}
 
