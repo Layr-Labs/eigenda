@@ -68,7 +68,7 @@ type ValidatorPayloadRetrieverConfig struct {
 	// The address of the EigenDAServiceManager contract
 	EigenDAServiceManagerAddr string
 
-	// The number of simultaneous connections to use when fetching chunks during validtor retrieval
+	// The number of simultaneous connections to use when fetching chunks during validator retrieval
 	ConnectionCount uint
 }
 
@@ -114,11 +114,11 @@ func getDefaultPayloadClientConfig() *PayloadClientConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
 
@@ -153,11 +153,11 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
@@ -187,11 +187,11 @@ func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfi
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
@@ -230,11 +230,11 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 	err := dc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
