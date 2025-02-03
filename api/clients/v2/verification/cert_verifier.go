@@ -3,10 +3,8 @@ package verification
 import (
 	"context"
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/common/geth"
-
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -57,7 +55,7 @@ func NewCertVerifier(
 	}, nil
 }
 
-// VerifyCertV2FromSignedBatch calls the verifyCertV2FromSignedBatch view function on the EigenDACertVerifier contract
+// VerifyCertV2FromSignedBatch calls the verifyDACertV2FromSignedBatch view function on the EigenDACertVerifier contract
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2FromSignedBatch(

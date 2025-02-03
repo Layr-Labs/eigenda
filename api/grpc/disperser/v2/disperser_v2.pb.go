@@ -48,10 +48,12 @@ const (
 	BlobStatus_QUEUED BlobStatus = 1
 	// ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
 	BlobStatus_ENCODED BlobStatus = 2
-	// GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,requesting for signatures.
+	// GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,
+	// and in doing so requesting that the validators sign to acknowledge receipt of the blob.
 	// Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser,
 	// after which the BlobStatus becomes COMPLETE.
-	// This status is not currently implemented, and is a placeholder for future functionality.
+	//
+	// Note: this status is not currently implemented, and is a placeholder for future functionality.
 	BlobStatus_GATHERING_SIGNATURES BlobStatus = 3
 	// COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed.
 	// This status does not guarantee any signer percentage, so a client should check that the signature has met
@@ -761,8 +763,11 @@ type Attestation struct {
 	Sigma []byte `protobuf:"bytes,4,opt,name=sigma,proto3" json:"sigma,omitempty"`
 	// Relevant quorum numbers for the attestation
 	QuorumNumbers []uint32 `protobuf:"varint,5,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// The attestation rate for each quorum.
-	// The order of the quorum_signed_percentages should match the order of the quorum_numbers
+	// The attestation rate for each quorum. Each quorum's signing percentage is represented by
+	// an 8 bit unsigned integer. The integer is the fraction of the quorum that has signed, with
+	// 100 representing 100% of the quorum signing, and 0 representing 0% of the quorum signing. The first
+	// byte in the byte array corresponds to the first quorum in the quorum_numbers array, the second byte
+	// corresponds to the second quorum, and so on.
 	QuorumSignedPercentages []byte `protobuf:"bytes,6,opt,name=quorum_signed_percentages,json=quorumSignedPercentages,proto3" json:"quorum_signed_percentages,omitempty"`
 }
 

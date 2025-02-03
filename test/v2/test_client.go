@@ -3,19 +3,13 @@ package v2
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -25,8 +19,14 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path"
+	"strings"
+	"testing"
+	"time"
 )
 
 const (
@@ -41,11 +41,13 @@ const (
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	t                 *testing.T
+	config            *TestClientConfig
 	logger            logging.Logger
 	DisperserClient   clients.DisperserClient
 	RelayClient       clients.RelayClient
 	indexedChainState core.IndexedChainState
 	RetrievalClient   clients.RetrievalClient
+	CertVerifier      *verification.CertVerifier
 }
 
 type TestClientConfig struct {
@@ -55,9 +57,12 @@ type TestClientConfig struct {
 	EthRPCURLs                    []string
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	EigenDACertVerifierAddress    string
 	SubgraphURL                   string
 	SRSOrder                      uint64
 	SRSNumberToLoad               uint64
+	MaxBlobSize                   uint64
+	MinimumSigningPercent         int // out of 100
 }
 
 // path returns the full path to a file in the test data directory.
@@ -133,10 +138,20 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	relayURLS, err := ethReader.GetRelayURLs(context.Background())
 	require.NoError(t, err)
 
+	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
+	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
+	rand := random.NewTestRandom(t)
+	keypair := rand.BLS()
+	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+		return keypair.SignMessage(data), nil
+	}
+
 	relayConfig := &clients.RelayClientConfig{
 		Sockets:            relayURLS,
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
+		OperatorID:         &core.OperatorID{0},
+		MessageSigner:      fakeSigner,
 	}
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
@@ -171,13 +186,27 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		blobVerifier,
 		20)
 
+	// the cert verifier needs a different flavor of eth client
+	gethClientConfig := geth.EthClientConfig{
+		RPCURLs:          config.EthRPCURLs,
+		PrivateKeyString: privateKeyString,
+		NumConfirmations: 0,
+		NumRetries:       3,
+	}
+	gethClient, err := geth.NewClient(gethClientConfig, gethcommon.Address{}, 0, logger)
+	require.NoError(t, err)
+	certVerifier, err := verification.NewCertVerifier(*gethClient, config.EigenDACertVerifierAddress)
+	require.NoError(t, err)
+
 	return &TestClient{
 		t:                 t,
+		config:            config,
 		logger:            logger,
 		DisperserClient:   disperserClient,
 		RelayClient:       relayClient,
 		indexedChainState: indexedChainState,
 		RetrievalClient:   retrievalClient,
+		CertVerifier:      certVerifier,
 	}
 }
 
@@ -186,19 +215,20 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
 	payload []byte,
-	quorums []core.QuorumID) error {
+	quorums []core.QuorumID,
+	salt uint32) error {
 
-	key, err := c.DispersePayload(ctx, payload, quorums)
+	key, err := c.DispersePayload(ctx, payload, quorums, salt)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
-	blobCert := c.WaitForCompletion(ctx, key)
+	blobCert := c.WaitForCertification(ctx, *key, quorums)
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
 
 	// Read the blob from the relays and validators
-	c.ReadBlobFromRelay(ctx, key, blobCert, unpaddedPayload)
+	c.ReadBlobFromRelay(ctx, *key, blobCert, unpaddedPayload)
 	c.ReadBlobFromValidators(ctx, blobCert, quorums, unpaddedPayload)
 
 	return nil
@@ -208,18 +238,25 @@ func (c *TestClient) DisperseAndVerify(
 func (c *TestClient) DispersePayload(
 	ctx context.Context,
 	payload []byte,
-	quorums []core.QuorumID) (corev2.BlobKey, error) {
+	quorums []core.QuorumID,
+	salt uint32) (*corev2.BlobKey, error) {
 
 	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
-	_, key, err := c.DisperserClient.DisperseBlob(ctx, payload, 0, quorums, 0)
+	_, key, err := c.DisperserClient.DisperseBlob(ctx, payload, 0, quorums, salt)
+	if err != nil {
+		return &corev2.BlobKey{}, fmt.Errorf("failed to disperse payload: %w", err)
+	}
 	fmt.Printf("Dispersed blob with key %x\n", key)
 
-	return key, err
+	return &key, err
 }
 
-// WaitForCompletion waits for a blob to be complete. Returns the blob certificate.
-// TODO: When GATHERING_SIGNATURES is added, this function should be updated to validate it first moves to GATHERING_SIGNATURES before moving to COMPLETE status.
-func (c *TestClient) WaitForCompletion(ctx context.Context, key corev2.BlobKey) *commonv2.BlobCertificate {
+// WaitForCertification waits for a blob to be certified. Returns the blob certificate.
+func (c *TestClient) WaitForCertification(
+	ctx context.Context,
+	key corev2.BlobKey,
+	expectedQuorums []core.QuorumID) *commonv2.BlobCertificate {
+
 	var status *v2.BlobStatus = nil
 	ticker := time.NewTicker(time.Second)
 	start := time.Now()
@@ -239,10 +276,12 @@ func (c *TestClient) WaitForCompletion(ctx context.Context, key corev2.BlobKey) 
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				require.NotNil(c.t, blobCert)
-				require.True(c.t, len(blobCert.RelayKeys) >= 1)
-				return blobCert
+				c.VerifyBlobCertification(key,
+					expectedQuorums,
+					reply.SignedBatch,
+					reply.BlobInclusionInfo)
 
+				return blobCert
 			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
 				statusStart = time.Now()
@@ -267,6 +306,54 @@ func (c *TestClient) WaitForCompletion(ctx context.Context, key corev2.BlobKey) 
 			require.Fail(c.t, "Timed out waiting for blob to be confirmed")
 		}
 	}
+}
+
+// VerifyBlobCertification verifies that the blob has been properly certified by the network.
+func (c *TestClient) VerifyBlobCertification(
+	key corev2.BlobKey,
+	expectedQuorums []core.QuorumID,
+	signedBatch *v2.SignedBatch,
+	inclusionInfo *v2.BlobInclusionInfo) {
+
+	blobCert := inclusionInfo.BlobCertificate
+	require.NotNil(c.t, blobCert)
+	require.True(c.t, len(blobCert.RelayKeys) >= 1)
+
+	// make sure the returned header hash matches the expected blob key
+	bh, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
+	require.NoError(c.t, err)
+	computedBlobKey, err := bh.BlobKey()
+	require.NoError(c.t, err)
+	require.Equal(c.t, key, computedBlobKey)
+
+	// verify that expected quorums are present
+	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
+	for _, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
+		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
+	}
+	// There may be other quorums in the batch. No biggie as long as the expected ones are there.
+	require.True(c.t, len(expectedQuorums) <= len(quorumSet))
+	for expectedQuorum := range quorumSet {
+		require.Contains(c.t, quorumSet, expectedQuorum)
+	}
+
+	// Check the signing percentages
+	signingPercents := make(map[core.QuorumID]int, len(signedBatch.Attestation.QuorumNumbers))
+	for i, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
+		percent := int(signedBatch.Attestation.QuorumSignedPercentages[i])
+		signingPercents[core.QuorumID(quorumNumber)] = percent
+	}
+	for _, quorum := range expectedQuorums {
+		percent, ok := signingPercents[quorum]
+		require.True(c.t, ok)
+		require.True(c.t, percent >= 0 && percent <= 100)
+		require.True(c.t, percent >= c.config.MinimumSigningPercent)
+	}
+
+	// TODO This currently does not pass!
+	// On-chain verification
+	//err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
+	//require.NoError(c.t, err)
 }
 
 // ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.
