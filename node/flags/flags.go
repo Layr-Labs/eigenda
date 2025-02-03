@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/go-units"
@@ -14,6 +15,11 @@ import (
 const (
 	FlagPrefix   = "node"
 	EnvVarPrefix = "NODE"
+
+	// Node mode values
+	ModeV1Only  = "v1-only"
+	ModeV2Only  = "v2-only"
+	ModeV1AndV2 = "v1-and-v2"
 )
 
 var (
@@ -232,18 +238,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolFlag{
-		Name:     "enable-v2",
-		Usage:    "Enable V2 features (default=false)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
-	}
-	DisableV1Flag = cli.BoolFlag{
-		Name:     "disable-v1",
-		Usage:    "Disable V1 features (default=false, NOTE: your operator can be ejected if used incorrectly)",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISABLE_V1"),
-	}
 	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2 (default: 1h)",
@@ -402,6 +396,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
 	}
+
+	RuntimeModeFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "runtime-mode"),
+		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1Only, ModeV2Only, ModeV1AndV2),
+		Required: false,
+		Value:    ModeV1Only,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -449,8 +451,6 @@ var optionalFlags = []cli.Flag{
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
 	BLSSignerAPIKeyFlag,
-	EnableV2Flag,
-	DisableV1Flag,
 	V2DispersalPortFlag,
 	V2RetrievalPortFlag,
 	OnchainStateRefreshIntervalFlag,
@@ -463,6 +463,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RuntimeModeFlag,
 }
 
 func init() {

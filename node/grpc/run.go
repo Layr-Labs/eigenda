@@ -17,7 +17,7 @@ import (
 const localhost = "0.0.0.0"
 
 func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logger logging.Logger) error {
-	if serverV1 == nil && !config.DisableV1 {
+	if config.EnableV1 && serverV1 == nil {
 		return errors.New("node v1 server is not configured")
 	}
 	if config.EnableV2 && serverV2 == nil {
@@ -26,7 +26,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 	// V1 dispersal service
 	go func() {
-		if config.DisableV1 {
+		if !config.EnableV1 {
 			logger.Warn("v1 is disabled, skipping v1 dispersal server startup")
 			return
 		}
@@ -88,7 +88,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 	// v1 Retrieval service
 	go func() {
-		if config.DisableV1 {
+		if !config.EnableV1 {
 			logger.Warn("v1 is disabled, skipping v1 retrieval server startup")
 			return
 		}

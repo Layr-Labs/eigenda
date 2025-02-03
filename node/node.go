@@ -279,7 +279,7 @@ func (n *Node) Start(ctx context.Context) error {
 		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
 	}
 
-	if !n.Config.DisableV1 {
+	if n.Config.EnableV1 {
 		go n.expireLoop()
 		go n.checkNodeReachability(v1CheckPath)
 	}

@@ -86,8 +86,9 @@ type Config struct {
 	LoggerConfig    common.LoggerConfig
 	EncoderConfig   kzg.KzgConfig
 
-	EnableV2                    bool
-	DisableV1                   bool
+	EnableV1 bool
+	EnableV2 bool
+
 	OnchainStateRefreshInterval time.Duration
 	ChunkDownloadTimeout        time.Duration
 	GRPCMsgSizeLimitV2          int
@@ -186,14 +187,14 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		blsSignerAPIKey := ctx.GlobalString(flags.BLSSignerAPIKeyFlag.Name)
 
 		if blsRemoteSignerEnabled && (blsRemoteSignerUrl == "" || blsPublicKeyHex == "") {
-			return nil, fmt.Errorf("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
+			return nil, errors.New("BLS remote signer URL and Public Key Hex is required if BLS remote signer is enabled")
 		}
 		if !blsRemoteSignerEnabled && (blsKeyFilePath == "" || blsKeyPassword == "") {
-			return nil, fmt.Errorf("BLS key file and password is required if BLS remote signer is disabled")
+			return nil, errors.New("BLS key file and password is required if BLS remote signer is disabled")
 		}
 
 		if blsRemoteSignerEnabled && blsSignerAPIKey == "" {
-			return nil, fmt.Errorf("BLS signer API key is required if BLS remote signer is enabled")
+			return nil, errors.New("BLS signer API key is required if BLS remote signer is enabled")
 		}
 
 		if blsRemoteSignerEnabled {
@@ -233,8 +234,19 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, err
 	}
 
+	runtimeMode := ctx.GlobalString(flags.RuntimeModeFlag.Name)
+	switch runtimeMode {
+	case flags.ModeV1Only, flags.ModeV2Only, flags.ModeV1AndV2:
+		// Valid mode
+	default:
+		return nil, fmt.Errorf("invalid runtime mode %q: must be one of %s, %s, or %s", runtimeMode, flags.ModeV1Only, flags.ModeV2Only, flags.ModeV1AndV2)
+	}
+
+	// Convert mode to v1/v2 enabled flags
+	v1Enabled := runtimeMode == flags.ModeV1Only || runtimeMode == flags.ModeV1AndV2
+	v2Enabled := runtimeMode == flags.ModeV2Only || runtimeMode == flags.ModeV1AndV2
+
 	// v1 ports must be defined and valid even if v1 is disabled
-	v1Disabled := ctx.GlobalBool(flags.DisableV1Flag.Name)
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
 	err = core.ValidatePort(dispersalPort)
 	if err != nil {
@@ -246,24 +258,19 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		return nil, fmt.Errorf("invalid v1 retrieval port: %s", retrievalPort)
 	}
 
-	v2Enabled := ctx.GlobalBool(flags.EnableV2Flag.Name)
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
 	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
 	if v2Enabled {
 		if v2DispersalPort == "" {
-			return nil, fmt.Errorf("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
-		} else if core.ValidatePort(v2DispersalPort) != nil {
+			return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
+		} else if err := core.ValidatePort(v2DispersalPort); err != nil {
 			return nil, fmt.Errorf("invalid v2 dispersal port: %s", v2DispersalPort)
 		}
 		if v2RetrievalPort == "" {
-			return nil, fmt.Errorf("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be defined when v2 is enabled")
-		} else if core.ValidatePort(v2RetrievalPort) != nil {
+			return nil, errors.New("v2 retrieval port (NODE_V2_RETRIEVAL_PORT) must be defined when v2 is enabled")
+		} else if err := core.ValidatePort(v2RetrievalPort); err != nil {
 			return nil, fmt.Errorf("invalid v2 retrieval port: %s", v2RetrievalPort)
 		}
-	}
-
-	if v1Disabled && !v2Enabled {
-		return nil, fmt.Errorf("invalid configuration: both v1 and v2 are disabled")
 	}
 
 	return &Config{
@@ -306,7 +313,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableNodeInfoResources:            ctx.GlobalBool(flags.DisableNodeInfoResourcesFlag.Name),
 		BlsSignerConfig:                     blsSignerConfig,
 		EnableV2:                            v2Enabled,
-		DisableV1:                           v1Disabled,
+		EnableV1:                            v1Enabled,
 		OnchainStateRefreshInterval:         ctx.GlobalDuration(flags.OnchainStateRefreshIntervalFlag.Name),
 		ChunkDownloadTimeout:                ctx.GlobalDuration(flags.ChunkDownloadTimeoutFlag.Name),
 		GRPCMsgSizeLimitV2:                  ctx.GlobalInt(flags.GRPCMsgSizeLimitV2Flag.Name),
