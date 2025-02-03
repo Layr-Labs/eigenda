@@ -82,7 +82,7 @@ func NewCertVerifier(
 	}, nil
 }
 
-// VerifyCertV2FromSignedBatch calls the verifyCertV2FromSignedBatch view function on the EigenDACertVerifier contract.
+// VerifyCertV2FromSignedBatch calls the verifyDACertV2FromSignedBatch view function on the EigenDACertVerifier contract.
 //
 // Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height.
 // This wait will time out if the duration exceeds the timeout configured for the input ctx parameter. If
