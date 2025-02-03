@@ -191,11 +191,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
     }
 
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
-        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
-    }
-
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
