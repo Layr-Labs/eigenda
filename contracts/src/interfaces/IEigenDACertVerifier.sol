@@ -32,11 +32,13 @@ interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
     ) external view;
 
     /**
@@ -50,12 +52,28 @@ interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
     ) external view;
 
     /**
+     * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
+     * @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel) 
+     *      currently has a limitation that it can only create zk proofs for functions that return a value
+     * @param batchHeader The batch header of the blob 
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
+     */
+    function verifyDACertV2ForZKProof(
+        BatchHeaderV2 calldata batchHeader,
+        BlobInclusionInfo calldata blobInclusionInfo,
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
+    ) external view returns (bool);
+
+    /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
-    ) external view returns (NonSignerStakesAndSignature memory);
+    ) external view returns (NonSignerStakesAndSignature memory, bytes memory);
 
     /**
      * @notice Verifies the security parameters for a blob cert
