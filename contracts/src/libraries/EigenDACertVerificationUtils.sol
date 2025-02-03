@@ -223,6 +223,7 @@ library EigenDACertVerificationUtils {
         );
     }
 
+    /// @dev External function needed for try-catch wrapper
     function verifyDACertV2ForQuorumsExternal(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
         IEigenDASignatureVerifier _signatureVerifier,
