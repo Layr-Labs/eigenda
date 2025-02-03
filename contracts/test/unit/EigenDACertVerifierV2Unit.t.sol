@@ -11,6 +11,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     address relay1 = address(uint160(uint256(keccak256(abi.encodePacked("relay1")))));
 
     function setUp() virtual public {
+        quorumNumbersRequired = hex"00";
         _deployDA();
     }
 
@@ -39,6 +40,52 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
         NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
         eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+    }
+
+    function test_verifyDACertV2ZK_True(uint256 pseudoRandomNumber) public {
+        (
+            SignedBatch memory signedBatch, 
+            BlobInclusionInfo memory blobInclusionInfo, 
+            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
+        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
+        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
+        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
+        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
+        nonSignerStakesAndSignature.sigma = nssas.sigma;
+        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
+        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
+        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
+
+        _registerRelayKeys();
+
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        assert(zk);
+    }
+
+    function test_verifyDACertV2ZK_False(uint256 pseudoRandomNumber) public {
+        (
+            SignedBatch memory signedBatch, 
+            BlobInclusionInfo memory blobInclusionInfo, 
+            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
+        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
+        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
+        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
+        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
+        nonSignerStakesAndSignature.sigma = nssas.sigma;
+        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
+        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
+        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
+
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        assert(!zk);
     }
 
     function test_verifyDACertV2_revert_RelayKeysNotSet(uint256 pseudoRandomNumber) public {
@@ -86,8 +133,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
         vm.store(
-            address(eigenDAThresholdRegistry),
-            bytes32(uint256(5)),
+            address(eigenDACertVerifier),
+            bytes32(uint256(0)),
             bytes32(uint256(14113))
         );
 
@@ -99,7 +146,11 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertSecurityParams() public {
         VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
-        SecurityThresholds memory securityThresholds = eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
+        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDACertVerifier.securityThresholdsV2();
+        SecurityThresholds memory securityThresholds = SecurityThresholds({
+            confirmationThreshold: confirmationThreshold,
+            adversaryThreshold: adversaryThreshold
+        });
         eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
         eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
     }
