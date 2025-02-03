@@ -622,14 +622,14 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 //	@Summary	Fetch operators signing info
 //	@Tags		Operators
 //	@Produce	json
-//	@Param		end			query		string	false	"Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval	query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
-//	@Param		quorums query		string false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
-//	@Param		nonsigner_only query		string false	"Whether return only operators with signing rate less than 100% [default: false]"
-//	@Success	200			{object}	OperatorsSigningInfoResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Param		end				query		string	false	"Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval		query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		quorums			query		string	false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
+//	@Param		nonsigner_only	query		string	false	"Whether return only operators with signing rate less than 100% [default: false]"
+//	@Success	200				{object}	OperatorsSigningInfoResponse
+//	@Failure	400				{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404				{object}	ErrorResponse	"error: Not found"
+//	@Failure	500				{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/signing-info [get]
 func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
@@ -1169,7 +1169,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 	numFailed := computeNumFailed(attestations, operatorQuorumIntervals)
 
 	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
-	// that operator "op" and quorum "q" are responsible for.
+	// that operator "op" are responsible for in quorum "q".
 	numResponsible := computeNumResponsible(attestations, operatorQuorumIntervals)
 
 	totalNumBatchesPerQuorum := computeTotalNumBatchesPerQuorum(attestations)

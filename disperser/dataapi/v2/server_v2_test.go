@@ -772,7 +772,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 
 		Column definitions:
 		- Batch:            Batch number
-		- AttestedAt:       Timestamp of attestation (sortkey)
+		- AttestedAt:       Timestamp of attestation (sortkey of this table)
 		- RefBlockNum:      Reference block number
 		- Quorums:          Quorum numbers used by the batch
 		- Nonsigners:       Operators that didn't sign for the batch
@@ -782,32 +782,32 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		+-------+------------+-------------+---------+------------+------------------------+
 		| Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     1 |          1 |           1 | 0,1     | 3          | 1: {2}                |
+		|     1 |          A |           1 | 0,1     | 3          | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     2 |          2 |           3 | 1       | 4          | 1: {2}                |
+		|     2 |          B |           3 | 1       | 4          | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		|       |            |             |         |            | 4: {0,1}              |
 		|       |            |             |         |            | 5: {0}                |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     3 |          3 |           2 | 0       | 3          | 1: {2}                |
+		|     3 |          C |           2 | 0       | 3          | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		|       |            |             |         |            | 4: {0,1}              |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     4 |          4 |           2 | 0,1     | None       | 1: {2}                |
+		|     4 |          D |           2 | 0,1     | None       | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		|       |            |             |         |            | 4: {0,1}              |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
+		|     5 |          E |           4 | 0,1     | 3,5        | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		|       |            |             |         |            | 5: {0}                |
 		+-------+------------+-------------+---------+------------+------------------------+
-		|     6 |          6 |           5 | 0       | 5          | 1: {2}                |
+		|     6 |          F |           5 | 0       | 5          | 1: {2}                |
 		|       |            |             |         |            | 2: {0,1}              |
 		|       |            |             |         |            | 3: {0,1}              |
 		|       |            |             |         |            | 5: {0}                |
@@ -860,6 +860,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 
 	// Mocking using a map function so we can always maintain the ID and address mapping
 	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
+	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
 	operatorIntialQuorumsByBlock := map[uint32]map[core.OperatorID]*big.Int{
 		1: map[core.OperatorID]*big.Int{
 			operatorIds[0]: big.NewInt(4), // quorum 2
@@ -887,8 +888,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		nil,
 	)
 
-	// operatorIds[0], operatorIds[1] and operatorIds[2] were active at the startBlock
-	// (see the above table)
+	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
 		1: core.OperatorStakes{
 			0: {
@@ -958,7 +958,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		nil,
 	)
 
-	// operatorIds[3], operatorIds[4] were not active at the startBlock, but were added to
+	// operatorIds[3], operatorIds[4] were not active at the first block, but were added to
 	// quorums after startBlock (see the above table).
 	operatorAddedToQuorum := []*subgraph.OperatorQuorum{
 		{
@@ -1013,7 +1013,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	}
 
 	/*
-		Resulting Operator SigningInfo
+		Resulting Operator SigningInfo (for block range [1, 5]
 
 		Column definitions:
 		- <operator, quorum>:    Operator ID and quorum pair
@@ -1198,7 +1198,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	})
 
 	t.Run("custom time range", func(t *testing.T) {
-		// 800 seconds before "now", it should hit the last 2 batches in the setup table:
+		// We query 800 seconds before "now", it should hit the last 2 batches in the setup table:
 		//
 		// +-------+------------+-------------+---------+------------+------------------------+
 		// | Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |

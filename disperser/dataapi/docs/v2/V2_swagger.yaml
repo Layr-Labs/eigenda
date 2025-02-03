@@ -470,6 +470,25 @@ definitions:
       v2_dispersal_status:
         type: string
     type: object
+  v2.OperatorSigningInfo:
+    properties:
+      operator_address:
+        type: string
+      operator_id:
+        type: string
+      quorum_id:
+        type: integer
+      signing_percentage:
+        type: number
+      stake_percentage:
+        type: number
+      total_batches:
+        type: integer
+      total_responsible_batches:
+        type: integer
+      total_unsigned_batches:
+        type: integer
+    type: object
   v2.OperatorStake:
     properties:
       operator_id:
@@ -480,6 +499,13 @@ definitions:
         type: integer
       stake_percentage:
         type: number
+    type: object
+  v2.OperatorsSigningInfoResponse:
+    properties:
+      operator_signing_info:
+        items:
+          $ref: '#/definitions/v2.OperatorSigningInfo'
+        type: array
     type: object
   v2.OperatorsStakeResponse:
     properties:
@@ -865,6 +891,51 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Operator node reachability check
+      tags:
+      - Operators
+  /operators/signing-info:
+    get:
+      parameters:
+      - description: 'Fetch operators signing info up to the end time (ISO 8601 format:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch operators signing info starting from an interval (in seconds)
+          before the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Comma separated list of quorum IDs to fetch signing info for
+          [default: 0,1]'
+        in: query
+        name: quorums
+        type: string
+      - description: 'Whether return only operators with signing rate less than 100%
+          [default: false]'
+        in: query
+        name: nonsigner_only
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorsSigningInfoResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch operators signing info
       tags:
       - Operators
   /operators/stake:
