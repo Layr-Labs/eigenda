@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"slices"
 	"strings"
 )
@@ -19,48 +20,73 @@ func (s OperatorSocket) String() string {
 	return string(s)
 }
 
-func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort string) OperatorSocket {
-	if v2DispersalPort == "" {
+func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) OperatorSocket {
+	//TODO:  Add config checks for invalid v1/v2 configs -- for v1, both v2 ports must be empty and for v2, both ports must be valid, reject any other combinations.
+	if v2DispersalPort == "" && v2RetrievalPort == "" {
 		return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
 	}
-	return OperatorSocket(fmt.Sprintf("%s:%s;%s;%s", nodeIP, dispersalPort, retrievalPort, v2DispersalPort))
+	return OperatorSocket(fmt.Sprintf("%s:%s;%s;%s;%s", nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort))
 }
 
 type StakeAmount = *big.Int
 
-func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, v2DispersalPort string, err error) {
+func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort string, err error) {
+
 	s := strings.Split(socket, ";")
 
-	if len(s) == 2 {
-		// no v2 dispersal port
-		retrievalPort = s[1]
-		s = strings.Split(s[0], ":")
-		if len(s) != 2 {
-			err = fmt.Errorf("invalid socket address format: %s", socket)
-			return
-		}
-		host = s[0]
-		dispersalPort = s[1]
+	host, v1DispersalPort, err = net.SplitHostPort(s[0])
+	if err != nil {
+		err = fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
 
 		return
 	}
+	if _, err = net.LookupHost(host); err != nil {
+		//Invalid host
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		return
+	}
+	if err = ValidatePort(v1DispersalPort); err != nil {
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid v1 dispersal port format in %s: it must specify valid v1 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		return
+	}
 
-	if len(s) == 3 {
-		// all ports specified
+	switch len(s) {
+	case 4:
 		v2DispersalPort = s[2]
-		retrievalPort = s[1]
-
-		s = strings.Split(s[0], ":")
-		if len(s) != 2 {
-			err = fmt.Errorf("invalid socket address format: %s", socket)
+		if err = ValidatePort(v2DispersalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v2 dispersal port format in %s: it must specify valid v2 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
 			return
 		}
-		host = s[0]
-		dispersalPort = s[1]
+
+		v2RetrievalPort = s[3]
+		if err = ValidatePort(v2RetrievalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v2 retrieval port format in %s: it must specify valid v2 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+			return
+		}
+		fallthrough
+	case 2:
+		// V1 Parsing
+		v1RetrievalPort = s[1]
+		if err = ValidatePort(v1RetrievalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v1 retrieval port format in %s: it must specify valid v1 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		}
+		return
+	default:
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid socket address format %s: it must specify v1 dispersal/retrieval ports, or v2 dispersal/retrieval ports (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
 		return
 	}
-
-	return "", "", "", "", fmt.Errorf("invalid socket address format %s: it must specify dispersal port, retrieval port, and/or v2 dispersal port (ex. 0.0.0.0:32004;32005;32006)", socket)
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
