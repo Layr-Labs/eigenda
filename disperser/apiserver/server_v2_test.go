@@ -636,7 +636,8 @@ func TestTooShortCommitment(t *testing.T) {
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	assert.NoError(t, err)
 
