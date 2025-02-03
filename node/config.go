@@ -236,11 +236,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	// v1 ports must be defined and valid even if v1 is disabled
 	v1Disabled := ctx.GlobalBool(flags.DisableV1Flag.Name)
 	dispersalPort := ctx.GlobalString(flags.DispersalPortFlag.Name)
-	if core.ValidatePort(dispersalPort) != nil {
+	err = core.ValidatePort(dispersalPort)
+	if err != nil {
 		return nil, fmt.Errorf("invalid v1 dispersal port: %s", dispersalPort)
 	}
 	retrievalPort := ctx.GlobalString(flags.RetrievalPortFlag.Name)
-	if core.ValidatePort(retrievalPort) != nil {
+	err = core.ValidatePort(retrievalPort)
+	if err != nil {
 		return nil, fmt.Errorf("invalid v1 retrieval port: %s", retrievalPort)
 	}
 
