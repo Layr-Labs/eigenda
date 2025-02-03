@@ -3,8 +3,8 @@ pragma solidity ^0.8.9;
 
 import {EigenDAThresholdRegistryStorage} from "./EigenDAThresholdRegistryStorage.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**

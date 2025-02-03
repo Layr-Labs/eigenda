@@ -2,9 +2,9 @@
 /*
 pragma solidity ^0.8.12;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ERC20PresetFixedSupply} from "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC20PresetFixedSupply} from "lib/openzeppelin-contracts/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
+import {ProxyAdmin} from "lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {
     ExistingDeploymentParser,
     RewardsCoordinator,
@@ -13,8 +13,8 @@ import {
     IStrategy,
     IERC20
 } from "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
-import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "../lib/eigenlayer-middleware/interfaces/IStakeRegistry.sol";
     
 import {EigenDAServiceManager} from "../../../src/core/EigenDAServiceManager.sol";
 

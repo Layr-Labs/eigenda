@@ -6,8 +6,8 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
 import {EigenDACertVerificationUtils} from "../libraries/EigenDACertVerificationUtils.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
