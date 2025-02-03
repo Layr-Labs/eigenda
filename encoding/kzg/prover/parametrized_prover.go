@@ -26,7 +26,7 @@ type ParametrizedProver struct {
 }
 
 type rsEncodeResult struct {
-	Frames   []rs.Frame
+	Frames   []rs.FrameCoeffs
 	Indices  []uint32
 	Duration time.Duration
 	Err      error
@@ -249,7 +249,7 @@ func (g *ParametrizedProver) GetFrames(inputFr []fr.Element) ([]encoding.Frame, 
 	for i, index := range rsResult.Indices {
 		kzgFrames[i] = encoding.Frame{
 			Proof:  proofsResult.Proofs[index],
-			Coeffs: rsResult.Frames[i].Coeffs,
+			Coeffs: rsResult.Frames[i],
 		}
 	}
 

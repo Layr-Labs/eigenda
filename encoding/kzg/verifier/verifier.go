@@ -294,11 +294,9 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
 func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]rs.Frame, len(chunks))
+	frames := make([]rs.FrameCoeffs, len(chunks))
 	for i := range chunks {
-		frames[i] = rs.Frame{
-			Coeffs: chunks[i].Coeffs,
-		}
+		frames[i] = chunks[i].Coeffs
 	}
 
 	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)

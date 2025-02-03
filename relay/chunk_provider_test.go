@@ -4,12 +4,23 @@ import (
 	"context"
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
+
+func deserializeBinaryFrames(t *testing.T, binaryFrames *rs.BinaryFrames) []*encoding.Frame {
+	bundleBytes, err := binaryFrames.SerializeAsBundle()
+	require.NoError(t, err)
+	bundle := core.Bundle{}
+	bundle, err = bundle.Deserialize(bundleBytes)
+	require.NoError(t, err)
+	return bundle
+}
 
 func TestFetchingIndividualBlobs(t *testing.T) {
 	tu.InitializeRandom()
@@ -75,7 +86,8 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 		// TODO: when I inspect this data using a debugger, the proofs are all made up of 0s... something
 		//  is wrong with the way the data is generated in the test.
-		require.Equal(t, frames, readFrames)
+		deserializedFrames := deserializeBinaryFrames(t, readFrames)
+		require.Equal(t, frames, deserializedFrames)
 	}
 
 	// Read it back again to test caching.
@@ -95,7 +107,8 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 		readFrames := (fMap)[key]
 		require.NotNil(t, readFrames)
 
-		require.Equal(t, frames, readFrames)
+		deserializedFrames := deserializeBinaryFrames(t, readFrames)
+		require.Equal(t, frames, deserializedFrames)
 	}
 }
 
@@ -169,7 +182,8 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 			require.NotNil(t, readFrames)
 
 			expectedFramesForBlob := expectedFrames[key]
-			require.Equal(t, expectedFramesForBlob, readFrames)
+			deserializedFrames := deserializeBinaryFrames(t, readFrames)
+			require.Equal(t, expectedFramesForBlob, deserializedFrames)
 		}
 	}
 }

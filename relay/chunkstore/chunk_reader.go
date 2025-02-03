@@ -9,19 +9,33 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // ChunkReader reads chunks written by ChunkWriter.
 type ChunkReader interface {
+
 	// GetChunkProofs reads a slice of proofs from the chunk store.
 	GetChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([]*encoding.Proof, error)
+
+	// GetBinaryChunkProofs reads a slice of proofs from the chunk store, similar to GetChunkProofs.
+	// Unlike GetChunkProofs, this method returns the raw serialized bytes of the proofs, as opposed to
+	// deserializing them into encoding.Proof structs.
+	GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error)
+
 	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
 	// should match the metadata returned by PutChunkCoefficients.
 	GetChunkCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
-		fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error)
+		fragmentInfo *encoding.FragmentInfo) ([]rs.FrameCoeffs, error)
+
+	// GetBinaryChunkCoefficients reads a slice of frames from the chunk store, similar to GetChunkCoefficients.
+	// Unlike GetChunkCoefficients, this method returns the raw serialized bytes of the frames, as opposed to
+	// deserializing them into rs.FrameCoeffs structs. The returned uint32 is the number of elements in each frame.
+	GetBinaryChunkCoefficients(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error)
 }
 
 var _ ChunkReader = (*chunkReader)(nil)
@@ -58,22 +72,25 @@ func (r *chunkReader) GetChunkProofs(
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
 	}
 
-	if len(bytes)%bn254.SizeOfG1AffineCompressed != 0 {
-		r.logger.Error("Invalid proof size")
-		return nil, fmt.Errorf("invalid proof size: %w", err)
+	proofs, err := rs.DeserializeFrameProofs(bytes)
+	if err != nil {
+		r.logger.Error("Failed to decode proofs: %v", err)
+		return nil, fmt.Errorf("failed to decode proofs: %w", err)
 	}
 
-	proofCount := len(bytes) / bn254.SizeOfG1AffineCompressed
-	proofs := make([]*encoding.Proof, proofCount)
+	return proofs, nil
+}
 
-	for i := 0; i < proofCount; i++ {
-		proof := encoding.Proof{}
-		err := proof.Unmarshal(bytes[i*bn254.SizeOfG1AffineCompressed:])
-		if err != nil {
-			r.logger.Error("Failed to unmarshal proof: %v", err)
-			return nil, fmt.Errorf("failed to unmarshal proof: %w", err)
-		}
-		proofs[i] = &proof
+func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
+	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
+	if err != nil {
+		r.logger.Error("Failed to download chunks from S3: %v", err)
+		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+	}
+
+	proofs, err := rs.SplitSerializedFrameProofs(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to split proofs: %w", err)
 	}
 
 	return proofs, nil
@@ -82,7 +99,7 @@ func (r *chunkReader) GetChunkProofs(
 func (r *chunkReader) GetChunkCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	fragmentInfo *encoding.FragmentInfo) ([]*rs.Frame, error) {
+	fragmentInfo *encoding.FragmentInfo) ([]rs.FrameCoeffs, error) {
 
 	bytes, err := r.client.FragmentedDownloadObject(
 		ctx,
@@ -96,11 +113,37 @@ func (r *chunkReader) GetChunkCoefficients(
 		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
 	}
 
-	frames, err := rs.GnarkDecodeFrames(bytes)
+	frames, err := rs.DeserializeFrameCoeffsSlice(bytes)
 	if err != nil {
 		r.logger.Error("Failed to decode frames: %v", err)
 		return nil, fmt.Errorf("failed to decode frames: %w", err)
 	}
 
 	return frames, nil
+}
+
+func (r *chunkReader) GetBinaryChunkCoefficients(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error) {
+
+	bytes, err := r.client.FragmentedDownloadObject(
+		ctx,
+		r.bucket,
+		s3.ScopedChunkKey(blobKey),
+		int(fragmentInfo.TotalChunkSizeBytes),
+		int(fragmentInfo.FragmentSizeBytes))
+
+	if err != nil {
+		r.logger.Error("Failed to download chunks from S3: %v", err)
+		return 0, nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+	}
+
+	elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
+	if err != nil {
+		r.logger.Error("Failed to split frames: %v", err)
+		return 0, nil, fmt.Errorf("failed to split frames: %w", err)
+	}
+
+	return elementCount, frames, nil
 }

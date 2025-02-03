@@ -279,13 +279,13 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}, nil
 }
 
-func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.Frame) {
+func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []rs.FrameCoeffs) {
 	proofs := make([]*encoding.Proof, len(frames))
-	coeffs := make([]*rs.Frame, len(frames))
+	coeffs := make([]rs.FrameCoeffs, len(frames))
 
 	for i, frame := range frames {
 		proofs[i] = &frame.Proof
-		coeffs[i] = &rs.Frame{Coeffs: frame.Coeffs}
+		coeffs[i] = frame.Coeffs
 	}
 	return proofs, coeffs
 }

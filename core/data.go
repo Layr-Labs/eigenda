@@ -360,6 +360,13 @@ func (b Bundle) Size() uint64 {
 	return size
 }
 
+// BinaryBundleHeader returns the header of a bundle in binary format.
+func BinaryBundleHeader(elementCount uint64) uint64 {
+	header := uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)
+	header |= elementCount
+	return header
+}
+
 // Serialize returns the serialized bytes of the bundle.
 //
 // The bytes are packed in this format:
@@ -389,7 +396,7 @@ func (b Bundle) Serialize() ([]byte, error) {
 	}
 	result := make([]byte, size+8)
 	buf := result
-	metadata := (uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(len(b[0].Coeffs))
+	metadata := BinaryBundleHeader(uint64(len(b[0].Coeffs)))
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, f := range b {

@@ -31,8 +31,8 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	}
 }
 
-func sampleFrames(frames []rs.Frame, num uint64) ([]rs.Frame, []uint64) {
-	samples := make([]rs.Frame, num)
+func sampleFrames(frames []rs.FrameCoeffs, num uint64) ([]rs.FrameCoeffs, []uint64) {
+	samples := make([]rs.FrameCoeffs, num)
 	indices := rand.Perm(len(frames))
 	indices = indices[:num]
 
