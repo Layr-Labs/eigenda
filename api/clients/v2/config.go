@@ -45,9 +45,9 @@ type PayloadClientConfig struct {
 	BlobVersion v2.BlobVersion
 }
 
-// PayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
-// by a PayloadRetriever
-type PayloadRetrieverConfig struct {
+// RelayPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
+// by a RelayPayloadRetriever
+type RelayPayloadRetrieverConfig struct {
 	PayloadClientConfig
 
 	// The timeout duration for relay calls to retrieve blobs.
@@ -125,11 +125,11 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	return nil
 }
 
-// GetDefaultPayloadRetrieverConfig creates a PayloadRetrieverConfig with default values
+// GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
 //
 // NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
-func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
-	return &PayloadRetrieverConfig{
+func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
+	return &RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
 		RelayTimeout:        5 * time.Second,
 	}
@@ -140,13 +140,13 @@ func GetDefaultPayloadRetrieverConfig() *PayloadRetrieverConfig {
 // 1. If a config value is 0, and a 0 value makes sense, do nothing.
 // 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
 // 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
-func (rc *PayloadRetrieverConfig) checkAndSetDefaults() error {
+func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
 		return err
 	}
 
-	defaultConfig := GetDefaultPayloadRetrieverConfig()
+	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
 	if rc.RelayTimeout == 0 {
 		rc.RelayTimeout = defaultConfig.RelayTimeout
 	}

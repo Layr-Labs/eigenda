@@ -54,6 +54,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
 	}
+	V2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "v2-retrieval-port"),
+		Usage:    "Port at which node registers to listen for v2 retrieval calls",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -438,6 +444,7 @@ var optionalFlags = []cli.Flag{
 	BLSSignerAPIKeyFlag,
 	EnableV2Flag,
 	V2DispersalPortFlag,
+	V2RetrievalPortFlag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
 	GRPCMsgSizeLimitV2Flag,

@@ -158,7 +158,7 @@ func (r *retrievalClient) getChunksFromOperator(
 	chunksChan chan clients.RetrievedChunks,
 ) {
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetRetrievalSocket(),
+		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(16 /* max blob size */ *8 /* encoding rate */ *units.MiB)),
 	)

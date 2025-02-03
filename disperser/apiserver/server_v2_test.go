@@ -72,7 +72,8 @@ func TestV2DisperseBlob(t *testing.T) {
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	assert.NoError(t, err)
 
@@ -121,7 +122,8 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 	data := make([]byte, 50)
 	_, err := rand.Read(data)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	data = codec.ConvertByPaddingEmptyByte(data)
 	commitments, err := prover.GetCommitmentsForPaddedLength(data)
 	assert.NoError(t, err)
@@ -329,7 +331,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	err = c.BlobMetadataStore.PutBlobCertificate(ctx, blobCert, nil)
 	require.NoError(t, err)
 
-	// Non ceritified blob status
+	// Queued/Encoded blob status
 	status, err := c.DispersalServerV2.GetBlobStatus(ctx, &pbv2.BlobStatusRequest{
 		BlobKey: blobKey[:],
 	})
@@ -343,8 +345,8 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
 
-	// Certified blob status
-	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Certified)
+	// Complete blob status
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
@@ -384,7 +386,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobKey: blobKey[:],
 	})
 	require.NoError(t, err)
-	require.Equal(t, pbv2.BlobStatus_CERTIFIED, reply.GetStatus())
+	require.Equal(t, pbv2.BlobStatus_COMPLETE, reply.GetStatus())
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	require.NoError(t, err)
 	blobCertProto, err := blobCert.ToProtobuf()
@@ -530,7 +532,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 
 	err = s.RefreshOnchainState(context.Background())
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	p := &peer.Peer{
 		Addr: &net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
@@ -581,7 +584,8 @@ func TestInvalidLength(t *testing.T) {
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	assert.NoError(t, err)
-	signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
 	sig, err := signer.SignBlobRequest(blobHeader)
 	assert.NoError(t, err)
 

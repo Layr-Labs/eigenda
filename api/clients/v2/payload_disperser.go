@@ -36,11 +36,9 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	kzgConfig *kzg.KzgConfig, encoderCfg *encoding.Config) (*PayloadDisperser, error) {
 	
 	// 1 - verify key semantics and create signer
-	var signer core.BlobRequestSigner
-	if len(payloadDispCfg.SignerPaymentKey) == 64 {
-		signer = auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
-	} else {
-		return nil, fmt.Errorf("invalid length for signer private key")
+	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
+	if err != nil {
+		return nil, fmt.Errorf("new local blob request signer: %w", err)
 	}
 
 	// 2 - create prover
@@ -213,7 +211,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 		case <-ctx.Done():
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
-				dispgrpc.BlobStatus_CERTIFIED.Descriptor(),
+				dispgrpc.BlobStatus_COMPLETE.Descriptor(),
 				previousStatus.Descriptor(),
 				ctx.Err())
 		case <-ticker.C:
@@ -237,7 +235,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
-			case dispgrpc.BlobStatus_CERTIFIED:
+			case dispgrpc.BlobStatus_COMPLETE:
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				continue

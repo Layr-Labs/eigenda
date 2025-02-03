@@ -3,20 +3,13 @@ package v2
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/docker/go-units"
-	"os"
-	"path"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -26,8 +19,14 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path"
+	"strings"
+	"testing"
+	"time"
 )
 
 const (
@@ -101,7 +100,8 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	privateKeyString = strings.Trim(privateKeyString, "\n \t")
 	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
 
-	signer := auth.NewLocalBlobRequestSigner(privateKeyString)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
+	require.NoError(t, err)
 	signerAccountId, err := signer.GetAccountID()
 	require.NoError(t, err)
 	accountId := gethcommon.HexToAddress(signerAccountId)
@@ -264,20 +264,20 @@ func (c *TestClient) WaitForCertification(
 			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
 			require.NoError(c.t, err)
 
-			if reply.Status == v2.BlobStatus_CERTIFIED {
+			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
 				totalElapsed := time.Since(start)
 				fmt.Printf(
-					"Blob is certified (spent %0.1fs in prior status, total time %0.1fs)\n",
+					"Blob is complete (spent %0.1fs in prior status, total time %0.1fs)\n",
 					elapsed.Seconds(),
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				c.VerifyBlobCertification(
-					key,
+				c.VerifyBlobCertification(key,
 					expectedQuorums,
 					reply.SignedBatch,
 					reply.BlobInclusionInfo)
+
 				return blobCert
 			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
@@ -292,8 +292,7 @@ func (c *TestClient) WaitForCertification(
 				status = &reply.Status
 
 				if reply.Status == v2.BlobStatus_FAILED ||
-					reply.Status == v2.BlobStatus_UNKNOWN ||
-					reply.Status == v2.BlobStatus_INSUFFICIENT_SIGNATURES {
+					reply.Status == v2.BlobStatus_UNKNOWN {
 					require.Fail(
 						c.t,
 						"Blob status is in a terminal non-successful state.",
