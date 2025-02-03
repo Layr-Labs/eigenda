@@ -54,9 +54,9 @@ type RelayPayloadRetrieverConfig struct {
 	RelayTimeout time.Duration
 }
 
-// DistributedPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values
-// needed by a DistributedPayloadRetriever
-type DistributedPayloadRetrieverConfig struct {
+// ValidatorPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values
+// needed by a ValidatorPayloadRetriever
+type ValidatorPayloadRetrieverConfig struct {
 	PayloadClientConfig
 
 	// The timeout duration for calls to retrieve blobs from a given quorum.
@@ -68,7 +68,7 @@ type DistributedPayloadRetrieverConfig struct {
 	// The address of the EigenDAServiceManager contract
 	EigenDAServiceManagerAddr string
 
-	// The number of simultaneous connections to use when fetching chunks during distributed retrieval
+	// The number of simultaneous connections to use when fetching chunks during validtor retrieval
 	ConnectionCount uint
 }
 
@@ -172,15 +172,15 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	return nil
 }
 
-// GetDefaultDistributedPayloadRetrieverConfig creates a DistributedPayloadRetrieverConfig with default values
+// GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
 //
 // NOTE: The following fields do not have defined defaults and must always be specifically configured:
 // - EthRpcUrl
 // - EigenDACertVerifierAddr
 // - BlsOperatorStateRetrieverAddr
 // - EigenDAServiceManagerAddr
-func GetDefaultDistributedPayloadRetrieverConfig() *DistributedPayloadRetrieverConfig {
-	return &DistributedPayloadRetrieverConfig{
+func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
+	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
 		RetrievalTimeout:    20 * time.Second,
 		ConnectionCount:     10,
@@ -192,7 +192,7 @@ func GetDefaultDistributedPayloadRetrieverConfig() *DistributedPayloadRetrieverC
 // 1. If a config value is 0, and a 0 value makes sense, do nothing.
 // 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
 // 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
-func (rc *DistributedPayloadRetrieverConfig) checkAndSetDefaults() error {
+func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func (rc *DistributedPayloadRetrieverConfig) checkAndSetDefaults() error {
 		return errors.New("EigenDAServiceManagerAddr is required")
 	}
 
-	defaultConfig := GetDefaultDistributedPayloadRetrieverConfig()
+	defaultConfig := GetDefaultValidatorPayloadRetrieverConfig()
 	if rc.RetrievalTimeout == 0 {
 		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
 	}

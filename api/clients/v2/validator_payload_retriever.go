@@ -19,28 +19,28 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// DistributedPayloadRetriever provides the ability to get payloads from the EigenDA nodes directly
+// ValidatorPayloadRetriever provides the ability to get payloads from the EigenDA validator nodes directly
 //
 // This struct is goroutine safe.
-type DistributedPayloadRetriever struct {
+type ValidatorPayloadRetriever struct {
 	logger          logging.Logger
-	config          DistributedPayloadRetrieverConfig
+	config          ValidatorPayloadRetrieverConfig
 	codec           codecs.BlobCodec
 	retrievalClient RetrievalClient
 	g1Srs           []bn254.G1Affine
 }
 
-var _ PayloadRetriever = &DistributedPayloadRetriever{}
+var _ PayloadRetriever = &ValidatorPayloadRetriever{}
 
-// BuildDistributedPayloadRetriever builds a DistributedPayloadRetriever from config structs.
-func BuildDistributedPayloadRetriever(
+// BuildValidatorPayloadRetriever builds a ValidatorPayloadRetriever from config structs.
+func BuildValidatorPayloadRetriever(
 	logger logging.Logger,
-	distributedPayloadRetrieverConfig DistributedPayloadRetrieverConfig,
+	validatorPayloadRetrieverConfig ValidatorPayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
 	thegraphConfig thegraph.Config,
 	kzgConfig kzg.KzgConfig,
-) (*DistributedPayloadRetriever, error) {
-	err := distributedPayloadRetrieverConfig.checkAndSetDefaults()
+) (*ValidatorPayloadRetriever, error) {
+	err := validatorPayloadRetrieverConfig.checkAndSetDefaults()
 	if err != nil {
 		return nil, fmt.Errorf("check and set config defaults: %w", err)
 	}
@@ -53,8 +53,8 @@ func BuildDistributedPayloadRetriever(
 	reader, err := eth.NewReader(
 		logger,
 		ethClient,
-		distributedPayloadRetrieverConfig.BlsOperatorStateRetrieverAddr,
-		distributedPayloadRetrieverConfig.EigenDAServiceManagerAddr)
+		validatorPayloadRetrieverConfig.BlsOperatorStateRetrieverAddr,
+		validatorPayloadRetrieverConfig.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
@@ -72,38 +72,38 @@ func BuildDistributedPayloadRetriever(
 		reader,
 		indexedChainState,
 		kzgVerifier,
-		int(distributedPayloadRetrieverConfig.ConnectionCount))
+		int(validatorPayloadRetrieverConfig.ConnectionCount))
 
 	codec, err := codecs.CreateCodec(
-		distributedPayloadRetrieverConfig.PayloadPolynomialForm,
-		distributedPayloadRetrieverConfig.BlobEncodingVersion)
+		validatorPayloadRetrieverConfig.PayloadPolynomialForm,
+		validatorPayloadRetrieverConfig.BlobEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create codec: %w", err)
 	}
 
-	return &DistributedPayloadRetriever{
+	return &ValidatorPayloadRetriever{
 		logger:          logger,
-		config:          distributedPayloadRetrieverConfig,
+		config:          validatorPayloadRetrieverConfig,
 		codec:           codec,
 		retrievalClient: retrievalClient,
 		g1Srs:           kzgVerifier.Srs.G1,
 	}, nil
 }
 
-// NewDistributedPayloadRetriever creates a new DistributedPayloadRetriever from already constructed objects
-func NewDistributedPayloadRetriever(
+// NewValidatorPayloadRetriever creates a new ValidatorPayloadRetriever from already constructed objects
+func NewValidatorPayloadRetriever(
 	logger logging.Logger,
-	config DistributedPayloadRetrieverConfig,
+	config ValidatorPayloadRetrieverConfig,
 	codec codecs.BlobCodec,
 	retrievalClient RetrievalClient,
 	g1Srs []bn254.G1Affine,
-) (*DistributedPayloadRetriever, error) {
+) (*ValidatorPayloadRetriever, error) {
 	err := config.checkAndSetDefaults()
 	if err != nil {
 		return nil, fmt.Errorf("check and set config defaults: %w", err)
 	}
 
-	return &DistributedPayloadRetriever{
+	return &ValidatorPayloadRetriever{
 		logger:          logger,
 		config:          config,
 		codec:           codec,
@@ -117,7 +117,7 @@ func NewDistributedPayloadRetriever(
 // If the blob is successfully retrieved, then the blob verified against the EigenDACert. If the verification succeeds,
 // the blob is decoded to yield the payload (the original user data, with no padding or any modification), and the
 // payload is returned.
-func (pr *DistributedPayloadRetriever) GetPayload(
+func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
 ) ([]byte, error) {
@@ -191,7 +191,7 @@ func (pr *DistributedPayloadRetriever) GetPayload(
 }
 
 // getBlobWithTimeout attempts to get a blob from a given quorum, and times out based on config.RetrievalTimeout
-func (pr *DistributedPayloadRetriever) getBlobWithTimeout(
+func (pr *ValidatorPayloadRetriever) getBlobWithTimeout(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
