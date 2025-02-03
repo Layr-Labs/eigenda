@@ -188,9 +188,12 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
-// TODO rename
+func generateRandomFrameCoeffs(
+	t *testing.T,
+	encoder *rs.Encoder,
+	size int,
+	params encoding.EncodingParams) []rs.FrameCoeffs {
 
-func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int, params encoding.EncodingParams) []rs.FrameCoeffs {
 	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)), params)
 	require.NoError(t, err)
 	return frames
@@ -218,7 +221,7 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	for i := 0; i < 100; i++ {
 		key := corev2.BlobKey(tu.RandomBytes(32))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
+		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		expectedValues[key] = coefficients
 
 		metadata, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
@@ -279,7 +282,7 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, writer.ProofExists(ctx, key))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
+		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
 		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
