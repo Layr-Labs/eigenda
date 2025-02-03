@@ -648,5 +648,5 @@ func TestTooShortCommitment(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "is less than blob length")
+	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2add ")
 }
