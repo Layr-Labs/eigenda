@@ -89,6 +89,9 @@ func (t *MockWriter) GetOperatorStakes(ctx context.Context, operatorId core.Oper
 func (t *MockWriter) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
 	args := t.Called()
 	result := args.Get(0)
+	if fn, ok := result.(func([]core.QuorumID, uint32) core.OperatorStakes); ok {
+		return fn(quorums, blockNumber), args.Error(1)
+	}
 	return result.(core.OperatorStakes), args.Error(1)
 }
 

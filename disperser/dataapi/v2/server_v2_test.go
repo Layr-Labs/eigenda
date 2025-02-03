@@ -295,6 +295,7 @@ func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.Oper
 	assert.Equal(t, expected.QuorumId, actual.QuorumId)
 	assert.Equal(t, expected.TotalUnsignedBatches, actual.TotalUnsignedBatches)
 	assert.Equal(t, expected.TotalResponsibleBatches, actual.TotalResponsibleBatches)
+	assert.Equal(t, expected.TotalBatches, actual.TotalBatches)
 }
 
 func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
@@ -762,7 +763,7 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	})
 }
 
-func FetchOperatorSigningInfo(t *testing.T) {
+func TestFetchOperatorSigningInfo(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -813,35 +814,6 @@ func FetchOperatorSigningInfo(t *testing.T) {
 		+-------+------------+-------------+---------+------------+------------------------+
 	*/
 
-	/*
-		Resulting Operator SigningInfo
-
-		Column definitions:
-		- <operator, quorum>:    Operator ID and quorum pair
-		- Total responsible:     Total number of batches the operator was responsible for
-		- Total nonsigning:      Number of batches where operator did not sign
-		- Signing rate:          Percentage of batches signed by <operator, quorum>
-
-		Data:
-		+------------------+-------------------+------------------+--------------+
-		| <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
-		+------------------+-------------------+------------------+--------------+
-		| <2, 0>          |                 5 |                0 |        100% |
-		+------------------+-------------------+------------------+--------------+
-		| <2, 1>          |                 4 |                0 |        100% |
-		+------------------+-------------------+------------------+--------------+
-		| <3, 0>          |                 5 |                3 |         40% |
-		+------------------+-------------------+------------------+--------------+
-		| <3, 1>          |                 4 |                2 |         50% |
-		+------------------+-------------------+------------------+--------------+
-		| <4, 0>          |                 2 |                0 |        100% |
-		+------------------+-------------------+------------------+--------------+
-		| <4, 1>          |                 2 |                1 |         50% |
-		+------------------+-------------------+------------------+--------------+
-		| <5, 0>          |                 2 |                2 |          0% |
-		+------------------+-------------------+------------------+--------------+
-	*/
-
 	// Create test operators
 	// Note: the operator numbered 1-5 in the above tables are corresponding to the
 	// operatorIds[0], ..., operatorIds[4] here
@@ -888,18 +860,27 @@ func FetchOperatorSigningInfo(t *testing.T) {
 
 	// Mocking using a map function so we can always maintain the ID and address mapping
 	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
-	operatorIntialQuorums := map[core.OperatorID]*big.Int{
-		operatorIds[0]: big.NewInt(4), // quorum 2
-		operatorIds[1]: big.NewInt(3), // quorum 0,1
-		operatorIds[2]: big.NewInt(3), // quorum 0,1
-		operatorIds[3]: big.NewInt(0), // no quorum
-		operatorIds[4]: big.NewInt(0), // no quorum
+	operatorIntialQuorumsByBlock := map[uint32]map[core.OperatorID]*big.Int{
+		1: map[core.OperatorID]*big.Int{
+			operatorIds[0]: big.NewInt(4), // quorum 2
+			operatorIds[1]: big.NewInt(3), // quorum 0,1
+			operatorIds[2]: big.NewInt(3), // quorum 0,1
+			operatorIds[3]: big.NewInt(0), // no quorum
+			operatorIds[4]: big.NewInt(0), // no quorum
+		},
+		4: map[core.OperatorID]*big.Int{
+			operatorIds[0]: big.NewInt(4), // quorum 2
+			operatorIds[1]: big.NewInt(3), // quorum 0,1
+			operatorIds[2]: big.NewInt(3), // quorum 0,1
+			operatorIds[3]: big.NewInt(0), // no quorum
+			operatorIds[4]: big.NewInt(1), // quorum 0
+		},
 	}
 	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return(
 		func(ids []core.OperatorID, blockNum uint32) []*big.Int {
 			bitmaps := make([]*big.Int, len(ids))
 			for i, id := range ids {
-				bitmaps[i] = operatorIntialQuorums[id]
+				bitmaps[i] = operatorIntialQuorumsByBlock[blockNum][id]
 			}
 			return bitmaps
 		},
@@ -908,34 +889,74 @@ func FetchOperatorSigningInfo(t *testing.T) {
 
 	// operatorIds[0], operatorIds[1] and operatorIds[2] were active at the startBlock
 	// (see the above table)
-	mockTx.On("GetOperatorStakesForQuorums").Return(core.OperatorStakes{
-		0: {
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		1: core.OperatorStakes{
 			0: {
-				OperatorID: operatorIds[1],
-				Stake:      big.NewInt(2),
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
 			},
 			1: {
-				OperatorID: operatorIds[2],
-				Stake:      big.NewInt(2),
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorIds[0],
+					Stake:      big.NewInt(2),
+				},
 			},
 		},
-		1: {
+		4: core.OperatorStakes{
 			0: {
-				OperatorID: operatorIds[1],
-				Stake:      big.NewInt(2),
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorIds[4],
+					Stake:      big.NewInt(2),
+				},
 			},
 			1: {
-				OperatorID: operatorIds[2],
-				Stake:      big.NewInt(2),
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorIds[0],
+					Stake:      big.NewInt(2),
+				},
 			},
 		},
-		2: {
-			1: {
-				OperatorID: operatorIds[0],
-				Stake:      big.NewInt(2),
-			},
+	}
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
 		},
-	}, nil)
+		nil,
+	)
 
 	// operatorIds[3], operatorIds[4] were not active at the startBlock, but were added to
 	// quorums after startBlock (see the above table).
@@ -991,6 +1012,35 @@ func FetchOperatorSigningInfo(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	/*
+		Resulting Operator SigningInfo
+
+		Column definitions:
+		- <operator, quorum>:    Operator ID and quorum pair
+		- Total responsible:     Total number of batches the operator was responsible for
+		- Total nonsigning:      Number of batches where operator did not sign
+		- Signing rate:          Percentage of batches signed by <operator, quorum>
+
+		Data:
+		+------------------+-------------------+------------------+--------------+
+		| <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 0>          |                 5 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 1>          |                 4 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 0>          |                 5 |                3 |         40% |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 1>          |                 4 |                2 |         50% |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 0>          |                 2 |                0 |        100% |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 1>          |                 2 |                1 |         50% |
+		+------------------+-------------------+------------------+--------------+
+		| <5, 0>          |                 2 |                2 |          0% |
+		+------------------+-------------------+------------------+--------------+
+	*/
+
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
 
 	t.Run("invalid params", func(t *testing.T) {
@@ -1014,7 +1064,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 		}
 	})
 
-	t.Run("signing info computing", func(t *testing.T) {
+	t.Run("default params", func(t *testing.T) {
 		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info")
 		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
 		osi := response.OperatorSigningInfo
@@ -1025,6 +1075,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                0,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
 		})
 		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[1].Hex(),
@@ -1032,6 +1083,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                0,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
 		})
 		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[1].Hex(),
@@ -1039,6 +1091,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                1,
 			TotalUnsignedBatches:    0,
 			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
 		})
 		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[3].Hex(),
@@ -1046,6 +1099,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                1,
 			TotalUnsignedBatches:    1,
 			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
 		})
 		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[2].Hex(),
@@ -1053,6 +1107,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                1,
 			TotalUnsignedBatches:    2,
 			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
 		})
 		checkOperatorSigningInfoEqual(t, osi[5], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[2].Hex(),
@@ -1060,6 +1115,7 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                0,
 			TotalUnsignedBatches:    3,
 			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
 		})
 		checkOperatorSigningInfoEqual(t, osi[6], &serverv2.OperatorSigningInfo{
 			OperatorId:              operatorIds[4].Hex(),
@@ -1067,8 +1123,162 @@ func FetchOperatorSigningInfo(t *testing.T) {
 			QuorumId:                0,
 			TotalUnsignedBatches:    2,
 			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
 		})
 	})
+
+	t.Run("nonsigner only", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info?nonsigner_only=true")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 4, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    3,
+			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
+		})
+	})
+
+	t.Run("quorum 1 only", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info?quorums=1")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 3, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+	})
+
+	t.Run("custom time range", func(t *testing.T) {
+		// 800 seconds before "now", it should hit the last 2 batches in the setup table:
+		//
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// | Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// |     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
+		// |       |            |             |         |            | 2: {0,1}              |
+		// |       |            |             |         |            | 3: {0,1}              |
+		// |       |            |             |         |            | 5: {0}                |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// |     6 |          6 |           5 | 0       | 5          | 1: {2}                |
+		// |       |            |             |         |            | 2: {0,1}              |
+		// |       |            |             |         |            | 3: {0,1}              |
+		// |       |            |             |         |            | 5: {0}                |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		//
+		// which results in:
+		//
+		// +------------------+-------------------+------------------+--------------+
+		// | <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
+		// +------------------+-------------------+------------------+--------------+
+		// | <2, 0>           |                 2 |                0 |        100%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <2, 1>           |                 1 |                0 |        100%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <3, 0>           |                 2 |                1 |         50%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <3, 1>           |                 1 |                1 |         0%   |
+		// +------------------+-------------------+------------------+--------------+
+		// | <5, 0>           |                 2 |                2 |         0%   |
+		// +------------------+-------------------+------------------+--------------+
+
+		tm := time.Unix(0, int64(now)+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/operators/signing-info?end=%s&interval=1000", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 5, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 1,
+			TotalBatches:            1,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 1,
+			TotalBatches:            1,
+		})
+	})
+
 }
 
 func TestCheckOperatorsReachability(t *testing.T) {

@@ -701,7 +701,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		quorumIds = append(quorumIds, q)
 	}
 
-	nonsignerOnly := "true"
+	nonsignerOnly := "false"
 	if c.Query("nonsigner_only") != "" {
 		nonsignerOnly = c.Query("nonsigner_only")
 		if nonsignerOnly != "true" && nonsignerOnly != "false" {
@@ -715,7 +715,9 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		startTime = oldestTime
 	}
 
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1)
+	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(
+		c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1,
+	)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
 		errorResponse(c, fmt.Errorf("failed to fetch attestation feed from blob metadata store: %w", err))
@@ -1155,7 +1157,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 	// Create operators' quorum intervals: OperatorQuorumIntervals[op][q] is a sequence of
 	// increasing and non-overlapping block intervals during which the operator "op" is
 	// registered in quorum "q".
-	operatorQuorumIntervals, quorumIDs, err := s.operatorHandler.CreateOperatorQuorumIntervals(
+	operatorQuorumIntervals, _, err := s.operatorHandler.CreateOperatorQuorumIntervals(
 		ctx, operatorList, operatorQuorumEvents, uint32(startBlock), uint32(endBlock),
 	)
 	if err != nil {
@@ -1169,6 +1171,8 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 	// Compute num batches responsible, where numResponsible[op][q] is the number of batches
 	// that operator "op" and quorum "q" are responsible for.
 	numResponsible := computeNumResponsible(attestations, operatorQuorumIntervals)
+
+	totalNumBatchesPerQuorum := computeTotalNumBatchesPerQuorum(attestations)
 
 	state, err := s.chainState.GetOperatorState(ctx, uint(endBlock), quorumIDs)
 	if err != nil {
@@ -1191,6 +1195,10 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 			numFailedToSign := 0
 			if num, exist := safeAccess(numFailed, operatorId, q); exist {
 				numFailedToSign = num
+			}
+
+			if nonsignerOnly && numFailedToSign == 0 {
+				continue
 			}
 
 			operatorAddress, ok := operatorList.GetAddress(operatorId)
@@ -1220,7 +1228,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 				QuorumId:                q,
 				TotalUnsignedBatches:    numFailedToSign,
 				TotalResponsibleBatches: numShouldHaveSigned,
-				TotalBatches:            len(attestations),
+				TotalBatches:            totalNumBatchesPerQuorum[q],
 				SigningPercentage:       signingPercentage,
 				StakePercentage:         stakePercentage,
 			}
@@ -1228,7 +1236,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 		}
 	}
 
-	// Sort by descending order of <signing rate, quorumId, operatorId>.
+	// Sort by descending order of signing rate and then asecnding order of <quorumId, operatorId>.
 	sort.Slice(signingInfo, func(i, j int) bool {
 		if signingInfo[i].SigningPercentage == signingInfo[j].SigningPercentage {
 			if signingInfo[i].OperatorId == signingInfo[j].OperatorId {
@@ -1365,6 +1373,16 @@ func computeNumResponsible(
 	}
 
 	return numResponsible
+}
+
+func computeTotalNumBatchesPerQuorum(attestations []*corev2.Attestation) map[uint8]int {
+	numBatchesPerQuorum := make(map[uint8]int)
+	for _, at := range attestations {
+		for _, q := range at.QuorumNumbers {
+			numBatchesPerQuorum[q]++
+		}
+	}
+	return numBatchesPerQuorum
 }
 
 func safeAccess(data map[string]map[uint8]int, i string, j uint8) (int, bool) {
