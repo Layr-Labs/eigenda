@@ -27,7 +27,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 	// V1 dispersal service
 	go func() {
 		if !config.EnableV1 {
-			logger.Warn("v1 is disabled, skipping v1 dispersal server startup")
+			logger.Warn("v1 is not enabled, skipping v1 dispersal server startup")
 			return
 		}
 		for {
@@ -89,7 +89,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 	// v1 Retrieval service
 	go func() {
 		if !config.EnableV1 {
-			logger.Warn("v1 is disabled, skipping v1 retrieval server startup")
+			logger.Warn("v1 is not enabled, skipping v1 retrieval server startup")
 			return
 		}
 		for {
