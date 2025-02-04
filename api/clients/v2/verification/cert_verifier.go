@@ -230,13 +230,12 @@ func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlock
 		defer cv.pollingActive.Store(false)
 	}
 
-	var actualBlockNumber uint64
 	for {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf(
 				"timed out waiting for block number %d (latest block number observed was %d): %w",
-				targetBlockNumber, actualBlockNumber, ctx.Err())
+				targetBlockNumber, cv.latestBlockNumber.Load(), ctx.Err())
 		case <-ticker.C:
 			if cv.latestBlockNumber.Load() >= targetBlockNumber {
 				return nil
@@ -263,7 +262,7 @@ func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlock
 			cv.logger.Debug(
 				"local client is behind the reference block number",
 				"targetBlockNumber", targetBlockNumber,
-				"actualBlockNumber", actualBlockNumber)
+				"actualBlockNumber", cv.latestBlockNumber.Load())
 		}
 	}
 }
