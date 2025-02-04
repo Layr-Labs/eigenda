@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,6 +35,11 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	controllerReadinessProbePath string        = "/tmp/controller-ready"
+	controllerHealthProbePath    string        = "/tmp/controller-health"
+	controllerMaxStallDuration   time.Duration = 240 * time.Second
+	controllerLivenessChan                     = make(chan time.Time, 1)
 )
 
 func main() {
@@ -49,10 +55,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
+
+	// Start HeartBeat Monitor
+	go heartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration)
+
 	select {}
 }
 
 func RunController(ctx *cli.Context) error {
+	// Reset readiness probe upon start-up
+	if _, err := os.Stat(controllerReadinessProbePath); err == nil {
+		if err := os.Remove(controllerReadinessProbePath); err != nil {
+			log.Printf("Failed to clean up readiness file: %v at path %v \n", err, controllerReadinessProbePath)
+		}
+	}
+
 	config, err := NewConfig(ctx)
 	if err != nil {
 		return err
@@ -201,5 +218,41 @@ func RunController(ctx *cli.Context) error {
 		}
 	}()
 
+	// Signal readiness once the controller starts successfully
+	if _, err := os.Create(controllerReadinessProbePath); err != nil {
+		log.Printf("Failed to create readiness file: %v at path %v \n", err, controllerReadinessProbePath)
+	}
+
 	return nil
+}
+
+// Function to process and send controller liveness probe to GoRoutine
+func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration) {
+	var lastHeartbeat time.Time
+	stallTimer := time.NewTimer(controllerMaxStallDuration)
+
+	for {
+		select {
+		// Heartbeat from Goroutine on controller Pull Interval
+		case heartbeat, ok := <-controllerLivenessChan:
+			if !ok {
+				log.Println("controllerLivenessChan closed, stopping health probe.")
+				return
+			}
+			log.Printf("Received heartbeat from controller GoRoutine: %v\n", heartbeat)
+			lastHeartbeat = heartbeat
+			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
+				log.Printf("Failed to update heartbeat file: %v", err)
+			} else {
+				log.Printf("Updated heartbeat file: %v with time %v\n", filePath, lastHeartbeat)
+			}
+			stallTimer.Reset(controllerMaxStallDuration) // Reset timer on new heartbeat
+
+		case <-stallTimer.C:
+			// Instead of stopping the function, log a warning
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Reset the timer to continue monitoring
+			stallTimer.Reset(controllerMaxStallDuration)
+		}
+	}
 }
