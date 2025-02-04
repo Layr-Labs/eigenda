@@ -28,7 +28,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
+	if err := s.validateDispersalRequest(req, onchainState); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
@@ -39,8 +39,6 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 
 	finishedValidation := time.Now()
 	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
-
-	s.metrics.reportDisperseBlobSize(len(req.GetBlob()))
 
 	blob := req.GetBlob()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
@@ -122,12 +120,13 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}
+	symbolsCharged := s.meterer.SymbolsCharged(blobLength)
+	s.metrics.reportDisperseBlobSymbolsCharged(int(symbolsCharged))
 
 	return nil
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
-	ctx context.Context,
 	req *pb.DisperseBlobRequest,
 	onchainState *OnchainState) error {
 
@@ -137,6 +136,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 	blob := req.GetBlob()
 	blobSize := len(blob)
+	s.metrics.reportDisperseBlobSize(blobSize)
 	if blobSize == 0 {
 		return errors.New("blob size must be greater than 0")
 	}
