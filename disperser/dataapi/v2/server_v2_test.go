@@ -1045,7 +1045,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	defer deleteItems(t, dynamoKeys)
 
 	/*
-		Resulting Operator SigningInfo (for block range [1, 5]
+		Resulting Operator SigningInfo (for block range [1, 5])
 
 		Column definitions:
 		- <operator, quorum>:    Operator ID and quorum pair
@@ -1057,19 +1057,19 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		+------------------+-------------------+------------------+--------------+
 		| <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
 		+------------------+-------------------+------------------+--------------+
-		| <2, 0>          |                 5 |                0 |        100% |
+		| <2, 0>           |                 5 |                0 |        100%  |
 		+------------------+-------------------+------------------+--------------+
-		| <2, 1>          |                 4 |                0 |        100% |
+		| <2, 1>           |                 4 |                0 |        100%  |
 		+------------------+-------------------+------------------+--------------+
-		| <3, 0>          |                 5 |                3 |         40% |
+		| <3, 0>           |                 5 |                3 |         40%  |
 		+------------------+-------------------+------------------+--------------+
-		| <3, 1>          |                 4 |                2 |         50% |
+		| <3, 1>           |                 4 |                2 |         50%  |
 		+------------------+-------------------+------------------+--------------+
-		| <4, 0>          |                 2 |                0 |        100% |
+		| <4, 0>           |                 2 |                0 |        100%  |
 		+------------------+-------------------+------------------+--------------+
-		| <4, 1>          |                 2 |                1 |         50% |
+		| <4, 1>           |                 2 |                1 |         50%  |
 		+------------------+-------------------+------------------+--------------+
-		| <5, 0>          |                 2 |                2 |          0% |
+		| <5, 0>           |                 2 |                2 |          0%  |
 		+------------------+-------------------+------------------+--------------+
 	*/
 
@@ -1230,7 +1230,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	})
 
 	t.Run("custom time range", func(t *testing.T) {
-		// We query 800 seconds before "now", it should hit the last 2 batches in the setup table:
+		// We query 800 seconds before "now", it should hit the last 2 batches (block 4, 5)
+		// in the setup table:
 		//
 		// +-------+------------+-------------+---------+------------+------------------------+
 		// | Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |

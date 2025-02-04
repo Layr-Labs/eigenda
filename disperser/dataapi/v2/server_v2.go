@@ -625,7 +625,7 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 //	@Param		end				query		string	false	"Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval		query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
 //	@Param		quorums			query		string	false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
-//	@Param		nonsigner_only	query		string	false	"Whether return only operators with signing rate less than 100% [default: false]"
+//	@Param		nonsigner_only	query		boolean false	"Whether to only return operators with signing rate less than 100% [default: false]"
 //	@Success	200				{object}	OperatorsSigningInfoResponse
 //	@Failure	400				{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404				{object}	ErrorResponse	"error: Not found"
@@ -701,10 +701,11 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		quorumIds = append(quorumIds, q)
 	}
 
-	nonsignerOnly := "false"
+	nonsignerOnly := false
 	if c.Query("nonsigner_only") != "" {
-		nonsignerOnly = c.Query("nonsigner_only")
-		if nonsignerOnly != "true" && nonsignerOnly != "false" {
+		nonsignerOnlyStr := c.Query("nonsigner_only")
+		nonsignerOnly, err = strconv.ParseBool(nonsignerOnlyStr)
+		if err != nil {
 			invalidParamsErrorResponse(c, errors.New("the nonsigner_only param must be \"true\" or \"false\""))
 			return
 		}
@@ -724,7 +725,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		return
 	}
 
-	signingInfo, err := s.computeOperatorsSigningInfo(c.Request.Context(), attestations, quorumIds, nonsignerOnly == "true")
+	signingInfo, err := s.computeOperatorsSigningInfo(c.Request.Context(), attestations, quorumIds, nonsignerOnly)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
 		errorResponse(c, fmt.Errorf("failed to compute the operators signing info: %w", err))
@@ -1207,6 +1208,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 				// between ID and address), but we don't fail the entire request, just
 				// mark internal error for the address field to signal the issue.
 				operatorAddress = "Unexpected internal error"
+				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", operatorId)
 			}
 
 			// Signing percentage with 2 decimal (e.g. 95.75, which means 95.75%)
@@ -1236,7 +1238,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 		}
 	}
 
-	// Sort by descending order of signing rate and then asecnding order of <quorumId, operatorId>.
+	// Sort by descending order of signing rate and then ascending order of <quorumId, operatorId>.
 	sort.Slice(signingInfo, func(i, j int) bool {
 		if signingInfo[i].SigningPercentage == signingInfo[j].SigningPercentage {
 			if signingInfo[i].OperatorId == signingInfo[j].OperatorId {

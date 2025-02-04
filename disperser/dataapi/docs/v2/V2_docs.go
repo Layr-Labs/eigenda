@@ -530,8 +530,8 @@ const docTemplateV2 = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Whether return only operators with signing rate less than 100% [default: false]",
+                        "type": "boolean",
+                        "description": "Whether to only return operators with signing rate less than 100% [default: false]",
                         "name": "nonsigner_only",
                         "in": "query"
                     }

@@ -911,11 +911,11 @@ paths:
         in: query
         name: quorums
         type: string
-      - description: 'Whether return only operators with signing rate less than 100%
-          [default: false]'
+      - description: 'Whether to only return operators with signing rate less than
+          100% [default: false]'
         in: query
         name: nonsigner_only
-        type: string
+        type: boolean
       produces:
       - application/json
       responses:
