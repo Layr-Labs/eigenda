@@ -27,7 +27,7 @@ type metricsV2 struct {
 	getPaymentStateLatency          *prometheus.SummaryVec
 	disperseBlobLatency             *prometheus.SummaryVec
 	disperseBlobSize                *prometheus.GaugeVec
-	disperseBlobSymbolsCharged      *prometheus.GaugeVec
+	disperseBlobMeteredBytes        *prometheus.GaugeVec
 	validateDispersalRequestLatency *prometheus.SummaryVec
 	storeBlobLatency                *prometheus.SummaryVec
 	getBlobStatusLatency            *prometheus.SummaryVec
@@ -89,11 +89,11 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		[]string{},
 	)
 
-	disperseBlobSymbolsCharged := promauto.With(registry).NewGaugeVec(
+	disperseBlobMeteredBytes := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "disperse_blob_symbols_charged",
-			Help:      "The number of symbols charged for the blob.",
+			Name:      "disperse_blob_metered_bytes",
+			Help:      "The number of bytes charged for the blob.",
 		},
 		[]string{},
 	)
@@ -134,7 +134,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 		getPaymentStateLatency:          getPaymentStateLatency,
 		disperseBlobLatency:             disperseBlobLatency,
 		disperseBlobSize:                disperseBlobSize,
-		disperseBlobSymbolsCharged:      disperseBlobSymbolsCharged,
+		disperseBlobMeteredBytes:        disperseBlobMeteredBytes,
 		validateDispersalRequestLatency: validateDispersalRequestLatency,
 		storeBlobLatency:                storeBlobLatency,
 		getBlobStatusLatency:            getBlobStatusLatency,
@@ -176,8 +176,8 @@ func (m *metricsV2) reportDisperseBlobSize(size int) {
 	m.disperseBlobSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *metricsV2) reportDisperseBlobSymbolsCharged(symbolsCharged int) {
-	m.disperseBlobSymbolsCharged.WithLabelValues().Set(float64(symbolsCharged))
+func (m *metricsV2) reportDisperseMeteredBytes(usageInBytes int) {
+	m.disperseBlobMeteredBytes.WithLabelValues().Set(float64(usageInBytes))
 }
 
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {

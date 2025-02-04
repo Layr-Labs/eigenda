@@ -121,7 +121,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		return api.NewErrorResourceExhausted(err.Error())
 	}
 	symbolsCharged := s.meterer.SymbolsCharged(blobLength)
-	s.metrics.reportDisperseBlobSymbolsCharged(int(symbolsCharged))
+	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
 
 	return nil
 }
