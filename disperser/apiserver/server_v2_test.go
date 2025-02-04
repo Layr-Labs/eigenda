@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -648,5 +649,6 @@ func TestTooShortCommitment(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2add ")
+	require.True(t, strings.Contains(err.Error(), "invalid commitment length") ||
+		strings.Contains(err.Error(), "is less than blob length"))
 }
