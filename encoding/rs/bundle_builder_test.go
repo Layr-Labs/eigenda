@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestParsingBinaryFrame(t *testing.T) {
+func TestParsingBundle(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
@@ -49,11 +49,11 @@ func TestParsingBinaryFrame(t *testing.T) {
 	require.Equal(t, len(proofs), len(splitProofs))
 
 	// Build binary Frames
-	binaryFrames, err := rs.BuildBinaryFrames(splitProofs, elementCount, splitSerializedCoeffs)
+	binaryFrames, err := rs.BuildChunksData(splitProofs, int(elementCount), splitSerializedCoeffs)
 	require.NoError(t, err)
 
 	// convert binary Frames into a serialized bundle
-	serializedBundle, err := binaryFrames.SerializeAsBundle()
+	serializedBundle, err := binaryFrames.FlattenToBundle()
 	require.NoError(t, err)
 
 	// construct a standard core.Bundle, serialize it, and compare bytes.

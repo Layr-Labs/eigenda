@@ -7,14 +7,13 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-func deserializeBinaryFrames(t *testing.T, binaryFrames *rs.BinaryFrames) []*encoding.Frame {
-	bundleBytes, err := binaryFrames.SerializeAsBundle()
+func deserializeBinaryFrames(t *testing.T, binaryFrames *core.ChunksData) []*encoding.Frame {
+	bundleBytes, err := binaryFrames.FlattenToBundle()
 	require.NoError(t, err)
 	bundle := core.Bundle{}
 	bundle, err = bundle.Deserialize(bundleBytes)

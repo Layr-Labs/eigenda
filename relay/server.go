@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"net"
 	"strings"
 	"time"
@@ -332,13 +331,13 @@ func getKeysFromChunkRequest(request *pb.GetChunksRequest) ([]v2.BlobKey, error)
 
 // gatherChunkDataToSend takes the chunk data and narrows it down to the data requested in the GetChunks request.
 func gatherChunkDataToSend(
-	frames map[v2.BlobKey]*rs.BinaryFrames,
+	frames map[v2.BlobKey]*core.ChunksData,
 	request *pb.GetChunksRequest) ([][]byte, error) {
 
 	bytesToSend := make([][]byte, 0, len(request.ChunkRequests))
 
 	for _, chunkRequest := range request.ChunkRequests {
-		var framesSubset *rs.BinaryFrames
+		var framesSubset *core.ChunksData
 		var err error
 
 		if chunkRequest.GetByIndex() != nil {
@@ -351,7 +350,7 @@ func gatherChunkDataToSend(
 			return nil, fmt.Errorf("error selecting frame subset: %v", err)
 		}
 
-		subsetBytes, err := framesSubset.SerializeAsBundle()
+		subsetBytes, err := framesSubset.FlattenToBundle()
 		if err != nil {
 			return nil, fmt.Errorf("error serializing frame subset: %v", err)
 		}
@@ -365,7 +364,7 @@ func gatherChunkDataToSend(
 // selectFrameSubsetByRange selects a subset of frames from a BinaryFrames object based on a range
 func selectFrameSubsetByRange(
 	request *pb.ChunkRequestByRange,
-	allFrames map[v2.BlobKey]*rs.BinaryFrames) (*rs.BinaryFrames, error) {
+	allFrames map[v2.BlobKey]*core.ChunksData) (*core.ChunksData, error) {
 
 	key := v2.BlobKey(request.GetBlobKey())
 	startIndex := request.StartIndex
@@ -381,15 +380,16 @@ func selectFrameSubsetByRange(
 			"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
 			startIndex, endIndex, key.Hex())
 	}
-	if endIndex > uint32(len(frames.Frames)) {
+	if endIndex > uint32(len(frames.Chunks)) {
 		return nil, fmt.Errorf(
 			"chunk range %d-%d is invald for key %s, chunk count %d",
-			startIndex, endIndex, key, len(frames.Frames))
+			startIndex, endIndex, key, len(frames.Chunks))
 	}
 
-	framesSubset := &rs.BinaryFrames{
-		ElementCount: frames.ElementCount,
-		Frames:       frames.Frames[startIndex:endIndex],
+	framesSubset := &core.ChunksData{
+		Chunks:   frames.Chunks[startIndex:endIndex],
+		Format:   frames.Format,
+		ChunkLen: frames.ChunkLen,
 	}
 
 	return framesSubset, nil
@@ -398,7 +398,7 @@ func selectFrameSubsetByRange(
 // selectFrameSubsetByIndex selects a subset of frames from a BinaryFrames object based on a list of indices
 func selectFrameSubsetByIndex(
 	request *pb.ChunkRequestByIndex,
-	allFrames map[v2.BlobKey]*rs.BinaryFrames) (*rs.BinaryFrames, error) {
+	allFrames map[v2.BlobKey]*core.ChunksData) (*core.ChunksData, error) {
 
 	key := v2.BlobKey(request.GetBlobKey())
 	frames, ok := allFrames[key]
@@ -406,24 +406,25 @@ func selectFrameSubsetByIndex(
 		return nil, fmt.Errorf("frames not found for key %s", key.Hex())
 	}
 
-	if len(request.ChunkIndices) > len(frames.Frames) {
+	if len(request.ChunkIndices) > len(frames.Chunks) {
 		return nil, fmt.Errorf("too many requested chunks for key %s, chunk count %d",
-			key.Hex(), len(frames.Frames))
+			key.Hex(), len(frames.Chunks))
 	}
 
-	framesSubset := &rs.BinaryFrames{
-		ElementCount: frames.ElementCount,
-		Frames:       make([][]byte, 0, len(request.ChunkIndices)),
+	framesSubset := &core.ChunksData{
+		Format:   frames.Format,
+		ChunkLen: frames.ChunkLen,
+		Chunks:   make([][]byte, 0, len(request.ChunkIndices)),
 	}
 
 	for index := range request.ChunkIndices {
-		if index >= len(frames.Frames) {
+		if index >= len(frames.Chunks) {
 			return nil, fmt.Errorf(
 				"chunk index %d out of range for key %s, chunk count %d",
-				index, key.Hex(), len(frames.Frames))
+				index, key.Hex(), len(frames.Chunks))
 		}
 
-		framesSubset.Frames = append(framesSubset.Frames, frames.Frames[index])
+		framesSubset.Chunks = append(framesSubset.Chunks, frames.Chunks[index])
 	}
 
 	return framesSubset, nil
