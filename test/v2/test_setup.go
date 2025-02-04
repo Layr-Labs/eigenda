@@ -21,7 +21,6 @@ var (
 		EigenDACertVerifierAddress:    "0xe2C7AfB3c47B800b439b0a3d8EA40ca79759B245",
 		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
 		SRSOrder:                      268435456,
-		SRSNumberToLoad:               2097152,
 		MaxBlobSize:                   16 * units.MiB,
 		MinimumSigningPercent:         55,
 	}
