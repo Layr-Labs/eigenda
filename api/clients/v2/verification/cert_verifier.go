@@ -7,7 +7,7 @@ import (
 	"time"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -37,7 +37,7 @@ type CertVerifier struct {
 	logger logging.Logger
 	// go binding around the EigenDACertVerifier ethereum contract
 	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
-	ethClient          *geth.EthClient
+	ethClient          common.EthClient
 	pollInterval       time.Duration
 	// storage shared between goroutines, containing the most recent block number observed by calling ethClient.BlockNumber()
 	latestBlockNumber atomic.Uint64
@@ -51,7 +51,7 @@ var _ ICertVerifier = &CertVerifier{}
 func NewCertVerifier(
 	logger logging.Logger,
 	// the eth client, which should already be set up
-	ethClient *geth.EthClient,
+	ethClient common.EthClient,
 	// the hex address of the EigenDACertVerifier contract
 	certVerifierAddress string,
 	// pollInterval is how frequently to check latest block number when waiting for the internal eth client to advance
