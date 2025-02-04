@@ -3,6 +3,8 @@ package dataapi
 import (
 	"fmt"
 	"sort"
+
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
 // NumBatchesAtBlock represents the number of batches at current block.
@@ -219,6 +221,21 @@ func CreateQuorumBatchMap(batches []*BatchNonSigningInfo) map[uint8]map[uint32]i
 				quorumBatchMap[q] = make(map[uint32]int)
 			}
 			quorumBatchMap[q][batch.ReferenceBlockNumber]++
+		}
+	}
+	return quorumBatchMap
+}
+
+// CreateQuorumBatchMapV2 returns quorumBatchMap, where quorumBatchMap[q][b] means the number of
+// batches at block b that have dispersed to quorum q.
+func CreateQuorumBatchMapV2(attestations []*corev2.Attestation) map[uint8]map[uint32]int {
+	quorumBatchMap := make(map[uint8]map[uint32]int)
+	for _, at := range attestations {
+		for _, q := range at.QuorumNumbers {
+			if _, ok := quorumBatchMap[q]; !ok {
+				quorumBatchMap[q] = make(map[uint32]int)
+			}
+			quorumBatchMap[q][uint32(at.ReferenceBlockNumber)]++
 		}
 	}
 	return quorumBatchMap

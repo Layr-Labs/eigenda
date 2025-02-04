@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"strconv"
 
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	"github.com/stretchr/testify/mock"
@@ -148,7 +149,18 @@ func (m *MockSubgraphApi) QueryOperatorAddedToQuorum(ctx context.Context, startB
 		value = args.Get(0).([]*subgraph.OperatorQuorum)
 	}
 
-	return value, args.Error(1)
+	result := make([]*subgraph.OperatorQuorum, 0)
+	for _, oq := range value {
+		blockNum, err := strconv.ParseUint(string(oq.BlockNumber), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		if blockNum >= uint64(startBlock) && blockNum <= uint64(endBlock) {
+			result = append(result, oq)
+		}
+	}
+
+	return result, args.Error(1)
 }
 
 func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, startBlock, endBlock uint32) ([]*subgraph.OperatorQuorum, error) {
@@ -159,7 +171,18 @@ func (m *MockSubgraphApi) QueryOperatorRemovedFromQuorum(ctx context.Context, st
 		value = args.Get(0).([]*subgraph.OperatorQuorum)
 	}
 
-	return value, args.Error(1)
+	result := make([]*subgraph.OperatorQuorum, 0)
+	for _, oq := range value {
+		blockNum, err := strconv.ParseUint(string(oq.BlockNumber), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		if blockNum >= uint64(startBlock) && blockNum <= uint64(endBlock) {
+			result = append(result, oq)
+		}
+	}
+
+	return result, args.Error(1)
 }
 
 func (m *MockSubgraphApi) QueryOperatorEjectionsGteBlockTimestamp(ctx context.Context, blockTimestamp uint64, first uint, skip uint) ([]*subgraph.OperatorEjection, error) {
