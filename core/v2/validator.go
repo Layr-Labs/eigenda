@@ -150,10 +150,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 			}
 
 			// TODO: Define params for the blob
-			params, err := blob.BlobHeader.GetEncodingParams(blobParams)
-			if err != nil {
-				return err
-			}
+			params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 
 			if err != nil {
 				return err

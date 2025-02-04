@@ -10,6 +10,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
@@ -271,4 +272,19 @@ func repeatedBytesToBN254G1Points(repeatedBytes [][]byte) ([]contractEigenDACert
 	}
 
 	return outputPoints, nil
+}
+
+// BlobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
+// encoding.BlobCommitments type
+func BlobCommitmentsBindingToInternal(
+	blobCommitmentBinding *contractEigenDACertVerifier.BlobCommitment,
+) (*encoding.BlobCommitments, error) {
+
+	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(BlobCommitmentBindingToProto(blobCommitmentBinding))
+
+	if err != nil {
+		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
+	}
+
+	return blobCommitment, nil
 }

@@ -1,7 +1,7 @@
 package clients
 
 import (
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -54,6 +54,24 @@ type RelayPayloadRetrieverConfig struct {
 	RelayTimeout time.Duration
 }
 
+// ValidatorPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values
+// needed by a ValidatorPayloadRetriever
+type ValidatorPayloadRetrieverConfig struct {
+	PayloadClientConfig
+
+	// The timeout duration for calls to retrieve blobs from a given quorum.
+	RetrievalTimeout time.Duration
+
+	// The address of the BlsOperatorStateRetriever contract
+	BlsOperatorStateRetrieverAddr string
+
+	// The address of the EigenDAServiceManager contract
+	EigenDAServiceManagerAddr string
+
+	// The number of simultaneous connections to use when fetching chunks during validator retrieval
+	ConnectionCount uint
+}
+
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
 // by a PayloadDisperser
 type PayloadDisperserConfig struct {
@@ -96,20 +114,20 @@ func getDefaultPayloadClientConfig() *PayloadClientConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
 
 	if cc.EthRpcUrl == "" {
-		return fmt.Errorf("EthRpcUrl is required")
+		return errors.New("EthRpcUrl is required")
 	}
 
 	if cc.EigenDACertVerifierAddr == "" {
-		return fmt.Errorf("EigenDACertVerifierAddr is required")
+		return errors.New("EigenDACertVerifierAddr is required")
 	}
 
 	// Nothing to do for PayloadPolynomialForm
@@ -135,11 +153,11 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
@@ -149,6 +167,51 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
 	if rc.RelayTimeout == 0 {
 		rc.RelayTimeout = defaultConfig.RelayTimeout
+	}
+
+	return nil
+}
+
+// GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
+//
+// NOTE: The following fields do not have defined defaults and must always be specifically configured:
+// - EthRpcUrl
+// - EigenDACertVerifierAddr
+// - BlsOperatorStateRetrieverAddr
+// - EigenDAServiceManagerAddr
+func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
+	return &ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		RetrievalTimeout:    20 * time.Second,
+		ConnectionCount:     10,
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
+//
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
+func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
+	err := rc.PayloadClientConfig.checkAndSetDefaults()
+	if err != nil {
+		return err
+	}
+
+	if rc.BlsOperatorStateRetrieverAddr == "" {
+		return errors.New("BlsOperatorStateRetrieverAddr is required")
+	}
+
+	if rc.EigenDAServiceManagerAddr == "" {
+		return errors.New("EigenDAServiceManagerAddr is required")
+	}
+
+	defaultConfig := GetDefaultValidatorPayloadRetrieverConfig()
+	if rc.RetrievalTimeout == 0 {
+		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
+	}
+	if rc.ConnectionCount == 0 {
+		rc.ConnectionCount = defaultConfig.ConnectionCount
 	}
 
 	return nil
@@ -167,11 +230,11 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 	err := dc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {

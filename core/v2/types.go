@@ -147,8 +147,8 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 	}, nil
 }
 
-func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(b.BlobCommitments.Length), blobParams)
+func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := GetChunkLength(uint32(blobLength), blobParams)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}

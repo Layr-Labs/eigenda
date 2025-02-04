@@ -146,7 +146,7 @@ func prepareBlobs(
 		blob := blobs[z]
 		header := cert.BlobHeader
 
-		params, err := header.GetEncodingParams(blobParams)
+		params, err := v2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
 		chunks, err := p.GetFrames(blob, params)
 		require.NoError(t, err)

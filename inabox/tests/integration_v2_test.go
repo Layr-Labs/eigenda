@@ -241,20 +241,50 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
+		blob1Key, err := blobCert1.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
+		blob2Key, err := blobCert2.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
 		// Test retrieval from DA network
-		b, err := retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 0)
+		b, err := retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			0)
 		Expect(err).To(BeNil())
 		restored := bytes.TrimRight(b, "\x00")
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 0)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			0)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))

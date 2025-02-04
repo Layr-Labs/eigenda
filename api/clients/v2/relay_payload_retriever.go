@@ -9,9 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifiercontract "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -104,8 +102,9 @@ func NewRelayPayloadRetriever(
 // GetPayload iteratively attempts to fetch a given blob with key blobKey from relays that have it, as claimed by the
 // blob certificate. The relays are attempted in random order.
 //
-// If the blob is successfully retrieved, then the blob is verified. If the verification succeeds, the blob is decoded
-// to yield the payload (the original user data, with no padding or any modification), and the payload is returned.
+// If the blob is successfully retrieved, then the blob verified against the EigenDACert. If the verification succeeds,
+// the blob is decoded to yield the payload (the original user data, with no padding or any modification), and the
+// payload is returned.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert) ([]byte, error) {
@@ -126,7 +125,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		return nil, errors.New("relay key count is zero")
 	}
 
-	blobCommitments, err := blobCommitmentsBindingToInternal(
+	blobCommitments, err := verification.BlobCommitmentsBindingToInternal(
 		&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
 
 	if err != nil {
@@ -154,11 +153,21 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 
-		err = pr.verifyBlobAgainstCert(blobKey, relayKey, blob, blobCommitments.Commitment, blobCommitments.Length)
-
-		// An honest relay should never send a blob which doesn't verify against the cert
+		err = verification.CheckBlobLength(blob, blobCommitments.Length)
 		if err != nil {
-			pr.log.Warn("verify blob from relay against cert: %w", err)
+			pr.log.Warn("check blob length", "blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			continue
+		}
+
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
+		if err != nil {
+			pr.log.Warn(
+				"generate and compare blob commitment",
+				"blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+			continue
+		}
+		if !valid {
+			pr.log.Warn("cert is invalid", "blobKey", blobKey.Hex(), "relayKey", relayKey)
 			continue
 		}
 
@@ -180,59 +189,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
-// verifyBlobAgainstCert verifies the blob received from a relay against the certificate.
-//
-// The following verifications are performed in this method:
-// 1. Verify that the blob isn't empty
-// 2. Verify the blob against the cert's kzg commitment
-// 3. Verify that the blob length is less than or equal to the cert's blob length
-//
-// If all verifications succeed, the method returns nil. Otherwise, it returns an error.
-func (pr *RelayPayloadRetriever) verifyBlobAgainstCert(
-	blobKey *core.BlobKey,
-	relayKey core.RelayKey,
-	blob []byte,
-	kzgCommitment *encoding.G1Commitment,
-	blobLength uint) error {
-
-	// An honest relay should never send an empty blob
-	if len(blob) == 0 {
-		return fmt.Errorf("blob %v received from relay %v had length 0", blobKey.Hex(), relayKey)
-	}
-
-	// TODO: in the future, this will be optimized to use fiat shamir transformation for verification, rather than
-	//  regenerating the commitment: https://github.com/Layr-Labs/eigenda/issues/1037
-	valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, kzgCommitment)
-	if err != nil {
-		return fmt.Errorf(
-			"generate and compare commitment for blob %v received from relay %v: %w",
-			blobKey.Hex(),
-			relayKey,
-			err)
-	}
-
-	if !valid {
-		return fmt.Errorf("commitment for blob %v is invalid for bytes received from relay %v", blobKey.Hex(), relayKey)
-	}
-
-	// Checking that the length returned by the relay is <= the length claimed in the BlobCommitments is sufficient
-	// here: it isn't necessary to verify the length proof itself, since this will have been done by DA nodes prior to
-	// signing for availability.
-	//
-	// Note that the length in the commitment is the length of the blob in symbols
-	if uint(len(blob)) > blobLength*encoding.BYTES_PER_SYMBOL {
-		return fmt.Errorf(
-			"length for blob %v (%d bytes) received from relay %v is greater than claimed blob length (%d bytes)",
-			blobKey.Hex(),
-			len(blob),
-			relayKey,
-			blobLength*encoding.BYTES_PER_SYMBOL)
-	}
-
-	return nil
-}
-
-// getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.RelayTimeout
+// getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.FetchTimeout
 func (pr *RelayPayloadRetriever) getBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
@@ -246,7 +203,7 @@ func (pr *RelayPayloadRetriever) getBlobWithTimeout(
 
 // verifyCertWithTimeout verifies an EigenDACert by making a call to VerifyCertV2.
 //
-// This method times out after the duration configured in relayPayloadRetrieverConfig.ContractCallTimeout
+// This method times out after the duration configured in RelayPayloadRetrieverConfig.ContractCallTimeout
 func (pr *RelayPayloadRetriever) verifyCertWithTimeout(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
@@ -270,20 +227,4 @@ func (pr *RelayPayloadRetriever) Close() error {
 	}
 
 	return nil
-}
-
-// blobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
-// encoding.BlobCommitments type
-func blobCommitmentsBindingToInternal(
-	blobCommitmentBinding *verifiercontract.BlobCommitment,
-) (*encoding.BlobCommitments, error) {
-
-	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(
-		verification.BlobCommitmentBindingToProto(blobCommitmentBinding))
-
-	if err != nil {
-		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
-	}
-
-	return blobCommitment, nil
 }
