@@ -41,6 +41,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
 
 	blob := req.GetBlob()
+	s.metrics.reportDisperseBlobSize(len(blob))
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %v", err))
@@ -116,11 +117,10 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}
-	symbolsCharged := s.meterer.SymbolsCharged(blobLength)
 	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
 
 	return nil
@@ -136,7 +136,6 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 	blob := req.GetBlob()
 	blobSize := len(blob)
-	s.metrics.reportDisperseBlobSize(blobSize)
 	if blobSize == 0 {
 		return errors.New("blob size must be greater than 0")
 	}
