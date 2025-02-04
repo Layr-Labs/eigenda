@@ -1,8 +1,10 @@
 package flags
 
 import (
-	"github.com/docker/go-units"
+	"fmt"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -13,6 +15,11 @@ import (
 const (
 	FlagPrefix   = "node"
 	EnvVarPrefix = "NODE"
+
+	// Node mode values
+	ModeV1Only  = "v1-only"
+	ModeV2Only  = "v2-only"
+	ModeV1AndV2 = "v1-and-v2"
 )
 
 var (
@@ -51,13 +58,13 @@ var (
 	V2DispersalPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
 		Usage:    "Port at which node registers to listen for v2 dispersal calls",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
 	}
 	V2RetrievalPortFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "v2-retrieval-port"),
 		Usage:    "Port at which node registers to listen for v2 retrieval calls",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
 	EnableNodeApiFlag = cli.BoolFlag{
@@ -231,12 +238,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolTFlag{
-		Name:     "enable-v2",
-		Usage:    "Enable V2 features",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
-	}
 	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2 (default: 1h)",
@@ -283,7 +284,7 @@ var (
 		Usage:    "The duration for which a disperser authentication is valid",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
-		Value:    time.Minute,
+		Value:    0, // TODO (cody-littley) remove this feature
 	}
 	RelayMaxGRPCMessageSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "relay-max-grpc-message-size"),
@@ -395,6 +396,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
 	}
+
+	RuntimeModeFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "runtime-mode"),
+		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1Only, ModeV2Only, ModeV1AndV2),
+		Required: false,
+		Value:    ModeV1Only,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -442,7 +451,6 @@ var optionalFlags = []cli.Flag{
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
 	BLSSignerAPIKeyFlag,
-	EnableV2Flag,
 	V2DispersalPortFlag,
 	V2RetrievalPortFlag,
 	OnchainStateRefreshIntervalFlag,
@@ -455,6 +463,7 @@ var optionalFlags = []cli.Flag{
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
+	RuntimeModeFlag,
 }
 
 func init() {

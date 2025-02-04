@@ -46,6 +46,10 @@ func NewOperatorList() *OperatorList {
 	}
 }
 
+func (o *OperatorList) GetOperatorIds() []core.OperatorID {
+	return o.operatorIds
+}
+
 func (o *OperatorList) Add(id core.OperatorID, address string) {
 	if _, exists := o.idToAddress[id]; exists {
 		return
@@ -84,7 +88,7 @@ func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 	}
 }
 
-func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
+func (oh *OperatorHandler) ProbeV2OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
 	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
 	if err != nil {
 		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
@@ -92,65 +96,82 @@ func (oh *OperatorHandler) ProbeOperatorHosts(ctx context.Context, operatorId st
 	}
 
 	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-	v1RetrievalSocket := operatorSocket.GetV1RetrievalSocket()
-	v1RetrievalPortOpen := checkIsOperatorPortOpen(v1RetrievalSocket, 3, oh.logger)
-	v1RetrievalOnline, v1RetrievalStatus := false, "port closed or unreachable"
-	if v1RetrievalPortOpen {
-		v1RetrievalOnline, v1RetrievalStatus = checkServiceOnline(ctx, "node.Retrieval", v1RetrievalSocket, 3*time.Second)
-	}
 
-	v1DispersalSocket := operatorSocket.GetV1DispersalSocket()
-	v1DispersalPortOpen := checkIsOperatorPortOpen(v1DispersalSocket, 3, oh.logger)
-	v1DispersalOnline, v1DispersalStatus := false, "port closed or unreachable"
-	if v1DispersalPortOpen {
-		v1DispersalOnline, v1DispersalStatus = checkServiceOnline(ctx, "node.Dispersal", v1DispersalSocket, 3*time.Second)
-	}
-
-	v2DispersalOnline, v2DispersalStatus := false, ""
-	v2DispersalSocket := operatorSocket.GetV2DispersalSocket()
-	if v2DispersalSocket == "" {
-		v2DispersalStatus = "v2 dispersal port is not registered"
+	retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
+	retrievalSocket := operatorSocket.GetV2RetrievalSocket()
+	if retrievalSocket == "" {
+		retrievalStatus = "v2 retrieval port is not registered"
 	} else {
-		v2DispersalPortOpen := checkIsOperatorPortOpen(v2DispersalSocket, 3, oh.logger)
-		if !v2DispersalPortOpen {
-			v2DispersalStatus = "port closed or unreachable"
-		} else {
-			v2DispersalOnline, v2DispersalStatus = checkServiceOnline(ctx, "node.v2.Dispersal", v2DispersalSocket, 3*time.Second)
+		retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
+		if retrievalPortOpen {
+			retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 3*time.Second)
 		}
 	}
 
-	v2RetrievalOnline, v2RetrievalStatus := false, ""
-	v2RetrievalSocket := operatorSocket.GetV2RetrievalSocket()
-	if v2RetrievalSocket == "" {
-		v2RetrievalStatus = "v2 retrieval port is not registered"
+	dispersalOnline, dispersalStatus := false, "v2 dispersal port closed or unreachable"
+	dispersalSocket := operatorSocket.GetV2DispersalSocket()
+	if dispersalSocket == "" {
+		dispersalStatus = "v2 dispersal port is not registered"
 	} else {
-		v2RetrievalPortOpen := checkIsOperatorPortOpen(v2RetrievalSocket, 3, oh.logger)
-		if !v2RetrievalPortOpen {
-			v2RetrievalStatus = "port closed or unreachable"
-		} else {
-			v2RetrievalOnline, v2RetrievalStatus = checkServiceOnline(ctx, "node.v2.Retrieval", v2RetrievalSocket, 3*time.Second)
+		dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
+		if dispersalPortOpen {
+			dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 3*time.Second)
 		}
 	}
 
 	// Create the metadata regardless of online status
 	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:        operatorId,
-		DispersalSocket:   v1DispersalSocket,
-		DispersalStatus:   v1DispersalStatus,
-		DispersalOnline:   v1DispersalOnline,
-		V2DispersalSocket: v2DispersalSocket,
-		V2DispersalOnline: v2DispersalOnline,
-		V2DispersalStatus: v2DispersalStatus,
-		RetrievalSocket:   v1RetrievalSocket,
-		RetrievalOnline:   v1RetrievalOnline,
-		RetrievalStatus:   v1RetrievalStatus,
-		V2RetrievalSocket: v2RetrievalSocket,
-		V2RetrievalOnline: v2RetrievalOnline,
-		V2RetrievalStatus: v2RetrievalStatus,
+		OperatorId:      operatorId,
+		DispersalSocket: dispersalSocket,
+		DispersalStatus: dispersalStatus,
+		DispersalOnline: dispersalOnline,
+		RetrievalSocket: retrievalSocket,
+		RetrievalOnline: retrievalOnline,
+		RetrievalStatus: retrievalStatus,
 	}
 
 	// Log the online status
-	oh.logger.Info("operator port check response", "response", portCheckResponse)
+	oh.logger.Info("v2 operator port check response", "response", portCheckResponse)
+
+	// Send the metadata to the results channel
+	return portCheckResponse, nil
+}
+
+func (oh *OperatorHandler) ProbeV1OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
+	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
+	if err != nil {
+		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
+		return &OperatorPortCheckResponse{}, err
+	}
+
+	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
+	retrievalSocket := operatorSocket.GetV1RetrievalSocket()
+	retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
+	retrievalOnline, retrievalStatus := false, "v1 retrieval port closed or unreachable"
+	if retrievalPortOpen {
+		retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "node.Retrieval", retrievalSocket, 3*time.Second)
+	}
+
+	dispersalSocket := operatorSocket.GetV1DispersalSocket()
+	dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
+	dispersalOnline, dispersalStatus := false, "v1 dispersal port closed or unreachable"
+	if dispersalPortOpen {
+		dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "node.Dispersal", dispersalSocket, 3*time.Second)
+	}
+
+	// Create the metadata regardless of online status
+	portCheckResponse := &OperatorPortCheckResponse{
+		OperatorId:      operatorId,
+		DispersalSocket: dispersalSocket,
+		DispersalStatus: dispersalStatus,
+		DispersalOnline: dispersalOnline,
+		RetrievalSocket: retrievalSocket,
+		RetrievalOnline: retrievalOnline,
+		RetrievalStatus: retrievalStatus,
+	}
+
+	// Log the online status
+	oh.logger.Info("v1 operator port check response", "response", portCheckResponse)
 
 	// Send the metadata to the results channel
 	return portCheckResponse, nil
@@ -325,7 +346,7 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 	}
 
 	// Get quorum change events from [startBlock+1, endBlock] for operators in operator set.
-	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, operatorQuorumEvents, operatorList)
+	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(operatorQuorumEvents, operatorList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,7 +361,6 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 }
 
 func (oh *OperatorHandler) getOperatorQuorumEvents(
-	ctx context.Context,
 	operatorQuorumEvents *OperatorQuorumEvents,
 	operatorList *OperatorList,
 ) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {

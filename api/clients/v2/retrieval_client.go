@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -167,6 +168,7 @@ func (r *retrievalClient) getChunksFromOperator(
 	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(16 /* max blob size */ *8 /* encoding rate */ *units.MiB)),
 	)
 	defer func() {
 		err := conn.Close()
