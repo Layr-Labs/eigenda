@@ -342,7 +342,7 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 	}
 
 	// Get quorum change events from [startBlock+1, endBlock] for operators in operator set.
-	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(ctx, operatorQuorumEvents, operatorList)
+	addedToQuorum, removedFromQuorum, err := oh.getOperatorQuorumEvents(operatorQuorumEvents, operatorList)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -357,7 +357,6 @@ func (oh *OperatorHandler) CreateOperatorQuorumIntervals(
 }
 
 func (oh *OperatorHandler) getOperatorQuorumEvents(
-	_ context.Context,
 	operatorQuorumEvents *OperatorQuorumEvents,
 	operatorList *OperatorList,
 ) (map[string][]*OperatorQuorum, map[string][]*OperatorQuorum, error) {
