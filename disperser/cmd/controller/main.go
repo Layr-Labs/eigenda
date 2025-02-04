@@ -25,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
@@ -228,7 +229,7 @@ func RunController(ctx *cli.Context) error {
 		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
 
-	// Signal liveness
+	// Signal heartbeat
 	signalHeartbeat(logger)
 
 	return nil
@@ -265,7 +266,7 @@ func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration)
 	}
 }
 
-func signalHeartbeat(logger common.Logger) {
+func signalHeartbeat(logger logging.Logger) {
 	select {
 	case controllerHeartbeatChan <- time.Now():
 		logger.Info("Heartbeat signal sent from Controller")
