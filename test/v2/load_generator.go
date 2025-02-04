@@ -1,7 +1,13 @@
 package v2
 
 import (
+	"context"
+	"fmt"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/docker/go-units"
+	"math/rand"
 	"sync/atomic"
 	"time"
 )
@@ -17,12 +23,16 @@ type LoadGeneratorConfig struct {
 	// By default, this utility reads each blob back from each relay once. The number of
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times.
-	RelayReadAmplification uint64
+	RelayReadAmplification uint64 // TODO use this
 	// By default, this utility reads chunks once. The number of chunk reads is multiplied
 	// by this factor. If this is set to 3, then chunks are read back 3 times.
-	ValidatorReadAmplification uint64
+	ValidatorReadAmplification uint64 // TODO use this
 	// The maximum number of parallel blobs in flight.
 	MaxParallelism uint64
+	// The timeout for each blob dispersal.
+	DispersalTimeout time.Duration
+	// The quorums to use for the load test.
+	Quorums []core.QuorumID
 }
 
 // DefaultLoadGeneratorConfig returns the default configuration for the load generator.
@@ -34,16 +44,25 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		RelayReadAmplification:     1,
 		ValidatorReadAmplification: 1,
 		MaxParallelism:             1000,
+		DispersalTimeout:           2 * time.Minute,
+		Quorums:                    []core.QuorumID{0, 1},
 	}
 }
 
 type LoadGenerator struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	// The configuration for the load generator.
 	config *LoadGeneratorConfig
 	// The  test client to use for the load test.
 	client *TestClient
+	// The random number generator to use for the load test.
+	rand *random.TestRandom
 	// The time between starting each blob submission.
 	submissionPeriod time.Duration
+	// The channel to limit the number of parallel blob submissions.
+	parallelismLimiter chan struct{}
 	// if true, the load generator is running.
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
@@ -51,16 +70,29 @@ type LoadGenerator struct {
 }
 
 // NewLoadGenerator creates a new LoadGenerator.
-func NewLoadGenerator(config *LoadGeneratorConfig, client *TestClient) *LoadGenerator {
+func NewLoadGenerator(
+	config *LoadGeneratorConfig,
+	client *TestClient,
+	rand *random.TestRandom) *LoadGenerator {
+
 	submissionFrequency := time.Duration(config.BytesPerSecond/config.AverageBlobSize) * time.Second
 	submissionPeriod := 1.0 / submissionFrequency
 
+	parallelismLimiter := make(chan struct{}, config.MaxParallelism)
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &LoadGenerator{
-		config:           config,
-		client:           client,
-		submissionPeriod: submissionPeriod,
-		alive:            atomic.Bool{},
-		finishedChan:     make(chan struct{}),
+		ctx:                ctx,
+		cancel:             cancel,
+		config:             config,
+		client:             client,
+		rand:               rand,
+		submissionPeriod:   submissionPeriod,
+		parallelismLimiter: parallelismLimiter,
+		alive:              atomic.Bool{},
+		finishedChan:       make(chan struct{}),
 	}
 }
 
@@ -79,6 +111,7 @@ func (l *LoadGenerator) Stop() {
 	// unblock Start()
 	l.finishedChan <- struct{}{}
 	l.alive.Store(false)
+	l.cancel()
 }
 
 // run runs the load generator.
@@ -86,7 +119,7 @@ func (l *LoadGenerator) run() {
 	ticker := time.NewTicker(l.submissionPeriod)
 	for l.alive.Load() {
 		<-ticker.C
-		// TODO limit parallelism
+		l.parallelismLimiter <- struct{}{}
 		go l.submitBlob()
 	}
 }
@@ -94,5 +127,25 @@ func (l *LoadGenerator) run() {
 // Submits a single blob to the network. This function does not return until it reads the blob back
 // from the network, which may take tens of seconds.
 func (l *LoadGenerator) submitBlob() {
+	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout)
+	defer func() {
+		<-l.parallelismLimiter
+		cancel()
+	}()
 
+	payloadSize := int(l.rand.BoundedGaussian(
+		float64(l.config.AverageBlobSize),
+		float64(l.config.BlobSizeStdDev),
+		1.0,
+		float64(l.client.Config.MaxBlobSize+1)))
+	payload := l.rand.Bytes(payloadSize)
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+	if uint64(len(paddedPayload)) > l.client.Config.MaxBlobSize {
+		paddedPayload = paddedPayload[:l.client.Config.MaxBlobSize]
+	}
+
+	err := l.client.DisperseAndVerify(ctx, payload, l.config.Quorums, rand.Uint32())
+	if err != nil {
+		fmt.Printf("failed to disperse and verify: %v\n", err)
+	}
 }
