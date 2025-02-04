@@ -26,13 +26,13 @@ jobs:
           aws configure --profile test-profile set region us-east-1
           aws configure --profile test-profile set source_profile default
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
         with:
           go-version: "1.21" # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Checkout EigenDA
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
       - name: Update Submodule Commits
         run: |
