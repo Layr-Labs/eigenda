@@ -40,9 +40,9 @@ type CertVerifier struct {
 	ethClient          *geth.EthClient
 	pollInterval       time.Duration
 	// storage shared between goroutines, containing the most recent block number observed by calling ethClient.BlockNumber()
-	latestBlockNumber *atomic.Uint64
+	latestBlockNumber atomic.Uint64
 	// atomic bool, so that only a single goroutine is polling the internal client with BlockNumber() calls at any given time
-	pollingActive *atomic.Bool
+	pollingActive atomic.Bool
 }
 
 var _ ICertVerifier = &CertVerifier{}
@@ -79,16 +79,11 @@ func NewCertVerifier(
 			"pollInterval", pollInterval)
 	}
 
-	latestBlockNumber := atomic.Uint64{}
-	pollingActive := atomic.Bool{}
-
 	return &CertVerifier{
 		logger:             logger,
 		certVerifierCaller: verifierCaller,
 		ethClient:          ethClient,
 		pollInterval:       pollInterval,
-		latestBlockNumber:  &latestBlockNumber,
-		pollingActive:      &pollingActive,
 	}, nil
 }
 
