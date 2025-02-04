@@ -55,7 +55,7 @@ func BuildRelayPayloadRetriever(
 
 	certVerifier, err := verification.NewCertVerifier(
 		log,
-		*ethClient,
+		ethClient,
 		relayPayloadRetrieverConfig.EigenDACertVerifierAddr,
 		relayPayloadRetrieverConfig.BlockNumberPollInterval)
 	if err != nil {

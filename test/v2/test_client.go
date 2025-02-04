@@ -198,7 +198,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	require.NoError(t, err)
 	certVerifier, err := verification.NewCertVerifier(
 		logger,
-		*gethClient,
+		gethClient,
 		config.EigenDACertVerifierAddress,
 		time.Second)
 	require.NoError(t, err)

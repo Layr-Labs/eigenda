@@ -36,7 +36,7 @@ type CertVerifier struct {
 	logger logging.Logger
 	// go binding around the EigenDACertVerifier ethereum contract
 	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
-	ethClient          geth.EthClient
+	ethClient *geth.EthClient
 	pollInterval       time.Duration
 }
 
@@ -46,7 +46,7 @@ var _ ICertVerifier = &CertVerifier{}
 func NewCertVerifier(
 	logger logging.Logger,
 	// the eth client, which should already be set up
-	ethClient geth.EthClient,
+	ethClient *geth.EthClient,
 	// the hex address of the EigenDACertVerifier contract
 	certVerifierAddress string,
 	// pollInterval is how frequently to check latest block number when waiting for the internal eth client to advance

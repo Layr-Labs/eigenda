@@ -78,7 +78,7 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 
 	certVerifier, err := verification.NewCertVerifier(
 		log,
-		*ethClient,
+		ethClient,
 		payloadDispCfg.EigenDACertVerifierAddr,
 		payloadDispCfg.BlockNumberPollInterval,
 	)
