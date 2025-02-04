@@ -23,6 +23,9 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 	if config.EnableV2 && serverV2 == nil {
 		return errors.New("node v2 server is not configured")
 	}
+	if !config.EnableV1 && !config.EnableV2 {
+		return errors.New("node is not configured to run any servers")
+	}
 
 	// V1 dispersal service
 	go func() {
