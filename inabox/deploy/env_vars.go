@@ -424,7 +424,7 @@ type OperatorVars struct {
 
 	NODE_BLS_SIGNER_API_KEY string
 
-	NODE_ENABLE_V2 string
+	NODE_RUNTIME_MODE string
 
 	NODE_ONCHAIN_STATE_REFRESH_INTERVAL string
 

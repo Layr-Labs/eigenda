@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"log"
 	"os"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common/geth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
