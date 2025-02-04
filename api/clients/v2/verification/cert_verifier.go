@@ -245,7 +245,14 @@ func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlock
 			if polling {
 				actualBlockNumber, err := cv.ethClient.BlockNumber(ctx)
 				if err != nil {
-					return fmt.Errorf("get block number: %w", err)
+					cv.logger.Debug(
+						"ethClient.BlockNumber returned an error",
+						"targetBlockNumber", targetBlockNumber,
+						"latestBlockNumber", cv.latestBlockNumber.Load(),
+						"error", err)
+
+					// tolerate some failures here. if failure continues for too long, it will be caught by the timeout
+					continue
 				}
 
 				cv.latestBlockNumber.Store(actualBlockNumber)
