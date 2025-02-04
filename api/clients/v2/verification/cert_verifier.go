@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -36,8 +37,12 @@ type CertVerifier struct {
 	logger logging.Logger
 	// go binding around the EigenDACertVerifier ethereum contract
 	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
-	ethClient *geth.EthClient
+	ethClient          *geth.EthClient
 	pollInterval       time.Duration
+	// storage shared between goroutines, containing the most recent block number observed by calling ethClient.BlockNumber()
+	latestBlockNumber *atomic.Uint64
+	// atomic bool, so that only a single goroutine is polling the internal client with BlockNumber() calls at any given time
+	pollingActive *atomic.Bool
 }
 
 var _ ICertVerifier = &CertVerifier{}
@@ -74,11 +79,16 @@ func NewCertVerifier(
 			"pollInterval", pollInterval)
 	}
 
+	latestBlockNumber := atomic.Uint64{}
+	pollingActive := atomic.Bool{}
+
 	return &CertVerifier{
 		logger:             logger,
 		certVerifierCaller: verifierCaller,
 		ethClient:          ethClient,
 		pollInterval:       pollInterval,
+		latestBlockNumber:  &latestBlockNumber,
+		pollingActive:      &pollingActive,
 	}, nil
 }
 
@@ -108,7 +118,7 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("convert blob inclusion info: %w", err)
 	}
 
-	err = cv.waitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
+	err = cv.MaybeWaitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return fmt.Errorf("wait for block number: %w", err)
 	}
@@ -137,7 +147,7 @@ func (cv *CertVerifier) VerifyCertV2(
 	ctx context.Context,
 	eigenDACert *EigenDACert,
 ) error {
-	err := cv.waitForBlockNumber(ctx, uint64(eigenDACert.BatchHeader.ReferenceBlockNumber))
+	err := cv.MaybeWaitForBlockNumber(ctx, uint64(eigenDACert.BatchHeader.ReferenceBlockNumber))
 	if err != nil {
 		return fmt.Errorf("wait for block number: %w", err)
 	}
@@ -173,7 +183,7 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
 
-	err = cv.waitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
+	err = cv.MaybeWaitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
@@ -189,19 +199,36 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	return &nonSignerStakesAndSignature, nil
 }
 
-// waitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber.
+// MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless
+// configured pollInterval is <= 0, in which case this method will NOT wait for the internal client to advance.
 //
 // This method will check the current block number of the internal client every CertVerifier.pollInterval duration.
 // It will return nil if the internal client advances to (or past) the targetBlockNumber. It will return an error
 // if the input context times out, or if any error occurs when checking the block number of the internal client.
-func (cv *CertVerifier) waitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
+//
+// This method is synchronized in a way that, if called by multiple goroutines, only a single goroutine will actually
+// poll the internal eth client for most recent block number. The goroutine responsible for polling at a given time
+// updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
+func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
 	if cv.pollInterval <= 0 {
 		// don't wait for the internal client to advance
 		return nil
 	}
 
+	if cv.latestBlockNumber.Load() >= targetBlockNumber {
+		// immediately return if the local client isn't behind the target block number
+		return nil
+	}
+
 	ticker := time.NewTicker(cv.pollInterval)
 	defer ticker.Stop()
+
+	polling := false
+	if cv.pollingActive.CompareAndSwap(false, true) {
+		// no other goroutine is currently polling, so assume responsibility
+		polling = true
+		defer cv.pollingActive.Store(false)
+	}
 
 	var actualBlockNumber uint64
 	for {
@@ -211,17 +238,30 @@ func (cv *CertVerifier) waitForBlockNumber(ctx context.Context, targetBlockNumbe
 				"timed out waiting for block number %d (latest block number observed was %d): %w",
 				targetBlockNumber, actualBlockNumber, ctx.Err())
 		case <-ticker.C:
-			actualBlockNumber, err := cv.ethClient.BlockNumber(ctx)
-			if err != nil {
-				return fmt.Errorf("get block number: %w", err)
-			}
-
-			if actualBlockNumber >= targetBlockNumber {
+			if cv.latestBlockNumber.Load() >= targetBlockNumber {
 				return nil
 			}
 
+			if cv.pollingActive.CompareAndSwap(false, true) {
+				// no other goroutine is currently polling, so assume responsibility
+				polling = true
+				defer cv.pollingActive.Store(false)
+			}
+
+			if polling {
+				actualBlockNumber, err := cv.ethClient.BlockNumber(ctx)
+				if err != nil {
+					return fmt.Errorf("get block number: %w", err)
+				}
+
+				cv.latestBlockNumber.Store(actualBlockNumber)
+				if actualBlockNumber >= targetBlockNumber {
+					return nil
+				}
+			}
+
 			cv.logger.Debug(
-				"local client is behind the target block number",
+				"local client is behind the reference block number",
 				"targetBlockNumber", targetBlockNumber,
 				"actualBlockNumber", actualBlockNumber)
 		}
