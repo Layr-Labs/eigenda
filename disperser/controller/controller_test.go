@@ -25,6 +25,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -204,13 +205,34 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 	return bk, bh
 }
 
+func TestHeartbeatMonitoring(t *testing.T) {
+	// Reset heartbeats before running the test
+	mu.Lock()
+	heartbeatsReceived = nil
+	mu.Unlock()
+
+	startHeartbeatMonitoring()
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		assert.GreaterOrEqual(t, len(heartbeats), 3, "Expected at least 3 heartbeats, but got %d", len(heartbeats))
+	}()
+
+	// Simulate heartbeats being sent
+	for i := 0; i < 3; i++ {
+		heartbeatChan <- time.Now()
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 func startHeartbeatMonitoring() {
 	go func() {
 		for {
 			select {
 			case hb := <-heartbeatChan:
 				mu.Lock()
-				if len(heartbeatsReceived) < cap(heartbeatChan) { // Prevent slice overgrowth
+				if len(heartbeatsReceived) < cap(heartbeatChan) {
 					heartbeatsReceived = append(heartbeatsReceived, hb)
 				}
 				mu.Unlock()
@@ -219,4 +241,10 @@ func startHeartbeatMonitoring() {
 			}
 		}
 	}()
+}
+
+func getHeartbeats() []time.Time {
+	mu.Lock()
+	defer mu.Unlock()
+	return heartbeatsReceived
 }

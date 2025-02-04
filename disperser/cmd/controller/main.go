@@ -40,6 +40,7 @@ var (
 	controllerHealthProbePath    string        = "/tmp/controller-health"
 	controllerMaxStallDuration   time.Duration = 240 * time.Second
 	controllerLivenessChan                     = make(chan time.Time, 1)
+	controllerHeartbeatChan                    = make(chan time.Time, 1)
 )
 
 func main() {
@@ -56,20 +57,17 @@ func main() {
 		log.Fatalf("application failed: %v", err)
 	}
 
-	// Start HeartBeat Monitor
+	if _, err := os.Create(controllerHealthProbePath); err != nil {
+		log.Printf("Failed to create healthProbe file: %v", err)
+	}
+
+	// Start heartbeat monitor
 	go heartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration)
 
 	select {}
 }
 
 func RunController(ctx *cli.Context) error {
-	// Reset readiness probe upon start-up
-	if _, err := os.Stat(controllerReadinessProbePath); err == nil {
-		if err := os.Remove(controllerReadinessProbePath); err != nil {
-			log.Printf("Failed to clean up readiness file: %v at path %v \n", err, controllerReadinessProbePath)
-		}
-	}
-
 	config, err := NewConfig(ctx)
 	if err != nil {
 		return err
@@ -78,6 +76,13 @@ func RunController(ctx *cli.Context) error {
 	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Reset readiness probe upon start-up
+	if _, err := os.Stat(controllerReadinessProbePath); err == nil {
+		if err := os.Remove(controllerReadinessProbePath); err != nil {
+			logger.Warn("Failed to clean up readiness file", "error", err, "path", controllerReadinessProbePath)
+		}
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -218,28 +223,31 @@ func RunController(ctx *cli.Context) error {
 		}
 	}()
 
-	// Signal readiness once the controller starts successfully
+	// Create readiness probe file once the controller starts successfully
 	if _, err := os.Create(controllerReadinessProbePath); err != nil {
-		log.Printf("Failed to create readiness file: %v at path %v \n", err, controllerReadinessProbePath)
+		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
+
+	// Signal liveness
+	signalHeartbeat(logger)
 
 	return nil
 }
 
-// Function to process and send controller liveness probe to GoRoutine
+// Function to process and send controller liveness probe to goroutine
 func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration) {
 	var lastHeartbeat time.Time
 	stallTimer := time.NewTimer(controllerMaxStallDuration)
 
 	for {
 		select {
-		// Heartbeat from Goroutine on controller Pull Interval
+		// Heartbeat from goroutine on controller pull interval
 		case heartbeat, ok := <-controllerLivenessChan:
 			if !ok {
 				log.Println("controllerLivenessChan closed, stopping health probe.")
 				return
 			}
-			log.Printf("Received heartbeat from controller GoRoutine: %v\n", heartbeat)
+			log.Printf("Received heartbeat from controller goroutine: %v\n", heartbeat)
 			lastHeartbeat = heartbeat
 			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
 				log.Printf("Failed to update heartbeat file: %v", err)
@@ -254,5 +262,15 @@ func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration)
 			// Reset the timer to continue monitoring
 			stallTimer.Reset(controllerMaxStallDuration)
 		}
+	}
+}
+
+func signalHeartbeat(logger common.Logger) {
+	select {
+	case controllerHeartbeatChan <- time.Now():
+		logger.Info("Heartbeat signal sent from Controller")
+	default:
+		// Avoid blocking if the channel is full or no receiver is actively consuming
+		logger.Warn("Heartbeat signal skipped, no receiver on the channel")
 	}
 }
