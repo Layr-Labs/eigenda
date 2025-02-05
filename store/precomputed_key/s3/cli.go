@@ -42,7 +42,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:     CredentialTypeFlagName,
-			Usage:    "the way to authenticate to S3, options are [iam, static]",
+			Usage:    "the way to authenticate to S3, options are [iam, static, public]",
 			EnvVars:  withEnvPrefix(envPrefix, "CREDENTIAL_TYPE"),
 			Category: category,
 		},

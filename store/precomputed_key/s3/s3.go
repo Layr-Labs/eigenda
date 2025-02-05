@@ -21,6 +21,7 @@ import (
 const (
 	CredentialTypeStatic  CredentialType = "static"
 	CredentialTypeIAM     CredentialType = "iam"
+	CredentialTypePublic  CredentialType = "public"
 	CredentialTypeUnknown CredentialType = "unknown"
 )
 
@@ -30,6 +31,8 @@ func StringToCredentialType(s string) CredentialType {
 		return CredentialTypeStatic
 	case "iam":
 		return CredentialTypeIAM
+	case "public":
+		return CredentialTypePublic
 	default:
 		return CredentialTypeUnknown
 	}
@@ -137,6 +140,9 @@ func (s *Store) BackendType() common.BackendType {
 func creds(cfg Config) *credentials.Credentials {
 	if cfg.CredentialType == CredentialTypeIAM {
 		return credentials.NewIAM("")
+	}
+	if cfg.CredentialType == CredentialTypePublic {
+		return nil
 	}
 	return credentials.NewStaticV4(cfg.AccessKeyID, cfg.AccessKeySecret, "")
 }
