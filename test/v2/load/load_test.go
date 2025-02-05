@@ -2,6 +2,7 @@ package load
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,7 @@ func TestLoad(t *testing.T) {
 	signals := make(chan os.Signal)
 	go func() {
 		<-signals
+		fmt.Printf("Stop Requested\n")
 		generator.Stop()
 	}()
 
