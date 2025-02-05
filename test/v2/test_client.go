@@ -41,14 +41,15 @@ const (
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	t                 *testing.T
-	config            *TestClientConfig
-	logger            logging.Logger
+	T                 *testing.T
+	Config            *TestClientConfig
+	Logger            logging.Logger
 	DisperserClient   clients.DisperserClient
 	RelayClient       clients.RelayClient
 	indexedChainState core.IndexedChainState
 	RetrievalClient   clients.RetrievalClient
 	CertVerifier      *verification.CertVerifier
+	PrivateKey        string
 }
 
 type TestClientConfig struct {
@@ -82,6 +83,11 @@ func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
+
+	if config.SRSNumberToLoad == 0 {
+		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
+		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
+	}
 
 	var loggerConfig common.LoggerConfig
 	if os.Getenv("CI") != "" {
@@ -204,14 +210,15 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	require.NoError(t, err)
 
 	return &TestClient{
-		t:                 t,
-		config:            config,
-		logger:            logger,
+		T:                 t,
+		Config:            config,
+		Logger:            logger,
 		DisperserClient:   disperserClient,
 		RelayClient:       relayClient,
 		indexedChainState: indexedChainState,
 		RetrievalClient:   retrievalClient,
 		CertVerifier:      certVerifier,
+		PrivateKey:        privateKeyString,
 	}
 }
 
@@ -270,7 +277,7 @@ func (c *TestClient) WaitForCertification(
 		select {
 		case <-ticker.C:
 			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
-			require.NoError(c.t, err)
+			require.NoError(c.T, err)
 
 			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
@@ -303,13 +310,13 @@ func (c *TestClient) WaitForCertification(
 				if reply.Status == v2.BlobStatus_FAILED ||
 					reply.Status == v2.BlobStatus_UNKNOWN {
 					require.Fail(
-						c.t,
+						c.T,
 						"Blob status is in a terminal non-successful state.",
 						reply.Status.String())
 				}
 			}
 		case <-ctx.Done():
-			require.Fail(c.t, "Timed out waiting for blob to be confirmed")
+			require.Fail(c.T, "Timed out waiting for blob to be confirmed")
 		}
 	}
 }
@@ -322,15 +329,15 @@ func (c *TestClient) VerifyBlobCertification(
 	inclusionInfo *v2.BlobInclusionInfo) {
 
 	blobCert := inclusionInfo.BlobCertificate
-	require.NotNil(c.t, blobCert)
-	require.True(c.t, len(blobCert.RelayKeys) >= 1)
+	require.NotNil(c.T, blobCert)
+	require.True(c.T, len(blobCert.RelayKeys) >= 1)
 
 	// make sure the returned header hash matches the expected blob key
 	bh, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
-	require.NoError(c.t, err)
+	require.NoError(c.T, err)
 	computedBlobKey, err := bh.BlobKey()
-	require.NoError(c.t, err)
-	require.Equal(c.t, key, computedBlobKey)
+	require.NoError(c.T, err)
+	require.Equal(c.T, key, computedBlobKey)
 
 	// verify that expected quorums are present
 	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
@@ -338,9 +345,9 @@ func (c *TestClient) VerifyBlobCertification(
 		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
 	}
 	// There may be other quorums in the batch. No biggie as long as the expected ones are there.
-	require.True(c.t, len(expectedQuorums) <= len(quorumSet))
+	require.True(c.T, len(expectedQuorums) <= len(quorumSet))
 	for expectedQuorum := range quorumSet {
-		require.Contains(c.t, quorumSet, expectedQuorum)
+		require.Contains(c.T, quorumSet, expectedQuorum)
 	}
 
 	// Check the signing percentages
@@ -351,15 +358,15 @@ func (c *TestClient) VerifyBlobCertification(
 	}
 	for _, quorum := range expectedQuorums {
 		percent, ok := signingPercents[quorum]
-		require.True(c.t, ok)
-		require.True(c.t, percent >= 0 && percent <= 100)
-		require.True(c.t, percent >= c.config.MinimumSigningPercent)
+		require.True(c.T, ok)
+		require.True(c.T, percent >= 0 && percent <= 100)
+		require.True(c.T, percent >= c.Config.MinimumSigningPercent)
 	}
 
 	// TODO This currently does not pass!
 	// On-chain verification
-	// err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
-	// require.NoError(c.t, err)
+	//err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
+	//require.NoError(c.T, err)
 }
 
 // ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.
@@ -372,10 +379,10 @@ func (c *TestClient) ReadBlobFromRelay(
 	for _, relayID := range blobCert.RelayKeys {
 		fmt.Printf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
-		require.NoError(c.t, err)
+		require.NoError(c.T, err)
 
 		relayPayload := codec.RemoveEmptyByteFromPaddedBytes(blobFromRelay)
-		require.Equal(c.t, payload, relayPayload)
+		require.Equal(c.T, payload, relayPayload)
 	}
 }
 
@@ -387,27 +394,27 @@ func (c *TestClient) ReadBlobFromValidators(
 	payload []byte) {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
-	require.NoError(c.t, err)
+	require.NoError(c.T, err)
 
 	for _, quorumID := range quorums {
 		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
-		require.NoError(c.t, err)
+		require.NoError(c.T, err)
 
 		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
-		require.NoError(c.t, err)
+		require.NoError(c.T, err)
 
 		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
 
 		// The payload may have a bunch of 0s appended at the end. Remove them.
-		require.True(c.t, len(retrievedPayload) >= len(payload))
+		require.True(c.T, len(retrievedPayload) >= len(payload))
 		truncatedPayload := retrievedPayload[:len(payload)]
 
 		// Only 0s should be appended at the end.
 		for i := len(payload); i < len(retrievedPayload); i++ {
-			require.Equal(c.t, byte(0), retrievedPayload[i])
+			require.Equal(c.T, byte(0), retrievedPayload[i])
 		}
 
-		require.Equal(c.t, payload, truncatedPayload)
+		require.Equal(c.T, payload, truncatedPayload)
 	}
 }

@@ -86,6 +86,13 @@ func (r *TestRandom) String(length int) string {
 	return string(b)
 }
 
+// VariableString generates a random string out of printable ASCII characters of a length between
+// min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableString(min int, max int) string {
+	length := r.Intn(max-min) + min
+	return r.String(length)
+}
+
 // Uint32n generates a random uint32 less than n.
 func (r *TestRandom) Uint32n(n uint32) uint32 {
 	return r.Uint32() % n
