@@ -99,7 +99,7 @@ func RunDataApi(ctx *cli.Context) error {
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
