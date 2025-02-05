@@ -59,7 +59,6 @@ type TestClientConfig struct {
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	T                 *testing.T
 	Config            *TestClientConfig
 	Logger            logging.Logger
 	DisperserClient   clients.DisperserClient
@@ -73,26 +72,31 @@ type TestClient struct {
 }
 
 // ResolveTildeInPath resolves the tilde (~) in the given path to the user's home directory.
-func ResolveTildeInPath(t *testing.T, path string) string {
+func ResolveTildeInPath(path string) (string, error) {
 	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
 
-	return strings.Replace(path, "~", homeDir, 1)
+	return strings.Replace(path, "~", homeDir, 1), nil
 }
 
 // path returns the full path to a file in the test data directory.
-func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
-	root := ResolveTildeInPath(t, c.TestDataPath)
+func (c *TestClientConfig) path(elements ...string) (string, error) {
+	root, err := ResolveTildeInPath(c.TestDataPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path: %w", err)
+	}
 
 	combinedElements := make([]string, 0, len(elements)+1)
 	combinedElements = append(combinedElements, root)
 	combinedElements = append(combinedElements, elements...)
 
-	return path.Join(combinedElements...)
+	return path.Join(combinedElements...), nil
 }
 
 // NewTestClient creates a new TestClient instance.
-func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
+func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 	if config.SRSNumberToLoad == 0 {
 		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
 		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
@@ -111,22 +115,33 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	}
 
 	logger, err := common.NewLogger(loggerConfig)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
 
 	// Construct the disperser client
 
-	privateKeyFile := ResolveTildeInPath(t, config.KeyPath)
+	privateKeyFile, err := ResolveTildeInPath(config.KeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve private key file: %w", err)
+	}
 	privateKey, err := os.ReadFile(privateKeyFile)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
 
 	privateKeyString := string(privateKey)
 	privateKeyString = strings.Trim(privateKeyString, "\n \t")
 	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
 
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
 	signerAccountId, err := signer.GetAccountID()
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account ID: %w", err)
+	}
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	fmt.Printf("Account ID: %s\n", accountId.String())
 
@@ -136,7 +151,9 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		UseSecureGrpcFlag: true,
 	}
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create disperser client: %w", err)
+	}
 
 	// Construct the relay client
 
@@ -147,21 +164,27 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		NumRetries:       3,
 	}
 	ethClient, err := geth.NewMultiHomingClient(ethClientConfig, accountId, logger)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eth client: %w", err)
+	}
 
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
 		config.BLSOperatorStateRetrieverAddr,
 		config.EigenDAServiceManagerAddr)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eth reader: %w", err)
+	}
 
 	relayURLS, err := ethReader.GetRelayURLs(context.Background())
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relay URLs: %w", err)
+	}
 
 	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
 	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom(nil)
 	keypair := rand.BLS()
 	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
@@ -187,12 +210,21 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	}
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
+	g1Path, err := config.path(SRSPathG1)
+	require.NoError(t, err)
+	g2Path, err := config.path(SRSPathG2)
+	require.NoError(t, err)
+	g2PowerOf2Path, err := config.path(SRSPathG2PowerOf2)
+	require.NoError(t, err)
+	cacheDir, err := config.path(SRSPathSRSTables)
+	require.NoError(t, err)
+
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:          config.path(t, SRSPathG1),
-		G2Path:          config.path(t, SRSPathG2),
-		G2PowerOf2Path:  config.path(t, SRSPathG2PowerOf2),
-		CacheDir:        config.path(t, SRSPathSRSTables),
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2PowerOf2Path:  g2PowerOf2Path,
+		CacheDir:        cacheDir,
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
@@ -238,7 +270,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		PrivateKey:        privateKeyString,
 		MetricsRegistry:   metrics.registry,
 		metrics:           metrics,
-	}
+	}, nil
 }
 
 // Stop stops the test client.

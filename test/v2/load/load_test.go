@@ -10,23 +10,31 @@ import (
 	"testing"
 )
 
-func parseConfig(t *testing.T, configFile string) *LoadGeneratorConfig {
-	configFile = client.ResolveTildeInPath(t, configFile)
+func parseConfig(configFile string) (*LoadGeneratorConfig, error) {
+	configFile, err := client.ResolveTildeInPath(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve config file: %v", err)
+	}
 	configFileBytes, err := os.ReadFile(configFile)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
 
 	config := &LoadGeneratorConfig{}
 	err = json.Unmarshal(configFileBytes, config)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file: %v", err)
+	}
 
-	return config
+	return config, nil
 }
 
 func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetClient(t)
 
-	config := parseConfig(t, "../config/load/1mb_s-10mb-0x.json")
+	config, err := parseConfig("../config/load/1mb_s-10mb-0x.json")
+	require.NoError(t, err)
 
 	generator := NewLoadGenerator(config, c, rand)
 

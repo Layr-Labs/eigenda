@@ -7,7 +7,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/require"
 	"io"
 	"math/big"
 	"math/rand"
@@ -32,6 +31,8 @@ type TestRandom struct {
 
 // NewTestRandom creates a new instance of TestRandom
 // This method may either be seeded, or not seeded. If no seed is provided, then current unix nano time is used.
+//
+// The testing.T object is optional but highly recommended. If nil and an error occurs, this utility panics.
 func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
 	var seed int64
 	if len(fixedSeed) == 0 {
@@ -144,7 +145,7 @@ func (r *TestRandom) IOReader() io.Reader {
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
 func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
-	require.NoError(r.t, err)
+	r.requireNoError(err)
 	return &key.PublicKey, key
 }
 
@@ -158,8 +159,15 @@ func (r *TestRandom) BLS() *core.KeyPair {
 
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := crand.Int(r.IOReader(), maxValue)
-	require.NoError(r.t, err)
+	r.requireNoError(err)
 
 	sk := new(core.PrivateKey).SetBigInt(n)
 	return core.MakeKeyPair(sk)
+}
+
+func (r *TestRandom) requireNoError(err error) {
+	if err != nil && r.t == nil {
+		panic(err)
+	}
+	r.requireNoError(err)
 }

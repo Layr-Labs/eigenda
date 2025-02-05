@@ -28,7 +28,8 @@ func GetConfig(t *testing.T) *TestClientConfig {
 		return config
 	}
 
-	configFile := ResolveTildeInPath(t, targetConfigFile)
+	configFile, err := ResolveTildeInPath(targetConfigFile)
+	require.NoError(t, err)
 	configFileBytes, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
@@ -70,13 +71,18 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	require.NoError(t, err)
 
 	// Create the SRS directories if they do not exist
-	err = os.MkdirAll(config.path(t, SRSPath), 0755)
+	srsPath, err := config.path(SRSPath)
 	require.NoError(t, err)
-	err = os.MkdirAll(config.path(t, SRSPathSRSTables), 0755)
+	err = os.MkdirAll(srsPath, 0755)
+	require.NoError(t, err)
+	srsTablesPath, err := config.path(SRSPathSRSTables)
+	require.NoError(t, err)
+	err = os.MkdirAll(srsTablesPath, 0755)
 	require.NoError(t, err)
 
 	// If any of the srs files do not exist, download them.
-	filePath := config.path(t, SRSPathG1)
+	filePath, err := config.path(SRSPathG1)
+	require.NoError(t, err)
 	_, err = os.Stat(filePath)
 	if os.IsNotExist(err) {
 		command := make([]string, 3)
@@ -94,7 +100,8 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 		require.NoError(t, err)
 	}
 
-	filePath = config.path(t, SRSPathG2)
+	filePath, err = config.path(SRSPathG2)
+	require.NoError(t, err)
 	_, err = os.Stat(filePath)
 	if os.IsNotExist(err) {
 		command := make([]string, 3)
@@ -112,7 +119,8 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 		require.NoError(t, err)
 	}
 
-	filePath = config.path(t, SRSPathG2PowerOf2)
+	filePath, err = config.path(SRSPathG2PowerOf2)
+	require.NoError(t, err)
 	_, err = os.Stat(filePath)
 	if os.IsNotExist(err) {
 		command := make([]string, 3)
@@ -131,7 +139,8 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	}
 
 	// Check to see if the private key file exists. If not, stop the test.
-	filePath = ResolveTildeInPath(t, config.KeyPath)
+	filePath, err = ResolveTildeInPath(config.KeyPath)
+	require.NoError(t, err)
 	_, err = os.Stat(filePath)
 	require.NoError(t, err,
 		"private key file %s does not exist. This file should "+
