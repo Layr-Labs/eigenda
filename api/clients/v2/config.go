@@ -66,7 +66,8 @@ type RelayPayloadRetrieverConfig struct {
 type ValidatorPayloadRetrieverConfig struct {
 	PayloadClientConfig
 
-	// The timeout duration for calls to retrieve blobs from a given quorum.
+	// The timeout duration for retrieving chunks from a given quorum, and reassembling the chunks into a blob.
+	// Once this timeout triggers, the retriever will give up on the quorum, and retry with the next quorum (if one exists)
 	RetrievalTimeout time.Duration
 
 	// The address of the BlsOperatorStateRetriever contract
