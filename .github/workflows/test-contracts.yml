@@ -46,6 +46,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup Go 1.21.13
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.13'
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
@@ -54,6 +59,9 @@ jobs:
       - name: Install forge dependencies
         run: forge install
         working-directory: ./contracts
+
+      - name: Install abi gen
+        run: go install github.com/ethereum/go-ethereum/cmd/abigen@latest
 
       - name: Bindings diff check
         run: make compile-contracts && git diff --exit-code
