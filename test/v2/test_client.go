@@ -91,6 +91,11 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
 	}
 
+	if config.SRSNumberToLoad == 0 {
+		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
+		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
+	}
+
 	var loggerConfig common.LoggerConfig
 	if os.Getenv("CI") != "" {
 		loggerConfig = common.DefaultLoggerConfig()
