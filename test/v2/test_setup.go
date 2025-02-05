@@ -23,6 +23,7 @@ var (
 		SRSOrder:                      268435456,
 		MaxBlobSize:                   16 * units.MiB,
 		MinimumSigningPercent:         55,
+		MetricsPort:                   9101,
 	}
 
 	lock   sync.Mutex

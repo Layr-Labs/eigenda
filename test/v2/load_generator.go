@@ -44,7 +44,7 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		RelayReadAmplification:     1,
 		ValidatorReadAmplification: 1,
 		MaxParallelism:             1000,
-		DispersalTimeout:           2 * time.Minute,
+		DispersalTimeout:           5 * time.Minute,
 		Quorums:                    []core.QuorumID{0, 1},
 	}
 }
@@ -75,8 +75,8 @@ func NewLoadGenerator(
 	client *TestClient,
 	rand *random.TestRandom) *LoadGenerator {
 
-	submissionFrequency := time.Duration(config.BytesPerSecond/config.AverageBlobSize) * time.Second
-	submissionPeriod := 1.0 / submissionFrequency
+	submissionFrequency := config.BytesPerSecond / config.AverageBlobSize
+	submissionPeriod := time.Second / time.Duration(submissionFrequency)
 
 	parallelismLimiter := make(chan struct{}, config.MaxParallelism)
 
@@ -108,9 +108,9 @@ func (l *LoadGenerator) Start(block bool) {
 
 // Stop stops the load generator.
 func (l *LoadGenerator) Stop() {
-	// unblock Start()
 	l.finishedChan <- struct{}{}
 	l.alive.Store(false)
+	l.client.Stop()
 	l.cancel()
 }
 
@@ -144,8 +144,20 @@ func (l *LoadGenerator) submitBlob() {
 		paddedPayload = paddedPayload[:l.client.Config.MaxBlobSize]
 	}
 
-	err := l.client.DisperseAndVerify(ctx, payload, l.config.Quorums, rand.Uint32())
+	key, err := l.client.DispersePayload(ctx, paddedPayload, l.config.Quorums, rand.Uint32())
 	if err != nil {
-		fmt.Printf("failed to disperse and verify: %v\n", err)
+		fmt.Printf("failed to disperse blob: %v\n", err)
+	}
+	blobCert := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
+
+	// Unpad the payload
+	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(paddedPayload)
+
+	// Read the blob from the relays and validators
+	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
+		l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+	}
+	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
+		l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
 	}
 }
