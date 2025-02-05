@@ -1,5 +1,5 @@
 test:
 	cd correctness && go test
 
-load:
-	cd load && go test
+generate-load:
+	cd load && go test -timeout 0
