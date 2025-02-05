@@ -1,8 +1,10 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 
 	"golang.org/x/exp/constraints"
 )
@@ -22,4 +24,16 @@ func RoundUpDivide[T constraints.Integer](a, b T) T {
 func NextPowerOf2[T constraints.Integer](d T) T {
 	nextPower := math.Ceil(math.Log2(float64(d)))
 	return T(math.Pow(2.0, nextPower))
+}
+
+func ValidatePort(portStr string) error {
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return fmt.Errorf("port is not a valid number: %v", err)
+	}
+
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("port number out of valid range (1-65535)")
+	}
+	return err
 }

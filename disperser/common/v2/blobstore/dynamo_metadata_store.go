@@ -59,11 +59,12 @@ const (
 
 var (
 	statusUpdatePrecondition = map[v2.BlobStatus][]v2.BlobStatus{
-		v2.Queued:                 {},
-		v2.Encoded:                {v2.Queued},
-		v2.Certified:              {v2.Encoded},
-		v2.Failed:                 {v2.Queued, v2.Encoded},
-		v2.InsufficientSignatures: {v2.Encoded},
+		v2.Queued:              {},
+		v2.Encoded:             {v2.Queued},
+		v2.GatheringSignatures: {v2.Encoded},
+		// TODO: when GatheringSignatures is fully supported, remove v2.Encoded from below
+		v2.Complete: {v2.Encoded, v2.GatheringSignatures},
+		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
@@ -463,7 +464,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAt(
 		return nil, errors.New("start must be less than end")
 	}
 
-	startBucket, endBucket := getAttestedAtBucketIDRange(start, end)
+	startBucket, endBucket := GetAttestedAtBucketIDRange(start, end)
 
 	result := make([]*corev2.Attestation, 0)
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
@@ -1549,9 +1550,9 @@ func getRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	return startBucket, endBucket
 }
 
-// getAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// GetAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
 // the allowed time range for blobs.
-func getAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+func GetAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	now := uint64(time.Now().UnixNano())
 	oldestAllowed := now - maxBlobAgeInNano
 

@@ -346,6 +346,8 @@ type OperatorVars struct {
 
 	NODE_V2_DISPERSAL_PORT string
 
+	NODE_V2_RETRIEVAL_PORT string
+
 	NODE_ENABLE_METRICS string
 
 	NODE_METRICS_PORT string
@@ -422,7 +424,7 @@ type OperatorVars struct {
 
 	NODE_BLS_SIGNER_API_KEY string
 
-	NODE_ENABLE_V2 string
+	NODE_RUNTIME_MODE string
 
 	NODE_ONCHAIN_STATE_REFRESH_INTERVAL string
 

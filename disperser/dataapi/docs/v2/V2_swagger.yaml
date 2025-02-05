@@ -2,52 +2,13 @@ basePath: /api/v2
 definitions:
   big.Int:
     type: object
-  core.BlobHeader:
-    properties:
-      accountID:
-        description: AccountID is the account that is paying for the blob to be stored
-        type: string
-      commitment:
-        $ref: '#/definitions/encoding.G1Commitment'
-      length:
-        type: integer
-      length_commitment:
-        $ref: '#/definitions/encoding.G2Commitment'
-      length_proof:
-        $ref: '#/definitions/encoding.LengthProof'
-      quorumInfos:
-        description: QuorumInfos contains the quorum specific parameters for the blob
-        items:
-          $ref: '#/definitions/core.BlobQuorumInfo'
-        type: array
-    type: object
-  core.BlobQuorumInfo:
-    properties:
-      adversaryThreshold:
-        description: AdversaryThreshold is the maximum amount of stake that can be
-          controlled by an adversary in the quorum as a percentage of the total stake
-          in the quorum
-        type: integer
-      chunkLength:
-        description: ChunkLength is the number of symbols in a chunk
-        type: integer
-      confirmationThreshold:
-        description: ConfirmationThreshold is the amount of stake that must sign a
-          message for it to be considered valid as a percentage of the total stake
-          in the quorum
-        type: integer
-      quorumID:
-        type: integer
-      quorumRate:
-        description: |-
-          Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used
-          for restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the
-          data was posted to the DA node.
-        type: integer
-    type: object
   core.G1Point:
     properties:
       x:
+        items:
+          type: integer
+        type: array
+      "y":
         items:
           type: integer
         type: array
@@ -55,6 +16,8 @@ definitions:
   core.G2Point:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -78,6 +41,10 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -96,15 +63,23 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -238,9 +213,9 @@ definitions:
     x-enum-varnames:
     - Queued
     - Encoded
-    - Certified
+    - GatheringSignatures
+    - Complete
     - Failed
-    - InsufficientSignatures
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
       attestation:
@@ -251,6 +226,10 @@ definitions:
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
+        items:
+          type: integer
+        type: array
+      a1:
         items:
           type: integer
         type: array
@@ -336,7 +315,7 @@ definitions:
   v2.BlobMetadata:
     properties:
       blobHeader:
-        $ref: '#/definitions/core.BlobHeader'
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader'
       blobSize:
         description: BlobSize is the size of the blob in bytes
         type: integer
@@ -470,6 +449,25 @@ definitions:
       v2_dispersal_status:
         type: string
     type: object
+  v2.OperatorSigningInfo:
+    properties:
+      operator_address:
+        type: string
+      operator_id:
+        type: string
+      quorum_id:
+        type: integer
+      signing_percentage:
+        type: number
+      stake_percentage:
+        type: number
+      total_batches:
+        type: integer
+      total_responsible_batches:
+        type: integer
+      total_unsigned_batches:
+        type: integer
+    type: object
   v2.OperatorStake:
     properties:
       operator_id:
@@ -480,6 +478,13 @@ definitions:
         type: integer
       stake_percentage:
         type: number
+    type: object
+  v2.OperatorsSigningInfoResponse:
+    properties:
+      operator_signing_info:
+        items:
+          $ref: '#/definitions/v2.OperatorSigningInfo'
+        type: array
     type: object
   v2.OperatorsStakeResponse:
     properties:
@@ -865,6 +870,51 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Operator node reachability check
+      tags:
+      - Operators
+  /operators/signing-info:
+    get:
+      parameters:
+      - description: 'Fetch operators signing info up to the end time (ISO 8601 format:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch operators signing info starting from an interval (in seconds)
+          before the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Comma separated list of quorum IDs to fetch signing info for
+          [default: 0,1]'
+        in: query
+        name: quorums
+        type: string
+      - description: 'Whether to only return operators with signing rate less than
+          100% [default: false]'
+        in: query
+        name: nonsigner_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorsSigningInfoResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch operators signing info
       tags:
       - Operators
   /operators/stake:

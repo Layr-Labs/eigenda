@@ -368,15 +368,12 @@ func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
 
 func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
 	switch status {
-	case dispv2.Certified:
-		m.completedBlobs.WithLabelValues("certified", "number").Inc()
-		m.completedBlobs.WithLabelValues("certified", "size").Add(float64(size))
+	case dispv2.Complete:
+		m.completedBlobs.WithLabelValues("complete", "number").Inc()
+		m.completedBlobs.WithLabelValues("complete", "size").Add(float64(size))
 	case dispv2.Failed:
 		m.completedBlobs.WithLabelValues("failed", "number").Inc()
 		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
-	case dispv2.InsufficientSignatures:
-		m.completedBlobs.WithLabelValues("insufficient_signature", "number").Inc()
-		m.completedBlobs.WithLabelValues("insufficient_signature", "size").Add(float64(size))
 	default:
 		return
 	}

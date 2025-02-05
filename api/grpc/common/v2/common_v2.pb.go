@@ -33,11 +33,14 @@ type BlobHeader struct {
 	// blob's availability.
 	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
 	// quorum_numbers is the list of quorum numbers that the blob is part of.
-	// All quorums must be specified (including required quorums).
+	// Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
 	//
-	// The following quorums are currently required:
+	// On-demand dispersal is currently limited to using a subset of the following quorums:
 	// - 0: ETH
 	// - 1: EIGEN
+	//
+	// Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
+	// Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
 	// commitment is the KZG commitment to the blob
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
@@ -313,6 +316,9 @@ func (x *Batch) GetBlobCertificates() []*BlobCertificate {
 // the server will reject the request and not proceed with dispersal. If reservation_period is not set
 // and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
 // Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
+// Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.
+// If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next
+// multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 type PaymentHeader struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -334,7 +340,8 @@ type PaymentHeader struct {
 	//  2. When sending a dispersal request at time t, the client computes reservation_period = floor(t / reservationPeriodInterval).
 	//  3. The request includes this reservation_period index. The disperser checks:
 	//     - If the reservation is active (t >= startTimestamp and t < endTimestamp).
-	//     - Whether the user still has bandwidth capacity (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
+	//     - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
+	//     (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
 	//  4. Server always go ahead with recording the received request, and then categorize the scenarios
 	//     - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
 	//     - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin.
@@ -356,7 +363,9 @@ type PaymentHeader struct {
 	//     out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain,
 	//     the server will only refresh every few minutes for the top-up to take effect.
 	//  2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
-	//  3. They calculate the incremental amount of tokens needed for the current request needs based on protocol defined pricing.
+	//  3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the
+	//     payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on
+	//     protocol defined pricing.
 	//  4. They take the sum of previousCumPmt + new incremental payment and place it in the “cumulative_payment” field.
 	//  5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment
 	//     and smallest later payment if exists).
