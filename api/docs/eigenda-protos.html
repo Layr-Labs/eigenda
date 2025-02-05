@@ -1102,11 +1102,14 @@ blob&#39;s availability. </p></td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
                   <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
-All quorums must be specified (including required quorums).
+Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
 
-The following quorums are currently required:
+On-demand dispersal is currently limited to using a subset of the following quorums:
 - 0: ETH
-- 1: EIGEN </p></td>
+- 1: EIGEN
+
+Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation. 
+Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10 </p></td>
                 </tr>
               
                 <tr>

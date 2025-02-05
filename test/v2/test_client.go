@@ -39,19 +39,7 @@ const (
 	KeyPath           = "private-key.txt"
 )
 
-// TestClient encapsulates the various clients necessary for interacting with EigenDA.
-type TestClient struct {
-	T                 *testing.T
-	Config            *TestClientConfig
-	Logger            logging.Logger
-	DisperserClient   clients.DisperserClient
-	RelayClient       clients.RelayClient
-	indexedChainState core.IndexedChainState
-	RetrievalClient   clients.RetrievalClient
-	CertVerifier      *verification.CertVerifier
-	PrivateKey        string
-}
-
+// TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	TestDataPath                  string
 	DisperserHostname             string
@@ -65,6 +53,21 @@ type TestClientConfig struct {
 	SRSNumberToLoad               uint64
 	MaxBlobSize                   uint64
 	MinimumSigningPercent         int // out of 100
+	MetricsPort                   int
+}
+
+// TestClient encapsulates the various clients necessary for interacting with EigenDA.
+type TestClient struct {
+	T                 *testing.T
+	Config            *TestClientConfig
+	Logger            logging.Logger
+	DisperserClient   clients.DisperserClient
+	RelayClient       clients.RelayClient
+	indexedChainState core.IndexedChainState
+	RetrievalClient   clients.RetrievalClient
+	CertVerifier      *verification.CertVerifier
+	PrivateKey        string
+	metrics           *testClientMetrics
 }
 
 // path returns the full path to a file in the test data directory.
@@ -83,6 +86,10 @@ func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
 
 // NewTestClient creates a new TestClient instance.
 func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
+	if config.SRSNumberToLoad == 0 {
+		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
+		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
+	}
 
 	if config.SRSNumberToLoad == 0 {
 		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
@@ -209,6 +216,9 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		time.Second)
 	require.NoError(t, err)
 
+	metrics := newTestClientMetrics(logger, config.MetricsPort)
+	metrics.start()
+
 	return &TestClient{
 		T:                 t,
 		Config:            config,
@@ -219,7 +229,13 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		RetrievalClient:   retrievalClient,
 		CertVerifier:      certVerifier,
 		PrivateKey:        privateKeyString,
+		metrics:           metrics,
 	}
+}
+
+// Stop stops the test client.
+func (c *TestClient) Stop() {
+	c.metrics.stop()
 }
 
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
@@ -240,7 +256,7 @@ func (c *TestClient) DisperseAndVerify(
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
 
 	// Read the blob from the relays and validators
-	c.ReadBlobFromRelay(ctx, *key, blobCert, unpaddedPayload)
+	c.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
 	c.ReadBlobFromValidators(ctx, blobCert, quorums, unpaddedPayload)
 
 	return nil
@@ -254,10 +270,12 @@ func (c *TestClient) DispersePayload(
 	salt uint32) (*corev2.BlobKey, error) {
 
 	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
+	start := time.Now()
 	_, key, err := c.DisperserClient.DisperseBlob(ctx, payload, 0, quorums, salt)
 	if err != nil {
 		return &corev2.BlobKey{}, fmt.Errorf("failed to disperse payload: %w", err)
 	}
+	c.metrics.reportDispersalTime(time.Since(start))
 	fmt.Printf("Dispersed blob with key %x\n", key)
 
 	return &key, err
@@ -293,6 +311,8 @@ func (c *TestClient) WaitForCertification(
 					expectedQuorums,
 					reply.SignedBatch,
 					reply.BlobInclusionInfo)
+
+				c.metrics.reportCertificationTime(time.Since(start))
 
 				return blobCert
 			} else if status == nil || reply.Status != *status {
@@ -369,17 +389,21 @@ func (c *TestClient) VerifyBlobCertification(
 	//require.NoError(c.T, err)
 }
 
-// ReadBlobFromRelay reads a blob from the relays and compares it to the given payload.
-func (c *TestClient) ReadBlobFromRelay(
+// ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
+func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
 	blobCert *commonv2.BlobCertificate,
 	payload []byte) {
 
 	for _, relayID := range blobCert.RelayKeys {
+		start := time.Now()
+
 		fmt.Printf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		require.NoError(c.T, err)
+
+		c.metrics.reportRelayReadTime(time.Since(start), relayID)
 
 		relayPayload := codec.RemoveEmptyByteFromPaddedBytes(blobFromRelay)
 		require.Equal(c.T, payload, relayPayload)
@@ -401,8 +425,12 @@ func (c *TestClient) ReadBlobFromValidators(
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
 		require.NoError(c.T, err)
 
+		start := time.Now()
+
 		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
 		require.NoError(c.T, err)
+
+		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
 		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
 
