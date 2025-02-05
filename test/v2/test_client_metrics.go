@@ -14,11 +14,6 @@ import (
 	"time"
 )
 
-// disperse
-// certify
-// read from relays
-// read from validators
-
 const namespace = "eigenda_test_client"
 
 // testClientMetrics encapsulates the metrics for the test client.
