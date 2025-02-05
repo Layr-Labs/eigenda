@@ -154,7 +154,9 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 		if !valid {
-			pr.log.Warn("cert is invalid", "blobKey", blobKey.Hex(), "relayKey", relayKey)
+			pr.log.Warn(
+				"generated commitment doesn't match cert commitment",
+				"blobKey", blobKey.Hex(), "relayKey", relayKey)
 			continue
 		}
 
