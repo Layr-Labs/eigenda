@@ -501,6 +501,69 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "/operators/signing-info": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Fetch operators signing info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of quorum IDs to fetch signing info for [default: 0,1]",
+                        "name": "quorums",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether to only return operators with signing rate less than 100% [default: false]",
+                        "name": "nonsigner_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorsSigningInfoResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/operators/stake": {
             "get": {
                 "produces": [
@@ -602,58 +665,6 @@ const docTemplateV2 = `{
     "definitions": {
         "big.Int": {
             "type": "object"
-        },
-        "core.BlobHeader": {
-            "type": "object",
-            "properties": {
-                "accountID": {
-                    "description": "AccountID is the account that is paying for the blob to be stored",
-                    "type": "string"
-                },
-                "commitment": {
-                    "$ref": "#/definitions/encoding.G1Commitment"
-                },
-                "length": {
-                    "type": "integer"
-                },
-                "length_commitment": {
-                    "$ref": "#/definitions/encoding.G2Commitment"
-                },
-                "length_proof": {
-                    "$ref": "#/definitions/encoding.LengthProof"
-                },
-                "quorumInfos": {
-                    "description": "QuorumInfos contains the quorum specific parameters for the blob",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/core.BlobQuorumInfo"
-                    }
-                }
-            }
-        },
-        "core.BlobQuorumInfo": {
-            "type": "object",
-            "properties": {
-                "adversaryThreshold": {
-                    "description": "AdversaryThreshold is the maximum amount of stake that can be controlled by an adversary in the quorum as a percentage of the total stake in the quorum",
-                    "type": "integer"
-                },
-                "chunkLength": {
-                    "description": "ChunkLength is the number of symbols in a chunk",
-                    "type": "integer"
-                },
-                "confirmationThreshold": {
-                    "description": "ConfirmationThreshold is the amount of stake that must sign a message for it to be considered valid as a percentage of the total stake in the quorum",
-                    "type": "integer"
-                },
-                "quorumID": {
-                    "type": "integer"
-                },
-                "quorumRate": {
-                    "description": "Rate Limit. This is a temporary measure until the node can derive rates on its own using rollup authentication. This is used\nfor restricting the rate at which retrievers are able to download data from the DA node to a multiple of the rate at which the\ndata was posted to the DA node.",
-                    "type": "integer"
-                }
-            }
         },
         "core.G1Point": {
             "type": "object",
@@ -1110,7 +1121,7 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "blobHeader": {
-                    "$ref": "#/definitions/core.BlobHeader"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
                 },
                 "blobSize": {
                     "description": "BlobSize is the size of the blob in bytes",
@@ -1303,6 +1314,35 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.OperatorSigningInfo": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum_id": {
+                    "type": "integer"
+                },
+                "signing_percentage": {
+                    "type": "number"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                },
+                "total_batches": {
+                    "type": "integer"
+                },
+                "total_responsible_batches": {
+                    "type": "integer"
+                },
+                "total_unsigned_batches": {
+                    "type": "integer"
+                }
+            }
+        },
         "v2.OperatorStake": {
             "type": "object",
             "properties": {
@@ -1317,6 +1357,17 @@ const docTemplateV2 = `{
                 },
                 "stake_percentage": {
                     "type": "number"
+                }
+            }
+        },
+        "v2.OperatorsSigningInfoResponse": {
+            "type": "object",
+            "properties": {
+                "operator_signing_info": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OperatorSigningInfo"
+                    }
                 }
             }
         },
