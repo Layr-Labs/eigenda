@@ -26,7 +26,7 @@ func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetClient(t)
 
-	config := parseConfig(t, "../config/load/100kb_s-1mb-3x.json")
+	config := parseConfig(t, "../config/load/1mb_s-10mb-0x.json")
 
 	generator := NewLoadGenerator(config, c, rand)
 

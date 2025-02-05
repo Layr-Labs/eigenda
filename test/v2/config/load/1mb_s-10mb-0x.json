@@ -1,0 +1,13 @@
+{
+  "BytesPerSecond": 1048576,
+  "AverageBlobSize": 10485760,
+  "BlobSizeStdDev": 262144,
+  "RelayReadAmplification": 0,
+  "ValidatorReadAmplification": 0,
+  "MaxParallelism": 20,
+  "DispersalTimeoutSeconds": 600,
+  "Quorums": [
+    0,
+    1
+  ]
+}
