@@ -56,7 +56,7 @@ type LoadGenerator struct {
 
 	// The configuration for the load generator.
 	config *LoadGeneratorConfig
-	// The  test client to use for the load test.
+	// The test client to use for the load test.
 	client *client.TestClient
 	// The random number generator to use for the load test.
 	rand *random.TestRandom
