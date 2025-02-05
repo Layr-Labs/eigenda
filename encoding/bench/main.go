@@ -145,7 +145,7 @@ func benchmarkEncodeAndVerify(p *prover.Prover, blobLength uint64, numChunks uin
 		ChunkLength: chunkLen,
 	}
 
-	fmt.Printf("Running load: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
+	fmt.Printf("Running benchmark: numChunks=%d, chunkLen=%d, blobLength=%d\n", params.NumChunks, params.ChunkLength, blobLength)
 
 	enc, err := p.GetKzgEncoder(params)
 	if err != nil {

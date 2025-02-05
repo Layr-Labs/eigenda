@@ -35,7 +35,7 @@ func writeThenReadBenchmark(b *testing.B, store kvstore.Store[[]byte]) {
 		}
 
 		// Change a few bytes in the key to avoid collisions. Change a few bytes in the value to
-		// avoid the DB taking shortcuts (since we aren't using random data for the sake of load performance).
+		// avoid the DB taking shortcuts (since we aren't using random data for the sake of benchmark performance).
 
 		key := make([]byte, keySize)
 		copy(key, baseKey)
