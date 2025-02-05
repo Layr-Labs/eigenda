@@ -1111,6 +1111,10 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
 	})
 }
 
