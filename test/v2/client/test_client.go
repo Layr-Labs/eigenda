@@ -72,8 +72,8 @@ type TestClient struct {
 	metrics           *testClientMetrics
 }
 
-// resolveTildeInPath resolves the tilde (~) in the given path to the user's home directory.
-func resolveTildeInPath(t *testing.T, path string) string {
+// ResolveTildeInPath resolves the tilde (~) in the given path to the user's home directory.
+func ResolveTildeInPath(t *testing.T, path string) string {
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
 
@@ -82,7 +82,7 @@ func resolveTildeInPath(t *testing.T, path string) string {
 
 // path returns the full path to a file in the test data directory.
 func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
-	root := resolveTildeInPath(t, c.TestDataPath)
+	root := ResolveTildeInPath(t, c.TestDataPath)
 
 	combinedElements := make([]string, 0, len(elements)+1)
 	combinedElements = append(combinedElements, root)
@@ -115,7 +115,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
 	// Construct the disperser client
 
-	privateKeyFile := resolveTildeInPath(t, config.KeyPath)
+	privateKeyFile := ResolveTildeInPath(t, config.KeyPath)
 	privateKey, err := os.ReadFile(privateKeyFile)
 	require.NoError(t, err)
 

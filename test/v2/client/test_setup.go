@@ -28,7 +28,7 @@ func GetConfig(t *testing.T) *TestClientConfig {
 		return config
 	}
 
-	configFile := resolveTildeInPath(t, targetConfigFile)
+	configFile := ResolveTildeInPath(t, targetConfigFile)
 	configFileBytes, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	}
 
 	// Check to see if the private key file exists. If not, stop the test.
-	filePath = resolveTildeInPath(t, config.KeyPath)
+	filePath = ResolveTildeInPath(t, config.KeyPath)
 	_, err = os.Stat(filePath)
 	require.NoError(t, err,
 		"private key file %s does not exist. This file should "+

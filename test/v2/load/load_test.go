@@ -1,21 +1,31 @@
 package load
 
 import (
+	"encoding/json"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
 
-func TestLightLoad(t *testing.T) {
+func parseConfig(t *testing.T, configFile string) *LoadGeneratorConfig {
+	configFile = client.ResolveTildeInPath(t, configFile)
+	configFileBytes, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+
+	config := &LoadGeneratorConfig{}
+	err = json.Unmarshal(configFileBytes, config)
+	require.NoError(t, err)
+
+	return config
+}
+
+func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetClient(t)
 
-	config := DefaultLoadGeneratorConfig()
-	config.AverageBlobSize = 100 * units.KiB
-	config.BlobSizeStdDev = 50 * units.KiB
-	config.BytesPerSecond = 100 * units.KiB
+	config := parseConfig(t, "../config/load/100kb_s-1mb-3x.json")
 
 	generator := NewLoadGenerator(config, c, rand)
 
