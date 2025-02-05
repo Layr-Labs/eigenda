@@ -1050,7 +1050,9 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 100,
 	}
-	err := blobMetadataStore.PutBatchHeader(ctx, batchHeader)
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	assert.NoError(t, err)
 
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -1099,6 +1101,17 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, inclusionInfo, blobAttestationInfo.InclusionInfo)
 	assert.Equal(t, attestation, blobAttestationInfo.Attestation)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+	})
 }
 
 func TestBlobMetadataStoreInclusionInfo(t *testing.T) {
