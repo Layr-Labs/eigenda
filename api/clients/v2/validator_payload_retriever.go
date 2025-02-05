@@ -72,7 +72,7 @@ func BuildValidatorPayloadRetriever(
 		reader,
 		indexedChainState,
 		kzgVerifier,
-		int(validatorPayloadRetrieverConfig.ConnectionCount))
+		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 
 	codec, err := codecs.CreateCodec(
 		validatorPayloadRetrieverConfig.PayloadPolynomialForm,

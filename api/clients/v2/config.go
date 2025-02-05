@@ -76,8 +76,8 @@ type ValidatorPayloadRetrieverConfig struct {
 	// The address of the EigenDAServiceManager contract
 	EigenDAServiceManagerAddr string
 
-	// The number of simultaneous connections to use when fetching chunks during validator retrieval
-	ConnectionCount uint
+	// The maximum number of simultaneous connections to use when fetching chunks during validator retrieval
+	MaxConnectionCount uint
 }
 
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -194,7 +194,7 @@ func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfi
 	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
 		RetrievalTimeout:    20 * time.Second,
-		ConnectionCount:     10,
+		MaxConnectionCount:  10,
 	}
 }
 
@@ -221,8 +221,8 @@ func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
 	if rc.RetrievalTimeout == 0 {
 		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
 	}
-	if rc.ConnectionCount == 0 {
-		rc.ConnectionCount = defaultConfig.ConnectionCount
+	if rc.MaxConnectionCount == 0 {
+		rc.MaxConnectionCount = defaultConfig.MaxConnectionCount
 	}
 
 	return nil
