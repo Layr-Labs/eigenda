@@ -498,7 +498,7 @@ func (c *InstrumentedEthClient) EstimateGasPriceAndLimitAndSendTx(
 		// Currently Alchemy is the only backend provider that exposes this
 		// method, so in the event their API is unreachable we can fallback to a
 		// degraded mode of operation. This also applies to our test
-		// environments, as hardhat doesn't support the query either.
+		// environment, as hardhat doesn't support the query either.
 		c.Logger.Info("eth_maxPriorityFeePerGas is unsupported by current backend, using fallback gasTipCap")
 		gasTipCap = FallbackGasTipCap
 	}

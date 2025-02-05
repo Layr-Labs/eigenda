@@ -1,4 +1,4 @@
-package v2
+package load
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	"math/rand"
 	"sync/atomic"
@@ -56,7 +57,7 @@ type LoadGenerator struct {
 	// The configuration for the load generator.
 	config *LoadGeneratorConfig
 	// The  test client to use for the load test.
-	client *TestClient
+	client *client.TestClient
 	// The random number generator to use for the load test.
 	rand *random.TestRandom
 	// The time between starting each blob submission.
@@ -74,7 +75,7 @@ type LoadGenerator struct {
 // NewLoadGenerator creates a new LoadGenerator.
 func NewLoadGenerator(
 	config *LoadGeneratorConfig,
-	client *TestClient,
+	client *client.TestClient,
 	rand *random.TestRandom) *LoadGenerator {
 
 	submissionFrequency := config.BytesPerSecond / config.AverageBlobSize
@@ -85,7 +86,7 @@ func NewLoadGenerator(
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
-	metrics := newLoadGeneratorMetrics(client.metrics.registry)
+	metrics := newLoadGeneratorMetrics(client.MetricsRegistry)
 
 	return &LoadGenerator{
 		ctx:                ctx,

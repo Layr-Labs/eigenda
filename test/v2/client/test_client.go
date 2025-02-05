@@ -1,8 +1,9 @@
-package v2
+package client
 
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"os"
 	"path"
 	"strings"
@@ -36,12 +37,12 @@ const (
 	SRSPathG2         = SRSPath + "/g2.point"
 	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
 	SRSPathSRSTables  = SRSPath + "/SRSTables"
-	KeyPath           = "private-key.txt"
 )
 
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	TestDataPath                  string
+	KeyPath                       string
 	DisperserHostname             string
 	DisperserPort                 int
 	EthRPCURLs                    []string
@@ -67,15 +68,21 @@ type TestClient struct {
 	RetrievalClient   clients.RetrievalClient
 	CertVerifier      *verification.CertVerifier
 	PrivateKey        string
+	MetricsRegistry   *prometheus.Registry
 	metrics           *testClientMetrics
+}
+
+// resolveTildeInPath resolves the tilde (~) in the given path to the user's home directory.
+func resolveTildeInPath(t *testing.T, path string) string {
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	return strings.Replace(path, "~", homeDir, 1)
 }
 
 // path returns the full path to a file in the test data directory.
 func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
-	homeDir, err := os.UserHomeDir()
-	require.NoError(t, err)
-
-	root := strings.Replace(c.TestDataPath, "~", homeDir, 1)
+	root := resolveTildeInPath(t, c.TestDataPath)
 
 	combinedElements := make([]string, 0, len(elements)+1)
 	combinedElements = append(combinedElements, root)
@@ -108,7 +115,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 
 	// Construct the disperser client
 
-	privateKeyFile := config.path(t, KeyPath)
+	privateKeyFile := resolveTildeInPath(t, config.KeyPath)
 	privateKey, err := os.ReadFile(privateKeyFile)
 	require.NoError(t, err)
 
@@ -229,6 +236,7 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 		RetrievalClient:   retrievalClient,
 		CertVerifier:      certVerifier,
 		PrivateKey:        privateKeyString,
+		MetricsRegistry:   metrics.registry,
 		metrics:           metrics,
 	}
 }

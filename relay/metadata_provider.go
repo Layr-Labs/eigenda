@@ -129,7 +129,7 @@ func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.Bl
 			if err != nil {
 				// Intentionally log at debug level. External users can force this condition to trigger
 				// by requesting metadata for a blob that does not exist, and so it's important to avoid
-				// allowing hooligans to spam the logs in production environments.
+				// allowing hooligans to spam the logs in production environment.
 				m.logger.Debugf("error retrieving metadata for blob %s: %v", boundKey.Hex(), err)
 				hadError.Store(true)
 				completionChannel <- &blobMetadataResult{

@@ -1,7 +1,8 @@
-package v2
+package load
 
 import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	"os"
 	"testing"
@@ -9,7 +10,7 @@ import (
 
 func TestLightLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := getClient(t)
+	c := client.GetClient(t)
 
 	config := DefaultLoadGeneratorConfig()
 	config.AverageBlobSize = 100 * units.KiB

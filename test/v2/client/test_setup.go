@@ -1,8 +1,8 @@
-package v2
+package client
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
@@ -11,40 +11,49 @@ import (
 )
 
 var (
-	preprodConfig = &TestClientConfig{
-		TestDataPath:                  "~/.test-v2",
-		DisperserHostname:             "disperser-preprod-holesky.eigenda.xyz",
-		DisperserPort:                 443,
-		EthRPCURLs:                    []string{"https://ethereum-holesky-rpc.publicnode.com"},
-		BLSOperatorStateRetrieverAddr: "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
-		EigenDAServiceManagerAddr:     "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
-		EigenDACertVerifierAddress:    "0xe2C7AfB3c47B800b439b0a3d8EA40ca79759B245",
-		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
-		SRSOrder:                      268435456,
-		MaxBlobSize:                   16 * units.MiB,
-		MinimumSigningPercent:         55,
-		MetricsPort:                   9101,
-	}
-
-	lock   sync.Mutex
-	client *TestClient
-
-	targetConfig = preprodConfig
+	targetConfigFile = "../config/environment/preprod.json"
+	configLock       sync.Mutex
+	config           *TestClientConfig
+	clientLock       sync.Mutex
+	client           *TestClient
 )
 
-// getClient returns a TestClient instance, creating one if it does not exist.
-// This uses a global static client... this is icky, but it takes ~1 minute
-// to read the SRS points, so it's the lesser of two evils to keep it around.
-func getClient(t *testing.T) *TestClient {
-	lock.Lock()
-	defer lock.Unlock()
+// GetConfig returns a TestClientConfig instance, creating one if it does not exist.
+func GetConfig(t *testing.T) *TestClientConfig {
+	configLock.Lock()
+	defer configLock.Unlock()
 
 	skipInCI(t)
-	setupFilesystem(t, targetConfig)
-
-	if client == nil {
-		client = NewTestClient(t, targetConfig)
+	if config != nil {
+		return config
 	}
+
+	configFile := resolveTildeInPath(t, targetConfigFile)
+	configFileBytes, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+
+	config = &TestClientConfig{}
+	err = json.Unmarshal(configFileBytes, config)
+	require.NoError(t, err)
+
+	return config
+}
+
+// GetClient returns a TestClient instance, creating one if it does not exist.
+// This uses a global static client... this is icky, but it takes ~1 minute
+// to read the SRS points, so it's the lesser of two evils to keep it around.
+func GetClient(t *testing.T) *TestClient {
+	clientLock.Lock()
+	defer clientLock.Unlock()
+
+	skipInCI(t)
+	if client != nil {
+		return client
+	}
+
+	testConfig := GetConfig(t)
+	client = NewTestClient(t, testConfig)
+	setupFilesystem(t, testConfig)
 
 	return client
 }
@@ -122,7 +131,7 @@ func setupFilesystem(t *testing.T, config *TestClientConfig) {
 	}
 
 	// Check to see if the private key file exists. If not, stop the test.
-	filePath = config.path(t, KeyPath)
+	filePath = resolveTildeInPath(t, config.KeyPath)
 	_, err = os.Stat(filePath)
 	require.NoError(t, err,
 		"private key file %s does not exist. This file should "+

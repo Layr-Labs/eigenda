@@ -138,7 +138,7 @@ func BenchmarkEncode(b *testing.B) {
 		blobs[i] = blob
 	}
 
-	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the benchmark.
+	// Warm up the encoder: ensures that all SRS tables are loaded so these aren't included in the load.
 	_, _, _ = p.EncodeAndProve(blobs[0], params)
 	b.ResetTimer()
 
