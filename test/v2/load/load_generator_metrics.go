@@ -1,9 +1,11 @@
-package v2
+package load
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+const namespace = "eigenda_test_client"
 
 // loadGeneratorMetrics encapsulates the metrics for the load generator.
 type loadGeneratorMetrics struct {
