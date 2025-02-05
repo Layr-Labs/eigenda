@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/docker/go-units"
-	"os"
-	"os/exec"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,126 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
 )
-
-var (
-	preprodConfig = &TestClientConfig{
-		TestDataPath:                  "~/.test-v2",
-		DisperserHostname:             "disperser-preprod-holesky.eigenda.xyz",
-		DisperserPort:                 443,
-		EthRPCURLs:                    []string{"https://ethereum-holesky-rpc.publicnode.com"},
-		BLSOperatorStateRetrieverAddr: "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
-		EigenDAServiceManagerAddr:     "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
-		EigenDACertVerifierAddress:    "0x5c33Ce64EE04400fD593F960d63336F1B65bF77B",
-		SubgraphURL:                   "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
-		SRSOrder:                      268435456,
-		SRSNumberToLoad:               2097152,
-		MaxBlobSize:                   16 * units.MiB,
-		MinimumSigningPercent:         55,
-	}
-
-	lock   sync.Mutex
-	client *TestClient
-
-	targetConfig = preprodConfig
-)
-
-func setupFilesystem(t *testing.T, config *TestClientConfig) {
-	// Create the test data directory if it does not exist
-	err := os.MkdirAll(config.TestDataPath, 0755)
-	require.NoError(t, err)
-
-	// Create the SRS directories if they do not exist
-	err = os.MkdirAll(config.path(t, SRSPath), 0755)
-	require.NoError(t, err)
-	err = os.MkdirAll(config.path(t, SRSPathSRSTables), 0755)
-	require.NoError(t, err)
-
-	// If any of the srs files do not exist, download them.
-	filePath := config.path(t, SRSPathG1)
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
-		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
-	}
-
-	filePath = config.path(t, SRSPathG2)
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
-		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
-	}
-
-	filePath = config.path(t, SRSPathG2PowerOf2)
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
-		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
-	}
-
-	// Check to see if the private key file exists. If not, stop the test.
-	filePath = config.path(t, KeyPath)
-	_, err = os.Stat(filePath)
-	require.NoError(t, err,
-		"private key file %s does not exist. This file should "+
-			"contain the private key for the account used in the test, in hex.",
-		filePath)
-}
-
-// getClient returns a TestClient instance, creating one if it does not exist.
-// This uses a global static client... this is icky, but it takes ~1 minute
-// to read the SRS points, so it's the lesser of two evils to keep it around.
-func getClient(t *testing.T) *TestClient {
-	lock.Lock()
-	defer lock.Unlock()
-
-	skipInCI(t)
-	setupFilesystem(t, targetConfig)
-
-	if client == nil {
-		client = NewTestClient(t, targetConfig)
-	}
-
-	return client
-}
-
-func skipInCI(t *testing.T) {
-	if os.Getenv("CI") != "" {
-		t.Skip("Skipping test in CI environment")
-	}
-}
 
 // Tests the basic dispersal workflow:
 // - disperse a blob
@@ -203,8 +82,7 @@ func TestPaddingError(t *testing.T) {
 // Disperse a small payload (between 1KB and 2KB).
 func TestSmallBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := 1024 + rand.Intn(1024)
-	payload := rand.Bytes(dataLength)
+	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -213,8 +91,7 @@ func TestSmallBlobDispersal(t *testing.T) {
 // Disperse a medium payload (between 100KB and 200KB).
 func TestMediumBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := 1024 * (100 + rand.Intn(100))
-	payload := rand.Bytes(dataLength)
+	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -233,8 +110,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 // Disperse a small payload (between 1KB and 2KB) with a single quorum
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	desiredDataLength := 1024 + rand.Intn(1024)
-	payload := rand.Bytes(desiredDataLength)
+	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0})
 	require.NoError(t, err)
@@ -267,8 +143,7 @@ func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := getClient(t)
 
-	dataLength := 1024 + rand.Intn(1024)
-	payload := rand.Bytes(dataLength)
+	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -285,13 +160,10 @@ func TestDoubleDispersal(t *testing.T) {
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
-	t.Skip("this test is not working due to a bug")
-
 	rand := random.NewTestRandom(t)
 	c := getClient(t)
 
-	dataLength := 1024 + rand.Intn(1024)
-	payload := rand.Bytes(dataLength)
+	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -313,5 +185,38 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	}
 	_, err = c.RelayClient.GetChunksByRange(ctx, targetRelay, chunkRequests)
 	require.Error(t, err)
-	// TODO (cody-littley) once this is properly returning an error, validate the error message
+	require.Contains(t, err.Error(), "failed to get operator key: operator not found")
+}
+
+func TestDispersalWithInvalidSignature(t *testing.T) {
+	rand := random.NewTestRandom(t)
+
+	c := getClient(t)
+
+	// Create a dispersal client with a random key
+	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
+	require.NoError(t, err)
+
+	signerAccountId, err := signer.GetAccountID()
+	require.NoError(t, err)
+	accountId := gethcommon.HexToAddress(signerAccountId)
+	fmt.Printf("Account ID: %s\n", accountId.String())
+
+	disperserConfig := &clients.DisperserClientConfig{
+		Hostname:          c.Config.DisperserHostname,
+		Port:              fmt.Sprintf("%d", c.Config.DisperserPort),
+		UseSecureGrpcFlag: true,
+	}
+	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
+	require.NoError(t, err)
+
+	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
+	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, []core.QuorumID{0, 1}, rand.Uint32())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "error accounting blob")
 }
