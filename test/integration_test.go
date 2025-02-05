@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/docker/go-units"
 	"log"
 	"math"
 	"math/big"
@@ -17,6 +16,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/stretchr/testify/require"
 
@@ -370,6 +371,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			DispersalAuthenticationKeyCacheSize: 1024,
 			DisableDispersalAuthentication:      false,
 			RelayMaxMessageSize:                 units.GiB,
+			EnableV1:                            true,
+			EnableV2:                            false,
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe

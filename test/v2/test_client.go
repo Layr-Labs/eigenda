@@ -3,6 +3,12 @@ package v2
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -22,11 +28,6 @@ import (
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path"
-	"strings"
-	"testing"
-	"time"
 )
 
 const (
@@ -201,7 +202,11 @@ func NewTestClient(t *testing.T, config *TestClientConfig) *TestClient {
 	}
 	gethClient, err := geth.NewClient(gethClientConfig, gethcommon.Address{}, 0, logger)
 	require.NoError(t, err)
-	certVerifier, err := verification.NewCertVerifier(*gethClient, config.EigenDACertVerifierAddress)
+	certVerifier, err := verification.NewCertVerifier(
+		logger,
+		gethClient,
+		config.EigenDACertVerifierAddress,
+		time.Second)
 	require.NoError(t, err)
 
 	return &TestClient{
@@ -283,7 +288,8 @@ func (c *TestClient) WaitForCertification(
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				c.VerifyBlobCertification(key,
+				c.VerifyBlobCertification(
+					key,
 					expectedQuorums,
 					reply.SignedBatch,
 					reply.BlobInclusionInfo)

@@ -120,7 +120,9 @@ type DisperseBlobRequest struct {
 	// The blob to be dispersed.
 	//
 	// The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-	// (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+	// While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the
+	// payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract
+	// (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 	//
 	// Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
 	// significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.

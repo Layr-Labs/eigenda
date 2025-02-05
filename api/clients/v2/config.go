@@ -38,6 +38,13 @@ type PayloadClientConfig struct {
 	// The timeout duration for contract calls
 	ContractCallTimeout time.Duration
 
+	// BlockNumberPollInterval is how frequently to check latest block number when waiting for the internal eth client
+	// to advance to a certain block.
+	//
+	// If this is configured to be <= 0, then contract calls which require the internal eth client to have reached a
+	// certain block height will fail if the internal client is behind.
+	BlockNumberPollInterval time.Duration
+
 	// The BlobVersion to use when creating new blobs, or interpreting blob bytes.
 	//
 	// BlobVersion needs to point to a version defined in the threshold registry contract.
@@ -89,10 +96,11 @@ type PayloadDisperserConfig struct {
 // NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
 func getDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
-		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
-		PayloadPolynomialForm: codecs.PolynomialFormEval,
-		ContractCallTimeout:   5 * time.Second,
-		BlobVersion:           0,
+		BlobEncodingVersion:     codecs.DefaultBlobEncoding,
+		PayloadPolynomialForm:   codecs.PolynomialFormEval,
+		ContractCallTimeout:     5 * time.Second,
+		BlockNumberPollInterval: 1 * time.Second,
+		BlobVersion:             0,
 	}
 }
 
@@ -119,6 +127,8 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	if cc.ContractCallTimeout == 0 {
 		cc.ContractCallTimeout = defaultConfig.ContractCallTimeout
 	}
+
+	// BlockNumberPollInterval may be 0, so don't do anything
 
 	// BlobVersion may be 0, so don't do anything
 
