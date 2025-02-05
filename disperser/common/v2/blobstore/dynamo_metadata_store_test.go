@@ -670,7 +670,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
 	// bucket.
 	startBucket, endBucket := blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
 	if startBucket < endBucket {
-		now -= uint64(25 * time.Hour.Nanoseconds())
+		now -= uint64(time.Hour.Nanoseconds())
 		firstBatchTs = now - uint64(5*time.Minute.Nanoseconds())
 	}
 	startBucket, endBucket = blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
