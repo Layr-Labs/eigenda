@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -974,6 +975,44 @@ func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey co
 	}
 
 	return info, nil
+}
+
+func (s *BlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobAttestationInfo, error) {
+	blobInclusionInfos, err := s.GetBlobInclusionInfos(ctx, blobKey)
+	if err != nil {
+		s.logger.Error("failed to get blob inclusion info for blob", "err", err, "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob inclusion info: %s", err.Error()))
+	}
+
+	if len(blobInclusionInfos) == 0 {
+		s.logger.Error("no blob inclusion info found for blob", "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal("no blob inclusion info found")
+	}
+
+	if len(blobInclusionInfos) > 1 {
+		s.logger.Warn("multiple inclusion info found for blob", "blobKey", blobKey.Hex())
+	}
+
+	for _, inclusionInfo := range blobInclusionInfos {
+		// get the signed batch from this inclusion info
+		batchHeaderHash, err := inclusionInfo.BatchHeader.Hash()
+		if err != nil {
+			s.logger.Error("failed to get batch header hash from blob inclusion info", "err", err, "blobKey", blobKey.Hex())
+			continue
+		}
+		_, attestation, err := s.GetSignedBatch(ctx, batchHeaderHash)
+		if err != nil {
+			s.logger.Error("failed to get signed batch", "err", err, "blobKey", blobKey.Hex())
+			continue
+		}
+
+		return &v2.BlobAttestationInfo{
+			InclusionInfo: inclusionInfo,
+			Attestation:   attestation,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("no attestation info found for blobkey: %s", blobKey.Hex())
 }
 
 func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
