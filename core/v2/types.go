@@ -310,7 +310,7 @@ func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
 type Attestation struct {
 	*BatchHeader
 
-	// AttestedAt is the time the attestation was made
+	// AttestedAt is the time the attestation was made in nanoseconds
 	AttestedAt uint64
 	// NonSignerPubKeys are the public keys of the operators that did not sign the blob
 	NonSignerPubKeys []*core.G1Point
@@ -322,7 +322,7 @@ type Attestation struct {
 	Sigma *core.Signature
 	// QuorumNumbers contains the quorums relevant for the attestation
 	QuorumNumbers []core.QuorumID
-	// QuorumResults contains the results of the quorum verification
+	// QuorumResults contains the operators' total signing percentage of the quorum
 	QuorumResults map[core.QuorumID]uint8
 }
 

@@ -66,6 +66,12 @@ func (r *TestRandom) Bytes(length int) []byte {
 	return bytes
 }
 
+// VariableBytes generates a random byte slice of a length between min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableBytes(min int, max int) []byte {
+	length := r.Intn(max-min) + min
+	return r.Bytes(length)
+}
+
 // Time generates a random time.
 func (r *TestRandom) Time() time.Time {
 	return time.Unix(r.Int63(), r.Int63())
@@ -78,6 +84,16 @@ func (r *TestRandom) String(length int) string {
 		b[i] = charset[r.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+// Uint32n generates a random uint32 less than n.
+func (r *TestRandom) Uint32n(n uint32) uint32 {
+	return r.Uint32() % n
+}
+
+// Uint64n generates a random uint64 less than n.
+func (r *TestRandom) Uint64n(n uint64) uint64 {
+	return r.Uint64() % n
 }
 
 var _ io.Reader = &randIOReader{}

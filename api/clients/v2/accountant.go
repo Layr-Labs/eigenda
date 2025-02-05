@@ -63,7 +63,9 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
 // reservation period for reservation payments and cumulative payment for on-demand payments,
-// and both fields are used to create the payment header and signature
+// and both fields are used to create the payment header and signature.
+// These generated values are used to create the payment header and signature, as specified in
+// api/proto/common/v2/common_v2.proto
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)

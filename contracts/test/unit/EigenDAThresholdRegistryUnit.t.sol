@@ -26,9 +26,6 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
         assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages())), keccak256(abi.encode(quorumAdversaryThresholdPercentages)));
         assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages())), keccak256(abi.encode(quorumConfirmationThresholdPercentages)));
         assertEq(keccak256(abi.encode(eigenDAThresholdRegistry.quorumNumbersRequired())), keccak256(abi.encode(quorumNumbersRequired)));
-        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDAThresholdRegistry.defaultSecurityThresholdsV2();
-        assertEq(adversaryThreshold, defaultSecurityThresholds.adversaryThreshold);
-        assertEq(confirmationThreshold, defaultSecurityThresholds.confirmationThreshold);
         (uint32 maxNumOperators, uint32 numChunks, uint8 codingRate) = eigenDAThresholdRegistry.versionedBlobParams(0); 
         assertEq(maxNumOperators, _versionedBlobParams.maxNumOperators);
         assertEq(numChunks, _versionedBlobParams.numChunks);
@@ -42,8 +39,7 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
             quorumAdversaryThresholdPercentages,
             quorumConfirmationThresholdPercentages,
             quorumNumbersRequired,
-            versionedBlobParams,
-            defaultSecurityThresholds
+            versionedBlobParams
         );
     }
 
@@ -95,12 +91,6 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
         quorumNumber = 2;
         isQuorumRequired = eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
         assertEq(isQuorumRequired, false);
-    }
-
-    function test_getDefaultSecurityThresholdsV2() public {
-        SecurityThresholds memory defaultSecurityThresholds = eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
-        assertEq(defaultSecurityThresholds.adversaryThreshold, defaultSecurityThresholds.adversaryThreshold);
-        assertEq(defaultSecurityThresholds.confirmationThreshold, defaultSecurityThresholds.confirmationThreshold);
     }
 
     function test_getBlobParams() public {

@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/docker/go-units"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -30,7 +32,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
@@ -91,7 +94,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
 				Expect(err).To(BeNil())
 
-				if status1 != dispv2.Certified || status2 != dispv2.Certified {
+				if status1 != dispv2.Complete || status2 != dispv2.Complete {
 					continue
 				}
 
@@ -207,7 +210,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		// Test retrieval from relay
 		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
+			Sockets:            relays,
+			MaxGRPCMessageSize: units.GiB,
 		}, logger)
 		Expect(err).To(BeNil())
 
@@ -300,13 +304,19 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 						X: commitX,
 						Y: commitY,
 					},
+					// Most crypptography library serializes a G2 point by having
+					// A0 followed by A1 for both X, Y field of G2. However, ethereum
+					// precompile assumes an ordering of A1, A0. We choose
+					// to conform with Ethereum order when serializing a blobHeaderV2
+					// for instance, gnark, https://github.com/Consensys/gnark-crypto/blob/de0d77f2b4d520350bc54c612828b19ce2146eee/ecc/bn254/marshal.go#L1078
+					// Ethereum, https://eips.ethereum.org/EIPS/eip-197#definition-of-the-groups
 					LengthCommitment: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthCommitX0, lengthCommitX1},
-						Y: [2]*big.Int{lengthCommitY0, lengthCommitY1},
+						X: [2]*big.Int{lengthCommitX1, lengthCommitX0},
+						Y: [2]*big.Int{lengthCommitY1, lengthCommitY0},
 					},
 					LengthProof: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthProofX0, lengthProofX1},
-						Y: [2]*big.Int{lengthProofY0, lengthProofY1},
+						X: [2]*big.Int{lengthProofX1, lengthProofX0},
+						Y: [2]*big.Int{lengthProofY1, lengthProofY0},
 					},
 					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},

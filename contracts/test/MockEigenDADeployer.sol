@@ -150,8 +150,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumAdversaryThresholdPercentages,
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
-                versionedBlobParams,
-                defaultSecurityThresholds
+                versionedBlobParams
             )
         );
 
@@ -204,7 +203,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IEigenDARelayRegistry(address(eigenDARelayRegistry)),
             OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator))
+            IRegistryCoordinator(address(registryCoordinator)),
+            defaultSecurityThresholds,
+            quorumNumbersRequired
         );
     }
 
