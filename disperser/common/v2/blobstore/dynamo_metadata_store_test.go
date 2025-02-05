@@ -1048,7 +1048,7 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	blobKey := corev2.BlobKey{1, 1, 1}
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
-		ReferenceBlockNumber: 100,
+		ReferenceBlockNumber: 1024,
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
