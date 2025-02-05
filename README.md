@@ -33,6 +33,7 @@ In order to disperse to the EigenDA network in production, or at high throughput
   - [Deployment Guide](#deployment-guide)
     - [Hardware Requirements](#hardware-requirements)
     - [Ethereum Node Requirements](#ethereum-node-requirements)
+    - [SRS Points Requirements](#srs-points-requirements)
     - [Deployment Steps](#deployment-steps)
     - [Env File](#env-file)
     - [Running via Docker](#running-via-docker)
@@ -74,6 +75,10 @@ The following specs are recommended for running on a single production server:
 A normal (non-archival) Ethereum node is sufficient for running the proxy with [cert verification](#certificate-verification) turned on. This is because all parameters that are read from the chain are either:
 1. immutable (eg: [securityThresholds](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L30)), or
 2. are upgradeable but have all the historical versions available in contract storage (eg: [versioninedBlobParams](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L27))
+
+### SRS Points Requirements
+
+In order to compute (and in our current implementation also verify) KZG commitments, G1 SRS points of size equivalent to the blob size are needed. The points must be loaded into the binary by using the [--eigenda.g1-path](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/verify/cli.go#L55) flag. A 32MiB G1 SRS file is available under [./resources/g1.point](./resources/g1.point). This file is also copied inside our distributed [docker images](https://github.com/Layr-Labs/eigenda-proxy/pkgs/container/eigenda-proxy), at [\<WORKDIR\>/resources/g1.point](https://github.com/Layr-Labs/eigenda-proxy/blob/147783535bedc117097ddc1c8c1eb7688de29eb6/Dockerfile#L30). The `--eigenda.g1-path` flag's default value is the relative path `resources/g1.point`, which will work when running the binary from the repo's root directory, as well as inside the container.
 
 ### Deployment Steps
 
