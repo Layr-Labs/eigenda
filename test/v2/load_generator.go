@@ -23,10 +23,10 @@ type LoadGeneratorConfig struct {
 	// By default, this utility reads each blob back from each relay once. The number of
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times.
-	RelayReadAmplification uint64 // TODO use this
+	RelayReadAmplification uint64
 	// By default, this utility reads chunks once. The number of chunk reads is multiplied
 	// by this factor. If this is set to 3, then chunks are read back 3 times.
-	ValidatorReadAmplification uint64 // TODO use this
+	ValidatorReadAmplification uint64
 	// The maximum number of parallel blobs in flight.
 	MaxParallelism uint64
 	// The timeout for each blob dispersal.
@@ -41,9 +41,9 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		BytesPerSecond:             10 * units.MiB,
 		AverageBlobSize:            1 * units.MiB,
 		BlobSizeStdDev:             0.5 * units.MiB,
-		RelayReadAmplification:     1,
-		ValidatorReadAmplification: 1,
-		MaxParallelism:             1000,
+		RelayReadAmplification:     3,
+		ValidatorReadAmplification: 3,
+		MaxParallelism:             10,
 		DispersalTimeout:           5 * time.Minute,
 		Quorums:                    []core.QuorumID{0, 1},
 	}
@@ -67,6 +67,8 @@ type LoadGenerator struct {
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
 	finishedChan chan struct{}
+	// The metrics for the load generator.
+	metrics *loadGeneratorMetrics
 }
 
 // NewLoadGenerator creates a new LoadGenerator.
@@ -83,6 +85,8 @@ func NewLoadGenerator(
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
+	metrics := newLoadGeneratorMetrics(client.metrics.registry)
+
 	return &LoadGenerator{
 		ctx:                ctx,
 		cancel:             cancel,
@@ -93,6 +97,7 @@ func NewLoadGenerator(
 		parallelismLimiter: parallelismLimiter,
 		alive:              atomic.Bool{},
 		finishedChan:       make(chan struct{}),
+		metrics:            metrics,
 	}
 }
 
@@ -128,8 +133,10 @@ func (l *LoadGenerator) run() {
 // from the network, which may take tens of seconds.
 func (l *LoadGenerator) submitBlob() {
 	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout)
+	l.metrics.startOperation()
 	defer func() {
 		<-l.parallelismLimiter
+		l.metrics.endOperation()
 		cancel()
 	}()
 

@@ -23,15 +23,14 @@ const namespace = "eigenda_test_client"
 
 // testClientMetrics encapsulates the metrics for the test client.
 type testClientMetrics struct {
-	logger logging.Logger
-	server *http.Server
+	logger   logging.Logger
+	server   *http.Server
+	registry *prometheus.Registry
 
-	dispersalTime      *prometheus.SummaryVec
-	certificationTime  *prometheus.SummaryVec
-	relayReadTime      *prometheus.SummaryVec
-	validatorReadTime  *prometheus.SummaryVec
-	operationsInFlight *prometheus.GaugeVec // TODO move this to load generator metrics
-	// TODO count successes, failures, and timeouts
+	dispersalTime     *prometheus.SummaryVec
+	certificationTime *prometheus.SummaryVec
+	relayReadTime     *prometheus.SummaryVec
+	validatorReadTime *prometheus.SummaryVec
 }
 
 // newTestClientMetrics creates a new testClientMetrics.
@@ -111,6 +110,7 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 	return &testClientMetrics{
 		logger:            logger,
 		server:            server,
+		registry:          registry,
 		dispersalTime:     dispersalTime,
 		certificationTime: certificationTime,
 		relayReadTime:     relayReadTime,
@@ -154,14 +154,4 @@ func (m *testClientMetrics) reportRelayReadTime(duration time.Duration, relayID 
 // reportValidatorReadTime reports the time taken to read a blob from a validator.
 func (m *testClientMetrics) reportValidatorReadTime(duration time.Duration, quorum core.QuorumID) {
 	m.validatorReadTime.WithLabelValues(fmt.Sprintf("%d", quorum)).Observe(common.ToMilliseconds(duration))
-}
-
-// startOperation should be called when starting the process of dispersing + verifying a blob
-func (m *testClientMetrics) startOperation() {
-	m.operationsInFlight.WithLabelValues().Inc()
-}
-
-// endOperation should be called when finishing the process of dispersing + verifying a blob
-func (m *testClientMetrics) endOperation() {
-	m.operationsInFlight.WithLabelValues().Dec()
 }
