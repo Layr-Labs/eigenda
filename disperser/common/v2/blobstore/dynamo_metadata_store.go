@@ -465,7 +465,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAt(
 		return nil, errors.New("start must be less than end")
 	}
 
-	startBucket, endBucket := getAttestedAtBucketIDRange(start, end)
+	startBucket, endBucket := GetAttestedAtBucketIDRange(start, end)
 
 	result := make([]*corev2.Attestation, 0)
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
@@ -1589,9 +1589,9 @@ func getRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	return startBucket, endBucket
 }
 
-// getAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// GetAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
 // the allowed time range for blobs.
-func getAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+func GetAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	now := uint64(time.Now().UnixNano())
 	oldestAllowed := now - maxBlobAgeInNano
 

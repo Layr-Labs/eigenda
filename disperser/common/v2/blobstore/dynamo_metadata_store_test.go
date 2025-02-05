@@ -664,15 +664,19 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
 	ctx := context.Background()
 
-	// Use a fixed "now" so all attestations will deterministically fall in just one
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
+	// Adjust "now" so all attestations will deterministically fall in just one
 	// bucket.
-	timestamp := "2025-01-21T15:04:05Z"
-	parsedTime, err := time.Parse(time.RFC3339, timestamp)
-	require.NoError(t, err)
-	now := uint64(parsedTime.UnixNano())
+	startBucket, endBucket := blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
+	if startBucket < endBucket {
+		now -= uint64(25 * time.Hour.Nanoseconds())
+		firstBatchTs = now - uint64(5*time.Minute.Nanoseconds())
+	}
+	startBucket, endBucket = blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
+	require.Equal(t, startBucket, endBucket)
 
 	numBatches := 240
-	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
 	nanoSecsPerBatch := uint64(time.Second.Nanoseconds()) // 1 batch per second
 
 	// Create attestations for testing
