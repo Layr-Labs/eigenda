@@ -43,17 +43,23 @@ func testBasicDispersal(
 	return nil
 }
 
-// Disperse a 0 byte payload.
+// Disperse a 0 byte blob.
 // Empty blobs are not allowed by the disperser
 func TestEmptyBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	payload := []byte{}
+	blobBytes := []byte{}
+	quorums := []core.QuorumID{0, 1}
+
+	c := client.GetClient(t, quorums)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
+	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+	_, _, err := c.DisperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
 	require.Error(t, err)
 	require.ErrorContains(t, err, "data is empty")
-
-	// TODO: blob no longer empty after payload is processed, this is definitely broken
 }
 
 // Disperse a 1 byte payload (no padding).
