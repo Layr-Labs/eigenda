@@ -144,16 +144,12 @@ func (pd *PayloadDisperser) SendPayload(
 	// different blob key, when using reserved bandwidth payments.
 	salt uint32,
 ) (*verification.EigenDACert, error) {
-	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
-	defer cancel()
-	blobStatus, blobKey, err := pd.SendDispersalRequest(timeoutCtx, payload, salt)
+	blobStatus, blobKey, err := pd.SendDispersalRequest(ctx, payload, salt)
 	if err != nil {
 		return nil, fmt.Errorf("send dispersal request: %w", err)
 	}
 
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
-	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
+	blobStatusReply, err := pd.pollBlobStatusUntilCertified(ctx, blobKey, blobStatus.ToProfobuf())
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
@@ -165,7 +161,7 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, err
 	}
 
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
 	if err != nil {
@@ -179,6 +175,8 @@ func (pd *PayloadDisperser) SendPayload(
 // SendDispersalRequest encodes a payload into a blob, and then submits a dispersal request to the disperser.
 // It returns immediately after receiving a response from the disperser, and doesn't wait for any particular blob
 // status before returning.
+//
+// This method imposes a timeout on the dispersal request, configured to duration PayloadDisperserConfig.DisperseBlobTimeout
 func (pd *PayloadDisperser) SendDispersalRequest(
 	ctx context.Context,
 	// payload is the raw data to be stored on eigenDA
@@ -194,8 +192,10 @@ func (pd *PayloadDisperser) SendDispersalRequest(
 	}
 	pd.logger.Debug("Payload encoded to blob")
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
+	defer cancel()
 	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
-		ctx,
+		timeoutCtx,
 		blobBytes,
 		pd.config.BlobVersion,
 		pd.config.Quorums,
@@ -227,6 +227,8 @@ func (pd *PayloadDisperser) Close() error {
 //
 // This method will only return a non-nil BlobStatusReply if the blob is reported to be CERTIFIED prior to the timeout.
 // In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
+//
+// This method imposes a timeout on the status polling, configured to duration PayloadDisperserConfig.BlobCertifiedTimeout
 func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
 	blobKey *core.BlobKey,
@@ -238,18 +240,21 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ticker := time.NewTicker(pd.config.BlobStatusPollInterval)
 	defer ticker.Stop()
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
+	defer cancel()
+
 	for {
 		select {
-		case <-ctx.Done():
+		case <-timeoutCtx.Done():
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.Descriptor(),
 				previousStatus.Descriptor(),
-				ctx.Err())
+				timeoutCtx.Err())
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
-			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, *blobKey)
+			blobStatusReply, err := pd.disperserClient.GetBlobStatus(timeoutCtx, *blobKey)
 			if err != nil {
 				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
@@ -283,6 +288,9 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 
 // buildEigenDACert makes a call to the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
 // contract, and then assembles an EigenDACert
+//
+// This method imposes a timeout on the contained contract call GetNonSignerStakesAndSignature, configured to duration
+// PayloadDisperserConfig.ContractCallTimeout
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
 	blobKey *core.BlobKey,
