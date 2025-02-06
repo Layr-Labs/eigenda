@@ -142,7 +142,7 @@ func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 		return nil, fmt.Errorf("failed to get account ID: %w", err)
 	}
 	accountId := gethcommon.HexToAddress(signerAccountId)
-	fmt.Printf("Account ID: %s\n", accountId.String())
+	logger.Debugf("Account ID: %s", accountId.String())
 
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          config.DisperserHostname,
@@ -332,14 +332,14 @@ func (c *TestClient) DispersePayload(
 	quorums []core.QuorumID,
 	salt uint32) (*corev2.BlobKey, error) {
 
-	fmt.Printf("Dispersing payload of length %d to quorums %v\n", len(payload), quorums)
+	c.Logger.Debugf("Dispersing payload of length %d to quorums %v", len(payload), quorums)
 	start := time.Now()
 	_, key, err := c.DisperserClient.DisperseBlob(ctx, payload, 0, quorums, salt)
 	if err != nil {
 		return &corev2.BlobKey{}, fmt.Errorf("failed to disperse payload: %w", err)
 	}
 	c.metrics.reportDispersalTime(time.Since(start))
-	fmt.Printf("Dispersed blob with key %x\n", key)
+	c.Logger.Debugf("Dispersed blob with key %x", key)
 
 	return &key, err
 }
@@ -365,8 +365,8 @@ func (c *TestClient) WaitForCertification(
 			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
 				totalElapsed := time.Since(start)
-				fmt.Printf(
-					"Blob is complete (spent %0.1fs in prior status, total time %0.1fs)\n",
+				c.Logger.Debugf(
+					"Blob is complete (spent %0.1fs in prior status, total time %0.1fs)",
 					elapsed.Seconds(),
 					totalElapsed.Seconds())
 
@@ -387,9 +387,9 @@ func (c *TestClient) WaitForCertification(
 				elapsed := time.Since(statusStart)
 				statusStart = time.Now()
 				if status == nil {
-					fmt.Printf("Blob status: %s\n", reply.Status.String())
+					c.Logger.Debugf("Blob status: %s", reply.Status.String())
 				} else {
-					fmt.Printf("Blob status: %s (spent %0.1fs in prior status)\n",
+					c.Logger.Debugf("Blob status: %s (spent %0.1fs in prior status)",
 						reply.Status.String(),
 						elapsed.Seconds())
 				}
@@ -488,7 +488,7 @@ func (c *TestClient) ReadBlobFromRelays(
 	for _, relayID := range blobCert.RelayKeys {
 		start := time.Now()
 
-		fmt.Printf("Reading blob from relay %d\n", relayID)
+		c.Logger.Debugf("Reading blob from relay %d", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		if err != nil {
 			return fmt.Errorf("failed to get blob from relay: %w", err)
@@ -517,7 +517,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	for _, quorumID := range quorums {
-		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
+		c.Logger.Debugf("Reading blob from validators for quorum %d", quorumID)
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
 		if err != nil {
 			return fmt.Errorf("failed to convert blob header: %w", err)

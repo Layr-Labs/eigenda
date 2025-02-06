@@ -2,7 +2,6 @@ package load
 
 import (
 	"context"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -141,12 +140,12 @@ func (l *LoadGenerator) submitBlob() {
 
 	key, err := l.client.DispersePayload(ctx, paddedPayload, l.config.Quorums, rand.Uint32())
 	if err != nil {
-		fmt.Printf("failed to disperse blob: %v\n", err)
+		l.client.Logger.Errorf("failed to disperse blob: %v", err)
 	}
 	blobCert, err := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
 	if err != nil {
-		fmt.Printf("failed to wait for certification: %v\n", err)
-		return // TODO metric
+		l.client.Logger.Errorf("failed to wait for certification: %v", err) // TODO metric
+		return
 	}
 
 	// Unpad the payload
@@ -156,14 +155,14 @@ func (l *LoadGenerator) submitBlob() {
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
 		err = l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
 		if err != nil {
-			fmt.Printf("failed to read blob from relays: %v\n", err) // TODO metric
+			l.client.Logger.Errorf("failed to read blob from relays: %v", err) // TODO metric
 			return
 		}
 	}
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
 		err = l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
 		if err != nil {
-			fmt.Printf("failed to read blob from validators: %v\n", err) // TODO metric
+			l.client.Logger.Errorf("failed to read blob from validators: %v", err) // TODO metric
 			return
 		}
 	}

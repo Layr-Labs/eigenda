@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
@@ -33,7 +34,7 @@ func GetTestClient(t *testing.T) *TestClient {
 	client, err = NewTestClient(testConfig)
 	require.NoError(t, err)
 
-	err = setupFilesystem(testConfig)
+	err = setupFilesystem(client.Logger, testConfig)
 	require.NoError(t, err)
 
 	return client
@@ -65,7 +66,7 @@ func GetClient() (*TestClient, error) {
 		return nil, fmt.Errorf("failed to create test client: %v", err)
 	}
 
-	err = setupFilesystem(testConfig)
+	err = setupFilesystem(client.Logger, testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup filesystem: %v", err)
 	}
@@ -94,7 +95,10 @@ func getClientConfig() (*TestClientConfig, error) {
 	return config, nil
 }
 
-func setupFilesystem(config *TestClientConfig) error {
+func setupFilesystem(
+	logger logging.Logger,
+	config *TestClientConfig) error {
+
 	// Create the test data directory if it does not exist
 	err := os.MkdirAll(config.TestDataPath, 0755)
 	if err != nil {
@@ -130,7 +134,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Infof("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
@@ -155,7 +159,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Infof("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
@@ -180,7 +184,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Infof("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
