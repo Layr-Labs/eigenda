@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -187,7 +187,7 @@ func (pd *PayloadDisperser) SendDispersalRequest(
 	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
 	// different blob key, when using reserved bandwidth payments.
 	salt uint32,
-) (*v2.BlobStatus, *core.BlobKey, error) {
+) (*dispv2.BlobStatus, *core.BlobKey, error) {
 	blobBytes, err := pd.codec.EncodeBlob(payload)
 	if err != nil {
 		return nil, nil, fmt.Errorf("encode payload to blob: %w", err)
