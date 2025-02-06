@@ -143,16 +143,28 @@ func (l *LoadGenerator) submitBlob() {
 	if err != nil {
 		fmt.Printf("failed to disperse blob: %v\n", err)
 	}
-	blobCert := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
+	blobCert, err := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
+	if err != nil {
+		fmt.Printf("failed to wait for certification: %v\n", err)
+		return // TODO metric
+	}
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(paddedPayload)
 
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
-		l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+		err = l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+		if err != nil {
+			fmt.Printf("failed to read blob from relays: %v\n", err) // TODO metric
+			return
+		}
 	}
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
-		l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
+		err = l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
+		if err != nil {
+			fmt.Printf("failed to read blob from validators: %v\n", err) // TODO metric
+			return
+		}
 	}
 }

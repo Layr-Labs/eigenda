@@ -47,13 +47,16 @@ func GetClient(t *testing.T) *TestClient {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
-	skipInCI(t)
+	skipInCI(t) // TODO create non-test variant
 	if client != nil {
 		return client
 	}
 
 	testConfig := GetConfig(t)
-	client = NewTestClient(t, testConfig)
+	var err error
+	client, err = NewTestClient(testConfig)
+	require.NoError(t, err)
+
 	setupFilesystem(t, testConfig)
 
 	return client

@@ -174,7 +174,8 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for blob to become certified
-	cert := c.WaitForCertification(ctx, *key, []core.QuorumID{0, 1})
+	cert, err := c.WaitForCertification(ctx, *key, []core.QuorumID{0, 1})
+	require.NoError(t, err)
 
 	targetRelay := cert.RelayKeys[0]
 

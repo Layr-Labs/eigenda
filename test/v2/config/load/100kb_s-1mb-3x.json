@@ -4,7 +4,7 @@
   "BlobSizeStdDev": 262144,
   "RelayReadAmplification": 3,
   "ValidatorReadAmplification": 3,
-  "MaxParallelism": 10,
+  "MaxParallelism": 100,
   "DispersalTimeoutSeconds": 300,
   "Quorums": [
     0,

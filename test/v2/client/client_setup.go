@@ -1,13 +1,13 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"os"
 	"path"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -28,7 +28,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -198,7 +197,9 @@ func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 		MessageSigner:      fakeSigner,
 	}
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create relay client: %w", err)
+	}
 
 	// Construct the retrieval client
 
@@ -211,13 +212,21 @@ func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
 	g1Path, err := config.path(SRSPathG1)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve G1 path: %w", err)
+	}
 	g2Path, err := config.path(SRSPathG2)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve G2 path: %w", err)
+	}
 	g2PowerOf2Path, err := config.path(SRSPathG2PowerOf2)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve G2 power of 2 path: %w", err)
+	}
 	cacheDir, err := config.path(SRSPathSRSTables)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve cache directory: %w", err)
+	}
 
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
@@ -230,7 +239,9 @@ func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 		NumWorker:       32,
 	}
 	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
+	}
 
 	retrievalClient := clients.NewRetrievalClient(
 		logger,
@@ -247,19 +258,22 @@ func NewTestClient(config *TestClientConfig) (*TestClient, error) {
 		NumRetries:       3,
 	}
 	gethClient, err := geth.NewClient(gethClientConfig, gethcommon.Address{}, 0, logger)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create geth client: %w", err)
+	}
 	certVerifier, err := verification.NewCertVerifier(
 		logger,
 		gethClient,
 		config.EigenDACertVerifierAddress,
 		time.Second)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
+	}
 
 	metrics := newTestClientMetrics(logger, config.MetricsPort)
 	metrics.start()
 
 	return &TestClient{
-		T:                 t,
 		Config:            config,
 		Logger:            logger,
 		DisperserClient:   disperserClient,
@@ -290,14 +304,23 @@ func (c *TestClient) DisperseAndVerify(
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
-	blobCert := c.WaitForCertification(ctx, *key, quorums)
+	blobCert, err := c.WaitForCertification(ctx, *key, quorums)
+	if err != nil {
+		return fmt.Errorf("failed to wait for certification: %w", err)
+	}
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(payload)
 
 	// Read the blob from the relays and validators
-	c.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
-	c.ReadBlobFromValidators(ctx, blobCert, quorums, unpaddedPayload)
+	err = c.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+	if err != nil {
+		return fmt.Errorf("failed to read blob from relays: %w", err)
+	}
+	err = c.ReadBlobFromValidators(ctx, blobCert, quorums, unpaddedPayload)
+	if err != nil {
+		return fmt.Errorf("failed to read blob from validators: %w", err)
+	}
 
 	return nil
 }
@@ -325,7 +348,7 @@ func (c *TestClient) DispersePayload(
 func (c *TestClient) WaitForCertification(
 	ctx context.Context,
 	key corev2.BlobKey,
-	expectedQuorums []core.QuorumID) *commonv2.BlobCertificate {
+	expectedQuorums []core.QuorumID) (*commonv2.BlobCertificate, error) {
 
 	var status *v2.BlobStatus = nil
 	ticker := time.NewTicker(time.Second)
@@ -335,7 +358,9 @@ func (c *TestClient) WaitForCertification(
 		select {
 		case <-ticker.C:
 			reply, err := c.DisperserClient.GetBlobStatus(ctx, key)
-			require.NoError(c.T, err)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get blob status: %w", err)
+			}
 
 			if reply.Status == v2.BlobStatus_COMPLETE {
 				elapsed := time.Since(statusStart)
@@ -346,15 +371,18 @@ func (c *TestClient) WaitForCertification(
 					totalElapsed.Seconds())
 
 				blobCert := reply.BlobInclusionInfo.BlobCertificate
-				c.VerifyBlobCertification(
+				err = c.VerifyBlobCertification(
 					key,
 					expectedQuorums,
 					reply.SignedBatch,
 					reply.BlobInclusionInfo)
+				if err != nil {
+					return nil, fmt.Errorf("failed to verify blob certification: %w", err)
+				}
 
 				c.metrics.reportCertificationTime(time.Since(start))
 
-				return blobCert
+				return blobCert, nil
 			} else if status == nil || reply.Status != *status {
 				elapsed := time.Since(statusStart)
 				statusStart = time.Now()
@@ -369,14 +397,12 @@ func (c *TestClient) WaitForCertification(
 
 				if reply.Status == v2.BlobStatus_FAILED ||
 					reply.Status == v2.BlobStatus_UNKNOWN {
-					require.Fail(
-						c.T,
-						"Blob status is in a terminal non-successful state.",
-						reply.Status.String())
+					return nil, fmt.Errorf(
+						"blob status is in a terminal non-successful state: %s", reply.Status.String())
 				}
 			}
 		case <-ctx.Done():
-			require.Fail(c.T, "Timed out waiting for blob to be confirmed")
+			return nil, fmt.Errorf("timed out waiting for blob certification")
 		}
 	}
 }
@@ -386,18 +412,28 @@ func (c *TestClient) VerifyBlobCertification(
 	key corev2.BlobKey,
 	expectedQuorums []core.QuorumID,
 	signedBatch *v2.SignedBatch,
-	inclusionInfo *v2.BlobInclusionInfo) {
+	inclusionInfo *v2.BlobInclusionInfo) error {
 
 	blobCert := inclusionInfo.BlobCertificate
-	require.NotNil(c.T, blobCert)
-	require.True(c.T, len(blobCert.RelayKeys) >= 1)
+	if blobCert == nil {
+		return fmt.Errorf("blob certificate is nil")
+	}
+	if len(blobCert.RelayKeys) == 0 {
+		return fmt.Errorf("no relay keys in blob certificate")
+	}
 
 	// make sure the returned header hash matches the expected blob key
 	bh, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
-	require.NoError(c.T, err)
+	if err != nil {
+		return fmt.Errorf("failed to convert blob header: %w", err)
+	}
 	computedBlobKey, err := bh.BlobKey()
-	require.NoError(c.T, err)
-	require.Equal(c.T, key, computedBlobKey)
+	if err != nil {
+		return fmt.Errorf("failed to compute blob key: %w", err)
+	}
+	if computedBlobKey != key {
+		return fmt.Errorf("expected blob key %x, got %x", key, computedBlobKey)
+	}
 
 	// verify that expected quorums are present
 	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
@@ -405,9 +441,13 @@ func (c *TestClient) VerifyBlobCertification(
 		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
 	}
 	// There may be other quorums in the batch. No biggie as long as the expected ones are there.
-	require.True(c.T, len(expectedQuorums) <= len(quorumSet))
+	if len(quorumSet) < len(expectedQuorums) {
+		return fmt.Errorf("expected %d quorums, got %d", len(expectedQuorums), len(quorumSet))
+	}
 	for expectedQuorum := range quorumSet {
-		require.Contains(c.T, quorumSet, expectedQuorum)
+		if _, ok := quorumSet[expectedQuorum]; !ok {
+			return fmt.Errorf("expected quorum %d not found", expectedQuorum)
+		}
 	}
 
 	// Check the signing percentages
@@ -418,15 +458,24 @@ func (c *TestClient) VerifyBlobCertification(
 	}
 	for _, quorum := range expectedQuorums {
 		percent, ok := signingPercents[quorum]
-		require.True(c.T, ok)
-		require.True(c.T, percent >= 0 && percent <= 100)
-		require.True(c.T, percent >= c.Config.MinimumSigningPercent,
-			"quorum %d signed by only %d%%", quorum, percent)
+		if !ok {
+			return fmt.Errorf("quorum %d not found in signed batch", quorum)
+		}
+		if percent < 0 || percent > 100 {
+			return fmt.Errorf("quorum %d signed by %d%%", quorum, percent)
+		}
+		if percent < c.Config.MinimumSigningPercent {
+			return fmt.Errorf("quorum %d signed by only %d%%", quorum, percent)
+		}
 	}
 
 	// On-chain verification
 	err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
-	require.NoError(c.T, err)
+	if err != nil {
+		return fmt.Errorf("failed to verify cert: %w", err)
+	}
+
+	return nil
 }
 
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
@@ -434,20 +483,25 @@ func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
 	blobCert *commonv2.BlobCertificate,
-	payload []byte) {
+	payload []byte) error {
 
 	for _, relayID := range blobCert.RelayKeys {
 		start := time.Now()
 
 		fmt.Printf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
-		require.NoError(c.T, err)
+		if err != nil {
+			return fmt.Errorf("failed to get blob from relay: %w", err)
+		}
 
 		c.metrics.reportRelayReadTime(time.Since(start), relayID)
 
 		relayPayload := codec.RemoveEmptyByteFromPaddedBytes(blobFromRelay)
-		require.Equal(c.T, payload, relayPayload)
+		if len(relayPayload) < len(payload) {
+			return fmt.Errorf("relay payload is too short")
+		}
 	}
+	return nil
 }
 
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
@@ -455,34 +509,48 @@ func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
 	blobCert *commonv2.BlobCertificate,
 	quorums []core.QuorumID,
-	payload []byte) {
+	payload []byte) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
-	require.NoError(c.T, err)
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
 
 	for _, quorumID := range quorums {
 		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
 		header, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
-		require.NoError(c.T, err)
+		if err != nil {
+			return fmt.Errorf("failed to convert blob header: %w", err)
+		}
 
 		start := time.Now()
 
 		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
-		require.NoError(c.T, err)
+		if err != nil {
+			return fmt.Errorf("failed to get blob from validator: %w", err)
+		}
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
 		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
 
 		// The payload may have a bunch of 0s appended at the end. Remove them.
-		require.True(c.T, len(retrievedPayload) >= len(payload))
+		if len(retrievedPayload) < len(payload) {
+			return fmt.Errorf("retrieved payload is too short")
+		}
 		truncatedPayload := retrievedPayload[:len(payload)]
 
 		// Only 0s should be appended at the end.
 		for i := len(payload); i < len(retrievedPayload); i++ {
-			require.Equal(c.T, byte(0), retrievedPayload[i])
+			if retrievedPayload[i] != 0 {
+				return fmt.Errorf("non-zero byte at index %d", i)
+			}
 		}
 
-		require.Equal(c.T, payload, truncatedPayload)
+		if !bytes.Equal(payload, truncatedPayload) {
+			return fmt.Errorf("payloads do not match")
+		}
 	}
+
+	return nil
 }

@@ -1,5 +1,5 @@
 {
-  "BytesPerSecond": 1048576,
+  "BytesPerSecond": 10485760,
   "AverageBlobSize": 10485760,
   "BlobSizeStdDev": 262144,
   "RelayReadAmplification": 0,
