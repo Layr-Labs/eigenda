@@ -14,9 +14,6 @@ type PayloadClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
 
-	// The Ethereum RPC URL to use for querying an Ethereum network
-	EthRpcUrl string
-
 	// The address of the EigenDACertVerifier contract
 	EigenDACertVerifierAddr string
 
@@ -112,8 +109,8 @@ type PayloadDisperserConfig struct {
 
 // GetDefaultPayloadClientConfig creates a PayloadClientConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
-func getDefaultPayloadClientConfig() *PayloadClientConfig {
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
+func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
 		BlobEncodingVersion:     codecs.DefaultBlobEncoding,
 		PayloadPolynomialForm:   codecs.PolynomialFormEval,
@@ -131,17 +128,13 @@ func getDefaultPayloadClientConfig() *PayloadClientConfig {
 func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
 
-	if cc.EthRpcUrl == "" {
-		return errors.New("EthRpcUrl is required")
-	}
-
 	if cc.EigenDACertVerifierAddr == "" {
 		return errors.New("EigenDACertVerifierAddr is required")
 	}
 
 	// Nothing to do for PayloadPolynomialForm
 
-	defaultConfig := getDefaultPayloadClientConfig()
+	defaultConfig := GetDefaultPayloadClientConfig()
 
 	if cc.ContractCallTimeout == 0 {
 		cc.ContractCallTimeout = defaultConfig.ContractCallTimeout
@@ -156,10 +149,10 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 
 // GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	return &RelayPayloadRetrieverConfig{
-		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		PayloadClientConfig: *GetDefaultPayloadClientConfig(),
 		RelayTimeout:        5 * time.Second,
 	}
 }
@@ -186,13 +179,12 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 // GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
 //
 // NOTE: The following fields do not have defined defaults and must always be specifically configured:
-// - EthRpcUrl
 // - EigenDACertVerifierAddr
 // - BlsOperatorStateRetrieverAddr
 // - EigenDAServiceManagerAddr
 func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
 	return &ValidatorPayloadRetrieverConfig{
-		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		PayloadClientConfig: *GetDefaultPayloadClientConfig(),
 		RetrievalTimeout:    30 * time.Second,
 		MaxConnectionCount:  100,
 	}
@@ -230,10 +222,10 @@ func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
 
 // GetDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	return &PayloadDisperserConfig{
-		PayloadClientConfig:    *getDefaultPayloadClientConfig(),
+		PayloadClientConfig:    *GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    5 * time.Second,
 		BlobCertifiedTimeout:   10 * time.Second,
 		BlobStatusPollInterval: 1 * time.Second,

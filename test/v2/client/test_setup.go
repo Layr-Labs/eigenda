@@ -3,11 +3,15 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"sync"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -15,7 +19,9 @@ var (
 	configLock       sync.Mutex
 	config           *TestClientConfig
 	clientLock       sync.Mutex
-	client           *TestClient
+	clientMap        = make(map[string]*TestClient)
+	logger           logging.Logger
+	metrics          *testClientMetrics
 )
 
 // GetConfig returns a TestClientConfig instance, creating one if it does not exist.
@@ -42,18 +48,46 @@ func GetConfig(t *testing.T) *TestClientConfig {
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes ~1 minute
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient(t *testing.T) *TestClient {
+func GetClient(t *testing.T, quorums []core.QuorumID) *TestClient {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
 	skipInCI(t)
-	if client != nil {
-		return client
-	}
 
 	testConfig := GetConfig(t)
-	client = NewTestClient(t, testConfig)
-	setupFilesystem(t, testConfig)
+
+	quorumsString := ""
+	for _, quorum := range quorums {
+		quorumsString += string(quorum) + ","
+	}
+	if clientMap[quorumsString] != nil {
+		return clientMap[quorumsString]
+	}
+
+	if len(clientMap) == 0 {
+		// only do this stuff once
+		setupFilesystem(t, testConfig)
+
+		var loggerConfig common.LoggerConfig
+		if os.Getenv("CI") != "" {
+			loggerConfig = common.DefaultLoggerConfig()
+		} else {
+			loggerConfig = common.DefaultConsoleLoggerConfig()
+		}
+
+		testLogger, err := common.NewLogger(loggerConfig)
+		require.NoError(t, err)
+
+		logger = testLogger
+
+		testMetrics := newTestClientMetrics(logger, config.MetricsPort)
+		metrics = testMetrics
+		testMetrics.start()
+	}
+
+	client := NewTestClient(t, logger, metrics, testConfig, quorums)
+
+	clientMap[quorumsString] = client
 
 	return client
 }
