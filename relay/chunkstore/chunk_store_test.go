@@ -161,13 +161,13 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 		proofs := getProofs(t, rand.Intn(100)+100)
 		expectedValues[key] = proofs
 
-		err := writer.PutChunkProofs(context.Background(), key, proofs)
+		err := writer.PutFrameProofs(context.Background(), key, proofs)
 		require.NoError(t, err)
 	}
 
 	// Read data
 	for key, expectedProofs := range expectedValues {
-		proofs, err := reader.GetChunkProofs(context.Background(), key)
+		proofs, err := reader.GetFrameProofs(context.Background(), key)
 		require.NoError(t, err)
 		require.Equal(t, expectedProofs, proofs)
 	}
@@ -224,14 +224,14 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		expectedValues[key] = coefficients
 
-		metadata, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
+		metadata, err := writer.PutFrameCoefficients(context.Background(), key, coefficients)
 		require.NoError(t, err)
 		metadataMap[key] = metadata
 	}
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
-		coefficients, err := reader.GetChunkCoefficients(context.Background(), key, metadataMap[key])
+		coefficients, err := reader.GetFrameCoefficients(context.Background(), key, metadataMap[key])
 		require.NoError(t, err)
 		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {
@@ -278,12 +278,12 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		key := corev2.BlobKey(tu.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
-		err := writer.PutChunkProofs(ctx, key, proofs)
+		err := writer.PutFrameProofs(ctx, key, proofs)
 		require.NoError(t, err)
 		require.True(t, writer.ProofExists(ctx, key))
 
 		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
-		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
+		metadata, err := writer.PutFrameCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
 		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
 		require.True(t, exist)

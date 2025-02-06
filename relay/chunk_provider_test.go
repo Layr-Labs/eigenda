@@ -45,10 +45,10 @@ func TestFetchingIndividualBlobs(t *testing.T) {
 
 		rsFrames, proofs := disassembleFrames(frames)
 
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, proofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, proofs)
 		require.NoError(t, err)
 
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, rsFrames)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, rsFrames)
 		require.NoError(t, err)
 
 		expectedFrames[blobKey] = frames
@@ -135,10 +135,10 @@ func TestFetchingBatchedBlobs(t *testing.T) {
 
 		rsFrames, proofs := disassembleFrames(frames)
 
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, proofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, proofs)
 		require.NoError(t, err)
 
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, rsFrames)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, rsFrames)
 		require.NoError(t, err)
 
 		expectedFrames[blobKey] = frames

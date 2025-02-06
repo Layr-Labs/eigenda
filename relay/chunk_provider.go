@@ -155,7 +155,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 			cancel()
 		}()
 
-		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(ctx, key.blobKey)
+		proofs, proofsErr = s.chunkReader.GetBinaryFrameProofs(ctx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
@@ -166,7 +166,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
 	defer cancel()
 
-	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
+	elementCount, coefficients, err := s.chunkReader.GetBinaryFrameCoefficients(ctx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}

@@ -157,7 +157,7 @@ func TestEncodeBlob(t *testing.T) {
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
 		// Check proofs
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
-		proofs, err := c.chunkStoreReader.GetChunkProofs(ctx, blobKey)
+		proofs, err := c.chunkStoreReader.GetFrameProofs(ctx, blobKey)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
@@ -166,7 +166,7 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, coefExist, "Coefficients should exist")
 		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
 
-		coefficients, err := c.chunkStoreReader.GetChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
+		coefficients, err := c.chunkStoreReader.GetFrameCoefficients(ctx, blobKey, expectedFragmentInfo)
 		assert.NoError(t, err, "Failed to get chunk coefficients")
 		assert.Len(t, coefficients, int(numChunks), "Unexpected number of coefficients")
 	})

@@ -256,7 +256,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}()
 
 	proofs, coeffs := extractProofsAndCoeffs(frames)
-	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
+	if err := s.chunkWriter.PutFrameProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
 	s.metrics.ObserveLatency("s3_upload_proofs", time.Since(storeStart))
@@ -264,7 +264,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	// Store coefficients
 	coeffStart := time.Now()
-	fragmentInfo, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey, coeffs)
+	fragmentInfo, err := s.chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}

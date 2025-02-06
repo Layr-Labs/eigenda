@@ -13,10 +13,10 @@ import (
 
 // ChunkWriter writes chunks that can be read by ChunkReader.
 type ChunkWriter interface {
-	// PutChunkProofs writes a slice of proofs to the chunk store.
-	PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error
-	// PutChunkCoefficients writes a slice of frames to the chunk store.
-	PutChunkCoefficients(
+	// PutFrameProofs writes a slice of proofs to the chunk store.
+	PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error
+	// PutFrameCoefficients writes a slice of frames to the chunk store.
+	PutFrameCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
 		frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error)
@@ -51,7 +51,7 @@ func NewChunkWriter(
 	}
 }
 
-func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
+func (c *chunkWriter) PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
 	if len(proofs) == 0 {
 		return fmt.Errorf("no proofs to upload")
 	}
@@ -70,7 +70,7 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 	return nil
 }
 
-func (c *chunkWriter) PutChunkCoefficients(
+func (c *chunkWriter) PutFrameCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error) {

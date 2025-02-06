@@ -14,25 +14,25 @@ import (
 // ChunkReader reads chunks written by ChunkWriter.
 type ChunkReader interface {
 
-	// GetChunkProofs reads a slice of proofs from the chunk store.
-	GetChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([]*encoding.Proof, error)
+	// GetFrameProofs reads a slice of proofs from the chunk store.
+	GetFrameProofs(ctx context.Context, blobKey corev2.BlobKey) ([]*encoding.Proof, error)
 
-	// GetBinaryChunkProofs reads a slice of proofs from the chunk store, similar to GetChunkProofs.
+	// GetBinaryFrameProofs reads a slice of proofs from the chunk store, similar to GetChunkProofs.
 	// Unlike GetChunkProofs, this method returns the raw serialized bytes of the proofs, as opposed to
 	// deserializing them into encoding.Proof structs.
-	GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error)
+	GetBinaryFrameProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error)
 
-	// GetChunkCoefficients reads a slice of frames from the chunk store. The metadata parameter
-	// should match the metadata returned by PutChunkCoefficients.
-	GetChunkCoefficients(
+	// GetFrameCoefficients reads a slice of frames from the chunk store. The metadata parameter
+	// should match the metadata returned by PutFrameCoefficients.
+	GetFrameCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
 		fragmentInfo *encoding.FragmentInfo) ([]rs.FrameCoeffs, error)
 
-	// GetBinaryChunkCoefficients reads a slice of frames from the chunk store, similar to GetChunkCoefficients.
+	// GetBinaryFrameCoefficients reads a slice of frames from the chunk store, similar to GetChunkCoefficients.
 	// Unlike GetChunkCoefficients, this method returns the raw serialized bytes of the frames, as opposed to
 	// deserializing them into rs.FrameCoeffs structs. The returned uint32 is the number of elements in each frame.
-	GetBinaryChunkCoefficients(
+	GetBinaryFrameCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
 		fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error)
@@ -62,7 +62,7 @@ func NewChunkReader(
 	}
 }
 
-func (r *chunkReader) GetChunkProofs(
+func (r *chunkReader) GetFrameProofs(
 	ctx context.Context,
 	blobKey corev2.BlobKey) ([]*encoding.Proof, error) {
 
@@ -81,7 +81,7 @@ func (r *chunkReader) GetChunkProofs(
 	return proofs, nil
 }
 
-func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
+func (r *chunkReader) GetBinaryFrameProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
 		r.logger.Error("Failed to download chunks from S3: %v", err)
@@ -96,7 +96,7 @@ func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.B
 	return proofs, nil
 }
 
-func (r *chunkReader) GetChunkCoefficients(
+func (r *chunkReader) GetFrameCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	fragmentInfo *encoding.FragmentInfo) ([]rs.FrameCoeffs, error) {
@@ -122,7 +122,7 @@ func (r *chunkReader) GetChunkCoefficients(
 	return frames, nil
 }
 
-func (r *chunkReader) GetBinaryChunkCoefficients(
+func (r *chunkReader) GetBinaryFrameCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	fragmentInfo *encoding.FragmentInfo) (uint32, [][]byte, error) {
