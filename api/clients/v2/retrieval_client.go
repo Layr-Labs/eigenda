@@ -157,10 +157,20 @@ func (r *retrievalClient) getChunksFromOperator(
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
 ) {
+
+	// TODO (cody-littley): this client should be refactored to make requests for smaller quantities of data
+	//  in order to avoid hitting the max message size limit. This will allow us to have much smaller
+	//  message size limits.
+
+	maxBlobSize := 16 * units.MiB // maximum size of the original blob
+	encodingRate := 8             // worst case scenario if one validator has 100% stake
+	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
+	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
+
 	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(16 /* max blob size */ *8 /* encoding rate */ *units.MiB)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
 	defer func() {
 		err := conn.Close()
