@@ -193,8 +193,8 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
 	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
-		RetrievalTimeout:    20 * time.Second,
-		MaxConnectionCount:  10,
+		RetrievalTimeout:    30 * time.Second,
+		MaxConnectionCount:  200,
 	}
 }
 
