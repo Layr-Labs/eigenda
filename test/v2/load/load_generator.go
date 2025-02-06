@@ -2,12 +2,10 @@ package load
 
 import (
 	"context"
-	"fmt"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -30,24 +28,10 @@ type LoadGeneratorConfig struct {
 	ValidatorReadAmplification uint64
 	// The maximum number of parallel blobs in flight.
 	MaxParallelism uint64
-	// The timeout for each blob dispersal.
-	DispersalTimeout time.Duration
+	// The timeout for each blob dispersal, in seconds.
+	DispersalTimeoutSeconds uint64
 	// The quorums to use for the load test.
 	Quorums []core.QuorumID
-}
-
-// DefaultLoadGeneratorConfig returns the default configuration for the load generator.
-func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
-	return &LoadGeneratorConfig{
-		BytesPerSecond:             10 * units.MiB,
-		AverageBlobSize:            1 * units.MiB,
-		BlobSizeStdDev:             0.5 * units.MiB,
-		RelayReadAmplification:     3,
-		ValidatorReadAmplification: 3,
-		MaxParallelism:             10,
-		DispersalTimeout:           5 * time.Minute,
-		Quorums:                    []core.QuorumID{0, 1},
-	}
 }
 
 type LoadGenerator struct {
@@ -78,8 +62,8 @@ func NewLoadGenerator(
 	client *client.TestClient,
 	rand *random.TestRandom) *LoadGenerator {
 
-	submissionFrequency := config.BytesPerSecond / config.AverageBlobSize
-	submissionPeriod := time.Second / time.Duration(submissionFrequency)
+	submissionFrequency := float64(config.BytesPerSecond) / float64(config.AverageBlobSize)
+	submissionPeriod := time.Duration(float64(time.Second) / submissionFrequency)
 
 	parallelismLimiter := make(chan struct{}, config.MaxParallelism)
 
@@ -133,7 +117,9 @@ func (l *LoadGenerator) run() {
 // Submits a single blob to the network. This function does not return until it reads the blob back
 // from the network, which may take tens of seconds.
 func (l *LoadGenerator) submitBlob() {
-	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout)
+	timeout := time.Duration(l.config.DispersalTimeoutSeconds) * time.Second
+
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
 	l.metrics.startOperation()
 	defer func() {
 		<-l.parallelismLimiter
@@ -154,18 +140,30 @@ func (l *LoadGenerator) submitBlob() {
 
 	key, err := l.client.DispersePayload(ctx, paddedPayload, l.config.Quorums, rand.Uint32())
 	if err != nil {
-		fmt.Printf("failed to disperse blob: %v\n", err)
+		l.client.Logger.Errorf("failed to disperse blob: %v", err)
 	}
-	blobCert := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
+	blobCert, err := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
+	if err != nil {
+		l.client.Logger.Errorf("failed to wait for certification: %v", err) // TODO metric
+		return
+	}
 
 	// Unpad the payload
 	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(paddedPayload)
 
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
-		l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+		err = l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+		if err != nil {
+			l.client.Logger.Errorf("failed to read blob from relays: %v", err) // TODO metric
+			return
+		}
 	}
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
-		l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
+		err = l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
+		if err != nil {
+			l.client.Logger.Errorf("failed to read blob from validators: %v", err) // TODO metric
+			return
+		}
 	}
 }
