@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 	"io"
 	"math/big"
 	"math/rand"
@@ -166,8 +167,9 @@ func (r *TestRandom) BLS() *core.KeyPair {
 }
 
 func (r *TestRandom) requireNoError(err error) {
-	if err != nil && r.t == nil {
+	if r.t != nil {
+		require.NoError(r.t, err)
+	} else if err != nil {
 		panic(err)
 	}
-	r.requireNoError(err)
 }
