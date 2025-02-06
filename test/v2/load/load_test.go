@@ -31,7 +31,7 @@ func parseConfig(configFile string) (*LoadGeneratorConfig, error) {
 
 func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t)
+	c := client.GetTestClient(t)
 
 	config, err := parseConfig("../config/load/1mb_s-10mb-0x.json")
 	require.NoError(t, err)

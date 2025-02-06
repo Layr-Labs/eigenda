@@ -29,7 +29,7 @@ func testBasicDispersal(
 	payload []byte,
 	quorums []core.QuorumID) error {
 
-	c := client.GetClient(t)
+	c := client.GetTestClient(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -101,7 +101,8 @@ func TestMediumBlobDispersal(t *testing.T) {
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := int(rand.Uint64n(client.GetConfig(t).MaxBlobSize/2) + client.GetConfig(t).MaxBlobSize/4)
+	c := client.GetTestClient(t)
+	dataLength := int(rand.Uint64n(c.Config.MaxBlobSize/2) + c.Config.MaxBlobSize/4)
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
@@ -120,7 +121,8 @@ func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := int(client.GetConfig(t).MaxBlobSize)
+	c := client.GetTestClient(t)
+	dataLength := int(c.Config.MaxBlobSize)
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength]
 
@@ -131,7 +133,8 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	dataLength := int(client.GetConfig(t).MaxBlobSize) + 1
+	c := client.GetTestClient(t)
+	dataLength := int(c.Config.MaxBlobSize) + 1
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength+1]
 
@@ -142,7 +145,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 
 func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t)
+	c := client.GetTestClient(t)
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -162,7 +165,7 @@ func TestDoubleDispersal(t *testing.T) {
 
 func TestUnauthorizedGetChunks(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t)
+	c := client.GetTestClient(t)
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -193,7 +196,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 func TestDispersalWithInvalidSignature(t *testing.T) {
 	rand := random.NewTestRandom(t)
 
-	c := client.GetClient(t)
+	c := client.GetTestClient(t)
 
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
