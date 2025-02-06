@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -143,25 +144,12 @@ func (pd *PayloadDisperser) SendPayload(
 	// different blob key, when using reserved bandwidth payments.
 	salt uint32,
 ) (*verification.EigenDACert, error) {
-
-	blobBytes, err := pd.codec.EncodeBlob(payload)
-	if err != nil {
-		return nil, fmt.Errorf("encode payload to blob: %w", err)
-	}
-	pd.logger.Debug("Payload encoded to blob")
-
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
-	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
-		timeoutCtx,
-		blobBytes,
-		pd.config.BlobVersion,
-		pd.config.Quorums,
-		salt)
+	blobStatus, blobKey, err := pd.SendDispersalRequest(timeoutCtx, payload, salt)
 	if err != nil {
-		return nil, fmt.Errorf("disperse blob: %w", err)
+		return nil, fmt.Errorf("send dispersal request: %w", err)
 	}
-	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
@@ -188,6 +176,38 @@ func (pd *PayloadDisperser) SendPayload(
 	return eigenDACert, nil
 }
 
+// SendDispersalRequest encodes a payload into a blob, and then submits a dispersal request to the disperser.
+// It returns immediately after receiving a response from the disperser, and doesn't wait for any particular blob
+// status before returning.
+func (pd *PayloadDisperser) SendDispersalRequest(
+	ctx context.Context,
+	// payload is the raw data to be stored on eigenDA
+	payload []byte,
+	// salt is added while constructing the blob header
+	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
+	// different blob key, when using reserved bandwidth payments.
+	salt uint32,
+) (*v2.BlobStatus, *core.BlobKey, error) {
+	blobBytes, err := pd.codec.EncodeBlob(payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encode payload to blob: %w", err)
+	}
+	pd.logger.Debug("Payload encoded to blob")
+
+	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
+		ctx,
+		blobBytes,
+		pd.config.BlobVersion,
+		pd.config.Quorums,
+		salt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("disperse blob: %w", err)
+	}
+	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
+
+	return blobStatus, &blobKey, nil
+}
+
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
 // clients, even if some closes fail.
 //
@@ -209,7 +229,7 @@ func (pd *PayloadDisperser) Close() error {
 // In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
 func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
-	blobKey core.BlobKey,
+	blobKey *core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
 ) (*dispgrpc.BlobStatusReply, error) {
 
@@ -229,7 +249,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 		case <-ticker.C:
 			// This call to the disperser doesn't have a dedicated timeout configured.
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
-			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
+			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, *blobKey)
 			if err != nil {
 				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
@@ -265,7 +285,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 // contract, and then assembles an EigenDACert
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
-	blobKey core.BlobKey,
+	blobKey *core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 ) (*verification.EigenDACert, error) {
 
