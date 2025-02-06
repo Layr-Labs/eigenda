@@ -420,13 +420,13 @@ func (c *TestClient) VerifyBlobCertification(
 		percent, ok := signingPercents[quorum]
 		require.True(c.T, ok)
 		require.True(c.T, percent >= 0 && percent <= 100)
-		require.True(c.T, percent >= c.Config.MinimumSigningPercent)
+		require.True(c.T, percent >= c.Config.MinimumSigningPercent,
+			"quorum %d signed by only %d%%", quorum, percent)
 	}
 
-	// TODO This currently does not pass!
 	// On-chain verification
-	//err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
-	//require.NoError(c.T, err)
+	err = c.CertVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
+	require.NoError(c.T, err)
 }
 
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
