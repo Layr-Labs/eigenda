@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"math/big"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -265,7 +267,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Signature:  sig,
 		BlobHeader: invalidReqProto,
 	})
-	assert.ErrorContains(t, err, "invalid blob commitment")
+	assert.ErrorContains(t, err, "is less than blob length")
 
 	// request with blob size exceeding the limit
 	data = make([]byte, 321)
@@ -597,4 +599,56 @@ func TestInvalidLength(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid commitment length, must be a power of 2")
+}
+
+func TestTooShortCommitment(t *testing.T) {
+	rand := random.NewTestRandom(t)
+
+	c := newTestServerV2(t)
+	ctx := peer.NewContext(context.Background(), c.Peer)
+	data := rand.VariableBytes(2, 100)
+	_, err := rand.Read(data)
+	assert.NoError(t, err)
+
+	data = codec.ConvertByPaddingEmptyByte(data)
+	commitments, err := prover.GetCommitmentsForPaddedLength(data)
+	assert.NoError(t, err)
+
+	// Length we are commiting to should be a power of 2.
+	require.Equal(t, commitments.Length, encoding.NextPowerOf2(commitments.Length))
+
+	// Choose a smaller commitment length than is legal. Make sure it's a power of 2 so that it doesn't
+	// fail prior to the commitment length check.
+	commitments.Length /= 2
+
+	accountID, err := c.Signer.GetAccountID()
+	assert.NoError(t, err)
+	commitmentProto, err := commitments.ToProtobuf()
+	assert.NoError(t, err)
+	blobHeaderProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID,
+			ReservationPeriod: 5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	assert.NoError(t, err)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
+	sig, err := signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+
+	_, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Blob:       data,
+		Signature:  sig,
+		BlobHeader: blobHeaderProto,
+	})
+
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "invalid commitment length") ||
+		strings.Contains(err.Error(), "is less than blob length"))
 }

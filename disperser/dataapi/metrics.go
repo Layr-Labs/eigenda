@@ -37,12 +37,14 @@ type Metrics struct {
 	logger   logging.Logger
 }
 
-func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(serverVersion uint, blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	reg.MustRegister(NewDynamoDBCollector(blobMetadataStore, logger))
+	if serverVersion == 1 {
+		reg.MustRegister(NewDynamoDBCollector(blobMetadataStore, logger))
+	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
