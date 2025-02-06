@@ -45,13 +45,12 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 
 	// the constructor checks that these values aren't empty. we don't need them, though, since we're using mocks
 	payloadClientConfig := clients.PayloadClientConfig{
-		EthRpcUrl:               "x",
-		EigenDACertVerifierAddr: "y",
+		EigenDACertVerifierAddr: "x",
 	}
 
 	clientConfig := clients.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: payloadClientConfig,
-		RelayTimeout: 50 * time.Millisecond,
+		RelayTimeout:        50 * time.Millisecond,
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}

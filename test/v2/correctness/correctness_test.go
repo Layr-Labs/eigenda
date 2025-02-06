@@ -3,14 +3,15 @@ package correctness
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"strings"
-	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
@@ -29,12 +30,12 @@ func testBasicDispersal(
 	payload []byte,
 	quorums []core.QuorumID) error {
 
-	c := client.GetClient(t)
+	c := client.GetClient(t, quorums)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, payload, quorums, rand.Uint32())
+	err := c.DisperseAndVerify(ctx, payload, rand.Uint32())
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -51,6 +52,8 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.Error(t, err)
 	require.ErrorContains(t, err, "data is empty")
+
+	// TODO: blob no longer empty after payload is processed, this is definitely broken
 }
 
 // Disperse a 1 byte payload (no padding).
@@ -119,12 +122,14 @@ func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
+	quorums := []core.QuorumID{0, 1}
+
 	rand := random.NewTestRandom(t)
 	dataLength := int(client.GetConfig(t).MaxBlobSize)
 	payload := rand.Bytes(dataLength)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength]
 
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, paddedPayload, quorums)
 	require.NoError(t, err)
 }
 
@@ -142,7 +147,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 
 func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t)
+	c := client.GetClient(t, []core.QuorumID{0, 1})
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -151,18 +156,18 @@ func TestDoubleDispersal(t *testing.T) {
 	defer cancel()
 
 	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, paddedPayload, []core.QuorumID{0, 1}, salt)
+	err := c.DisperseAndVerify(ctx, paddedPayload, salt)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, paddedPayload, []core.QuorumID{0, 1}, salt)
+	err = c.DisperseAndVerify(ctx, paddedPayload, salt)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t)
+	c := client.GetClient(t, []core.QuorumID{0, 1})
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
@@ -170,17 +175,17 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	key, err := c.DispersePayload(ctx, paddedPayload, []core.QuorumID{0, 1}, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, paddedPayload, rand.Uint32())
 	require.NoError(t, err)
 
-	// Wait for blob to become certified
-	cert := c.WaitForCertification(ctx, *key, []core.QuorumID{0, 1})
+	blobKey, err := eigenDACert.ComputeBlobKey()
+	require.NoError(t, err)
 
-	targetRelay := cert.RelayKeys[0]
+	targetRelay := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys[0]
 
 	chunkRequests := make([]*clients.ChunkRequestByRange, 1)
 	chunkRequests[0] = &clients.ChunkRequestByRange{
-		BlobKey: *key,
+		BlobKey: *blobKey,
 		Start:   0,
 		End:     1,
 	}
@@ -190,9 +195,11 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 }
 
 func TestDispersalWithInvalidSignature(t *testing.T) {
+	quorums := []core.QuorumID{0, 1}
+
 	rand := random.NewTestRandom(t)
 
-	c := client.GetClient(t)
+	c := client.GetClient(t, quorums)
 
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
@@ -217,7 +224,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, []core.QuorumID{0, 1}, rand.Uint32())
+	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums, rand.Uint32())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

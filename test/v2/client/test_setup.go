@@ -3,11 +3,13 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"sync"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -15,7 +17,7 @@ var (
 	configLock       sync.Mutex
 	config           *TestClientConfig
 	clientLock       sync.Mutex
-	client           *TestClient
+	clientMap        = make(map[string]*TestClient)
 )
 
 // GetConfig returns a TestClientConfig instance, creating one if it does not exist.
@@ -42,18 +44,30 @@ func GetConfig(t *testing.T) *TestClientConfig {
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes ~1 minute
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient(t *testing.T) *TestClient {
+func GetClient(t *testing.T, quorums []core.QuorumID) *TestClient {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
 	skipInCI(t)
-	if client != nil {
-		return client
-	}
 
 	testConfig := GetConfig(t)
-	client = NewTestClient(t, testConfig)
-	setupFilesystem(t, testConfig)
+
+	quorumsString := ""
+	for _, quorum := range quorums {
+		quorumsString += string(quorum) + ","
+	}
+	if clientMap[quorumsString] != nil {
+		return clientMap[quorumsString]
+	}
+
+	client := NewTestClient(t, testConfig, quorums)
+
+	if len(clientMap) == 0 {
+		// only do this once
+		setupFilesystem(t, testConfig)
+	}
+
+	clientMap[quorumsString] = client
 
 	return client
 }

@@ -3,14 +3,15 @@ package load
 import (
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
 	"math/rand"
 	"sync/atomic"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
+	"github.com/docker/go-units"
 )
 
 // LoadGeneratorConfig is the configuration for the load generator.
@@ -147,25 +148,35 @@ func (l *LoadGenerator) submitBlob() {
 		1.0,
 		float64(l.client.Config.MaxBlobSize+1)))
 	payload := l.rand.Bytes(payloadSize)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	if uint64(len(paddedPayload)) > l.client.Config.MaxBlobSize {
-		paddedPayload = paddedPayload[:l.client.Config.MaxBlobSize]
-	}
 
-	key, err := l.client.DispersePayload(ctx, paddedPayload, l.config.Quorums, rand.Uint32())
+	eigenDACert, err := l.client.DispersePayload(ctx, payload, rand.Uint32())
 	if err != nil {
 		fmt.Printf("failed to disperse blob: %v\n", err)
 	}
-	blobCert := l.client.WaitForCertification(ctx, *key, l.config.Quorums)
 
-	// Unpad the payload
-	unpaddedPayload := codec.RemoveEmptyByteFromPaddedBytes(paddedPayload)
+	blobKey, err := eigenDACert.ComputeBlobKey()
+	if err != nil {
+		fmt.Printf("failed to compute blob key: %v\n", err)
+	}
 
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
-		l.client.ReadBlobFromRelays(ctx, *key, blobCert, unpaddedPayload)
+		l.client.ReadBlobFromRelays(ctx, *blobKey, eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys, payload)
 	}
+
+	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
+	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	if err != nil {
+		fmt.Printf("failed to compute blob commitment: %v\n", err)
+	}
+
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
-		l.client.ReadBlobFromValidators(ctx, blobCert, l.config.Quorums, unpaddedPayload)
+		l.client.ReadBlobFromValidators(
+			ctx,
+			*blobKey,
+			blobHeader.Version,
+			*commitment,
+			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+			payload)
 	}
 }
