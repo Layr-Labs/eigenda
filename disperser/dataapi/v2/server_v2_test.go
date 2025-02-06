@@ -595,22 +595,20 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchBlobInclusionInfoHandler(t *testing.T) {
+func TestFetchBlobAttestationInfo(t *testing.T) {
+	ctx := context.Background()
 	r := setUpRouter()
 
-	// Set up blob inclusion info in metadata store
+	// Set up blob inclusion info
 	blobHeader := makeBlobHeaderV2(t)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
-
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 100,
 	}
-	batchHeaderHash, err := batchHeader.Hash()
-	require.NoError(t, err)
-
-	ctx := context.Background()
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -622,13 +620,54 @@ func TestFetchBlobInclusionInfoHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/inclusion-info", testDataApiServerV2.FetchBlobInclusionInfoHandler)
+	r.GET("/v2/blobs/:blob_key/attestation-info", testDataApiServerV2.FetchBlobAttestationInfo)
 
-	reqStr := fmt.Sprintf("/v2/blobs/%s/inclusion-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.BlobInclusionInfoResponse](t, w)
+	t.Run("no attestation found", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+	})
 
-	assert.Equal(t, inclusionInfo.InclusionProof, response.InclusionInfo.InclusionProof)
+	// Set up attestation
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	t.Run("found attestation info", func(t *testing.T) {
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		w := executeRequest(t, r, http.MethodGet, reqStr)
+		response := decodeResponseBody[serverv2.BlobAttestationInfoResponse](t, w)
+
+		assert.Equal(t, blobKey.Hex(), response.BlobKey)
+		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
+		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, attestation, response.Attestation)
+	})
 }
 
 func TestFetchBatchHandlerV2(t *testing.T) {

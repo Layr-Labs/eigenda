@@ -21,7 +21,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Batch"
+                    "Batches"
                 ],
                 "summary": "Fetch batch feed",
                 "parameters": [
@@ -78,7 +78,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Batch"
+                    "Batches"
                 ],
                 "summary": "Fetch batch by the batch header hash",
                 "parameters": [
@@ -124,7 +124,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
                 "summary": "Fetch blob feed",
                 "parameters": [
@@ -187,7 +187,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
                 "summary": "Fetch blob metadata by blob key",
                 "parameters": [
@@ -227,15 +227,15 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/certificate": {
+        "/blobs/{blob_key}/attestation-info": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob certificate by blob key v2",
+                "summary": "Fetch attestation info for a blob",
                 "parameters": [
                     {
                         "type": "string",
@@ -249,7 +249,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobCertificateResponse"
+                            "$ref": "#/definitions/v2.BlobAttestationInfoResponse"
                         }
                     },
                     "400": {
@@ -273,27 +273,20 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/inclusion-info": {
+        "/blobs/{blob_key}/certificate": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob inclusion info by blob key and batch header hash",
+                "summary": "Fetch blob certificate by blob key v2",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Blob key in hex string",
                         "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
                         "in": "path",
                         "required": true
                     }
@@ -302,7 +295,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobInclusionInfoResponse"
+                            "$ref": "#/definitions/v2.BlobCertificateResponse"
                         }
                     },
                     "400": {
@@ -464,7 +457,7 @@ const docTemplateV2 = `{
                 "tags": [
                     "Operators"
                 ],
-                "summary": "Operator node reachability check",
+                "summary": "Operator v2 node reachability check",
                 "parameters": [
                     {
                         "type": "string",
@@ -674,12 +667,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -687,9 +674,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -723,12 +707,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -757,12 +735,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -771,9 +743,6 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -781,9 +750,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -987,12 +953,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "a1": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -1076,6 +1036,23 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.BlobAttestationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_inclusion_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                },
+                "blob_key": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.BlobCertificateResponse": {
             "type": "object",
             "properties": {
@@ -1095,14 +1072,6 @@ const docTemplateV2 = `{
                 },
                 "pagination_token": {
                     "type": "string"
-                }
-            }
-        },
-        "v2.BlobInclusionInfoResponse": {
-            "type": "object",
-            "properties": {
-                "blob_inclusion_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
                 }
             }
         },
@@ -1301,15 +1270,6 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "retrieval_status": {
-                    "type": "string"
-                },
-                "v2_dispersal_online": {
-                    "type": "boolean"
-                },
-                "v2_dispersal_socket": {
-                    "type": "string"
-                },
-                "v2_dispersal_status": {
                     "type": "string"
                 }
             }
