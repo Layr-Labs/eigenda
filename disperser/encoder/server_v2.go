@@ -2,13 +2,13 @@ package encoder
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -109,6 +109,11 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 		s.metrics.ObserveLatency("total", time.Since(totalStart))
 	}()
 
+	// Validate request first
+	blobKey, encodingParams, err := s.validateAndParseRequest(req)
+	if err != nil {
+		return nil, err
+	}
 	blobSize := req.GetBlobSize()
 	sizeBucket := common.BlobSizeBucket(int(blobSize))
 
@@ -122,7 +127,7 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(int(blobSize))
 		s.logger.Warn("rate limiting as request queue is full", "requestQueueSize", s.config.RequestQueueSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, errors.New("too many requests")
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("request queue is full, max queue size: %d", s.config.RequestQueueSize))
 	}
 
 	// Limit the number of concurrent requests
@@ -134,7 +139,7 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 	}
 
 	s.metrics.ObserveLatency("queuing", time.Since(totalStart))
-	reply, err := s.handleEncodingToChunkStore(ctx, req)
+	reply, err := s.handleEncodingToChunkStore(ctx, blobKey, encodingParams)
 	if err != nil {
 		s.metrics.IncrementFailedBlobRequestNum(int(blobSize))
 	} else {
@@ -144,13 +149,7 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 	return reply, err
 }
 
-func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
-	// Validate request first
-	blobKey, encodingParams, err := s.validateAndParseRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*pb.EncodeBlobReply, error) {
 	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
 	// Check if the blob has already been encoded
@@ -224,9 +223,16 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 	if req.EncodingParams.ChunkLength == 0 {
 		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be greater than zero")
 	}
+	if req.EncodingParams.ChunkLength&(req.EncodingParams.ChunkLength-1) != 0 {
+		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be power of 2")
+	}
 
 	if req.EncodingParams.NumChunks == 0 {
 		return blobKey, params, status.Error(codes.InvalidArgument, "number of chunks must be greater than zero")
+	}
+
+	if req.BlobSize == 0 || uint64(encoding.GetBlobLength(uint(req.BlobSize))) > req.EncodingParams.ChunkLength*req.EncodingParams.NumChunks {
+		return blobKey, params, status.Error(codes.InvalidArgument, "blob size is invalid")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(req.BlobKey)
