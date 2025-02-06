@@ -16,7 +16,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
@@ -99,26 +98,23 @@ func (c *TestClientConfig) path(t *testing.T, elements ...string) string {
 }
 
 // NewTestClient creates a new TestClient instance.
-func NewTestClient(t *testing.T, config *TestClientConfig, quorums []core.QuorumID) *TestClient {
-	if config.SRSNumberToLoad == 0 {
-		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
-		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
-	}
+func NewTestClient(
+	t *testing.T,
+	logger logging.Logger,
+	metrics *testClientMetrics,
+	config *TestClientConfig,
+	quorums []core.QuorumID,
+) *TestClient {
 
 	if config.SRSNumberToLoad == 0 {
 		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
 		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
 	}
 
-	var loggerConfig common.LoggerConfig
-	if os.Getenv("CI") != "" {
-		loggerConfig = common.DefaultLoggerConfig()
-	} else {
-		loggerConfig = common.DefaultConsoleLoggerConfig()
+	if config.SRSNumberToLoad == 0 {
+		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
+		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
 	}
-
-	logger, err := common.NewLogger(loggerConfig)
-	require.NoError(t, err)
 
 	// Construct the disperser client
 
@@ -267,9 +263,6 @@ func NewTestClient(t *testing.T, config *TestClientConfig, quorums []core.Quorum
 		retrievalClient,
 		blobVerifier.Srs.G1)
 	require.NoError(t, err)
-
-	metrics := newTestClientMetrics(logger, config.MetricsPort)
-	metrics.start()
 
 	return &TestClient{
 		T:                         t,

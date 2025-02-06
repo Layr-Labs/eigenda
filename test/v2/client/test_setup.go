@@ -8,7 +8,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,6 +20,8 @@ var (
 	config           *TestClientConfig
 	clientLock       sync.Mutex
 	clientMap        = make(map[string]*TestClient)
+	logger           logging.Logger
+	metrics          *testClientMetrics
 )
 
 // GetConfig returns a TestClientConfig instance, creating one if it does not exist.
@@ -60,12 +64,28 @@ func GetClient(t *testing.T, quorums []core.QuorumID) *TestClient {
 		return clientMap[quorumsString]
 	}
 
-	client := NewTestClient(t, testConfig, quorums)
-
 	if len(clientMap) == 0 {
-		// only do this once
+		// only do this stuff once
 		setupFilesystem(t, testConfig)
+
+		var loggerConfig common.LoggerConfig
+		if os.Getenv("CI") != "" {
+			loggerConfig = common.DefaultLoggerConfig()
+		} else {
+			loggerConfig = common.DefaultConsoleLoggerConfig()
+		}
+
+		testLogger, err := common.NewLogger(loggerConfig)
+		require.NoError(t, err)
+
+		logger = testLogger
+
+		testMetrics := newTestClientMetrics(logger, config.MetricsPort)
+		metrics = testMetrics
+		testMetrics.start()
 	}
+
+	client := NewTestClient(t, logger, metrics, testConfig, quorums)
 
 	clientMap[quorumsString] = client
 
