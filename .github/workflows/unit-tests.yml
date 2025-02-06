@@ -32,7 +32,7 @@ jobs:
       - run: go version
 
       - name: Checkout EigenDA
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
       - name: Build
         run: make build
@@ -58,7 +58,7 @@ jobs:
     needs: unit-tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/master'

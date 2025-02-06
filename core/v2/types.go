@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -107,6 +108,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		}
 		quorumNumbers[i] = core.QuorumID(q)
 	}
+	slices.Sort(quorumNumbers)
 
 	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
 	if paymentMetadata == nil {

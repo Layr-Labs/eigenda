@@ -8,14 +8,13 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConvertBatchToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
 	commitments, err := p.GetCommitmentsForPaddedLength(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	bh0 := &v2.BlobHeader{
 		BlobVersion:     0,
@@ -69,9 +68,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
 	commitments, err := p.GetCommitmentsForPaddedLength(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	bh := &v2.BlobHeader{
 		BlobVersion:     0,
@@ -96,9 +93,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 	data := codec.ConvertByPaddingEmptyByte(GETTYSBURG_ADDRESS_BYTES)
 	commitments, err := p.GetCommitmentsForPaddedLength(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	bh := &v2.BlobHeader{
 		BlobVersion:     0,

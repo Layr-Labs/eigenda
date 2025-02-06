@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -42,7 +43,6 @@ func ComputeBlobKey(
 	paymentMetadataHash [32]byte,
 	salt uint32,
 ) ([32]byte, error) {
-
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err
@@ -121,10 +121,13 @@ func ComputeBlobKey(
 			Type: saltType,
 		},
 	}
-
+	// Sort the quorum numbers to ensure the hash is consistent
+	sortedQuorums := make([]core.QuorumID, len(quorumNumbers))
+	copy(sortedQuorums, quorumNumbers)
+	slices.Sort(sortedQuorums)
 	packedBytes, err := arguments.Pack(
 		blobVersion,
-		quorumNumbers,
+		sortedQuorums,
 		abiBlobCommitments{
 			Commitment: abiG1Commit{
 				X: blobCommitments.Commitment.X.BigInt(new(big.Int)),
