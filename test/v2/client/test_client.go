@@ -435,7 +435,16 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		start := time.Now()
 
-		retrievedBlob, err := c.RetrievalClient.GetBlob(ctx, header, uint64(currentBlockNumber), quorumID)
+		blobKey, err := header.BlobKey()
+		require.NoError(c.T, err)
+
+		retrievedBlob, err := c.RetrievalClient.GetBlob(
+			ctx,
+			blobKey,
+			header.BlobVersion,
+			header.BlobCommitments,
+			uint64(currentBlockNumber),
+			quorumID)
 		require.NoError(c.T, err)
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
