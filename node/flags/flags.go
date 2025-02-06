@@ -399,9 +399,9 @@ var (
 
 	RuntimeModeFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "runtime-mode"),
-		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1Only, ModeV2Only, ModeV1AndV2),
+		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1AndV2, ModeV1Only, ModeV2Only),
 		Required: false,
-		Value:    ModeV1Only,
+		Value:    ModeV1AndV2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
 	}
 )

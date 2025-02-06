@@ -80,8 +80,11 @@ type (
 		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
 	}
 
-	BlobInclusionInfoResponse struct {
-		InclusionInfo *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
+	BlobAttestationInfoResponse struct {
+		BlobKey         string                    `json:"blob_key"`
+		BatchHeaderHash string                    `json:"batch_header_hash"`
+		InclusionInfo   *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
+		Attestation     *corev2.Attestation       `json:"attestation"`
 	}
 
 	BlobInfo struct {
@@ -262,7 +265,7 @@ func (s *ServerV2) Start() error {
 			blobs.GET("/feed", s.FetchBlobFeedHandler)
 			blobs.GET("/:blob_key", s.FetchBlobHandler)
 			blobs.GET("/:blob_key/certificate", s.FetchBlobCertificateHandler)
-			blobs.GET("/:blob_key/inclusion-info", s.FetchBlobInclusionInfoHandler)
+			blobs.GET("/:blob_key/attestation-info", s.FetchBlobAttestationInfo)
 		}
 		batches := v2.Group("/batches")
 		{
@@ -373,7 +376,7 @@ func (s *ServerV2) Shutdown() error {
 // FetchBlobFeedHandler godoc
 //
 //	@Summary	Fetch blob feed
-//	@Tags		Blob
+//	@Tags		Blobs
 //	@Produce	json
 //	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
@@ -496,7 +499,7 @@ func (s *ServerV2) FetchBlobFeedHandler(c *gin.Context) {
 // FetchBlobHandler godoc
 //
 //	@Summary	Fetch blob metadata by blob key
-//	@Tags		Blob
+//	@Tags		Blobs
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
 //	@Success	200			{object}	BlobResponse
@@ -540,7 +543,7 @@ func (s *ServerV2) FetchBlobHandler(c *gin.Context) {
 // FetchBlobCertificateHandler godoc
 //
 //	@Summary	Fetch blob certificate by blob key v2
-//	@Tags		Blob
+//	@Tags		Blobs
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
 //	@Success	200			{object}	BlobCertificateResponse
@@ -571,45 +574,49 @@ func (s *ServerV2) FetchBlobCertificateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// FetchBlobInclusionInfoHandler godoc
+// FetchBlobAttestationInfo godoc
 //
-//	@Summary	Fetch blob inclusion info by blob key and batch header hash
-//	@Tags		Blob
+//	@Summary	Fetch attestation info for a blob
+//	@Tags		Blobs
 //	@Produce	json
-//	@Param		blob_key			path		string	true	"Blob key in hex string"
-//	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
-//
-//	@Success	200					{object}	BlobInclusionInfoResponse
-//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404					{object}	ErrorResponse	"error: Not found"
-//	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/{blob_key}/inclusion-info [get]
-func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
+//	@Param		blob_key	path		string	true	"Blob key in hex string"
+//	@Success	200			{object}	BlobAttestationInfoResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/{blob_key}/attestation-info [get]
+func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	start := time.Now()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobInclusionInfo")
-		errorResponse(c, err)
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobAttestationInfo")
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse blob_key param: %w", err))
 		return
 	}
-	batchHeaderHashHex := c.Query("batch_header_hash")
-	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
+
+	attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobInclusionInfo")
-		errorResponse(c, err)
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
 		return
 	}
-	bvi, err := s.blobMetadataStore.GetBlobInclusionInfo(c.Request.Context(), blobKey, batchHeaderHash)
+
+	batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobInclusionInfo")
-		errorResponse(c, err)
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to get batch header hash from blob inclusion info: %w", err))
 		return
 	}
-	response := &BlobInclusionInfoResponse{
-		InclusionInfo: bvi,
+
+	response := &BlobAttestationInfoResponse{
+		BlobKey:         blobKey.Hex(),
+		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
+		InclusionInfo:   attestationInfo.InclusionInfo,
+		Attestation:     attestationInfo.Attestation,
 	}
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobInclusionInfo")
-	s.metrics.ObserveLatency("FetchBlobInclusionInfo", float64(time.Since(start).Milliseconds()))
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
+	s.metrics.ObserveLatency("FetchBlobAttestationInfo", float64(time.Since(start).Milliseconds()))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -622,7 +629,7 @@ func (s *ServerV2) FetchBlobInclusionInfoHandler(c *gin.Context) {
 //	@Param		end				query		string	false	"Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval		query		int		false	"Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]"
 //	@Param		quorums			query		string	false	"Comma separated list of quorum IDs to fetch signing info for [default: 0,1]"
-//	@Param		nonsigner_only	query		boolean false	"Whether to only return operators with signing rate less than 100% [default: false]"
+//	@Param		nonsigner_only	query		boolean	false	"Whether to only return operators with signing rate less than 100% [default: false]"
 //	@Success	200				{object}	OperatorsSigningInfoResponse
 //	@Failure	400				{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404				{object}	ErrorResponse	"error: Not found"
@@ -739,7 +746,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 // FetchBatchFeedHandler godoc
 //
 //	@Summary	Fetch batch feed
-//	@Tags		Batch
+//	@Tags		Batches
 //	@Produce	json
 //	@Param		end			query		string	false	"Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		interval	query		int		false	"Fetch batches starting from an interval (in seconds) before the end time [default: 3600]"
@@ -836,7 +843,7 @@ func (s *ServerV2) FetchBatchFeedHandler(c *gin.Context) {
 // FetchBatchHandler godoc
 //
 //	@Summary	Fetch batch by the batch header hash
-//	@Tags		Batch
+//	@Tags		Batches
 //	@Produce	json
 //	@Param		batch_header_hash	path		string	true	"Batch header hash in hex string"
 //	@Success	200					{object}	BatchResponse
