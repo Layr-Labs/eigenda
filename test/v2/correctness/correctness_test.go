@@ -74,9 +74,7 @@ func TestMicroscopicBlobDispersal(t *testing.T) {
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	payload := []byte{1}
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	require.Equal(t, 2, len(paddedPayload))
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
 }
 
@@ -93,8 +91,7 @@ func TestPaddingError(t *testing.T) {
 func TestSmallBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
 }
 
@@ -102,8 +99,7 @@ func TestSmallBlobDispersal(t *testing.T) {
 func TestMediumBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
 }
 
@@ -112,8 +108,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	dataLength := int(rand.Uint64n(client.GetConfig(t).MaxBlobSize/2) + client.GetConfig(t).MaxBlobSize/4)
 	payload := rand.Bytes(dataLength)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
 }
 
@@ -121,8 +116,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0})
 	require.NoError(t, err)
 }
 
@@ -133,9 +127,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	dataLength := int(client.GetConfig(t).MaxBlobSize)
 	payload := rand.Bytes(dataLength)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength]
-
-	err := testBasicDispersal(t, rand, paddedPayload, quorums)
+	err := testBasicDispersal(t, rand, payload, quorums)
 	require.NoError(t, err)
 }
 
@@ -144,9 +136,8 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	dataLength := int(client.GetConfig(t).MaxBlobSize) + 1
 	payload := rand.Bytes(dataLength)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)[:dataLength+1]
 
-	err := testBasicDispersal(t, rand, paddedPayload, []core.QuorumID{0, 1})
+	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob size cannot exceed"))
 }
@@ -156,17 +147,16 @@ func TestDoubleDispersal(t *testing.T) {
 	c := client.GetClient(t, []core.QuorumID{0, 1})
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, paddedPayload, salt)
+	err := c.DisperseAndVerify(ctx, payload, salt)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, paddedPayload, salt)
+	err = c.DisperseAndVerify(ctx, payload, salt)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -176,12 +166,11 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	c := client.GetClient(t, []core.QuorumID{0, 1})
 
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, paddedPayload, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, payload, rand.Uint32())
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()

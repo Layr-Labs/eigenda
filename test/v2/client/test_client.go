@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -133,12 +134,27 @@ func NewTestClient(
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	fmt.Printf("Account ID: %s\n", accountId.String())
 
+	kzgConfig := &kzg.KzgConfig{
+		LoadG2Points:    true,
+		G1Path:          config.path(t, SRSPathG1),
+		G2Path:          config.path(t, SRSPathG2),
+		G2PowerOf2Path:  config.path(t, SRSPathG2PowerOf2),
+		CacheDir:        config.path(t, SRSPathSRSTables),
+		SRSOrder:        config.SRSOrder,
+		SRSNumberToLoad: config.SRSNumberToLoad,
+		NumWorker:       32,
+	}
+
+	kzgProver, err := prover.NewProver(kzgConfig, nil)
+	require.NoError(t, err)
+
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          config.DisperserHostname,
 		Port:              fmt.Sprintf("%d", config.DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
-	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
+
+	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, kzgProver, nil)
 	require.NoError(t, err)
 
 	ethClientConfig := geth.EthClientConfig{
@@ -206,16 +222,6 @@ func NewTestClient(
 	relayClient, err := clients.NewRelayClient(relayConfig, logger)
 	require.NoError(t, err)
 
-	kzgConfig := &kzg.KzgConfig{
-		LoadG2Points:    true,
-		G1Path:          config.path(t, SRSPathG1),
-		G2Path:          config.path(t, SRSPathG2),
-		G2PowerOf2Path:  config.path(t, SRSPathG2PowerOf2),
-		CacheDir:        config.path(t, SRSPathSRSTables),
-		SRSOrder:        config.SRSOrder,
-		SRSNumberToLoad: config.SRSNumberToLoad,
-		NumWorker:       32,
-	}
 	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	require.NoError(t, err)
 
@@ -280,6 +286,7 @@ func NewTestClient(
 		MetricsRegistry:           metrics.registry,
 		metrics:                   metrics,
 		quorums:                   quorums,
+		blobCodec:                 blobCodec,
 	}
 }
 
