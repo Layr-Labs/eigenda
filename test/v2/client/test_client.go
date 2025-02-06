@@ -305,21 +305,24 @@ func (c *TestClient) DisperseAndVerify(
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(c.T, err)
 
+	// read blob from a single relay (assuming success, otherwise will retry)
 	payloadBytesFromRelayRetriever, err := c.RelayPayloadRetriever.GetPayload(ctx, eigenDACert)
 	require.NoError(c.T, err)
 	require.Equal(c.T, payload, payloadBytesFromRelayRetriever)
 
+	// read blob from a single quorum (assuming success, otherwise will retry)
 	payloadBytesFromValidatorRetriever, err := c.ValidatorPayloadRetriever.GetPayload(ctx, eigenDACert)
 	require.NoError(c.T, err)
 	require.Equal(c.T, payload, payloadBytesFromValidatorRetriever)
 
-	// Read the blob from the relays and validators
+	// read blob from ALL relays
 	c.ReadBlobFromRelays(ctx, *blobKey, eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys, payload)
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
 	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	require.NoError(c.T, err)
 
+	// read blob from ALL quorums
 	c.ReadBlobFromValidators(
 		ctx,
 		*blobKey,

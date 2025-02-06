@@ -165,7 +165,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.PollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
+	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
@@ -203,11 +203,11 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
-// PollBlobStatusUntilCertified polls the disperser for the status of a blob that has been dispersed
+// pollBlobStatusUntilCertified polls the disperser for the status of a blob that has been dispersed
 //
 // This method will only return a non-nil BlobStatusReply if the blob is reported to be CERTIFIED prior to the timeout.
 // In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
-func (pd *PayloadDisperser) PollBlobStatusUntilCertified(
+func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
