@@ -194,7 +194,7 @@ func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfi
 	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *getDefaultPayloadClientConfig(),
 		RetrievalTimeout:    30 * time.Second,
-		MaxConnectionCount:  200,
+		MaxConnectionCount:  100,
 	}
 }
 
