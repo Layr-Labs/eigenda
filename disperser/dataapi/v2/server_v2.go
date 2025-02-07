@@ -147,7 +147,7 @@ type (
 		Responses []*corev2.DispersalResponse `json:"operator_dispersal_responses"`
 	}
 
-	OperatorPortCheckResponse struct {
+	OperatorLivenessResponse struct {
 		OperatorId      string `json:"operator_id"`
 		DispersalSocket string `json:"dispersal_socket"`
 		DispersalOnline bool   `json:"dispersal_online"`
@@ -271,8 +271,8 @@ func (s *ServerV2) Start() error {
 		{
 			operators.GET("/signing-info", s.FetchOperatorSigningInfo)
 			operators.GET("/stake", s.FetchOperatorsStake)
-			operators.GET("/nodeinfo", s.FetchOperatorsNodeInfo)
-			operators.GET("/reachability", s.CheckOperatorsReachability)
+			operators.GET("/node-info", s.FetchOperatorsNodeInfo)
+			operators.GET("/liveness", s.CheckOperatorsLiveness)
 			operators.GET("/response/:batch_header_hash", s.FetchOperatorsResponses)
 		}
 		metrics := v2.Group("/metrics")
@@ -906,7 +906,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 //	@Produce	json
 //	@Success	200	{object}	SemverReportResponse
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/nodeinfo [get]
+//	@Router		/operators/node-info [get]
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 	handlerStart := time.Now()
 
@@ -981,18 +981,18 @@ func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// CheckOperatorsReachability godoc
+// CheckOperatorsLiveness godoc
 //
-//	@Summary	Operator v2 node reachability check
+//	@Summary	Check operator v2 node liveness
 //	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
-//	@Success	200			{object}	OperatorPortCheckResponse
+//	@Success	200			{object}    OperatorLivenessResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/reachability [get]
-func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
+//	@Router		/operators/liveness [get]
+func (s *ServerV2) CheckOperatorsLiveness(c *gin.Context) {
 	handlerStart := time.Now()
 
 	operatorId := c.DefaultQuery("operator_id", "")
@@ -1002,17 +1002,17 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
 			s.logger.Warn("operator not found", "operatorId", operatorId)
-			s.metrics.IncrementNotFoundRequestNum("OperatorPortCheck")
+			s.metrics.IncrementNotFoundRequestNum("CheckOperatorsLiveness")
 		} else {
 			s.logger.Error("operator port check failed", "error", err)
-			s.metrics.IncrementFailedRequestNum("OperatorPortCheck")
+			s.metrics.IncrementFailedRequestNum("CheckOperatorsLiveness")
 		}
 		errorResponse(c, err)
 		return
 	}
 
-	s.metrics.IncrementSuccessfulRequestNum("OperatorPortCheck")
-	s.metrics.ObserveLatency("OperatorPortCheck", time.Since(handlerStart))
+	s.metrics.IncrementSuccessfulRequestNum("CheckOperatorsLiveness")
+	s.metrics.ObserveLatency("CheckOperatorsLiveness", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, portCheckResponse)
 }

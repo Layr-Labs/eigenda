@@ -1385,7 +1385,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 
 }
 
-func TestCheckOperatorsReachability(t *testing.T) {
+func TestCheckOperatorsLiveness(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
@@ -1394,9 +1394,9 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
 
-	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
@@ -1411,7 +1411,7 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestCheckOperatorsReachabilityLegacyV1SocketRegistration(t *testing.T) {
+func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
@@ -1420,9 +1420,9 @@ func TestCheckOperatorsReachabilityLegacyV1SocketRegistration(t *testing.T) {
 	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
 
-	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
