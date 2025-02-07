@@ -34,7 +34,6 @@ type RelayPayloadRetrieverTester struct {
 	Random                *testrandom.TestRandom
 	RelayPayloadRetriever *clients.RelayPayloadRetriever
 	MockRelayClient       *clientsmock.MockRelayClient
-	MockCertVerifier      *clientsmock.MockCertVerifier
 	Codec                 *codecs.DefaultBlobCodec
 	G1Srs                 []bn254.G1Affine
 }
@@ -46,19 +45,16 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 
 	// the constructor checks that these values aren't empty. we don't need them, though, since we're using mocks
 	payloadClientConfig := clients.PayloadClientConfig{
-		EthRpcUrl:               "x",
-		EigenDACertVerifierAddr: "y",
+		EigenDACertVerifierAddr: "x",
 	}
 
 	clientConfig := clients.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: payloadClientConfig,
-		RelayTimeout: 50 * time.Millisecond,
+		RelayTimeout:        50 * time.Millisecond,
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	codec := codecs.NewDefaultBlobCodec()
-
-	mockCertVerifier := clientsmock.MockCertVerifier{}
 
 	random := testrandom.NewTestRandom(t)
 
@@ -71,7 +67,6 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		&mockCertVerifier,
 		&codec,
 		g1Srs)
 
@@ -82,7 +77,6 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		Random:                random,
 		RelayPayloadRetriever: client,
 		MockRelayClient:       &mockRelayClient,
-		MockCertVerifier:      &mockCertVerifier,
 		Codec:                 &codec,
 		G1Srs:                 g1Srs,
 	}
@@ -156,12 +150,6 @@ func TestGetPayloadSuccess(t *testing.T) {
 	blobKey, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(blobBytes, nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 
@@ -177,13 +165,6 @@ func TestRelayCallTimeout(t *testing.T) {
 	relayKeys := make([]core.RelayKey, 1)
 	relayKeys[0] = tester.Random.Uint32()
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
-
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	// the timeout should occur before the panic has a chance to be triggered
 	tester.MockRelayClient.On("GetBlob", mock.Anything, relayKeys[0], blobKey).Return(
@@ -254,12 +235,6 @@ func TestRandomRelayRetries(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.MatchedBy(onlineKeyMatcher), blobKey).Return(
 		blobBytes,
 		nil)
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	// keep track of how many tries various blob retrievals require
 	// this allows us to require that there is variability, i.e. that relay call order is actually random
@@ -292,12 +267,6 @@ func TestNoRelayResponse(t *testing.T) {
 	blobKey, _, blobCert := buildBlobAndCert(t, tester, relayKeys)
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(nil, fmt.Errorf("offline relay"))
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.Nil(t, payload)
@@ -309,13 +278,6 @@ func TestNoRelayResponse(t *testing.T) {
 // TestNoRelays tests that having no relay keys is handled gracefully
 func TestNoRelays(t *testing.T) {
 	tester := buildRelayPayloadRetrieverTester(t)
-
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	_, _, blobCert := buildBlobAndCert(t, tester, []core.RelayKey{})
 
@@ -343,12 +305,6 @@ func TestGetBlobReturns0Len(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(
 		blobBytes,
 		nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	// the call to the first relay will fail with a 0 len blob returned. the call to the second relay will succeed
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
@@ -372,12 +328,6 @@ func TestGetBlobReturnsDifferentBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes2, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey1).Return(blobBytes1, nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert1)
 	require.NotNil(t, payload)
@@ -402,12 +352,6 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(tooLongBytes, nil).Once()
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, blobKey).Return(blobBytes, nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	// this will fail the first time, since there isn't enough srs loaded to compute the commitment of the returned bytes
 	// it will succeed when the second relay gives the correct bytes
@@ -415,35 +359,6 @@ func TestGetBlobReturnsInvalidBlob(t *testing.T) {
 
 	require.NotNil(t, payload)
 	require.NoError(t, err)
-
-	tester.MockRelayClient.AssertExpectations(t)
-}
-
-// TestBlobFailsVerifyCertV2 tests what happens if cert verification fails
-func TestBlobFailsVerifyCertV2(t *testing.T) {
-	tester := buildRelayPayloadRetrieverTester(t)
-	relayCount := 10
-	relayKeys := make([]core.RelayKey, relayCount)
-	for i := 0; i < relayCount; i++ {
-		relayKeys[i] = tester.Random.Uint32()
-	}
-	_, blobBytes, blobCert := buildBlobAndCert(t, tester, relayKeys)
-
-	tooLongBytes := make([]byte, len(blobBytes)+100)
-	copy(tooLongBytes[:], blobBytes)
-
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(errors.New("verification failed")).Once()
-
-	// this will fail the first time, since verifyBlobV2 will fail
-	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
-
-	require.Nil(t, payload)
-	require.Error(t, err)
 
 	tester.MockRelayClient.AssertExpectations(t)
 }
@@ -461,12 +376,6 @@ func TestGetBlobReturnsBlobWithInvalidLen(t *testing.T) {
 	blobCert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length = (uint32(len(blobBytes)) / 32) - 1
 
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(blobBytes, nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	// this will fail, since the length in the BlobCommitment doesn't match the actual blob length
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
@@ -504,12 +413,6 @@ func TestFailedDecoding(t *testing.T) {
 	tester.MockRelayClient.On("GetBlob", mock.Anything, mock.Anything, mock.Anything).Return(
 		blobBytes,
 		nil).Once()
-	tester.MockCertVerifier.On(
-		"VerifyCertV2",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(nil)
 
 	payload, err := tester.RelayPayloadRetriever.GetPayload(context.Background(), blobCert)
 	require.Error(t, err)
