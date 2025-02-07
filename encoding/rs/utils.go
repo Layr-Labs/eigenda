@@ -37,24 +37,17 @@ func ToFrArray(data []byte) ([]fr.Element, error) {
 	return eles, nil
 }
 
-// ToFieldElementArray accept a byte array as an input, and converts it to an array of field elements
-//
-// This function expects the input array to be a multiple of the size of a field element.
-// TODO: test
+// BytesToFieldElements accept a byte array as an input, and converts it to an array of field elements
 func BytesToFieldElements(inputData []byte) ([]fr.Element, error) {
-	if len(inputData)%encoding.BYTES_PER_SYMBOL != 0 {
-		return nil, fmt.Errorf(
-			"input array length %d isn't a multiple of encoding.BYTES_PER_SYMBOL %d",
-			len(inputData), encoding.BYTES_PER_SYMBOL)
-	}
+	bytes := padToBytesPerSymbol(inputData)
 
-	elementCount := len(inputData) / encoding.BYTES_PER_SYMBOL
+	elementCount := len(bytes) / encoding.BYTES_PER_SYMBOL
 	outputElements := make([]fr.Element, elementCount)
 	for i := 0; i < elementCount; i++ {
 		destinationStartIndex := i * encoding.BYTES_PER_SYMBOL
 		destinationEndIndex := destinationStartIndex + encoding.BYTES_PER_SYMBOL
 
-		err := outputElements[i].SetBytesCanonical(inputData[destinationStartIndex:destinationEndIndex])
+		err := outputElements[i].SetBytesCanonical(bytes[destinationStartIndex:destinationEndIndex])
 		if err != nil {
 			return nil, fmt.Errorf("fr set bytes canonical: %w", err)
 		}
@@ -77,6 +70,19 @@ func FieldElementsToBytes(fieldElements []fr.Element) []byte {
 	}
 
 	return outputBytes
+}
+
+// padToBytesPerSymbol accepts input bytes, and returns the bytes padded to a multiple of encoding.BYTES_PER_SYMBOL
+func padToBytesPerSymbol(inputBytes []byte) []byte {
+	remainder := len(inputBytes) % encoding.BYTES_PER_SYMBOL
+
+	if remainder == 0 {
+		// no padding necessary, since bytes are already a multiple of BYTES_PER_SYMBOL
+		return inputBytes
+	} else {
+		necessaryPadding := encoding.BYTES_PER_SYMBOL - remainder
+		return append(inputBytes, make([]byte, necessaryPadding)...)
+	}
 }
 
 // ToByteArray converts a list of Fr to a byte array

@@ -6,79 +6,63 @@ import (
 
 // Blob is data that is dispersed on eigenDA.
 //
-// A Blob will contain either an encodedPayload, or a coeffPoly. Whether the Blob contains the former or the latter
-// is determined by how the dispersing client has been configured.
+// A Blob is represented under the hood by a coeff polynomial
 type Blob struct {
-	encodedPayload *encodedPayload
-	coeffPoly      *coeffPoly
+	coeffPolynomial *coeffPoly
 }
 
-// BlobFromEncodedPayload creates a Blob containing an encodedPayload
-func blobFromEncodedPayload(encodedPayload *encodedPayload) *Blob {
-	return &Blob{encodedPayload: encodedPayload}
-}
-
-// blobFromCoeffPoly creates a Blob containing a coeffPoly
-func blobFromCoeffPoly(poly *coeffPoly) *Blob {
-	return &Blob{coeffPoly: poly}
-}
-
-// NewBlob initializes a Blob from raw bytes, and the expected BlobForm
-//
-// This function will return an error if the input bytes cannot be successfully interpreted as the claimed BlobForm
-func NewBlob(bytes []byte, blobForm BlobForm) (*Blob, error) {
-	switch blobForm {
-	case Eval:
-		encodedPayload, err := newEncodedPayload(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("new encoded payload: %v", err)
-		}
-
-		return blobFromEncodedPayload(encodedPayload), nil
-	case Coeff:
-		coeffPoly, err := coeffPolyFromBytes(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("new coeff poly: %v", err)
-		}
-
-		return blobFromCoeffPoly(coeffPoly), nil
-	default:
-		return nil, fmt.Errorf("unsupported blob form type: %v", blobForm)
+// BlobFromBytes initializes a Blob from bytes
+func BlobFromBytes(bytes []byte) (*Blob, error) {
+	poly, err := coeffPolyFromBytes(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("polynomial from bytes: %w", err)
 	}
+
+	return BlobFromPolynomial(poly)
+}
+
+// BlobFromPolynomial initializes a blob from a polynomial
+func BlobFromPolynomial(coeffPolynomial *coeffPoly) (*Blob, error) {
+	return &Blob{coeffPolynomial: coeffPolynomial}, nil
 }
 
 // GetBytes gets the raw bytes of the Blob
 func (b *Blob) GetBytes() []byte {
-	if b.encodedPayload == nil {
-		return b.encodedPayload.getBytes()
-	} else {
-		return b.coeffPoly.getBytes()
-	}
+	return b.coeffPolynomial.getBytes()
 }
 
 // ToPayload converts the Blob into a Payload
-func (b *Blob) ToPayload() (*Payload, error) {
+//
+// The payloadStartingForm indicates how payloads are constructed by the dispersing client. Based on the starting form
+// of the payload, we can determine what operations must be done to the blob in order to reconstruct the original payload
+func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
 	var encodedPayload *encodedPayload
 	var err error
-	if b.encodedPayload != nil {
-		encodedPayload = b.encodedPayload
-	} else if b.coeffPoly != nil {
-		evalPoly, err := b.coeffPoly.toEvalPoly()
+	switch payloadStartingForm {
+	case PolynomialFormCoeff:
+		// the payload started off in coefficient form, so no conversion needs to be done
+		encodedPayload, err = b.coeffPolynomial.toEncodedPayload()
 		if err != nil {
-			return nil, fmt.Errorf("coeff poly to eval poly: %v", err)
+			return nil, fmt.Errorf("coeff poly to encoded payload: %w", err)
+		}
+	case PolynomialFormEval:
+		// the payload started off in evaluation form, so we first need to convert the blob's coeff poly into an eval poly
+		evalPoly, err := b.coeffPolynomial.toEvalPoly()
+		if err != nil {
+			return nil, fmt.Errorf("coeff poly to eval poly: %w", err)
 		}
 
 		encodedPayload, err = evalPoly.toEncodedPayload()
 		if err != nil {
-			return nil, fmt.Errorf("eval poly to encoded payload: %v", err)
+			return nil, fmt.Errorf("eval poly to encoded payload: %w", err)
 		}
-	} else {
-		return nil, fmt.Errorf("blob has no contents")
+	default:
+		return nil, fmt.Errorf("invalid polynomial form")
 	}
 
 	payload, err := encodedPayload.decode()
 	if err != nil {
-		return nil, fmt.Errorf("decode encoded payload: %v", err)
+		return nil, fmt.Errorf("decode payload: %w", err)
 	}
 
 	return payload, nil

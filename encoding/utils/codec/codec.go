@@ -102,6 +102,8 @@ func PadPayload(inputData []byte) []byte {
 
 // GetPaddedDataLength accepts the length of a byte array, and returns the length that the array would be after
 // adding internal byte padding
+//
+// The value returned from this function will always be a multiple of encoding.BYTES_PER_SYMBOL
 func GetPaddedDataLength(inputLen uint32) uint32 {
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
 	chunkCount := inputLen / bytesPerChunk

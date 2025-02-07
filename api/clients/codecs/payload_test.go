@@ -17,7 +17,7 @@ func TestPayloadEncoding(t *testing.T) {
 
 	for i := 0; i < iterations; i++ {
 		payload := NewPayload(testRandom.Bytes(testRandom.Intn(1024) + 1))
-		encodedPayload, err := payload.encode()
+		encodedPayload, err := newEncodedPayload(payload)
 		require.NoError(t, err)
 
 		// Decode the encoded data

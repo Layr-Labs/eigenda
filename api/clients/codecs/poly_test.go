@@ -20,7 +20,7 @@ func TestFftEncode(t *testing.T) {
 		originalData := testRandom.Bytes(testRandom.Intn(1024) + 1) // ensure it's not length 0
 
 		payload := NewPayload(originalData)
-		encodedPayload, err := payload.encode()
+		encodedPayload, err := newEncodedPayload(payload)
 		require.NoError(t, err)
 
 		evalPoly, err := encodedPayload.toEvalPoly()

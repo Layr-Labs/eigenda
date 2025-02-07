@@ -17,12 +17,10 @@ type coeffPoly struct {
 	fieldElements []fr.Element
 }
 
-// coeffPolyFromBytes creates a new coeffPoly from bytes. This function performs the necessary checks to guarantee that the
+// coeffPolyFromBytes creates a new polynomial from bytes. This function performs the necessary checks to guarantee that the
 // bytes are well-formed, and returns a new object if they are
 func coeffPolyFromBytes(bytes []byte) (*coeffPoly, error) {
-	paddedBytes := encoding.PadToPowerOfTwo(bytes)
-
-	fieldElements, err := rs.BytesToFieldElements(paddedBytes)
+	fieldElements, err := rs.BytesToFieldElements(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
 	}
@@ -31,27 +29,35 @@ func coeffPolyFromBytes(bytes []byte) (*coeffPoly, error) {
 }
 
 // coeffPolyFromElements creates a new coeffPoly from field elements.
-func coeffPolyFromElements(elements []fr.Element) (*coeffPoly, error) {
-	return &coeffPoly{fieldElements: elements}, nil
+func coeffPolyFromElements(elements []fr.Element) *coeffPoly {
+	return &coeffPoly{fieldElements: elements}
 }
 
 // toEvalPoly converts a coeffPoly to an evalPoly, using the FFT operation
-func (cp *coeffPoly) toEvalPoly() (*evalPoly, error) {
-	maxScale := uint8(math.Log2(float64(len(cp.fieldElements))))
-	fftedElements, err := fft.NewFFTSettings(maxScale).FFT(cp.fieldElements, false)
+func (p *coeffPoly) toEvalPoly() (*evalPoly, error) {
+	// we need to pad to the next power of 2, to be able to take the FFT
+	paddedLength := encoding.NextPowerOf2(len(p.fieldElements))
+	padding := make([]fr.Element, paddedLength-len(p.fieldElements))
+	paddedElements := append(p.fieldElements, padding...)
+
+	maxScale := uint8(math.Log2(float64(len(paddedElements))))
+	fftedElements, err := fft.NewFFTSettings(maxScale).FFT(paddedElements, false)
 	if err != nil {
 		return nil, fmt.Errorf("perform FFT: %w", err)
 	}
 
-	evalPoly, err := evalPolyFromElements(fftedElements)
-	if err != nil {
-		return nil, fmt.Errorf("construct eval poly: %w", err)
-	}
-
-	return evalPoly, nil
+	return evalPolyFromElements(fftedElements), nil
 }
 
 // GetBytes returns the bytes that underlie the polynomial
-func (cp *coeffPoly) getBytes() []byte {
-	return rs.FieldElementsToBytes(cp.fieldElements)
+func (p *coeffPoly) getBytes() []byte {
+	return rs.FieldElementsToBytes(p.fieldElements)
+}
+
+// toEncodedPayload converts a coeffPoly into an encoded payload
+//
+// This conversion entails removing the power-of-2 padding which is added to an encodedPayload when originally creating
+// an evalPoly.
+func (p *coeffPoly) toEncodedPayload() (*encodedPayload, error) {
+	return encodedPayloadFromElements(p.fieldElements)
 }
