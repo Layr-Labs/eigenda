@@ -128,6 +128,10 @@ type (
 		StakePercentage         float64 `json:"stake_percentage"`
 	}
 	OperatorsSigningInfoResponse struct {
+		StartBlock          uint32                 `json:"start_block"`
+		EndBlock            uint32                 `json:"end_block"`
+		StartTimeUnixSec    int64                  `json:"start_time_unix_sec"`
+		EndTimeUnixSec      int64                  `json:"end_time_unix_sec"`
 		OperatorSigningInfo []*OperatorSigningInfo `json:"operator_signing_info"`
 	}
 
@@ -139,6 +143,7 @@ type (
 	}
 
 	OperatorsStakeResponse struct {
+		CurrentBlock         uint32                      `json:"current_block"`
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
@@ -214,7 +219,7 @@ func NewServerV2(
 		indexedChainState: indexedChainState,
 		metrics:           metrics,
 		operatorHandler:   dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
-		metricsHandler:    dataapi.NewMetricsHandler(promClient),
+		metricsHandler:    dataapi.NewMetricsHandler(promClient, dataapi.V2),
 	}
 }
 
@@ -725,7 +730,12 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		errorResponse(c, fmt.Errorf("failed to compute the operators signing info: %w", err))
 		return
 	}
+	startBlock, endBlock := computeBlockRange(attestations)
 	response := OperatorsSigningInfoResponse{
+		StartBlock:          startBlock,
+		EndBlock:            endBlock,
+		StartTimeUnixSec:    startTime.Unix(),
+		EndTimeUnixSec:      endTime.Unix(),
 		OperatorSigningInfo: signingInfo,
 	}
 
@@ -886,12 +896,19 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
 
+	currentBlock, err := s.chainReader.GetCurrentBlockNumber(c.Request.Context())
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to get current block number: %w", err))
+		return
+	}
 	operatorsStakeResponse, err := s.operatorHandler.GetOperatorsStake(c.Request.Context(), operatorId)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
-		errorResponse(c, fmt.Errorf("failed to get operator stake - %s", err))
+		errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
 		return
 	}
+	operatorsStakeResponse.CurrentBlock = currentBlock
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsStake")
 	s.metrics.ObserveLatency("FetchOperatorsStake", time.Since(handlerStart))
@@ -1111,21 +1128,12 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 
 	// Compute the block number range [startBlock, endBlock] (both inclusive) when the
 	// attestations have happened.
-	startBlock := attestations[0].ReferenceBlockNumber
-	endBlock := attestations[0].ReferenceBlockNumber
-	for i := range attestations {
-		if startBlock > attestations[i].ReferenceBlockNumber {
-			startBlock = attestations[i].ReferenceBlockNumber
-		}
-		if endBlock < attestations[i].ReferenceBlockNumber {
-			endBlock = attestations[i].ReferenceBlockNumber
-		}
-	}
+	startBlock, endBlock := computeBlockRange(attestations)
 
 	// Get quorum change events in range [startBlock+1, endBlock].
 	// We don't need the events at startBlock because we'll fetch all active operators and
 	// quorums at startBlock.
-	operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, uint32(startBlock+1), uint32(endBlock))
+	operatorQuorumEvents, err := s.subgraphClient.QueryOperatorQuorumEvent(ctx, startBlock+1, endBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -1144,7 +1152,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 	// increasing and non-overlapping block intervals during which the operator "op" is
 	// registered in quorum "q".
 	operatorQuorumIntervals, _, err := s.operatorHandler.CreateOperatorQuorumIntervals(
-		ctx, operatorList, operatorQuorumEvents, uint32(startBlock), uint32(endBlock),
+		ctx, operatorList, operatorQuorumEvents, startBlock, endBlock,
 	)
 	if err != nil {
 		return nil, err
@@ -1196,17 +1204,24 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", operatorId)
 			}
 
-			// Signing percentage with 2 decimal (e.g. 95.75, which means 95.75%)
+			// Signing percentage with 8 decimal (e.g. 95.75000000, which means 95.75%).
+			// We need 8 decimal because if there is one attestation per second, then we
+			// need to have resolution 1/(3600*24*14), which is 8.26719577e-7. At this
+			// resolution we can capture the signing rate difference caused by 1 unsigned
+			// batch.
 			signingPercentage := math.Round(
-				(float64(numShouldHaveSigned-numFailedToSign)/float64(numShouldHaveSigned))*100*100,
-			) / 100
+				(float64(numShouldHaveSigned-numFailedToSign)/float64(numShouldHaveSigned))*100*1e8,
+			) / 1e8
 
 			stakePercentage := float64(0)
 			if stake, ok := state.Operators[q][op]; ok {
 				totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
-				stakePercentage, _ = new(big.Float).Quo(
+				stakeRatio := new(big.Float).Quo(
 					new(big.Float).SetInt(stake.Stake),
-					totalStake).Float64()
+					totalStake,
+				)
+				stakeRatio.Mul(stakeRatio, big.NewFloat(100))
+				stakePercentage, _ = stakeRatio.Float64()
 			}
 
 			si := &OperatorSigningInfo{
@@ -1244,7 +1259,7 @@ func (s *ServerV2) computeOperatorsSigningInfo(
 // - the operators that joined after startBlock
 func (s *ServerV2) getOperatorsOfInterest(
 	ctx context.Context,
-	startBlock, endBlock uint64,
+	startBlock, endBlock uint32,
 	quorumIDs []uint8,
 	operatorQuorumEvents *dataapi.OperatorQuorumEvents,
 ) (*dataapi.OperatorList, error) {
@@ -1370,6 +1385,23 @@ func computeTotalNumBatchesPerQuorum(attestations []*corev2.Attestation) map[uin
 		}
 	}
 	return numBatchesPerQuorum
+}
+
+func computeBlockRange(attestations []*corev2.Attestation) (uint32, uint32) {
+	if len(attestations) == 0 {
+		return 0, 0
+	}
+	startBlock := attestations[0].ReferenceBlockNumber
+	endBlock := attestations[0].ReferenceBlockNumber
+	for i := range attestations {
+		if startBlock > attestations[i].ReferenceBlockNumber {
+			startBlock = attestations[i].ReferenceBlockNumber
+		}
+		if endBlock < attestations[i].ReferenceBlockNumber {
+			endBlock = attestations[i].ReferenceBlockNumber
+		}
+	}
+	return uint32(startBlock), uint32(endBlock)
 }
 
 func safeAccess(data map[string]map[uint8]int, i string, j uint8) (int, bool) {
