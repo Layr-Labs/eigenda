@@ -133,9 +133,9 @@ func setup(_ *testing.M) {
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
 	accountID3 = crypto.PubkeyToAddress(privateKey3.PublicKey)
-	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
-	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 20, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
@@ -177,12 +177,11 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(1), nil)
+	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
-	reservationPeriod := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -201,11 +200,12 @@ func TestMetererReservations(t *testing.T) {
 	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
-	// overwhelming bin overflow for empty bins
+	reservationPeriod := meterer.GetReservationPeriod(uint64(time.Now().Unix()), mt.ChainPaymentState.GetReservationWindow())
+	// previous reservation period is okay
 	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
-	// overwhelming bin overflow for empty bins
+	// overwhelming bin overflow
 	header = createPaymentHeader(reservationPeriod-1, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
