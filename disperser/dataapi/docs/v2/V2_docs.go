@@ -424,7 +424,52 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/operators/nodeinfo": {
+        "/operators/liveness": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Check operator v2 node liveness",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorLivenessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/node-info": {
             "get": {
                 "produces": [
                     "application/json"
@@ -438,51 +483,6 @@ const docTemplateV2 = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/v2.SemverReportResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/operators/reachability": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Operators"
-                ],
-                "summary": "Operator v2 node reachability check",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Operator ID in hex string [default: all operators if unspecified]",
-                        "name": "operator_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.OperatorPortCheckResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
                         }
                     },
                     "500": {
@@ -1215,25 +1215,8 @@ const docTemplateV2 = `{
         "v2.Metric": {
             "type": "object",
             "properties": {
-                "cost_in_gas": {
-                    "type": "number"
-                },
                 "throughput": {
                     "type": "number"
-                },
-                "total_stake": {
-                    "description": "deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/big.Int"
-                        }
-                    ]
-                },
-                "total_stake_per_quorum": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/big.Int"
-                    }
                 }
             }
         },
@@ -1248,7 +1231,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorPortCheckResponse": {
+        "v2.OperatorLivenessResponse": {
             "type": "object",
             "properties": {
                 "dispersal_online": {

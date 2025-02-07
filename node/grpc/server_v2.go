@@ -140,10 +140,12 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, err
 	}
 
+	stageTimer := time.Now()
 	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download batch: %v", err))
 	}
+	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
 
 	type storeResult struct {
 		keys []kvstore.Key
@@ -151,6 +153,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 	storeChan := make(chan storeResult)
 	go func() {
+		storageStart := time.Now()
 		keys, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
 		if err != nil {
 			storeChan <- storeResult{
@@ -161,13 +164,14 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 
 		s.metrics.ReportStoreChunksRequestSize(size)
-
+		s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
 		storeChan <- storeResult{
 			keys: keys,
 			err:  nil,
 		}
 	}()
 
+	stageTimer = time.Now()
 	err = s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		res := <-storeChan
@@ -178,6 +182,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
 	}
+	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	res := <-storeChan
 	if res.err != nil {
@@ -189,7 +194,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
 	}
 
-	s.metrics.ReportStoreChunksLatency(time.Since(start))
+	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
 
 	return &pb.StoreChunksReply{
 		Signature: sig,

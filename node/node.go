@@ -49,7 +49,7 @@ const (
 	gcPercentageTime = 0.1
 
 	v1CheckPath = "api/v1/operators-info/port-check"
-	v2CheckPath = "api/v2/operators/reachability"
+	v2CheckPath = "api/v2/operators/liveness"
 )
 
 var (

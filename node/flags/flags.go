@@ -294,45 +294,6 @@ var (
 		Value:    units.GiB, // intentionally large for the time being
 	}
 
-	// Test only, DO NOT USE the following flags in production
-
-	// This flag controls whether other test flags can take effect.
-	// By default, it is not test mode.
-	EnableTestModeFlag = cli.BoolFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "enable-test-mode"),
-		Usage:    "Whether to run as test mode. This flag needs to be enabled for other test flags to take effect",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_TEST_MODE"),
-	}
-
-	// Corresponding to the BLOCK_STALE_MEASURE defined onchain in
-	// contracts/src/core/EigenDAServiceManagerStorage.sol
-	// This flag is used to override the value from the chain. The target use case is testing.
-	OverrideBlockStaleMeasureFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "override-block-stale-measure"),
-		Usage:    "The maximum amount of blocks in the past that the service will consider stake amounts to still be valid. This is used to override the value set on chain. <=0 means no override",
-		Required: false,
-		Value:    "-1",
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_BLOCK_STALE_MEASURE"),
-	}
-	// Corresponding to the STORE_DURATION_BLOCKS defined onchain in
-	// contracts/src/core/EigenDAServiceManagerStorage.sol
-	// This flag is used to override the value from the chain. The target use case is testing.
-	OverrideStoreDurationBlocksFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "override-store-duration-blocks"),
-		Usage:    "Unit of measure (in blocks) for which data will be stored for after confirmation. This is used to override the value set on chain. <=0 means no override",
-		Required: false,
-		Value:    "-1",
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
-	}
-	// DO NOT set plain private key in flag in production.
-	// When test mode is enabled, the DA Node will take private BLS key from this flag.
-	TestPrivateBlsFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "test-private-bls"),
-		Usage:    "Test BLS private key for node operator",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TEST_PRIVATE_BLS"),
-	}
 	ClientIPHeaderFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "client-ip-header"),
 		Usage:    "The name of the header used to get the client IP address. If set to empty string, the IP address will be taken from the connection. The rightmost value of the header will be used.",
@@ -404,6 +365,64 @@ var (
 		Value:    ModeV1AndV2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
 	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// TEST FLAGS SECTION
+	//
+	// WARNING: These flags are for testing purposes only.
+	// They must be disabled in production environments as they may:
+	//   - Break protocol requirements
+	//   - Expose sensitive information
+	//   - Bypass security checks
+	//   - Degrade performance
+	/////////////////////////////////////////////////////////////////////////////
+
+	// This flag controls whether other test flags can take effect.
+	// By default, it is not test mode.
+	EnableTestModeFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-test-mode"),
+		Usage:    "Whether to run as test mode. This flag needs to be enabled for other test flags to take effect",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_TEST_MODE"),
+	}
+
+	// Corresponding to the BLOCK_STALE_MEASURE defined onchain in
+	// contracts/src/core/EigenDAServiceManagerStorage.sol
+	// This flag is used to override the value from the chain. The target use case is testing.
+	OverrideBlockStaleMeasureFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-block-stale-measure"),
+		Usage:    "The maximum amount of blocks in the past that the service will consider stake amounts to still be valid. This is used to override the value set on chain. <=0 means no override",
+		Required: false,
+		Value:    "-1",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_BLOCK_STALE_MEASURE"),
+	}
+	// Corresponding to the STORE_DURATION_BLOCKS defined onchain in
+	// contracts/src/core/EigenDAServiceManagerStorage.sol
+	// This flag is used to override the value from the chain. The target use case is testing.
+	OverrideStoreDurationBlocksFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "override-store-duration-blocks"),
+		Usage:    "Unit of measure (in blocks) for which data will be stored for after confirmation. This is used to override the value set on chain. <=0 means no override",
+		Required: false,
+		Value:    "-1",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
+	}
+	// DO NOT set plain private key in flag in production.
+	// When test mode is enabled, the DA Node will take private BLS key from this flag.
+	TestPrivateBlsFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "test-private-bls"),
+		Usage:    "Test BLS private key for node operator",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TEST_PRIVATE_BLS"),
+	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// END TEST FLAGS SECTION
+	//
+	// If you need to add new test flags:
+	// 1. Place them within this section above
+	// 2. Document their purpose and impact
+	/////////////////////////////////////////////////////////////////////////////
+
 )
 
 var requiredFlags = []cli.Flag{
