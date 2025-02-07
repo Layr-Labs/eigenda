@@ -4,13 +4,12 @@ import (
 	"fmt"
 )
 
-type BlobEncodingVersion byte
+type PayloadEncodingVersion byte
 
 const (
 	// PayloadEncodingVersion0 entails a 32 byte header = [0x00, version byte, big-endian uint32 len of payload, 0x00, 0x00,...]
 	// followed by the encoded data [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
-	// NOTE: this encoding will soon be updated, such that the result will be padded to align to 32 bytes
-	PayloadEncodingVersion0 BlobEncodingVersion = 0x0
+	PayloadEncodingVersion0 PayloadEncodingVersion = 0x0
 )
 
 type BlobCodec interface {
@@ -18,7 +17,7 @@ type BlobCodec interface {
 	EncodeBlob(rawData []byte) ([]byte, error)
 }
 
-func BlobEncodingVersionToCodec(version BlobEncodingVersion) (BlobCodec, error) {
+func BlobEncodingVersionToCodec(version PayloadEncodingVersion) (BlobCodec, error) {
 	switch version {
 	case PayloadEncodingVersion0:
 		return DefaultBlobCodec{}, nil
@@ -34,7 +33,7 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 	// version byte is stored in [1], because [0] is always 0 to ensure the codecBlobHeader is a valid bn254 element
 	// see https://github.com/Layr-Labs/eigenda/blob/master/api/clients/codecs/default_blob_codec.go#L21
 	// TODO: we should prob be working over a struct with methods such as GetBlobEncodingVersion() to prevent index errors
-	version := BlobEncodingVersion(data[1])
+	version := PayloadEncodingVersion(data[1])
 	codec, err := BlobEncodingVersionToCodec(version)
 	if err != nil {
 		return nil, err
@@ -50,7 +49,7 @@ func GenericDecodeBlob(data []byte) ([]byte, error) {
 
 // CreateCodec creates a new BlobCodec based on the defined polynomial form of payloads, and the desired
 // BlobEncodingVersion
-func CreateCodec(payloadPolynomialForm PolynomialForm, version BlobEncodingVersion) (BlobCodec, error) {
+func CreateCodec(payloadPolynomialForm PolynomialForm, version PayloadEncodingVersion) (BlobCodec, error) {
 	lowLevelCodec, err := BlobEncodingVersionToCodec(version)
 	if err != nil {
 		return nil, fmt.Errorf("create low level codec: %w", err)

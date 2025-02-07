@@ -14,7 +14,7 @@ type PayloadClientConfig struct {
 	// The payload encoding version to use when encoding payload bytes
 	//
 	// This is the version that is put into the header of the EncodedPayload.
-	PayloadEncodingVersion codecs.BlobEncodingVersion
+	PayloadEncodingVersion codecs.PayloadEncodingVersion
 
 	// The address of the EigenDACertVerifier contract
 	EigenDACertVerifierAddr string
