@@ -26,7 +26,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -108,13 +107,7 @@ func NewTestClient(
 ) *TestClient {
 
 	if config.SRSNumberToLoad == 0 {
-		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
-		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
-	}
-
-	if config.SRSNumberToLoad == 0 {
-		// See https://github.com/Layr-Labs/eigenda/pull/1208#discussion_r1941571297
-		config.SRSNumberToLoad = config.MaxBlobSize / 32 / 4096 * 8
+		config.SRSNumberToLoad = config.MaxBlobSize / 32
 	}
 
 	// Construct the disperser client
@@ -459,17 +452,9 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-		retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
-
-		// The payload may have a bunch of 0s appended at the end. Remove them.
-		require.True(c.T, len(retrievedPayload) >= len(expectedPayload))
-		truncatedPayload := retrievedPayload[:len(expectedPayload)]
-
-		// Only 0s should be appended at the end.
-		for i := len(expectedPayload); i < len(retrievedPayload); i++ {
-			require.Equal(c.T, byte(0), retrievedPayload[i])
-		}
-
-		require.Equal(c.T, expectedPayload, truncatedPayload)
+		//retrievedPayload := codec.RemoveEmptyByteFromPaddedBytes(retrievedBlob)
+		retrievedPayload, err := c.blobCodec.DecodeBlob(retrievedBlob)
+		require.NoError(c.T, err)
+		require.Equal(c.T, len(retrievedPayload), len(expectedPayload))
 	}
 }

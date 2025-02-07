@@ -8,7 +8,7 @@
   ],
   "BLSOperatorStateRetrieverAddr": "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
   "EigenDAServiceManagerAddr":     "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
-  "EigenDACertVerifierAddress":    "0xe2C7AfB3c47B800b439b0a3d8EA40ca79759B245",
+  "EigenDACertVerifierAddress":    "0xA6be9E1425CD1A49c1b5288903C54E807604d8DC",
   "SubgraphURL": "https://subgraph.satsuma-prod.com/51caed8fa9cb/eigenlabs/eigenda-operator-state-preprod-holesky/version/v0.7.0/api",
   "SRSOrder": 268435456,
   "MaxBlobSize": 16777216,
