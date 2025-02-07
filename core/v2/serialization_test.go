@@ -54,6 +54,23 @@ func TestBlobKeyFromHeader(t *testing.T) {
 	assert.NoError(t, err)
 	// 0x2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a has verified in solidity  with chisel
 	assert.Equal(t, "2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a", blobKey.Hex())
+
+	// same blob key should be generated for the blob header with shuffled quorum numbers
+	bh2 := v2.BlobHeader{
+		BlobVersion:     0,
+		BlobCommitments: commitments,
+		QuorumNumbers:   []core.QuorumID{1, 0},
+		PaymentMetadata: core.PaymentMetadata{
+			AccountID:         "0x123",
+			ReservationPeriod: 5,
+			CumulativePayment: big.NewInt(100),
+		},
+		Salt: 42,
+	}
+
+	blobKey2, err := bh2.BlobKey()
+	assert.NoError(t, err)
+	assert.Equal(t, blobKey2.Hex(), blobKey.Hex())
 }
 
 func TestBatchHeaderHash(t *testing.T) {

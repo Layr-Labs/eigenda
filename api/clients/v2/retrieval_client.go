@@ -22,7 +22,14 @@ import (
 // To retrieve a blob from the relay, use RelayClient instead.
 type RetrievalClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
-	GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
+	GetBlob(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		blobVersion corev2.BlobVersion,
+		blobCommitments encoding.BlobCommitments,
+		referenceBlockNumber uint64,
+		quorumID core.QuorumID,
+	) ([]byte, error)
 }
 
 type retrievalClient struct {
@@ -32,6 +39,8 @@ type retrievalClient struct {
 	verifier          encoding.Verifier
 	numConnections    int
 }
+
+var _ RetrievalClient = &retrievalClient{}
 
 // NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
@@ -50,18 +59,17 @@ func NewRetrievalClient(
 	}
 }
 
-func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
-	if blobHeader == nil {
-		return nil, errors.New("blob header is nil")
-	}
+func (r *retrievalClient) GetBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobVersion corev2.BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	referenceBlockNumber uint64,
+	quorumID core.QuorumID,
+) ([]byte, error) {
 
-	blobKey, err := blobHeader.BlobKey()
-	if err != nil {
-		return nil, err
-	}
-
-	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
-	err = r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
+	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
@@ -80,12 +88,12 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 		return nil, err
 	}
 
-	blobParam, ok := blobVersions[blobHeader.BlobVersion]
+	blobParam, ok := blobVersions[blobVersion]
 	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobHeader.BlobVersion)
+		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
 	}
 
-	encodingParams, err := blobHeader.GetEncodingParams(blobParam)
+	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParam)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +133,7 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 			assignmentIndices[i] = uint(index)
 		}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobHeader.BlobCommitments, encodingParams)
+		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
 			continue
@@ -145,7 +153,7 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 		chunks,
 		indices,
 		encodingParams,
-		uint64(blobHeader.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
+		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
 	)
 }
 
@@ -157,10 +165,20 @@ func (r *retrievalClient) getChunksFromOperator(
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
 ) {
+
+	// TODO (cody-littley): this client should be refactored to make requests for smaller quantities of data
+	//  in order to avoid hitting the max message size limit. This will allow us to have much smaller
+	//  message size limits.
+
+	maxBlobSize := 16 * units.MiB // maximum size of the original blob
+	encodingRate := 8             // worst case scenario if one validator has 100% stake
+	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
+	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
+
 	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(16 /* max blob size */ *8 /* encoding rate */ *units.MiB)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
 	defer func() {
 		err := conn.Close()

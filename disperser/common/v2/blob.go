@@ -89,3 +89,12 @@ type BlobMetadata struct {
 
 	*encoding.FragmentInfo
 }
+
+// BlobAttestationInfo describes the attestation information for a blob regarding to the batch
+// that the blob belongs to and the validators' attestation to that batch.
+//
+// Note: for a blob, there will be at most one attested/signed batch that contains the blob.
+type BlobAttestationInfo struct {
+	InclusionInfo *corev2.BlobInclusionInfo
+	Attestation   *corev2.Attestation
+}

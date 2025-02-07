@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -663,15 +664,19 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
 	ctx := context.Background()
 
-	// Use a fixed "now" so all attestations will deterministically fall in just one
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
+	// Adjust "now" so all attestations will deterministically fall in just one
 	// bucket.
-	timestamp := "2025-01-21T15:04:05Z"
-	parsedTime, err := time.Parse(time.RFC3339, timestamp)
-	require.NoError(t, err)
-	now := uint64(parsedTime.UnixNano())
+	startBucket, endBucket := blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
+	if startBucket < endBucket {
+		now -= uint64(time.Hour.Nanoseconds())
+		firstBatchTs = now - uint64(5*time.Minute.Nanoseconds())
+	}
+	startBucket, endBucket = blobstore.GetAttestedAtBucketIDRange(firstBatchTs-1, now)
+	require.Equal(t, startBucket, endBucket)
 
 	numBatches := 240
-	firstBatchTs := now - uint64(5*time.Minute.Nanoseconds())
 	nanoSecsPerBatch := uint64(time.Second.Nanoseconds()) // 1 batch per second
 
 	// Create attestations for testing
@@ -1038,6 +1043,81 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID2.Hex()},
+		},
+	})
+}
+
+func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
+	ctx := context.Background()
+	blobKey := corev2.BlobKey{1, 1, 1}
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 1024,
+	}
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
+	assert.NoError(t, err)
+
+	inclusionInfo := &corev2.BlobInclusionInfo{
+		BatchHeader:    batchHeader,
+		BlobKey:        blobKey,
+		BlobIndex:      10,
+		InclusionProof: []byte("proof"),
+	}
+	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
+	assert.NoError(t, err)
+
+	// Test 1: the batch isn't signed yet, so there is no attestation info
+	_, err = blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
+	assert.Error(t, err)
+	assert.True(t, strings.Contains(err.Error(), "no attestation info found"))
+
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	// Test 2: the batch is signed, so we can fetch blob's attestation info
+	blobAttestationInfo, err := blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
+	require.NoError(t, err)
+	assert.Equal(t, inclusionInfo, blobAttestationInfo.InclusionInfo)
+	assert.Equal(t, attestation, blobAttestationInfo.Attestation)
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 		},
 	})
 }

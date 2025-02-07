@@ -76,6 +76,7 @@ var (
 
 	dynamoClient dynamodb.Client
 
+	serverVersion     = uint(2)
 	mockLogger        = testutils.GetLogger()
 	blobstore         = inmem.NewBlobStore()
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
@@ -103,7 +104,7 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
 	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
 		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
@@ -223,7 +224,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
@@ -594,22 +595,20 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchBlobInclusionInfoHandler(t *testing.T) {
+func TestFetchBlobAttestationInfo(t *testing.T) {
+	ctx := context.Background()
 	r := setUpRouter()
 
-	// Set up blob inclusion info in metadata store
+	// Set up blob inclusion info
 	blobHeader := makeBlobHeaderV2(t)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
-
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 100,
 	}
-	batchHeaderHash, err := batchHeader.Hash()
-	require.NoError(t, err)
-
-	ctx := context.Background()
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -621,13 +620,69 @@ func TestFetchBlobInclusionInfoHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/inclusion-info", testDataApiServerV2.FetchBlobInclusionInfoHandler)
+	r.GET("/v2/blobs/:blob_key/attestation-info", testDataApiServerV2.FetchBlobAttestationInfo)
 
-	reqStr := fmt.Sprintf("/v2/blobs/%s/inclusion-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.BlobInclusionInfoResponse](t, w)
+	t.Run("no attestation found", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+	})
 
-	assert.Equal(t, inclusionInfo.InclusionProof, response.InclusionInfo.InclusionProof)
+	// Set up attestation
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	t.Run("found attestation info", func(t *testing.T) {
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		w := executeRequest(t, r, http.MethodGet, reqStr)
+		response := decodeResponseBody[serverv2.BlobAttestationInfoResponse](t, w)
+
+		assert.Equal(t, blobKey.Hex(), response.BlobKey)
+		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
+		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, attestation, response.Attestation)
+	})
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+	})
 }
 
 func TestFetchBatchHandlerV2(t *testing.T) {
