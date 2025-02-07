@@ -389,19 +389,8 @@ definitions:
     type: object
   v2.Metric:
     properties:
-      cost_in_gas:
-        type: number
       throughput:
         type: number
-      total_stake:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
-          frontend is updated.'
-      total_stake_per_quorum:
-        additionalProperties:
-          $ref: '#/definitions/big.Int'
-        type: object
     type: object
   v2.OperatorDispersalResponses:
     properties:
@@ -410,7 +399,7 @@ definitions:
           $ref: '#/definitions/v2.DispersalResponse'
         type: array
     type: object
-  v2.OperatorPortCheckResponse:
+  v2.OperatorLivenessResponse:
     properties:
       dispersal_online:
         type: boolean
@@ -800,7 +789,36 @@ paths:
       summary: Fetch operator attestation response for a batch
       tags:
       - Operators
-  /operators/nodeinfo:
+  /operators/liveness:
+    get:
+      parameters:
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorLivenessResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Check operator v2 node liveness
+      tags:
+      - Operators
+  /operators/node-info:
     get:
       produces:
       - application/json
@@ -814,35 +832,6 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Active operator semver
-      tags:
-      - Operators
-  /operators/reachability:
-    get:
-      parameters:
-      - description: 'Operator ID in hex string [default: all operators if unspecified]'
-        in: query
-        name: operator_id
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.OperatorPortCheckResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-      summary: Operator v2 node reachability check
       tags:
       - Operators
   /operators/signing-info:
