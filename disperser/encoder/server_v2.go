@@ -2,6 +2,7 @@ package encoder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -112,7 +113,7 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 	// Validate request first
 	blobKey, encodingParams, err := s.validateAndParseRequest(req)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	blobSize := req.GetBlobSize()
 	sizeBucket := common.BlobSizeBucket(int(blobSize))
@@ -208,36 +209,36 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 	)
 
 	if req == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "request cannot be nil")
+		return blobKey, params, errors.New("request cannot be nil")
 	}
 
 	if req.BlobKey == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "blob key cannot be nil")
+		return blobKey, params, errors.New("blob key cannot be nil")
 	}
 
 	if req.EncodingParams == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "encoding parameters cannot be nil")
+		return blobKey, params, errors.New("encoding parameters cannot be nil")
 	}
 
 	// Since these are uint32 in the proto, we only need to check for positive values
 	if req.EncodingParams.ChunkLength == 0 {
-		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be greater than zero")
+		return blobKey, params, errors.New("chunk length must be greater than zero")
 	}
 	if req.EncodingParams.ChunkLength&(req.EncodingParams.ChunkLength-1) != 0 {
-		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be power of 2")
+		return blobKey, params, errors.New("chunk length must be power of 2")
 	}
 
 	if req.EncodingParams.NumChunks == 0 {
-		return blobKey, params, status.Error(codes.InvalidArgument, "number of chunks must be greater than zero")
+		return blobKey, params, errors.New("number of chunks must be greater than zero")
 	}
 
 	if req.BlobSize == 0 || uint64(encoding.GetBlobLength(uint(req.BlobSize))) > req.EncodingParams.ChunkLength*req.EncodingParams.NumChunks {
-		return blobKey, params, status.Error(codes.InvalidArgument, "blob size is invalid")
+		return blobKey, params, errors.New("blob size is invalid")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(req.BlobKey)
 	if err != nil {
-		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid blob key: %v", err)
+		return blobKey, params, fmt.Errorf("invalid blob key: %v", err)
 	}
 
 	// Convert proto EncodingParams to our domain type
@@ -248,7 +249,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 
 	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
 	if err != nil {
-		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid encoding parameters: %v", err)
+		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}
 
 	return blobKey, params, nil
