@@ -135,7 +135,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to get account ID: %w", err)
 	}
 	accountId := gethcommon.HexToAddress(signerAccountId)
-	fmt.Printf("Account ID: %s\n", accountId.String())
+	logger.Infof("Account ID: %s\n", accountId.String())
 
 	g1Path, err := config.path(SRSPathG1)
 	if err != nil {
@@ -408,7 +408,7 @@ func (c *TestClient) DispersePayload(
 	payload []byte,
 	salt uint32) (*verification.EigenDACert, error) {
 
-	fmt.Printf("Dispersing payload of length %d\n", len(payload))
+	c.Logger.Debugf("Dispersing payload of length %d\n", len(payload))
 	start := time.Now()
 
 	cert, err := c.PayloadDisperser.SendPayload(ctx, payload, salt)
@@ -502,7 +502,7 @@ func (c *TestClient) ReadBlobFromRelays(
 	for _, relayID := range relayKeys {
 		start := time.Now()
 
-		fmt.Printf("Reading blob from relay %d\n", relayID)
+		c.Logger.Debugf("Reading blob from relay %d\n", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay: %w", err)
@@ -538,7 +538,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	for _, quorumID := range quorums {
-		fmt.Printf("Reading blob from validators for quorum %d\n", quorumID)
+		c.Logger.Debugf("Reading blob from validators for quorum %d\n", quorumID)
 
 		start := time.Now()
 

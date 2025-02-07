@@ -10,7 +10,7 @@ import (
 	"github.com/docker/go-units"
 )
 
-func TestLightLoad(t *testing.T) {
+func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetTestClient(t, []core.QuorumID{0, 1})
 

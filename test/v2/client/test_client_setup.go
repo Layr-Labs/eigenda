@@ -83,12 +83,6 @@ func GetClient(quorums []core.QuorumID) (*TestClient, error) {
 	}
 
 	if len(clientMap) == 0 {
-		// only do this stuff once
-		err = setupFilesystem(testConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
-		}
-
 		var loggerConfig common.LoggerConfig
 		if os.Getenv("CI") != "" {
 			loggerConfig = common.DefaultLoggerConfig()
@@ -100,8 +94,13 @@ func GetClient(quorums []core.QuorumID) (*TestClient, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create logger: %w", err)
 		}
-
 		logger = testLogger
+
+		// only do this stuff once
+		err = setupFilesystem(logger, testConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
+		}
 
 		testMetrics := newTestClientMetrics(logger, config.MetricsPort)
 		metrics = testMetrics
@@ -124,7 +123,7 @@ func skipInCI(t *testing.T) {
 	}
 }
 
-func setupFilesystem(config *TestClientConfig) error {
+func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	// Create the test data directory if it does not exist
 	err := os.MkdirAll(config.TestDataPath, 0755)
 	if err != nil {
@@ -160,7 +159,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Info("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
@@ -185,7 +184,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Info("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
@@ -210,7 +209,7 @@ func setupFilesystem(config *TestClientConfig) error {
 		command[0] = "wget"
 		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
 		command[2] = "--output-document=" + filePath
-		fmt.Printf("executing %s\n", command)
+		logger.Info("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
 		cmd.Stdout = os.Stdout
