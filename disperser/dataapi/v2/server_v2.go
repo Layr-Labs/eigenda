@@ -373,10 +373,10 @@ func (s *ServerV2) Shutdown() error {
 //	@Summary	Fetch blob feed
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO  8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval			query		int		false	"Fetch blobs starting from an         interval (in seconds) before the end time [default: 3600]"
-//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the        pagination token (exclusively). Overrides the interval param if specified [default: empty]"
-//	@Param		limit				query		int		false	"The maximum number of blobs to       fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
+//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
+//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
 //	@Success	200					{object}	BlobFeedResponse
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
@@ -987,7 +987,7 @@ func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 //	@Tags		Operators
 //	@Produce	json
 //	@Param		operator_id	query		string	false	"Operator ID in hex string [default: all operators if unspecified]"
-//	@Success	200			{object}    OperatorLivenessResponse
+//	@Success	200			{object}	OperatorLivenessResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
