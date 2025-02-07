@@ -2,8 +2,11 @@ package load
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/docker/go-units"
 	"math/rand"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -11,17 +14,16 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
 )
 
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
-	// The desired number of bytes per second to write.
-	BytesPerSecond uint64
-	// The average size of the blobs to write.
-	AverageBlobSize uint64
-	// The standard deviation of the blob size.
-	BlobSizeStdDev uint64
+	// The desired number of megabytes bytes per second to write.
+	MBPerSecond float64
+	// The average size of the blobs to write, in megabytes.
+	AverageBlobSizeMB float64
+	// The standard deviation of the blob size, in megabytes.
+	BlobSizeStdDev float64
 	// By default, this utility reads each blob back from each relay once. The number of
 	// reads per relay is multiplied by this factor. For example, If this is set to 3,
 	// then each blob is read back from each relay 3 times.
@@ -35,20 +37,6 @@ type LoadGeneratorConfig struct {
 	DispersalTimeout time.Duration
 	// The quorums to use for the load test.
 	Quorums []core.QuorumID
-}
-
-// DefaultLoadGeneratorConfig returns the default configuration for the load generator.
-func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
-	return &LoadGeneratorConfig{
-		BytesPerSecond:             10 * units.MiB,
-		AverageBlobSize:            1 * units.MiB,
-		BlobSizeStdDev:             0.5 * units.MiB,
-		RelayReadAmplification:     3,
-		ValidatorReadAmplification: 3,
-		MaxParallelism:             10,
-		DispersalTimeout:           5 * time.Minute,
-		Quorums:                    []core.QuorumID{0, 1},
-	}
 }
 
 type LoadGenerator struct {
@@ -73,14 +61,38 @@ type LoadGenerator struct {
 	metrics *loadGeneratorMetrics
 }
 
+// ReadConfigFile loads a LoadGeneratorConfig from a file.
+func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
+	configFile, err := client.ResolveTildeInPath(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
+	}
+	configFileBytes, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	config := &LoadGeneratorConfig{}
+	err = json.Unmarshal(configFileBytes, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	return config, nil
+}
+
 // NewLoadGenerator creates a new LoadGenerator.
 func NewLoadGenerator(
 	config *LoadGeneratorConfig,
 	client *client.TestClient,
 	rand *random.TestRandom) *LoadGenerator {
 
-	submissionFrequency := config.BytesPerSecond / config.AverageBlobSize
-	submissionPeriod := time.Second / time.Duration(submissionFrequency)
+	bytesPerSecond := config.MBPerSecond * units.MiB
+	averageBlobSize := config.AverageBlobSizeMB * units.MiB
+
+	submissionFrequency := bytesPerSecond / averageBlobSize
+	submissionPeriod := 1 / submissionFrequency
+	submissionPeriodAsDuration := time.Duration(submissionPeriod * float64(time.Second))
 
 	parallelismLimiter := make(chan struct{}, config.MaxParallelism)
 
@@ -95,7 +107,7 @@ func NewLoadGenerator(
 		config:             config,
 		client:             client,
 		rand:               rand,
-		submissionPeriod:   submissionPeriod,
+		submissionPeriod:   submissionPeriodAsDuration,
 		parallelismLimiter: parallelismLimiter,
 		alive:              atomic.Bool{},
 		finishedChan:       make(chan struct{}),
@@ -145,8 +157,8 @@ func (l *LoadGenerator) submitBlob() {
 	// TODO: failure metrics
 
 	payloadSize := int(l.rand.BoundedGaussian(
-		float64(l.config.AverageBlobSize),
-		float64(l.config.BlobSizeStdDev),
+		l.config.AverageBlobSizeMB*units.MiB,
+		l.config.BlobSizeStdDev*units.MiB,
 		1.0,
 		float64(l.client.Config.MaxBlobSize+1)))
 	payload := l.rand.Bytes(payloadSize)

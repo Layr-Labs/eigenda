@@ -24,6 +24,14 @@ var (
 	metrics          *testClientMetrics
 )
 
+func SetTargetConfigFile(file string) {
+	clientLock.Lock()
+	defer clientLock.Unlock()
+
+	targetConfigFile = file
+	clientMap = make(map[string]*TestClient)
+}
+
 // GetConfig returns a TestClientConfig instance, creating one if it does not exist.
 func GetConfig() (*TestClientConfig, error) {
 	configLock.Lock()

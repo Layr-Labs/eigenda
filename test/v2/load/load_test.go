@@ -1,23 +1,23 @@
 package load
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
 )
+
+const targetConfigFile = "../config/load/100kb_s-1mb-3x.json"
 
 func TestLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetTestClient(t, []core.QuorumID{0, 1})
 
-	config := DefaultLoadGeneratorConfig()
-	config.AverageBlobSize = 100 * units.KiB
-	config.BlobSizeStdDev = 50 * units.KiB
-	config.BytesPerSecond = 100 * units.KiB
+	config, err := ReadConfigFile(targetConfigFile)
+	require.NoError(t, err)
 
 	generator := NewLoadGenerator(config, c, rand)
 
