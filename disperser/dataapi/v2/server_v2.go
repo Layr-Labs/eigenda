@@ -28,7 +28,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
 	swaggerfiles "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
 )
@@ -384,14 +383,10 @@ func (s *ServerV2) Shutdown() error {
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/feed [get]
 func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlobFeed", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
+	handlerStart := time.Now()
 	var err error
 
-	now := time.Now()
+	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
 	endTime := now
@@ -489,6 +484,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeed")
+	s.metrics.ObserveLatency("FetchBlobFeed", time.Since(handlerStart))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -504,7 +500,8 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key} [get]
 func (s *ServerV2) FetchBlob(c *gin.Context) {
-	start := time.Now()
+	handlerStart := time.Now()
+
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlob")
@@ -531,7 +528,7 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		BlobSizeBytes: metadata.BlobSize,
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
-	s.metrics.ObserveLatency("FetchBlob", float64(time.Since(start).Milliseconds()))
+	s.metrics.ObserveLatency("FetchBlob", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -548,7 +545,8 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key}/certificate [get]
 func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
-	start := time.Now()
+	handlerStart := time.Now()
+
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobCertificate")
@@ -565,7 +563,7 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 		Certificate: cert,
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobCertificate")
-	s.metrics.ObserveLatency("FetchBlobCertificate", float64(time.Since(start).Milliseconds()))
+	s.metrics.ObserveLatency("FetchBlobCertificate", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -582,7 +580,7 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key}/attestation-info [get]
 func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
-	start := time.Now()
+	handlerStart := time.Now()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobAttestationInfo")
@@ -612,7 +610,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
-	s.metrics.ObserveLatency("FetchBlobAttestationInfo", float64(time.Since(start).Milliseconds()))
+	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -632,14 +630,10 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 //	@Failure	500				{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/signing-info [get]
 func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorSigningInfo", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
+	handlerStart := time.Now()
 	var err error
 
-	now := time.Now()
+	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
 	endTime := now
@@ -736,6 +730,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorSigningInfo")
+	s.metrics.ObserveLatency("FetchOperatorSigningInfo", time.Since(handlerStart))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -753,14 +748,10 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/batches/feed [get]
 func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBatchFeed", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
-
+	handlerStart := time.Now()
 	var err error
 
-	now := time.Now()
+	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
 	endTime := now
@@ -833,6 +824,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 		Batches: batches,
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatchFeed")
+	s.metrics.ObserveLatency("FetchBatchFeed", time.Since(now))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -848,7 +840,8 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatch(c *gin.Context) {
-	start := time.Now()
+	handlerStart := time.Now()
+
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
 	if err != nil {
@@ -871,7 +864,7 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		},
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
-	s.metrics.ObserveLatency("FetchBatch", float64(time.Since(start).Milliseconds()))
+	s.metrics.ObserveLatency("FetchBatch", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, batchResponse)
 }
@@ -888,10 +881,7 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/stake [get]
 func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorsStake", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
@@ -904,6 +894,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsStake")
+	s.metrics.ObserveLatency("FetchOperatorsStake", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorsStakeAge))
 	c.JSON(http.StatusOK, operatorsStakeResponse)
 }
@@ -917,10 +908,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/nodeinfo [get]
 func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorsNodeInfo", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
 	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
@@ -928,6 +916,9 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsNodeInfo")
 		errorResponse(c, err)
 	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsNodeInfo")
+	s.metrics.ObserveLatency("FetchOperatorsNodeInfo", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, report)
 }
@@ -945,10 +936,7 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/{batch_header_hash} [get]
 func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorsResponses", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
@@ -988,6 +976,7 @@ func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 		Responses: operatorResponses,
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsResponses")
+	s.metrics.ObserveLatency("FetchOperatorsResponses", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
 	c.JSON(http.StatusOK, response)
 }
@@ -1004,10 +993,7 @@ func (s *ServerV2) FetchOperatorsResponses(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators/reachability [get]
 func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
@@ -1024,6 +1010,9 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
+
+	s.metrics.IncrementSuccessfulRequestNum("OperatorPortCheck")
+	s.metrics.ObserveLatency("OperatorPortCheck", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
 	c.JSON(http.StatusOK, portCheckResponse)
 }
@@ -1041,12 +1030,9 @@ func (s *ServerV2) CheckOperatorsReachability(c *gin.Context) {
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/summary  [get]
 func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetricsSummary", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
-	now := time.Now()
+	now := handlerStart
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
 	if err != nil || start == 0 {
 		start = now.Add(-time.Hour * 1).Unix()
@@ -1069,6 +1055,7 @@ func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsSummary")
+	s.metrics.ObserveLatency("FetchMetricsSummary", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxMetricAge))
 	c.JSON(http.StatusOK, metricSummary)
 }
@@ -1086,12 +1073,9 @@ func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/timeseries/throughput  [get]
 func (s *ServerV2) FetchMetricsThroughputTimeseries(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetricsThroughputTimeseries", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
 
-	now := time.Now()
+	now := handlerStart
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
 	if err != nil || start == 0 {
 		start = now.Add(-time.Hour * 1).Unix()
@@ -1110,6 +1094,7 @@ func (s *ServerV2) FetchMetricsThroughputTimeseries(c *gin.Context) {
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsThroughputTimeseries")
+	s.metrics.ObserveLatency("FetchMetricsThroughputTimeseries", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxThroughputAge))
 	c.JSON(http.StatusOK, ths)
 }

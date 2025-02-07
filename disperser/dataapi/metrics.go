@@ -118,8 +118,8 @@ func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort stri
 }
 
 // ObserveLatency observes the latency of a stage in 'stage
-func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
-	g.Latency.WithLabelValues(method).Observe(latencyMs)
+func (g *Metrics) ObserveLatency(method string, duration time.Duration) {
+	g.Latency.WithLabelValues(method).Observe(float64(duration.Milliseconds()))
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests
