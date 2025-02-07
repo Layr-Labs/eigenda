@@ -43,7 +43,7 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 
 	// 2 - create prover (if applicable)
 
-	var kzgProver *prover.Prover
+	var kzgProver encoding.Prover
 	if kzgConfig != nil {
 		if encoderCfg == nil {
 			encoderCfg = encoding.DefaultConfig()
