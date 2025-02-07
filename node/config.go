@@ -212,7 +212,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			TLSCertFilePath:  ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
 			CerberusAPIKey:   blsSignerAPIKey,
 		}
-	} else {
+	} else if testMode && ctx.GlobalString(flags.TestPrivateBlsFlag.Name) != "" {
 		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
 		blsSignerConfig = blssignerTypes.SignerConfig{
 			SignerType: blssignerTypes.PrivateKey,
