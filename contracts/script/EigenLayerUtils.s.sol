@@ -9,7 +9,7 @@ import "forge-std/StdJson.sol";
 contract EigenLayerUtils {
     function _allocate(IERC20 token, address[] memory tos, uint256[] memory amounts) internal {
         for (uint256 i = 0; i < tos.length; i++) {
-            if(token == IERC20(address(0))) {
+            if (token == IERC20(address(0))) {
                 payable(tos[i]).transfer(amounts[i]);
             } else {
                 token.transfer(tos[i], amounts[i]);

@@ -8,14 +8,14 @@ import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
 struct QuorumBlobParam {
     uint8 quorumNumber;
     uint8 adversaryThresholdPercentage;
-    uint8 confirmationThresholdPercentage; 
-    uint32 chunkLength; 
+    uint8 confirmationThresholdPercentage;
+    uint32 chunkLength;
 }
 
 struct BlobHeader {
-    BN254.G1Point commitment; 
-    uint32 dataLength; 
-    QuorumBlobParam[] quorumBlobParams; 
+    BN254.G1Point commitment;
+    uint32 dataLength;
+    QuorumBlobParam[] quorumBlobParams;
 }
 
 struct ReducedBatchHeader {
@@ -25,15 +25,15 @@ struct ReducedBatchHeader {
 
 struct BatchHeader {
     bytes32 blobHeadersRoot;
-    bytes quorumNumbers; 
-    bytes signedStakeForQuorums; 
+    bytes quorumNumbers;
+    bytes signedStakeForQuorums;
     uint32 referenceBlockNumber;
 }
-    
+
 struct BatchMetadata {
-    BatchHeader batchHeader; 
-    bytes32 signatoryRecordHash; 
-    uint32 confirmationBlockNumber; 
+    BatchHeader batchHeader;
+    bytes32 signatoryRecordHash;
+    uint32 confirmationBlockNumber;
 }
 
 struct BlobVerificationProof {
@@ -114,14 +114,14 @@ struct Attestation {
 ///////////////////////// SIGNATURE VERIFIER ///////////////////////////////
 
 struct NonSignerStakesAndSignature {
-    uint32[] nonSignerQuorumBitmapIndices; 
-    BN254.G1Point[] nonSignerPubkeys; 
-    BN254.G1Point[] quorumApks; 
-    BN254.G2Point apkG2; 
-    BN254.G1Point sigma; 
-    uint32[] quorumApkIndices; 
-    uint32[] totalStakeIndices; 
-    uint32[][] nonSignerStakeIndices; 
+    uint32[] nonSignerQuorumBitmapIndices;
+    BN254.G1Point[] nonSignerPubkeys;
+    BN254.G1Point[] quorumApks;
+    BN254.G2Point apkG2;
+    BN254.G1Point sigma;
+    uint32[] quorumApkIndices;
+    uint32[] totalStakeIndices;
+    uint32[][] nonSignerStakeIndices;
 }
 
 struct QuorumStakeTotals {
@@ -132,6 +132,6 @@ struct QuorumStakeTotals {
 struct CheckSignaturesIndices {
     uint32[] nonSignerQuorumBitmapIndices;
     uint32[] quorumApkIndices;
-    uint32[] totalStakeIndices;  
+    uint32[] totalStakeIndices;
     uint32[][] nonSignerStakeIndices;
 }
