@@ -37,3 +37,26 @@ jobs:
       - name: Run snapshot
         run: forge snapshot
         working-directory: ./contracts
+
+## This check ensures that any modifications made to contract storage are caught loudly
+## in CI
+  validate-storage:
+    name: Storage mapping validation
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install forge dependencies
+        run: forge install
+        working-directory: ./contracts
+
+      - name: Run validation script
+        run: ./storage-verify.sh
+        working-directory: ./contracts
