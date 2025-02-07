@@ -175,42 +175,42 @@
         
           
           <li>
-            <a href="#node%2fv2%2fnode_v2.proto">node/v2/node_v2.proto</a>
+            <a href="#validator%2fnode_v2.proto">validator/node_v2.proto</a>
             <ul>
               
                 <li>
-                  <a href="#node.v2.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                  <a href="#validator.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                  <a href="#validator.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.NodeInfoReply"><span class="badge">M</span>NodeInfoReply</a>
+                  <a href="#validator.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.NodeInfoRequest"><span class="badge">M</span>NodeInfoRequest</a>
+                  <a href="#validator.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
+                  <a href="#validator.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                  <a href="#validator.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
                 </li>
               
               
               
               
                 <li>
-                  <a href="#node.v2.Dispersal"><span class="badge">S</span>Dispersal</a>
+                  <a href="#validator.Dispersal"><span class="badge">S</span>Dispersal</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.Retrieval"><span class="badge">S</span>Retrieval</a>
+                  <a href="#validator.Retrieval"><span class="badge">S</span>Retrieval</a>
                 </li>
               
             </ul>
@@ -223,13 +223,13 @@
     
       
       <div class="file-heading">
-        <h2 id="node/v2/node_v2.proto">node/v2/node_v2.proto</h2><a href="#title">Top</a>
+        <h2 id="validator/node_v2.proto">validator/node_v2.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
       
-        <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
-        <p></p>
+        <h3 id="validator.GetChunksReply">GetChunksReply</h3>
+        <p>The response to the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -252,8 +252,8 @@
 
         
       
-        <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
-        <p></p>
+        <h3 id="validator.GetChunksRequest">GetChunksRequest</h3>
+        <p>The parameter for the GetChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -266,7 +266,9 @@
                   <td>blob_key</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The unique identifier for the blob the chunks are being requested for.
+The blob_key is the keccak hash of the rlp serialization of the BlobHeader, as computed here:
+https://github.com/Layr-Labs/eigenda/blob/0f14d1c90b86d29c30ff7e92cbadf2762c47f402/core/v2/serialization.go#L30 </p></td>
                 </tr>
               
                 <tr>
@@ -285,7 +287,7 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.NodeInfoReply">NodeInfoReply</h3>
+        <h3 id="validator.GetNodeInfoReply">GetNodeInfoReply</h3>
         <p>Node info reply</p>
 
         
@@ -299,35 +301,35 @@ The ID must be in range [0, 254]. </p></td>
                   <td>semver</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The version of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>arch</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The architecture of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>os</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The operating system of the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>num_cpu</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The number of CPUs on the node. </p></td>
                 </tr>
               
                 <tr>
                   <td>mem_bytes</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The amount of memory on the node in bytes. </p></td>
                 </tr>
               
             </tbody>
@@ -337,15 +339,15 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.NodeInfoRequest">NodeInfoRequest</h3>
-        <p>Node info request</p>
+        <h3 id="validator.GetNodeInfoRequest">GetNodeInfoRequest</h3>
+        <p>The parameter for the GetNodeInfo() RPC.</p>
 
         
 
         
       
-        <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
-        <p></p>
+        <h3 id="validator.StoreChunksReply">StoreChunksReply</h3>
+        <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
 
         
           <table class="field-table">
@@ -358,7 +360,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>a custody signature of the received chunks </p></td>
                 </tr>
               
             </tbody>
@@ -368,7 +370,7 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.StoreChunksRequest">StoreChunksRequest</h3>
+        <h3 id="validator.StoreChunksRequest">StoreChunksRequest</h3>
         <p>Request that the Node store a batch of chunks.</p>
 
         
@@ -397,7 +399,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature
-is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
+is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
 
 Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned).
 A reference implementation (golang) can be found at
@@ -438,8 +440,8 @@ Note that this signature is not included in the hash for obvious reasons. </p></
       
 
       
-        <h3 id="node.v2.Dispersal">Dispersal</h3>
-        <p>WARNING: the following RPCs are experimental and subject to change.</p>
+        <h3 id="validator.Dispersal">Dispersal</h3>
+        <p>Dispersal is utilized to disperse chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -448,24 +450,28 @@ Note that this signature is not included in the hash for obvious reasons. </p></
             
               <tr>
                 <td>StoreChunks</td>
-                <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
-                <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
-                <td><p></p></td>
+                <td><a href="#validator.StoreChunksRequest">StoreChunksRequest</a></td>
+                <td><a href="#validator.StoreChunksReply">StoreChunksReply</a></td>
+                <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
+either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
+the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
+This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
+is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
               </tr>
             
               <tr>
-                <td>NodeInfo</td>
-                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
-                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
-                <td><p></p></td>
+                <td>GetNodeInfo</td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
               </tr>
             
           </tbody>
         </table>
 
         
-        <h3 id="node.v2.Retrieval">Retrieval</h3>
-        <p></p>
+        <h3 id="validator.Retrieval">Retrieval</h3>
+        <p>Retrieval is utilized to retrieve chunk data.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -474,15 +480,16 @@ Note that this signature is not included in the hash for obvious reasons. </p></
             
               <tr>
                 <td>GetChunks</td>
-                <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
-                <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
-                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node.</p></td>
+                <td><a href="#validator.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#validator.GetChunksReply">GetChunksReply</a></td>
+                <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
+faster to retrieve chunks from the relay service if that service is available.</p></td>
               </tr>
             
               <tr>
-                <td>NodeInfo</td>
-                <td><a href="#node.v2.NodeInfoRequest">NodeInfoRequest</a></td>
-                <td><a href="#node.v2.NodeInfoReply">NodeInfoReply</a></td>
+                <td>GetNodeInfo</td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
                 <td><p>Retrieve node info metadata</p></td>
               </tr>
             

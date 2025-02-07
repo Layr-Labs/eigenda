@@ -3,6 +3,7 @@ package grpc_test
 import (
 	"context"
 	"fmt"
+	"github.com/docker/go-units"
 	"net"
 	"os"
 	"runtime"
@@ -88,6 +89,7 @@ func makeConfig(t *testing.T) *node.Config {
 		NumBatchValidators:             runtime.GOMAXPROCS(0),
 		EnableV2:                       false,
 		DisableDispersalAuthentication: true,
+		RelayMaxMessageSize:            units.GiB,
 	}
 }
 

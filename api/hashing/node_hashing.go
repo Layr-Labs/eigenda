@@ -1,11 +1,12 @@
 package hashing
 
 import (
+	"hash"
+
 	commonv1 "github.com/Layr-Labs/eigenda/api/grpc/common"
 	common "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"golang.org/x/crypto/sha3"
-	"hash"
 )
 
 // This file contains code for hashing gRPC messages that are sent to the DA node.
@@ -25,8 +26,9 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) {
 	hashBlobHeader(hasher, blobCertificate.BlobHeader)
-	for _, relayID := range blobCertificate.Relays {
-		hashUint32(hasher, relayID)
+	hasher.Write(blobCertificate.Signature)
+	for _, relayKey := range blobCertificate.RelayKeys {
+		hashUint32(hasher, relayKey)
 	}
 }
 
@@ -37,7 +39,7 @@ func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) {
 	}
 	hashBlobCommitment(hasher, header.Commitment)
 	hashPaymentHeader(hasher, header.PaymentHeader)
-	hasher.Write(header.Signature)
+	hashUint32(hasher, header.Salt)
 }
 
 func hashBatchHeader(hasher hash.Hash, header *common.BatchHeader) {
@@ -52,9 +54,8 @@ func hashBlobCommitment(hasher hash.Hash, commitment *commonv1.BlobCommitment) {
 	hashUint32(hasher, commitment.Length)
 }
 
-func hashPaymentHeader(hasher hash.Hash, header *commonv1.PaymentHeader) {
+func hashPaymentHeader(hasher hash.Hash, header *common.PaymentHeader) {
 	hasher.Write([]byte(header.AccountId))
 	hashUint32(hasher, header.ReservationPeriod)
 	hasher.Write(header.CumulativePayment)
-	hashUint32(hasher, header.Salt)
 }

@@ -3,11 +3,13 @@ package relay
 import (
 	"context"
 	"encoding/binary"
+	"github.com/docker/go-units"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/mock"
-	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 
@@ -25,12 +27,12 @@ import (
 func defaultConfig() *Config {
 	return &Config{
 		GRPCPort:                   50051,
-		MaxGRPCMessageSize:         1024 * 1024 * 300,
+		MaxGRPCMessageSize:         units.MB,
 		MetadataCacheSize:          1024 * 1024,
 		MetadataMaxConcurrency:     32,
 		BlobCacheBytes:             1024 * 1024,
 		BlobMaxConcurrency:         32,
-		ChunkCacheSize:             1024 * 1024,
+		ChunkCacheBytes:            1024 * 1024,
 		ChunkMaxConcurrency:        32,
 		MaxKeysPerGetChunksRequest: 1024,
 		AuthenticationKeyCacheSize: 1024,
@@ -282,7 +284,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
@@ -793,7 +795,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
@@ -1093,7 +1095,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000

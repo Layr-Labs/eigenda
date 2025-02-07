@@ -39,9 +39,9 @@ type metadataProvider struct {
 	// assigned to this server will not be in the cache.
 	metadataCache cache.CacheAccessor[v2.BlobKey, *blobMetadata]
 
-	// relayIDSet is the set of relay IDs assigned to this relay. This relay will refuse to serve metadata for blobs
-	// that are not assigned to one of these IDs.
-	relayIDSet map[v2.RelayKey]struct{}
+	// relayKeySet is the set of relay keys assigned to this relay. This relay will refuse to serve metadata for blobs
+	// that are not assigned to one of these keys.
+	relayKeySet map[v2.RelayKey]struct{}
 
 	// fetchTimeout is the maximum time to wait for a metadata fetch operation to complete.
 	fetchTimeout time.Duration
@@ -57,21 +57,21 @@ func newMetadataProvider(
 	metadataStore *blobstore.BlobMetadataStore,
 	metadataCacheSize int,
 	maxIOConcurrency int,
-	relayIDs []v2.RelayKey,
+	relayKeys []v2.RelayKey,
 	fetchTimeout time.Duration,
 	blobParamsMap *v2.BlobVersionParameterMap,
 	metrics *cache.CacheAccessorMetrics) (*metadataProvider, error) {
 
-	relayIDSet := make(map[v2.RelayKey]struct{}, len(relayIDs))
-	for _, id := range relayIDs {
-		relayIDSet[id] = struct{}{}
+	relayKeySet := make(map[v2.RelayKey]struct{}, len(relayKeys))
+	for _, id := range relayKeys {
+		relayKeySet[id] = struct{}{}
 	}
 
 	server := &metadataProvider{
 		ctx:           ctx,
 		logger:        logger,
 		metadataStore: metadataStore,
-		relayIDSet:    relayIDSet,
+		relayKeySet:   relayKeySet,
 		fetchTimeout:  fetchTimeout,
 	}
 	server.blobParamsMap.Store(blobParamsMap)
@@ -160,6 +160,24 @@ func (m *metadataProvider) UpdateBlobVersionParameters(blobParamsMap *v2.BlobVer
 	m.blobParamsMap.Store(blobParamsMap)
 }
 
+func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSizeBytes uint32) (uint32, error) {
+	blobParamsMap := m.blobParamsMap.Load()
+	if blobParamsMap == nil {
+		return 0, fmt.Errorf("blob version parameters is nil")
+	}
+
+	blobParams, ok := blobParamsMap.Get(header.BlobVersion)
+	if !ok {
+		return 0, fmt.Errorf("blob version %d not found in blob params map", header.BlobVersion)
+	}
+
+	if blobParams.NumChunks == 0 {
+		return 0, fmt.Errorf("numChunks is 0, this should never happen")
+	}
+
+	return totalChunkSizeBytes / blobParams.NumChunks, nil
+}
+
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
@@ -176,10 +194,10 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 		return nil, fmt.Errorf("error retrieving metadata for blob %s: %w", key.Hex(), err)
 	}
 
-	if len(m.relayIDSet) > 0 {
+	if len(m.relayKeySet) > 0 {
 		validShard := false
 		for _, shard := range cert.RelayKeys {
-			if _, ok := m.relayIDSet[shard]; ok {
+			if _, ok := m.relayKeySet[shard]; ok {
 				validShard = true
 				break
 			}
@@ -192,12 +210,8 @@ func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) 
 
 	// TODO(cody-littley): blob size is not correct https://github.com/Layr-Labs/eigenda/pull/906#discussion_r1847396530
 	blobSize := uint32(cert.BlobHeader.BlobCommitments.Length) * encoding.BYTES_PER_SYMBOL
-	blobParams, ok := blobParamsMap.Get(cert.BlobHeader.BlobVersion)
-	if !ok {
-		return nil, fmt.Errorf("blob version %d not found in blob params map", cert.BlobHeader.BlobVersion)
-	}
-	chunkSize, err := v2.GetChunkLength(blobSize, blobParams)
-	chunkSize *= encoding.BYTES_PER_SYMBOL
+
+	chunkSize, err := m.computeChunkSize(cert.BlobHeader, fragmentInfo.TotalChunkSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error getting chunk length: %w", err)
 	}

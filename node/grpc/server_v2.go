@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
-	pb "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/core"
@@ -77,9 +77,9 @@ func NewServerV2(
 	}, nil
 }
 
-func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.NodeInfoReply, error) {
+func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (*pb.GetNodeInfoReply, error) {
 	if s.config.DisableNodeInfoResources {
-		return &pb.NodeInfoReply{Semver: node.SemVer}, nil
+		return &pb.GetNodeInfoReply{Semver: node.SemVer}, nil
 	}
 
 	memBytes := uint64(0)
@@ -88,7 +88,12 @@ func (s *ServerV2) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.No
 		memBytes = v.Total
 	}
 
-	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
+	return &pb.GetNodeInfoReply{
+		Semver:   node.SemVer,
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
+		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
+		MemBytes: memBytes}, nil
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {

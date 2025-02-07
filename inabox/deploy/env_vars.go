@@ -344,6 +344,10 @@ type OperatorVars struct {
 
 	NODE_RETRIEVAL_PORT string
 
+	NODE_V2_DISPERSAL_PORT string
+
+	NODE_V2_RETRIEVAL_PORT string
+
 	NODE_ENABLE_METRICS string
 
 	NODE_METRICS_PORT string
@@ -418,7 +422,9 @@ type OperatorVars struct {
 
 	NODE_BLS_SIGNER_CERT_FILE string
 
-	NODE_ENABLE_V2 string
+	NODE_BLS_SIGNER_API_KEY string
+
+	NODE_RUNTIME_MODE string
 
 	NODE_ONCHAIN_STATE_REFRESH_INTERVAL string
 
@@ -714,7 +720,7 @@ type RelayVars struct {
 
 	RELAY_METADATA_TABLE_NAME string
 
-	RELAY_RELAY_IDS string
+	RELAY_RELAY_KEYS string
 
 	RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR string
 

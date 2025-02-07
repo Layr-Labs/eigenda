@@ -63,7 +63,9 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
 // reservation period for reservation payments and cumulative payment for on-demand payments,
-// and both fields are used to create the payment header and signature
+// and both fields are used to create the payment header and signature.
+// These generated values are used to create the payment header and signature, as specified in
+// api/proto/common/v2/common_v2.proto
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint32, *big.Int, error) {
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
@@ -109,7 +111,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8, salt uint32) (*core.PaymentMetadata, error) {
+func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
 	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
@@ -119,7 +121,6 @@ func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums
 		AccountID:         a.accountID,
 		ReservationPeriod: reservationPeriod,
 		CumulativePayment: cumulativePayment,
-		Salt:              salt,
 	}
 
 	return pm, nil

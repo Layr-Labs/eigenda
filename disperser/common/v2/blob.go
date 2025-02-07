@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -13,9 +13,9 @@ type BlobStatus uint
 const (
 	Queued BlobStatus = iota
 	Encoded
-	Certified
+	GatheringSignatures
+	Complete
 	Failed
-	InsufficientSignatures
 )
 
 func (s BlobStatus) String() string {
@@ -24,12 +24,12 @@ func (s BlobStatus) String() string {
 		return "Queued"
 	case Encoded:
 		return "Encoded"
-	case Certified:
-		return "Certified"
+	case GatheringSignatures:
+		return "Gathering Signatures"
+	case Complete:
+		return "Complete"
 	case Failed:
 		return "Failed"
-	case InsufficientSignatures:
-		return "Insufficient Signatures"
 	default:
 		return "Unknown"
 	}
@@ -41,12 +41,12 @@ func (s BlobStatus) ToProfobuf() pb.BlobStatus {
 		return pb.BlobStatus_QUEUED
 	case Encoded:
 		return pb.BlobStatus_ENCODED
-	case Certified:
-		return pb.BlobStatus_CERTIFIED
+	case GatheringSignatures:
+		return pb.BlobStatus_GATHERING_SIGNATURES
+	case Complete:
+		return pb.BlobStatus_COMPLETE
 	case Failed:
 		return pb.BlobStatus_FAILED
-	case InsufficientSignatures:
-		return pb.BlobStatus_INSUFFICIENT_SIGNATURES
 	default:
 		return pb.BlobStatus_UNKNOWN
 	}
@@ -58,12 +58,12 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 		return Queued, nil
 	case pb.BlobStatus_ENCODED:
 		return Encoded, nil
-	case pb.BlobStatus_CERTIFIED:
-		return Certified, nil
+	case pb.BlobStatus_GATHERING_SIGNATURES:
+		return GatheringSignatures, nil
+	case pb.BlobStatus_COMPLETE:
+		return Complete, nil
 	case pb.BlobStatus_FAILED:
 		return Failed, nil
-	case pb.BlobStatus_INSUFFICIENT_SIGNATURES:
-		return InsufficientSignatures, nil
 	default:
 		return 0, fmt.Errorf("unknown blob status: %v", s)
 	}
@@ -71,7 +71,8 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 
 // BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {
-	BlobHeader *core.BlobHeader
+	BlobHeader *corev2.BlobHeader
+	Signature  []byte
 
 	// BlobStatus indicates the current status of the blob
 	BlobStatus BlobStatus
@@ -81,10 +82,19 @@ type BlobMetadata struct {
 	NumRetries uint
 	// BlobSize is the size of the blob in bytes
 	BlobSize uint64
-	// RequestedAt is the Unix timestamp of when the blob was requested in seconds
+	// RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds
 	RequestedAt uint64
 	// UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_
 	UpdatedAt uint64
 
 	*encoding.FragmentInfo
+}
+
+// BlobAttestationInfo describes the attestation information for a blob regarding to the batch
+// that the blob belongs to and the validators' attestation to that batch.
+//
+// Note: for a blob, there will be at most one attested/signed batch that contains the blob.
+type BlobAttestationInfo struct {
+	InclusionInfo *corev2.BlobInclusionInfo
+	Attestation   *corev2.Attestation
 }

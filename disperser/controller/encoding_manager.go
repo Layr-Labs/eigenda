@@ -210,6 +210,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 				}
 				cert := &corev2.BlobCertificate{
 					BlobHeader: blob.BlobHeader,
+					Signature:  blob.Signature,
 					RelayKeys:  relayKeys,
 				}
 
@@ -282,7 +283,7 @@ func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey
 	})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	encodingParams, err := blob.BlobHeader.GetEncodingParams(blobParams)
+	encodingParams, err := corev2.GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get encoding params: %w", err)
 	}

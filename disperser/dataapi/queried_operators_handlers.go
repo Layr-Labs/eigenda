@@ -198,8 +198,8 @@ func checkIsOnlineAndProcessOperator(operatorStatus OperatorOnlineStatus, operat
 	var isOnline bool
 	var socket string
 	if operatorStatus.IndexedOperatorInfo != nil {
-		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetRetrievalSocket()
-		isOnline = checkIsOperatorOnline(socket, 10, logger)
+		socket = core.OperatorSocket(operatorStatus.IndexedOperatorInfo.Socket).GetV1RetrievalSocket()
+		isOnline = checkIsOperatorPortOpen(socket, 10, logger)
 	}
 
 	// Log the online status
@@ -245,8 +245,8 @@ func ValidOperatorIP(address string, logger logging.Logger) bool {
 	return isValid
 }
 
-// method to check if operator is online via socket dial
-func checkIsOperatorOnline(socket string, timeoutSecs int, logger logging.Logger) bool {
+// method to check if operator port is open
+func checkIsOperatorPortOpen(socket string, timeoutSecs int, logger logging.Logger) bool {
 	if !ValidOperatorIP(socket, logger) {
 		logger.Error("port check blocked invalid operator IP", "socket", socket)
 		return false

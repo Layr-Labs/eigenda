@@ -40,6 +40,7 @@ func main() {
 		plugin.BLSRemoteSignerUrlFlag,
 		plugin.BLSPublicKeyHexFlag,
 		plugin.BLSSignerCertFileFlag,
+		plugin.BLSSignerAPIKeyFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
@@ -66,6 +67,7 @@ func pluginOps(ctx *cli.Context) {
 		TLSCertFilePath:  config.BLSSignerCertFile,
 		Path:             config.BlsKeyFile,
 		Password:         config.BlsKeyPassword,
+		CerberusAPIKey:   config.BLSSignerAPIKey,
 	}
 	if config.BLSRemoteSignerUrl != "" {
 		signerCfg.SignerType = blssignerTypes.Cerberus
@@ -133,7 +135,7 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	_, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
@@ -141,8 +143,8 @@ func pluginOps(ctx *cli.Context) {
 
 	socket := config.Socket
 	if isLocalhost(socket) {
-		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
+		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to get socket address from ip provider: %v", err)
 			return

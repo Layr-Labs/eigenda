@@ -75,9 +75,9 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	mockClient0 := clientsmock.NewNodeClient()
 	sig0 := mockChainState.KeyPairs[opId0].SignMessage(bhh)
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(sig0, nil)
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
@@ -98,13 +98,13 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	// Test that the blob metadata status are updated
 	bm0, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[0])
 	require.NoError(t, err)
-	require.Equal(t, v2.Certified, bm0.BlobStatus)
+	require.Equal(t, v2.Complete, bm0.BlobStatus)
 	bm1, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[1])
 	require.NoError(t, err)
-	require.Equal(t, v2.Certified, bm1.BlobStatus)
+	require.Equal(t, v2.Complete, bm1.BlobStatus)
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, objs.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objs.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err = vis[0].BatchHeader.Hash()
@@ -150,9 +150,9 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	// only op2 signs - quorum 0 will have 0 signing rate, quorum 1 will have 20%
 	mockClient0 := clientsmock.NewNodeClient()
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
@@ -173,16 +173,16 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	for _, blobKey := range failedObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range successfulObjs.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.Certified, bm.BlobStatus)
+		require.Equal(t, v2.Complete, bm.BlobStatus)
 	}
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, failedObjs.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, failedObjs.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err = vis[0].BatchHeader.Hash()
@@ -223,9 +223,9 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	// no operators sign, all blobs will have insufficient signatures
 	mockClient0 := clientsmock.NewNodeClient()
 	mockClient0.On("StoreChunks", mock.Anything, mock.Anything).Return(nil, errors.New("failure"))
-	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].DispersalPort
-	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].DispersalPort
-	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].DispersalPort
+	op0Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId0].V2DispersalPort
+	op1Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId1].V2DispersalPort
+	op2Port := mockChainState.GetTotalOperatorState(ctx, uint(blockNumber)).PrivateOperators[opId2].V2DispersalPort
 	require.NotEqual(t, op0Port, op1Port)
 	require.NotEqual(t, op0Port, op2Port)
 	components.NodeClientManager.On("GetClient", mock.Anything, op0Port).Return(mockClient0, nil)
@@ -245,16 +245,16 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	for _, blobKey := range objsInBothQuorum.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 	for _, blobKey := range objsInQuorum1.blobKeys {
 		bm, err := components.BlobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		require.NoError(t, err)
-		require.Equal(t, v2.InsufficientSignatures, bm.BlobStatus)
+		require.Equal(t, v2.Failed, bm.BlobStatus)
 	}
 
 	// Get batch header
-	vis, err := components.BlobMetadataStore.GetBlobVerificationInfos(ctx, objsInBothQuorum.blobKeys[0])
+	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, objsInBothQuorum.blobKeys[0])
 	require.NoError(t, err)
 	require.Len(t, vis, 1)
 	bhh, err := vis[0].BatchHeader.Hash()
@@ -325,8 +325,8 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.NotNil(t, bh)
 	require.Equal(t, bh, batch.BatchHeader)
 
-	// Test that blob verification infos are written
-	vi0, err := components.BlobMetadataStore.GetBlobVerificationInfo(ctx, objs.blobKeys[0], bhh)
+	// Test that blob inclusion infos are written
+	vi0, err := components.BlobMetadataStore.GetBlobInclusionInfo(ctx, objs.blobKeys[0], bhh)
 	require.NoError(t, err)
 	require.NotNil(t, vi0)
 	cert := batch.BlobCertificates[vi0.BlobIndex]
@@ -360,8 +360,8 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0},
 		},
 		{
@@ -374,8 +374,8 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 					ReservationPeriod: 0,
 					CumulativePayment: big.NewInt(532),
 				},
-				Signature: []byte("signature"),
 			},
+			Signature: []byte("signature"),
 			RelayKeys: []corev2.RelayKey{0, 1, 2},
 		},
 	}

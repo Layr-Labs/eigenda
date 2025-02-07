@@ -1,7 +1,10 @@
 package flags
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -12,6 +15,11 @@ import (
 const (
 	FlagPrefix   = "node"
 	EnvVarPrefix = "NODE"
+
+	// Node mode values
+	ModeV1Only  = "v1-only"
+	ModeV2Only  = "v2-only"
+	ModeV1AndV2 = "v1-and-v2"
 )
 
 var (
@@ -46,6 +54,18 @@ var (
 		Usage:    "Port at which node listens for retrieval calls (used when node is behind NGINX)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_RETRIEVAL_PORT"),
+	}
+	V2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "v2-dispersal-port"),
+		Usage:    "Port at which node registers to listen for v2 dispersal calls",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_DISPERSAL_PORT"),
+	}
+	V2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "v2-retrieval-port"),
+		Usage:    "Port at which node registers to listen for v2 retrieval calls",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
@@ -148,9 +168,9 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHURNER_USE_SECURE_GRPC"),
 	}
-	PubIPProviderFlag = cli.StringFlag{
+	PubIPProviderFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "public-ip-provider"),
-		Usage:    "The ip provider service used to obtain a node's public IP [seeip (default), ipify)",
+		Usage:    "The ip provider service(s) used to obtain a node's public IP. Valid options: 'seeip', 'ipify'",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "PUBLIC_IP_PROVIDER"),
 	}
@@ -218,12 +238,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_GNARK_BUNDLE_ENCODING"),
 	}
-	EnableV2Flag = cli.BoolFlag{
-		Name:     "enable-v2",
-		Usage:    "Enable V2 features",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_V2"),
-	}
 	OnchainStateRefreshIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2 (default: 1h)",
@@ -238,6 +252,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "CHUNK_DOWNLOAD_TIMEOUT"),
 		Value:    20 * time.Second,
 	}
+	GRPCMsgSizeLimitV2Flag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "grpc-msg-size-limit-v2"),
+		Usage:    "The maximum message size in bytes the V2 dispersal endpoint can receive from the client. This flag is only relevant in v2 (default: 1MB)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GRPC_MSG_SIZE_LIMIT_V2"),
+		Value:    units.MiB,
+	}
 	DisableDispersalAuthenticationFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disable-dispersal-authentication"),
 		Usage:    "Disable authentication for StoreChunks() calls from the disperser",
@@ -249,7 +270,7 @@ var (
 		Usage:    "The size of the dispersal authentication key cache",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_KEY_CACHE_SIZE"),
-		Value:    1024,
+		Value:    units.KiB,
 	}
 	DisperserKeyTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-key-timeout"),
@@ -263,7 +284,14 @@ var (
 		Usage:    "The duration for which a disperser authentication is valid",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DISPERSAL_AUTHENTICATION_TIMEOUT"),
-		Value:    time.Minute,
+		Value:    0, // TODO (cody-littley) remove this feature
+	}
+	RelayMaxGRPCMessageSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-max-grpc-message-size"),
+		Usage:    "The maximum message size in bytes for messages received from the relay",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RELAY_MAX_GRPC_MESSAGE_SIZE"),
+		Value:    units.GiB, // intentionally large for the time being
 	}
 
 	// Test only, DO NOT USE the following flags in production
@@ -347,6 +375,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_CERT_FILE"),
 	}
+
+	BLSSignerAPIKeyFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "bls-signer-api-key"),
+		Usage:    "The API key for the BLS signer. Only required if BLSRemoteSignerEnabled is true",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "BLS_SIGNER_API_KEY"),
+	}
+
 	PprofHttpPort = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "pprof-http-port"),
 		Usage:    "the http port which the pprof server is listening",
@@ -359,6 +395,14 @@ var (
 		Usage:    "start prrof server",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "ENABLE_PPROF"),
+	}
+
+	RuntimeModeFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "runtime-mode"),
+		Usage:    fmt.Sprintf("Node runtime mode (%s (default), %s, or %s)", ModeV1AndV2, ModeV1Only, ModeV2Only),
+		Required: false,
+		Value:    ModeV1AndV2,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
 	}
 )
 
@@ -406,15 +450,20 @@ var optionalFlags = []cli.Flag{
 	BLSRemoteSignerUrlFlag,
 	BLSPublicKeyHexFlag,
 	BLSSignerCertFileFlag,
-	EnableV2Flag,
+	BLSSignerAPIKeyFlag,
+	V2DispersalPortFlag,
+	V2RetrievalPortFlag,
 	OnchainStateRefreshIntervalFlag,
 	ChunkDownloadTimeoutFlag,
+	GRPCMsgSizeLimitV2Flag,
 	PprofHttpPort,
 	EnablePprof,
 	DisableDispersalAuthenticationFlag,
 	DispersalAuthenticationKeyCacheSizeFlag,
 	DisperserKeyTimeoutFlag,
 	DispersalAuthenticationTimeoutFlag,
+	RelayMaxGRPCMessageSizeFlag,
+	RuntimeModeFlag,
 }
 
 func init() {

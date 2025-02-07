@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"net"
+	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
@@ -17,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -63,65 +65,6 @@ type Server struct {
 	metrics *metrics.RelayMetrics
 }
 
-type Config struct {
-
-	// RelayIDs contains the IDs of the relays that this server is willing to serve data for. If empty, the server will
-	// serve data for any shard it can.
-	RelayIDs []v2.RelayKey
-
-	// GRPCPort is the port that the relay server listens on.
-	GRPCPort int
-
-	// MaxGRPCMessageSize is the maximum size of a gRPC message that the server will accept.
-	MaxGRPCMessageSize int
-
-	// MetadataCacheSize is the maximum number of items in the metadata cache.
-	MetadataCacheSize int
-
-	// MetadataMaxConcurrency puts a limit on the maximum number of concurrent metadata fetches actively running on
-	// goroutines.
-	MetadataMaxConcurrency int
-
-	// BlobCacheBytes is the maximum size of the blob cache, in bytes.
-	BlobCacheBytes uint64
-
-	// BlobMaxConcurrency puts a limit on the maximum number of concurrent blob fetches actively running on goroutines.
-	BlobMaxConcurrency int
-
-	// ChunkCacheSize is the maximum size of the chunk cache, in bytes.
-	ChunkCacheSize uint64
-
-	// ChunkMaxConcurrency is the size of the work pool for fetching chunks. Note that this does not
-	// impact concurrency utilized by the s3 client to upload/download fragmented files.
-	ChunkMaxConcurrency int
-
-	// MaxKeysPerGetChunksRequest is the maximum number of keys that can be requested in a single GetChunks request.
-	MaxKeysPerGetChunksRequest int
-
-	// RateLimits contains configuration for rate limiting.
-	RateLimits limiter.Config
-
-	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
-	AuthenticationKeyCacheSize int
-
-	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
-	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
-	// will be authenticated independently, regardless of timing.
-	AuthenticationTimeout time.Duration
-
-	// AuthenticationDisabled will disable authentication if set to true.
-	AuthenticationDisabled bool
-
-	// Timeouts contains configuration for relay timeouts.
-	Timeouts TimeoutConfig
-
-	// OnchainStateRefreshInterval is the interval at which the onchain state is refreshed.
-	OnchainStateRefreshInterval time.Duration
-
-	// MetricsPort is the port that the relay metrics server listens on.
-	MetricsPort int
-}
-
 // NewServer creates a new relay Server.
 func NewServer(
 	ctx context.Context,
@@ -151,7 +94,7 @@ func NewServer(
 		metadataStore,
 		config.MetadataCacheSize,
 		config.MetadataMaxConcurrency,
-		config.RelayIDs,
+		config.RelayKeys,
 		config.Timeouts.InternalGetMetadataTimeout,
 		v2.NewBlobVersionParameterMap(blobParams),
 		relayMetrics.MetadataCacheMetrics)
@@ -176,7 +119,7 @@ func NewServer(
 		ctx,
 		logger,
 		chunkReader,
-		config.ChunkCacheSize,
+		config.ChunkCacheBytes,
 		config.ChunkMaxConcurrency,
 		config.Timeouts.InternalGetProofsTimeout,
 		config.Timeouts.InternalGetCoefficientsTimeout,
@@ -199,7 +142,7 @@ func NewServer(
 
 	return &Server{
 		config:           config,
-		logger:           logger,
+		logger:           logger.With("component", "RelayServer"),
 		metadataProvider: mp,
 		blobProvider:     bp,
 		chunkProvider:    cp,
@@ -220,42 +163,45 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		defer cancel()
 	}
 
-	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
-	if err != nil {
-		return nil, err
-	}
-	defer s.blobRateLimiter.FinishGetBlobOperation()
-
+	// Validate the request params before any further processing (as validation is cheaper)
 	key, err := v2.BytesToBlobKey(request.BlobKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid blob key: %w", err)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
 	}
+	s.logger.Debug("GetBlob request received", "key", key.Hex())
+
+	err = s.blobRateLimiter.BeginGetBlobOperation(time.Now())
+	if err != nil {
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
+	}
+	defer s.blobRateLimiter.FinishGetBlobOperation()
 
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
 	}
 	metadata := mMap[v2.BlobKey(request.BlobKey)]
 	if metadata == nil {
-		return nil, fmt.Errorf("blob not found")
+		return nil, api.NewErrorNotFound("blob not found")
 	}
 
 	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportBlobMetadataLatency(finishedFetchingMetadata.Sub(start))
 
+	s.metrics.ReportBlobRequestedBandwidthUsage(int(metadata.blobSizeBytes))
 	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
 	}
 
 	data, err := s.blobProvider.GetBlob(ctx, key)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching blob %s: %w", key.Hex(), err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching blob %s: %v", key.Hex(), err))
 	}
 
-	s.metrics.ReportBlobDataSize(len(data))
+	s.metrics.ReportBlobBandwidthUsage(len(data))
 	s.metrics.ReportBlobDataLatency(time.Since(finishedFetchingMetadata))
 	s.metrics.ReportBlobLatency(time.Since(start))
 
@@ -276,26 +222,28 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 
 	if len(request.ChunkRequests) <= 0 {
-		return nil, fmt.Errorf("no chunk requests provided")
+		return nil, api.NewErrorInvalidArg("no chunk requests provided")
 	}
 	if len(request.ChunkRequests) > s.config.MaxKeysPerGetChunksRequest {
-		return nil, fmt.Errorf(
-			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest)
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
+			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest))
 	}
 	s.metrics.ReportChunkKeyCount(len(request.ChunkRequests))
 
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
 		if !ok {
-			return nil, errors.New("could not get peer information")
+			return nil, api.NewErrorInvalidArg("could not get peer information")
 		}
 		clientAddress := client.Addr.String()
 
 		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
-			return nil, fmt.Errorf("auth failed: %w", err)
+			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
+		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 
 	finishedAuthenticating := time.Now()
@@ -306,20 +254,20 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	clientID := string(request.OperatorId)
 	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
 	// keys might contain duplicate keys
 	keys, err := getKeysFromChunkRequest(request)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid request: %v", err))
 	}
 
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %w", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf(
+			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
 	}
 
 	finishedFetchingMetadata := time.Now()
@@ -327,22 +275,26 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
 	if err != nil {
-		return nil, fmt.Errorf("error computing required bandwidth: %w", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
+	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth)
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "internal error") {
+			return nil, api.NewErrorInternal(err.Error())
+		}
+		return nil, buildInsufficientGetChunksBandwidthError(request, requiredBandwidth, err)
 	}
-	s.metrics.ReportChunkDataSize(requiredBandwidth)
+	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching frames: %w", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
 	}
 
 	bytesToSend, err := gatherChunkDataToSend(frames, request)
 	if err != nil {
-		return nil, fmt.Errorf("error gathering chunk data: %w", err)
+		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
 	}
 
 	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
@@ -462,7 +414,28 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 	}
 
 	return requiredBandwidth, nil
+}
 
+// buildInsufficientBandwidthError builds an informative error message for when there is insufficient
+// bandwidth to serve a GetChunks() request.
+func buildInsufficientGetChunksBandwidthError(
+	request *pb.GetChunksRequest,
+	requiredBandwidth int,
+	originalError error) error {
+
+	chunkCount := 0
+	for _, chunkRequest := range request.ChunkRequests {
+		if chunkRequest.GetByIndex() != nil {
+			chunkCount += len(chunkRequest.GetByIndex().ChunkIndices)
+		} else {
+			chunkCount += int(chunkRequest.GetByRange().EndIndex - chunkRequest.GetByRange().StartIndex)
+		}
+	}
+
+	blobCount := len(request.ChunkRequests)
+
+	return api.NewErrorResourceExhausted(fmt.Sprintf("unable to serve data (%d blobs, %d chunks, %d bytes): %v",
+		blobCount, chunkCount, requiredBandwidth, originalError))
 }
 
 // Start starts the server listening for requests. This method will block until the server is stopped.

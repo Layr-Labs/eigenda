@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -21,7 +23,7 @@ type dispatcherMetrics struct {
 	buildMerkleTreeLatency      *prometheus.SummaryVec
 	putBatchHeaderLatency       *prometheus.SummaryVec
 	proofLatency                *prometheus.SummaryVec
-	putVerificationInfosLatency *prometheus.SummaryVec
+	putInclusionInfosLatency    *prometheus.SummaryVec
 	poolSubmissionLatency       *prometheus.SummaryVec
 	putDispersalRequestLatency  *prometheus.SummaryVec
 	sendChunksLatency           *prometheus.SummaryVec
@@ -34,11 +36,21 @@ type dispatcherMetrics struct {
 	updateBatchStatusLatency    *prometheus.SummaryVec
 	blobE2EDispersalLatency     *prometheus.SummaryVec
 	completedBlobs              *prometheus.CounterVec
+	attestation                 *prometheus.GaugeVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
 func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+
+	attestation := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "attestation",
+			Help:      "number of signers and non-signers for the batch",
+		},
+		[]string{"type", "quorum"},
+	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
@@ -120,11 +132,11 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
-	putVerificationInfosLatency := promauto.With(registry).NewSummaryVec(
+	putInclusionInfosLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "put_verification_infos_latency_ms",
-			Help:       "The time required to put the verification infos (part of NewBatch()).",
+			Help:       "The time required to put the inclusion infos (part of NewBatch()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -257,7 +269,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		buildMerkleTreeLatency:      buildMerkleTreeLatency,
 		putBatchHeaderLatency:       putBatchHeaderLatency,
 		proofLatency:                proofLatency,
-		putVerificationInfosLatency: putVerificationInfosLatency,
+		putInclusionInfosLatency:    putInclusionInfosLatency,
 		poolSubmissionLatency:       poolSubmissionLatency,
 		putDispersalRequestLatency:  putDispersalRequestLatency,
 		sendChunksLatency:           sendChunksLatency,
@@ -270,6 +282,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		updateBatchStatusLatency:    updateBatchStatusLatency,
 		blobE2EDispersalLatency:     blobE2EDispersalLatency,
 		completedBlobs:              completedBlobs,
+		attestation:                 attestation,
 	}
 }
 
@@ -305,8 +318,8 @@ func (m *dispatcherMetrics) reportProofLatency(duration time.Duration) {
 	m.proofLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
-func (m *dispatcherMetrics) reportPutVerificationInfosLatency(duration time.Duration) {
-	m.putVerificationInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+func (m *dispatcherMetrics) reportPutInclusionInfosLatency(duration time.Duration) {
+	m.putInclusionInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportPoolSubmissionLatency(duration time.Duration) {
@@ -355,19 +368,35 @@ func (m *dispatcherMetrics) reportE2EDispersalLatency(duration time.Duration) {
 
 func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStatus) {
 	switch status {
-	case dispv2.Certified:
-		m.completedBlobs.WithLabelValues("certified", "number").Inc()
-		m.completedBlobs.WithLabelValues("certified", "size").Add(float64(size))
+	case dispv2.Complete:
+		m.completedBlobs.WithLabelValues("complete", "number").Inc()
+		m.completedBlobs.WithLabelValues("complete", "size").Add(float64(size))
 	case dispv2.Failed:
 		m.completedBlobs.WithLabelValues("failed", "number").Inc()
 		m.completedBlobs.WithLabelValues("failed", "size").Add(float64(size))
-	case dispv2.InsufficientSignatures:
-		m.completedBlobs.WithLabelValues("insufficient_signature", "number").Inc()
-		m.completedBlobs.WithLabelValues("insufficient_signature", "size").Add(float64(size))
 	default:
 		return
 	}
 
 	m.completedBlobs.WithLabelValues("total", "number").Inc()
 	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+}
+
+func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+	for quorumID, count := range operatorCount {
+		quorumStr := fmt.Sprintf("%d", quorumID)
+		signers, ok := signerCount[quorumID]
+		if !ok {
+			continue
+		}
+		nonSigners := count - signers
+		quorumResult, ok := quorumResults[quorumID]
+		if !ok {
+			continue
+		}
+
+		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
+		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
+		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
+	}
 }

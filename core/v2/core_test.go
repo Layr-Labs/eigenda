@@ -21,8 +21,8 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
-	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -42,6 +42,7 @@ var (
 	blobParamsMap = v2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	})
+	quorumNumbers = []core.QuorumID{0, 1, 2}
 )
 
 func TestMain(m *testing.M) {
@@ -135,7 +136,7 @@ func prepareBlobs(
 	cst, err := mock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
 		1: int(operatorCount),
-		2: int(operatorCount),
+		2: int(operatorCount) / 2,
 	})
 	assert.NoError(t, err)
 
@@ -145,38 +146,23 @@ func prepareBlobs(
 		blob := blobs[z]
 		header := cert.BlobHeader
 
-		params, err := header.GetEncodingParams(blobParams)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		params, err := v2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
+		require.NoError(t, err)
 		chunks, err := p.GetFrames(blob, params)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		require.NoError(t, err)
 		state, err := cst.GetOperatorState(context.Background(), uint(referenceBlockNumber), header.QuorumNumbers)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+		require.NoError(t, err)
 		blobMap := make(map[core.QuorumID]map[core.OperatorID][]*encoding.Frame)
 
 		for _, quorum := range header.QuorumNumbers {
-
 			assignments, err := corev2.GetAssignments(state, blobParams, quorum)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			blobMap[quorum] = make(map[core.OperatorID][]*encoding.Frame)
 
 			for opID, assignment := range assignments {
-
 				blobMap[quorum][opID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
-
 			}
-
 		}
 
 		blobsMap = append(blobsMap, blobMap)
@@ -201,7 +187,6 @@ func prepareBlobs(
 					continue
 				}
 				inverseMap[operatorID][blobIndex].Bundles[quorum] = append(inverseMap[operatorID][blobIndex].Bundles[quorum], frames...)
-
 			}
 		}
 	}
@@ -213,48 +198,30 @@ func prepareBlobs(
 // checkBatchByUniversalVerifier runs the verification logic for each DA node in the current OperatorState, and returns an error if any of
 // the DA nodes' validation checks fails
 func checkBatchByUniversalVerifier(
+	t *testing.T,
 	cst core.IndexedChainState,
 	packagedBlobs map[core.OperatorID][]*corev2.BlobShard,
 	pool common.WorkerPool,
-) error {
+) {
 
 	ctx := context.Background()
-
-	quorums := []core.QuorumID{0, 1}
-	state, _ := cst.GetIndexedOperatorState(context.Background(), 0, quorums)
-
-	var errList *multierror.Error
+	state, _ := cst.GetIndexedOperatorState(context.Background(), 0, quorumNumbers)
 
 	for id := range state.IndexedOperators {
-
 		val := corev2.NewShardValidator(v, id, testutils.GetLogger())
-
 		blobs := packagedBlobs[id]
-
-		err := val.ValidateBlobs(ctx, blobs, blobParamsMap, pool, state.OperatorState)
-		if err != nil {
-			errList = multierror.Append(errList, err)
-		}
+		st, err := cst.GetOperatorStateByOperator(ctx, 0, id)
+		require.NoError(t, err)
+		err = val.ValidateBlobs(ctx, blobs, blobParamsMap, pool, st)
+		require.NoError(t, err)
 	}
-
-	return errList.ErrorOrNil()
-
 }
 
 func TestValidationSucceeds(t *testing.T) {
 
-	// operatorCounts := []uint{1, 2, 4, 10, 30}
-
-	// numBlob := 3 // must be greater than 0
-	// blobLengths := []int{1, 32, 128}
-
-	operatorCounts := []uint{4}
-
+	operatorCounts := []uint{1, 10}
 	numBlob := 1 // must be greater than 0
 	blobLengths := []int{1, 2}
-
-	quorumNumbers := []core.QuorumID{0, 1}
-
 	bn := uint64(1000)
 
 	version := corev2.BlobVersion(0)
@@ -264,21 +231,20 @@ func TestValidationSucceeds(t *testing.T) {
 	for _, operatorCount := range operatorCounts {
 
 		// batch can only be tested per operatorCount, because the assignment would be wrong otherwise
-		headers := make([]corev2.BlobCertificate, 0)
+		certs := make([]corev2.BlobCertificate, 0)
 		blobs := make([][]byte, 0)
 		for _, blobLength := range blobLengths {
 			for i := 0; i < numBlob; i++ {
-				header, data := makeTestBlob(t, p, version, blobLength, quorumNumbers)
-				headers = append(headers, header)
+				cert, data := makeTestBlob(t, p, version, blobLength, quorumNumbers)
+				certs = append(certs, cert)
 				blobs = append(blobs, data)
 			}
 		}
 
-		packagedBlobs, cst := prepareBlobs(t, operatorCount, headers, blobs, bn)
+		packagedBlobs, cst := prepareBlobs(t, operatorCount, certs, blobs, bn)
 
 		t.Run(fmt.Sprintf("universal verifier operatorCount=%v over %v blobs", operatorCount, len(blobs)), func(t *testing.T) {
-			err := checkBatchByUniversalVerifier(cst, packagedBlobs, pool)
-			assert.NoError(t, err)
+			checkBatchByUniversalVerifier(t, cst, packagedBlobs, pool)
 		})
 
 	}

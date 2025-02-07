@@ -15,13 +15,70 @@ const docTemplateV2 = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/batches/feed": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batches"
+                ],
+                "summary": "Fetch batch feed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch batches starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "The maximum number of batches to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BatchFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Batch"
+                    "Batches"
                 ],
                 "summary": "Fetch batch by the batch header hash",
                 "parameters": [
@@ -61,13 +118,76 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "/blobs/feed": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blobs"
+                ],
+                "summary": "Fetch blob feed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]",
+                        "name": "pagination_token",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "The maximum number of blobs to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/blobs/{blob_key}": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
                 "summary": "Fetch blob metadata by blob key",
                 "parameters": [
@@ -107,15 +227,15 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/certificate": {
+        "/blobs/{blob_key}/attestation-info": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob certificate by blob key v2",
+                "summary": "Fetch attestation info for a blob",
                 "parameters": [
                     {
                         "type": "string",
@@ -129,7 +249,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobCertificateResponse"
+                            "$ref": "#/definitions/v2.BlobAttestationInfoResponse"
                         }
                     },
                     "400": {
@@ -153,27 +273,20 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/verification-info": {
+        "/blobs/{blob_key}/certificate": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob verification info by blob key and batch header hash",
+                "summary": "Fetch blob certificate by blob key v2",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Blob key in hex string",
                         "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
                         "in": "path",
                         "required": true
                     }
@@ -182,7 +295,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobVerificationInfoResponse"
+                            "$ref": "#/definitions/v2.BlobCertificateResponse"
                         }
                     },
                     "400": {
@@ -344,7 +457,7 @@ const docTemplateV2 = `{
                 "tags": [
                     "Operators"
                 ],
-                "summary": "Operator node reachability check",
+                "summary": "Operator v2 node reachability check",
                 "parameters": [
                     {
                         "type": "string",
@@ -358,6 +471,69 @@ const docTemplateV2 = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/v2.OperatorPortCheckResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/signing-info": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Fetch operators signing info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch operators signing info up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch operators signing info starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of quorum IDs to fetch signing info for [default: 0,1]",
+                        "name": "quorums",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether to only return operators with signing rate less than 100% [default: false]",
+                        "name": "nonsigner_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorsSigningInfoResponse"
                         }
                     },
                     "400": {
@@ -510,7 +686,7 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "cumulative_payment": {
-                    "description": "TODO: we are thinking the contract can use uint128 for cumulative payment,\nbut the definition on v2 uses uint64. Double check with team.",
+                    "description": "CumulativePayment represents the total amount of payment (in wei) made by the user up to this point",
                     "allOf": [
                         {
                             "$ref": "#/definitions/big.Int"
@@ -519,10 +695,6 @@ const docTemplateV2 = `{
                 },
                 "reservation_period": {
                     "description": "ReservationPeriod represents the range of time at which the dispersal is made",
-                    "type": "integer"
-                },
-                "salt": {
-                    "description": "Allow same blob to be dispersed multiple times within the same reservation period",
                     "type": "integer"
                 }
             }
@@ -594,7 +766,7 @@ const docTemplateV2 = `{
                     ]
                 },
                 "attestedAt": {
-                    "description": "AttestedAt is the time the attestation was made",
+                    "description": "AttestedAt is the time the attestation was made in nanoseconds",
                     "type": "integer"
                 },
                 "batchRoot": {
@@ -626,7 +798,7 @@ const docTemplateV2 = `{
                     }
                 },
                 "quorumResults": {
-                    "description": "QuorumResults contains the results of the quorum verification",
+                    "description": "QuorumResults contains the operators' total signing percentage of the quorum",
                     "type": "object",
                     "additionalProperties": {
                         "type": "integer"
@@ -674,6 +846,13 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "signature": {
+                    "description": "Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,\nwhich is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -701,16 +880,13 @@ const docTemplateV2 = `{
                         "type": "integer"
                     }
                 },
-                "signature": {
-                    "description": "Signature is the signature of the blob header by the account ID",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                "salt": {
+                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
+                    "type": "integer"
                 }
             }
         },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo": {
+        "github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo": {
             "type": "object",
             "properties": {
                 "BlobKey": {
@@ -740,6 +916,23 @@ const docTemplateV2 = `{
                     "type": "integer"
                 }
             }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus": {
+            "type": "integer",
+            "enum": [
+                0,
+                1,
+                2,
+                3,
+                4
+            ],
+            "x-enum-varnames": [
+                "Queued",
+                "Encoded",
+                "GatheringSignatures",
+                "Complete",
+                "Failed"
+            ]
         },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
@@ -786,20 +979,77 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.BatchFeedResponse": {
+            "type": "object",
+            "properties": {
+                "batches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.BatchInfo"
+                    }
+                }
+            }
+        },
+        "v2.BatchInfo": {
+            "type": "object",
+            "properties": {
+                "aggregated_signature": {
+                    "$ref": "#/definitions/core.Signature"
+                },
+                "attested_at": {
+                    "type": "integer"
+                },
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "quorum_numbers": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorum_signed_percentages": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
         "v2.BatchResponse": {
             "type": "object",
             "properties": {
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "blob_verification_infos": {
+                "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
                     }
                 },
                 "signed_batch": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch"
+                }
+            }
+        },
+        "v2.BlobAttestationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_inclusion_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                },
+                "blob_key": {
+                    "type": "string"
                 }
             }
         },
@@ -808,6 +1058,81 @@ const docTemplateV2 = `{
             "properties": {
                 "blob_certificate": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                }
+            }
+        },
+        "v2.BlobFeedResponse": {
+            "type": "object",
+            "properties": {
+                "blobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.BlobInfo"
+                    }
+                },
+                "pagination_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.BlobInfo": {
+            "type": "object",
+            "properties": {
+                "blob_key": {
+                    "type": "string"
+                },
+                "blob_metadata": {
+                    "$ref": "#/definitions/v2.BlobMetadata"
+                }
+            }
+        },
+        "v2.BlobMetadata": {
+            "type": "object",
+            "properties": {
+                "blobHeader": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "blobSize": {
+                    "description": "BlobSize is the size of the blob in bytes",
+                    "type": "integer"
+                },
+                "blobStatus": {
+                    "description": "BlobStatus indicates the current status of the blob",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus"
+                        }
+                    ]
+                },
+                "expiry": {
+                    "description": "Expiry is Unix timestamp of the blob expiry in seconds from epoch",
+                    "type": "integer"
+                },
+                "fragmentSizeBytes": {
+                    "description": "FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.",
+                    "type": "integer"
+                },
+                "numRetries": {
+                    "description": "NumRetries is the number of times the blob has been retried",
+                    "type": "integer"
+                },
+                "requestedAt": {
+                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds",
+                    "type": "integer"
+                },
+                "signature": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "totalChunkSizeBytes": {
+                    "description": "TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "description": "UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_",
+                    "type": "integer"
                 }
             }
         },
@@ -828,14 +1153,6 @@ const docTemplateV2 = `{
                 },
                 "status": {
                     "type": "string"
-                }
-            }
-        },
-        "v2.BlobVerificationInfoResponse": {
-            "type": "object",
-            "properties": {
-                "blob_verification_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobVerificationInfo"
                 }
             }
         },
@@ -940,6 +1257,9 @@ const docTemplateV2 = `{
                 "dispersal_socket": {
                     "type": "string"
                 },
+                "dispersal_status": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -948,6 +1268,38 @@ const docTemplateV2 = `{
                 },
                 "retrieval_socket": {
                     "type": "string"
+                },
+                "retrieval_status": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.OperatorSigningInfo": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                },
+                "quorum_id": {
+                    "type": "integer"
+                },
+                "signing_percentage": {
+                    "type": "number"
+                },
+                "stake_percentage": {
+                    "type": "number"
+                },
+                "total_batches": {
+                    "type": "integer"
+                },
+                "total_responsible_batches": {
+                    "type": "integer"
+                },
+                "total_unsigned_batches": {
+                    "type": "integer"
                 }
             }
         },
@@ -965,6 +1317,17 @@ const docTemplateV2 = `{
                 },
                 "stake_percentage": {
                     "type": "number"
+                }
+            }
+        },
+        "v2.OperatorsSigningInfoResponse": {
+            "type": "object",
+            "properties": {
+                "operator_signing_info": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OperatorSigningInfo"
+                    }
                 }
             }
         },

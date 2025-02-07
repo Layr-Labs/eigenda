@@ -3,14 +3,15 @@ module github.com/Layr-Labs/eigenda
 go 1.21.13
 
 require (
-	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250115171849-5af43b43bf20
-	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250115171849-5af43b43bf20
+	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
+	github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.11
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
 	github.com/consensys/gnark-crypto v0.12.1
+	github.com/docker/go-units v0.5.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/fxamacker/cbor/v2 v2.5.0
@@ -18,7 +19,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ingonyama-zk/icicle/v3 v3.1.0
+	github.com/ingonyama-zk/icicle/v3 v3.4.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -47,7 +48,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/Layr-Labs/cerberus-api v0.0.2-0.20250108174619-d5e1eb03fbd5 // indirect
+	github.com/Layr-Labs/cerberus-api v0.0.2-0.20250117193600-e69c5e8b08fd // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
@@ -70,7 +71,7 @@ require (
 	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bytedance/sonic v1.9.2 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
@@ -85,7 +86,6 @@ require (
 	github.com/docker/cli v25.0.3+incompatible // indirect
 	github.com/docker/docker v25.0.6+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect

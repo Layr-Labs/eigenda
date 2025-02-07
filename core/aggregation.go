@@ -138,7 +138,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
 			if err != nil {
-				a.Logger.Error("failed to get operator address from registry", "operatorID", operatorIDHex)
+				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
 				a.OperatorAddresses.Add(r.Operator, operatorAddr)
@@ -357,9 +357,13 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
+	totalStake := state.Totals[quorum].Stake
+	if totalStake.Cmp(big.NewInt(0)) == 0 {
+		return 0
+	}
 
 	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
-	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)
+	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())
 

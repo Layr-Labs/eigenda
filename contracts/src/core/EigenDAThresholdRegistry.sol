@@ -22,39 +22,17 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumAdversaryThresholdPercentages,
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
-        VersionedBlobParams[] memory _versionedBlobParams,
-        SecurityThresholds memory _defaultSecurityThresholdsV2
+        VersionedBlobParams[] memory _versionedBlobParams
     ) external initializer {
         _transferOwnership(_initialOwner);
 
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
         quorumNumbersRequired = _quorumNumbersRequired;
-        defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
         
         for (uint256 i = 0; i < _versionedBlobParams.length; ++i) {
             _addVersionedBlobParams(_versionedBlobParams[i]);
         }
-    }
-
-    function updateQuorumAdversaryThresholdPercentages(bytes memory _quorumAdversaryThresholdPercentages) external onlyOwner {
-        emit QuorumAdversaryThresholdPercentagesUpdated(quorumAdversaryThresholdPercentages, _quorumAdversaryThresholdPercentages);
-        quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
-    }
-
-    function updateQuorumConfirmationThresholdPercentages(bytes memory _quorumConfirmationThresholdPercentages) external onlyOwner {
-        emit QuorumConfirmationThresholdPercentagesUpdated(quorumConfirmationThresholdPercentages, _quorumConfirmationThresholdPercentages);
-        quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
-    }
-
-    function updateQuorumNumbersRequired(bytes memory _quorumNumbersRequired) external onlyOwner {
-        emit QuorumNumbersRequiredUpdated(quorumNumbersRequired, _quorumNumbersRequired);
-        quorumNumbersRequired = _quorumNumbersRequired;
-    }
-
-    function updateDefaultSecurityThresholdsV2(SecurityThresholds memory _defaultSecurityThresholdsV2) external onlyOwner {
-        emit DefaultSecurityThresholdsV2Updated(defaultSecurityThresholdsV2, _defaultSecurityThresholdsV2);
-        defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
     }
 
     function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) external onlyOwner returns (uint16) {
@@ -96,11 +74,6 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     }
 
     ///////////////////////// V2 ///////////////////////////////
-
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
-        return defaultSecurityThresholdsV2;
-    }
 
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {

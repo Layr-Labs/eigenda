@@ -177,9 +177,11 @@ type (
 	OperatorPortCheckResponse struct {
 		OperatorId      string `json:"operator_id"`
 		DispersalSocket string `json:"dispersal_socket"`
-		RetrievalSocket string `json:"retrieval_socket"`
 		DispersalOnline bool   `json:"dispersal_online"`
+		DispersalStatus string `json:"dispersal_status"`
+		RetrievalSocket string `json:"retrieval_socket"`
 		RetrievalOnline bool   `json:"retrieval_online"`
+		RetrievalStatus string `json:"retrieval_status"`
 	}
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`
@@ -911,7 +913,7 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 
 // OperatorPortCheck godoc
 //
-//	@Summary	Operator node reachability port check
+//	@Summary	Operator v1 node reachability port check
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		operator_id	query		string	true	"Operator ID"
@@ -928,7 +930,7 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.ProbeOperatorHosts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.ProbeV1OperatorPorts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound

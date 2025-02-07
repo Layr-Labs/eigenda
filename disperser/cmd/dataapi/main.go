@@ -99,7 +99,7 @@ func RunDataApi(ctx *cli.Context) error {
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -123,15 +123,9 @@ func RunDataApi(ctx *cli.Context) error {
 		)
 	)
 
-	// Enable Metrics Block
-	if config.MetricsConfig.EnableMetrics {
-		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
-		metrics.Start(context.Background())
-		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
-	}
-
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 		serverv2 := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -150,7 +144,22 @@ func RunDataApi(ctx *cli.Context) error {
 			logger,
 			metrics,
 		)
+
+		// Enable Metrics Block
+		if config.MetricsConfig.EnableMetrics {
+			httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
+			metrics.Start(context.Background())
+			logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
+		}
+
 		return runServer(serverv2, logger)
+	}
+
+	// Enable Metrics Block
+	if config.MetricsConfig.EnableMetrics {
+		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
+		metrics.Start(context.Background())
+		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
 	}
 
 	return runServer(server, logger)

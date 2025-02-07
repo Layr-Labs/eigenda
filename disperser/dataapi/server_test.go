@@ -52,8 +52,9 @@ var (
 
 	config = dataapi.Config{ServerMode: "test", SocketAddr: ":8080", AllowOrigins: []string{"*"}, DisperserHostname: "localhost:32007", ChurnerHostname: "localhost:32009"}
 
+	serverVersion     = uint(1)
 	mockTx            = &coremock.MockWriter{}
-	metrics           = dataapi.NewMetrics(nil, "9001", mockLogger)
+	metrics           = dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger)
 	opId0, _          = core.OperatorIDFromHex("e22dae12a0074f20b8fc96a0489376db34075e545ef60c4845d264a732568311")
 	opId1, _          = core.OperatorIDFromHex("e23cae12a0074f20b8fc96a0489376db34075e545ef60c4845d264b732568312")
 	mockChainState, _ = coremock.NewChainDataMock(map[uint8]map[core.OperatorID]int{
@@ -71,7 +72,7 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
+	testDataApiServer               = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 	expectedRequestedAt             = uint64(5567830000000000000)
 	expectedDataLength              = 32
 	expectedBatchId                 = uint32(99)
