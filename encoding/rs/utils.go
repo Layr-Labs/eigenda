@@ -11,34 +11,8 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// ToFrArray TODO: This function will be removed in favor ToFieldElementArray
-func ToFrArray(data []byte) ([]fr.Element, error) {
-	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_SYMBOL)
-	eles := make([]fr.Element, numEle)
-
-	for i := uint64(0); i < numEle; i++ {
-		start := i * uint64(encoding.BYTES_PER_SYMBOL)
-		end := (i + 1) * uint64(encoding.BYTES_PER_SYMBOL)
-		if end >= uint64(len(data)) {
-			padded := make([]byte, encoding.BYTES_PER_SYMBOL)
-			copy(padded, data[start:])
-			err := eles[i].SetBytesCanonical(padded)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err := eles[i].SetBytesCanonical(data[start:end])
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return eles, nil
-}
-
-// BytesToFieldElements accept a byte array as an input, and converts it to an array of field elements
-func BytesToFieldElements(inputData []byte) ([]fr.Element, error) {
+// ToFrArray accept a byte array as an input, and converts it to an array of field elements
+func ToFrArray(inputData []byte) ([]fr.Element, error) {
 	bytes := padToBytesPerSymbol(inputData)
 
 	elementCount := len(bytes) / encoding.BYTES_PER_SYMBOL

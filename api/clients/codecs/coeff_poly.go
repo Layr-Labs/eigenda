@@ -20,7 +20,7 @@ type coeffPoly struct {
 // coeffPolyFromBytes creates a new polynomial from bytes. This function performs the necessary checks to guarantee that the
 // bytes are well-formed, and returns a new object if they are
 func coeffPolyFromBytes(bytes []byte) (*coeffPoly, error) {
-	fieldElements, err := rs.BytesToFieldElements(bytes)
+	fieldElements, err := rs.ToFrArray(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
 	}
