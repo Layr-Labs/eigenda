@@ -12,7 +12,7 @@ import (
 
 func TestLightLoad(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetClient(t, []core.QuorumID{0, 1})
+	c := client.GetTestClient(t, []core.QuorumID{0, 1})
 
 	config := DefaultLoadGeneratorConfig()
 	config.AverageBlobSize = 100 * units.KiB

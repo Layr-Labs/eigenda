@@ -142,6 +142,8 @@ func (l *LoadGenerator) submitBlob() {
 		cancel()
 	}()
 
+	// TODO: failure metrics
+
 	payloadSize := int(l.rand.BoundedGaussian(
 		float64(l.config.AverageBlobSize),
 		float64(l.config.BlobSizeStdDev),
@@ -152,16 +154,25 @@ func (l *LoadGenerator) submitBlob() {
 	eigenDACert, err := l.client.DispersePayload(ctx, payload, rand.Uint32())
 	if err != nil {
 		fmt.Printf("failed to disperse blob: %v\n", err)
+		return
 	}
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
 		fmt.Printf("failed to compute blob key: %v\n", err)
+		return
 	}
 
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
-		l.client.ReadBlobFromRelays(ctx, *blobKey, eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys, payload)
+		err = l.client.ReadBlobFromRelays(
+			ctx,
+			*blobKey,
+			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+			payload)
+		if err != nil {
+			fmt.Printf("failed to read blob from relays: %v\n", err)
+		}
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
@@ -171,12 +182,15 @@ func (l *LoadGenerator) submitBlob() {
 	}
 
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
-		l.client.ReadBlobFromValidators(
+		err = l.client.ReadBlobFromValidators(
 			ctx,
 			*blobKey,
 			blobHeader.Version,
 			*commitment,
 			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 			payload)
+		if err != nil {
+			fmt.Printf("failed to read blob from validators: %v\n", err)
+		}
 	}
 }
