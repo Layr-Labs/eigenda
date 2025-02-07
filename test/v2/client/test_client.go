@@ -181,7 +181,7 @@ func NewTestClient(
 		Quorums:             quorums,
 	}
 
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.BlobEncodingVersion)
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.PayloadEncodingVersion)
 	require.NoError(t, err)
 
 	payloadDisperser, err := clients.NewPayloadDisperser(
