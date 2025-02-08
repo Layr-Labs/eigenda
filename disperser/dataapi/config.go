@@ -8,3 +8,10 @@ type Config struct {
 	ChurnerHostname    string
 	BatcherHealthEndpt string
 }
+
+type DataApiVersion uint
+
+const (
+	V1 DataApiVersion = 1
+	V2 DataApiVersion = 2
+)

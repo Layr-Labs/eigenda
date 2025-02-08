@@ -221,12 +221,8 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	return false, fmt.Sprintf("grpc available but %s service not found at %s", serviceName, socket)
 }
 
-func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
-	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber()
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
-	}
-	state, err := oh.chainState.GetOperatorState(ctx, currentBlock, []core.QuorumID{0, 1, 2})
+func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operatorId string, currentBlock uint32) (*OperatorsStakeResponse, error) {
+	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), []core.QuorumID{0, 1, 2})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed operator state: %w", err)
 	}
@@ -249,20 +245,17 @@ func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId str
 			}
 		}
 	}
-	stakeRanked["total"] = make([]*OperatorStake, 0)
-	for i, op := range tqs {
-		if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
-			stakeRanked["total"] = append(stakeRanked["total"], &OperatorStake{
-				QuorumId:        "total",
-				OperatorId:      op.OperatorId.Hex(),
-				StakePercentage: op.StakeShare / 100.0,
-				Rank:            i + 1,
-			})
-		}
-	}
 	return &OperatorsStakeResponse{
 		StakeRankedOperators: stakeRanked,
 	}, nil
+}
+
+func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
+	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
+	}
+	return oh.GetOperatorsStakeAtBlock(ctx, operatorId, uint32(currentBlock))
 }
 
 func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {

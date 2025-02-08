@@ -1306,17 +1306,32 @@ const docTemplateV2 = `{
         "v2.OperatorsSigningInfoResponse": {
             "type": "object",
             "properties": {
+                "end_block": {
+                    "type": "integer"
+                },
+                "end_time_unix_sec": {
+                    "type": "integer"
+                },
                 "operator_signing_info": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/v2.OperatorSigningInfo"
                     }
+                },
+                "start_block": {
+                    "type": "integer"
+                },
+                "start_time_unix_sec": {
+                    "type": "integer"
                 }
             }
         },
         "v2.OperatorsStakeResponse": {
             "type": "object",
             "properties": {
+                "current_block": {
+                    "type": "integer"
+                },
                 "stake_ranked_operators": {
                     "type": "object",
                     "additionalProperties": {
