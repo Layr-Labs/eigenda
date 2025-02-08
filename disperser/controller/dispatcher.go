@@ -43,7 +43,8 @@ type Dispatcher struct {
 	logger            logging.Logger
 	metrics           *dispatcherMetrics
 
-	cursor *blobstore.StatusIndexCursor
+	cursor          *blobstore.StatusIndexCursor
+	signalHeartbeat func()
 }
 
 type batchData struct {
@@ -63,6 +64,7 @@ func NewDispatcher(
 	nodeClientManager NodeClientManager,
 	logger logging.Logger,
 	registry *prometheus.Registry,
+	signalHeartbeat func(),
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -81,7 +83,8 @@ func NewDispatcher(
 		logger:            logger.With("component", "Dispatcher"),
 		metrics:           newDispatcherMetrics(registry),
 
-		cursor: nil,
+		cursor:          nil,
+		signalHeartbeat: signalHeartbeat,
 	}, nil
 }
 
@@ -124,6 +127,9 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 }
 
 func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage, *batchData, error) {
+	// Signal Liveness to indicate no stall
+	d.signalHeartbeat()
+
 	start := time.Now()
 	defer func() {
 		d.metrics.reportHandleBatchLatency(time.Since(start))

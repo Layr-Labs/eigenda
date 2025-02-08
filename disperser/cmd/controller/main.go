@@ -41,7 +41,6 @@ var (
 	controllerHealthProbePath    string        = "/tmp/controller-health"
 	controllerMaxStallDuration   time.Duration = 240 * time.Second
 	controllerLivenessChan                     = make(chan time.Time, 1)
-	controllerHeartbeatChan                    = make(chan time.Time, 1)
 )
 
 func main() {
@@ -135,6 +134,7 @@ func RunController(ctx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
+		func() { signalHeartbeat(controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -201,6 +201,7 @@ func RunController(ctx *cli.Context) error {
 		nodeClientManager,
 		logger,
 		metricsRegistry,
+		func() { signalHeartbeat(controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -228,9 +229,6 @@ func RunController(ctx *cli.Context) error {
 	if _, err := os.Create(controllerReadinessProbePath); err != nil {
 		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
-
-	// Signal heartbeat
-	signalHeartbeat(logger)
 
 	return nil
 }
@@ -266,9 +264,9 @@ func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration)
 	}
 }
 
-func signalHeartbeat(logger logging.Logger) {
+func signalHeartbeat(controllerLivenessChan chan time.Time, logger logging.Logger) {
 	select {
-	case controllerHeartbeatChan <- time.Now():
+	case controllerLivenessChan <- time.Now():
 		logger.Info("Heartbeat signal sent from Controller")
 	default:
 		// Avoid blocking if the channel is full or no receiver is actively consuming
