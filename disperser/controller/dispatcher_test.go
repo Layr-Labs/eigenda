@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,7 +57,7 @@ type dispatcherComponents struct {
 }
 
 func TestDispatcherHandleBatch(t *testing.T) {
-	components := newDispatcherComponents(t)
+	components, getHeartbeats := newDispatcherComponents(t)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	ctx := context.Background()
 
@@ -139,7 +140,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 }
 
 func TestDispatcherInsufficientSignatures(t *testing.T) {
-	components := newDispatcherComponents(t)
+	components, getHeartbeats := newDispatcherComponents(t)
 	failedObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	successfulObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -230,7 +231,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 }
 
 func TestDispatcherInsufficientSignatures2(t *testing.T) {
-	components := newDispatcherComponents(t)
+	components, getHeartbeats := newDispatcherComponents(t)
 	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -306,7 +307,7 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 }
 
 func TestDispatcherMaxBatchSize(t *testing.T) {
-	components := newDispatcherComponents(t)
+	components, getHeartbeats := newDispatcherComponents(t)
 	numBlobs := 12
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
 	ctx := context.Background()
@@ -340,7 +341,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 }
 
 func TestDispatcherNewBatch(t *testing.T) {
-	components := newDispatcherComponents(t)
+	components, getHeartbeats := newDispatcherComponents(t)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	require.Len(t, objs.blobHedaers, 2)
 	require.Len(t, objs.blobKeys, 2)
@@ -551,11 +552,11 @@ func newDispatcherComponents(t *testing.T) (*dispatcherComponents, func() []time
 	var heartbeatsReceived []time.Time
 	doneListening := make(chan bool)
 
-	// Mock signalHeartbeat function
+	// Mocked signalHeartbeat function
 	mockSignalHeartbeat := func() {
 		mu.Lock()
+		defer mu.Unlock()
 		heartbeatsReceived = append(heartbeatsReceived, time.Now())
-		mu.Unlock()
 	}
 
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
@@ -564,7 +565,7 @@ func newDispatcherComponents(t *testing.T) (*dispatcherComponents, func() []time
 		NodeRequestTimeout:     1 * time.Second,
 		NumRequestRetries:      3,
 		MaxBatchSize:           maxBatchSize,
-	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry())
+	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), mockSignalHeartbeat)
 	require.NoError(t, err)
 	return &dispatcherComponents{
 			Dispatcher:        d,

@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,18 +111,6 @@ func TestGetRelayKeys(t *testing.T) {
 func TestEncodingManagerHandleBatch(t *testing.T) {
 	ctx := context.Background()
 
-	defer func() {
-		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
-				"Heartbeats should have at least 1-second interval")
-		}
-	}()
-
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -134,11 +123,23 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	require.NoError(t, err)
 
-	c := newTestComponents(t, false)
+	c, getHeartbeats := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
+
+		// Additional checks (e.g., time intervals between heartbeats)
+		for i := 1; i < len(heartbeats); i++ {
+			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
+				"Heartbeats should have at least 1-second interval")
+		}
+	}()
 
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
@@ -164,18 +165,6 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	ctx := context.Background()
 
-	defer func() {
-		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
-				"Heartbeats should have at least 1-second interval")
-		}
-	}()
-
 	numBlobs := 12
 	keys := make([]corev2.BlobKey, numBlobs)
 	headers := make([]*corev2.BlobHeader, numBlobs)
@@ -194,8 +183,20 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	c := newTestComponents(t, true)
+	c, getHeartbeats := newTestComponents(t, true)
 	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + 1)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
+
+		// Additional checks (e.g., time intervals between heartbeats)
+		for i := 1; i < len(heartbeats); i++ {
+			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
+				"Heartbeats should have at least 1-second interval")
+		}
+	}()
 
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
 	expectedNumTasks := 0
@@ -236,6 +237,9 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 	ctx := context.Background()
 
+	c, getHeartbeats := newTestComponents(t, false)
+	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
 	defer func() {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
@@ -248,26 +252,12 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 		}
 	}()
 
-	c := newTestComponents(t, false)
-	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	err := c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
 }
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	ctx := context.Background()
-
-	defer func() {
-		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
-				"Heartbeats should have at least 1-second interval")
-		}
-	}()
 
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
@@ -281,12 +271,24 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	require.NoError(t, err)
 
-	c := newTestComponents(t, false)
+	c, getHeartbeats := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
+
+		// Additional checks (e.g., time intervals between heartbeats)
+		for i := 1; i < len(heartbeats); i++ {
+			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
+				"Heartbeats should have at least 1-second interval")
+		}
+	}()
 
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
@@ -313,18 +315,6 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	ctx := context.Background()
 
-	defer func() {
-		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
-				"Heartbeats should have at least 1-second interval")
-		}
-	}()
-	
 	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
 	now := time.Now()
 	metadata1 := &commonv2.BlobMetadata{
@@ -337,8 +327,20 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	require.NoError(t, err)
 
-	c := newTestComponents(t, false)
+	c, getHeartbeats := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
+
+		// Additional checks (e.g., time intervals between heartbeats)
+		for i := 1; i < len(heartbeats); i++ {
+			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
+				"Heartbeats should have at least 1-second interval")
+		}
+	}()
 
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
@@ -359,7 +361,7 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
-func newTestComponents(t *testing.T, mockPool bool) *testComponents {
+func newTestComponents(t *testing.T, mockPool bool) (*testComponents, func() []time.Time) {
 	logger := testutils.GetLogger()
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// require.NoError(t, err)
@@ -383,6 +385,18 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond
 
+	// Heartbeat tracking variables
+	var mu sync.Mutex
+	var heartbeatsReceived []time.Time
+	doneListening := make(chan bool)
+
+	// Mocked signalHeartbeat function
+	mockSignalHeartbeat := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		heartbeatsReceived = append(heartbeatsReceived, time.Now())
+	}
+
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
 		PullInterval:                1 * time.Second,
 		EncodingRequestTimeout:      5 * time.Second,
@@ -392,7 +406,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry())
+	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), mockSignalHeartbeat)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
@@ -400,10 +414,15 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	// Start the encoding manager to fetch the onchain state
 	_ = em.Start(ctx)
 	return &testComponents{
-		EncodingManager: em,
-		Pool:            pool,
-		EncodingClient:  encodingClient,
-		ChainReader:     chainReader,
-		MockPool:        mockP,
-	}
+			EncodingManager: em,
+			Pool:            pool,
+			EncodingClient:  encodingClient,
+			ChainReader:     chainReader,
+			MockPool:        mockP,
+		}, func() []time.Time {
+			close(doneListening) // Stop tracking
+			mu.Lock()
+			defer mu.Unlock()
+			return heartbeatsReceived
+		}
 }
