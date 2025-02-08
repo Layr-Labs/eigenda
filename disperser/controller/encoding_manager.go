@@ -61,7 +61,8 @@ type EncodingManager struct {
 	cursor                *blobstore.StatusIndexCursor
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
 
-	metrics *encodingManagerMetrics
+	metrics         *encodingManagerMetrics
+	signalHeartbeat func()
 }
 
 func NewEncodingManager(
@@ -72,6 +73,7 @@ func NewEncodingManager(
 	chainReader core.Reader,
 	logger logging.Logger,
 	registry *prometheus.Registry,
+	signalHeartbeat func(),
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
 		len(config.AvailableRelays) == 0 ||
@@ -90,6 +92,7 @@ func NewEncodingManager(
 		logger:                logger.With("component", "EncodingManager"),
 		cursor:                nil,
 		metrics:               newEncodingManagerMetrics(registry),
+		signalHeartbeat:       signalHeartbeat,
 	}, nil
 }
 
@@ -142,6 +145,9 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 }
 
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
+	// Signal Liveness to indicate no stall
+	e.signalHeartbeat()
+
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {

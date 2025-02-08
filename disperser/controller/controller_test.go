@@ -57,7 +57,6 @@ var (
 
 func TestMain(m *testing.M) {
 	setup(m)
-	startHeartbeatMonitoring()
 	code := m.Run()
 	teardown()
 	os.Exit(code)
@@ -224,6 +223,9 @@ func TestHeartbeatMonitoring(t *testing.T) {
 		heartbeatChan <- time.Now()
 		time.Sleep(50 * time.Millisecond)
 	}
+
+	// Stop listening after test
+	close(doneListening)
 }
 
 func startHeartbeatMonitoring() {
