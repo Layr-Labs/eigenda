@@ -189,11 +189,6 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
 		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-				"Heartbeats should have at least 1-second interval")
-		}
 	}()
 
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
