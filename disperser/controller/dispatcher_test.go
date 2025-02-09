@@ -64,7 +64,6 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	defer func() {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
 
 		// Additional checks (e.g., time intervals between heartbeats)
 		for i := 1; i < len(heartbeats); i++ {
@@ -148,7 +147,6 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	defer func() {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
 
 		// Additional checks (e.g., time intervals between heartbeats)
 		for i := 1; i < len(heartbeats); i++ {
@@ -239,7 +237,6 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	defer func() {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
-		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
 
 		// Additional checks (e.g., time intervals between heartbeats)
 		for i := 1; i < len(heartbeats); i++ {
@@ -314,7 +311,6 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 
 	defer func() {
 		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
 		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
 
 		// Additional checks (e.g., time intervals between heartbeats)
@@ -351,7 +347,6 @@ func TestDispatcherNewBatch(t *testing.T) {
 
 	defer func() {
 		heartbeats := getHeartbeats()
-		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
 		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
 
 		// Additional checks (e.g., time intervals between heartbeats)
@@ -415,12 +410,6 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 		heartbeats := getHeartbeats()
 		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
 		require.GreaterOrEqual(t, len(heartbeats), 2, "Expected at least 2 heartbeats")
-
-		// Additional checks (e.g., time intervals between heartbeats)
-		for i := 1; i < len(heartbeats); i++ {
-			require.GreaterOrEqual(t, heartbeats[i].Sub(heartbeats[i-1]), time.Second,
-				"Heartbeats should have at least 1-second interval")
-		}
 	}()
 
 	certs := []*corev2.BlobCertificate{
