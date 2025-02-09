@@ -18,7 +18,7 @@ func TestPutBlobNoopSigner(t *testing.T) {
 	assert.NoError(t, err)
 
 	test := []byte("test")
-	test[0] = 0x00 // make sure the first byte of the requst is always 0
+	test[0] = 0x00 // make sure the first byte of the request is always 0
 	quorums := []uint8{0}
 	_, _, err = disperserClient.DisperseBlobAuthenticated(context.Background(), test, quorums)
 	st, isGRPCError := status.FromError(err)
