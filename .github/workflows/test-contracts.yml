@@ -30,10 +30,6 @@ jobs:
         with:
           version: nightly
 
-      - name: Install forge dependencies
-        run: forge install
-        working-directory: ./contracts
-
       - name: Set Node.js 16.x
         uses: actions/setup-node@v3
         with:
@@ -43,6 +39,12 @@ jobs:
         uses: borales/actions-yarn@v4
         with:
           cmd: install
+
+      - name: Install forge dependencies
+        run: |
+          yarn
+          forge install
+        working-directory: ./contracts
 
       - name: Run tests
         run: forge test -vvv
