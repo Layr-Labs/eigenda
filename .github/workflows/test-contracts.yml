@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  forge-tests:
     name: Foundry Project
     runs-on: ubuntu-22.04
     steps:
@@ -37,3 +37,31 @@ jobs:
       - name: Run snapshot
         run: forge snapshot
         working-directory: ./contracts
+
+  binding-verify:
+    name: Verify bindings are updated
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Go 1.21.13
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.13'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      
+      - name: Install forge dependencies
+        run: forge install
+        working-directory: ./contracts
+
+      - name: Install abi gen
+        run: go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+
+      - name: Bindings diff check
+        run: make compile-contracts && git diff --exit-code
