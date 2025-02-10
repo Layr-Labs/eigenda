@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -37,12 +40,20 @@ type Metrics struct {
 	logger   logging.Logger
 }
 
-func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
-	reg.MustRegister(NewDynamoDBCollector(blobMetadataStore, logger))
+	if serverVersion == 1 {
+		if store, ok := blobMetadataStore.(*blobstore.BlobMetadataStore); ok {
+			reg.MustRegister(NewDynamoDBCollector(store, logger))
+		}
+	} else if serverVersion == 2 {
+		if store, ok := blobMetadataStore.(*blobstorev2.BlobMetadataStore); ok {
+			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, logger))
+		}
+	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
 			prometheus.CounterOpts{
@@ -107,8 +118,8 @@ func NewMetrics(blobMetadataStore *blobstore.BlobMetadataStore, httpPort string,
 }
 
 // ObserveLatency observes the latency of a stage in 'stage
-func (g *Metrics) ObserveLatency(method string, latencyMs float64) {
-	g.Latency.WithLabelValues(method).Observe(latencyMs)
+func (g *Metrics) ObserveLatency(method string, duration time.Duration) {
+	g.Latency.WithLabelValues(method).Observe(float64(duration.Milliseconds()))
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests
@@ -232,5 +243,152 @@ func (collector *DynamoDBCollector) Collect(ch chan<- prometheus.Metric) {
 		prometheus.GaugeValue,
 		float64(count),
 		disperser.Processing.String(),
+	)
+}
+
+// BlobStatusMetrics holds the metrics for a specific blob status
+type BlobStatusMetrics struct {
+	gauge        prometheus.Gauge
+	currentValue float64
+}
+
+// BlobMetadataStoreV2Collector collects metrics from the blob metadata store.
+type BlobMetadataStoreV2Collector struct {
+	blobMetadataStore *blobstorev2.BlobMetadataStore
+	statusMetrics     map[commonv2.BlobStatus]*BlobStatusMetrics
+	logger            logging.Logger
+	ctx               context.Context
+	cancel            context.CancelFunc
+}
+
+func NewBlobMetadataStoreV2Collector(blobMetadataStore *blobstorev2.BlobMetadataStore, logger logging.Logger) *BlobMetadataStoreV2Collector {
+	ctx, cancel := context.WithCancel(context.Background())
+	collector := &BlobMetadataStoreV2Collector{
+		blobMetadataStore: blobMetadataStore,
+		statusMetrics:     make(map[commonv2.BlobStatus]*BlobStatusMetrics),
+		logger:            logger,
+		ctx:               ctx,
+		cancel:            cancel,
+	}
+
+	// Create a gauge for each possible status (that is not terminal)
+	for _, status := range []commonv2.BlobStatus{
+		commonv2.Queued,
+		commonv2.Encoded,
+		commonv2.GatheringSignatures,
+	} {
+		gauge := prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "eigenda_blob_metadata_v2_status_count",
+				Help: "Current number of blobs in this status. In case of timeouts or failures when querying the blob metadata store (e.g. when there are too many blobs), the last known value will be returned as stale data.",
+				ConstLabels: prometheus.Labels{
+					"status": status.String(),
+				},
+			},
+		)
+		prometheus.MustRegister(gauge)
+		collector.statusMetrics[status] = &BlobStatusMetrics{
+			gauge:        gauge,
+			currentValue: 0,
+		}
+	}
+
+	// Do initial count
+	collector.updateCounts(context.Background())
+
+	return collector
+}
+
+// countBlobsWithStatus counts blobs for a specific status with pagination and timeout handling
+func (collector *BlobMetadataStoreV2Collector) countBlobsWithStatus(ctx context.Context, status commonv2.BlobStatus) (int32, error) {
+	var totalCount int32
+	var cursor *blobstorev2.StatusIndexCursor
+
+	for {
+		select {
+		case <-ctx.Done():
+			return totalCount, ctx.Err()
+		default:
+			blobs, nextCursor, err := collector.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, status, cursor, 100)
+			if err != nil {
+				return totalCount, err
+			}
+
+			count := int32(len(blobs))
+			totalCount += count
+
+			collector.logger.Debug("Got partial count for status",
+				"status", status.String(),
+				"partial_count", count,
+				"running_total", totalCount,
+				"has_more", nextCursor != nil,
+			)
+
+			if count == 0 || nextCursor == nil {
+				return totalCount, nil
+			}
+			cursor = nextCursor
+		}
+	}
+}
+
+func (collector *BlobMetadataStoreV2Collector) updateCounts(ctx context.Context) {
+	collector.logger.Debug("Starting blob status count update")
+	startTime := time.Now()
+
+	for status, metrics := range collector.statusMetrics {
+		statusCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+
+		totalCount, err := collector.countBlobsWithStatus(statusCtx, status)
+		defer cancel()
+
+		if err != nil {
+			collector.logger.Error("Failed to get count of blob metadata by status - using stale data",
+				"status", status,
+				"err", err,
+				"current_count", metrics.currentValue,
+			)
+			continue // Keep using the last known value
+		}
+
+		metrics.gauge.Set(float64(totalCount))
+		metrics.currentValue = float64(totalCount)
+
+		collector.logger.Debug("Updated blob status count",
+			"status", status.String(),
+			"count", totalCount,
+		)
+	}
+
+	collector.logger.Debug("Completed blob status count update",
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
+}
+
+func (collector *BlobMetadataStoreV2Collector) Describe(ch chan<- *prometheus.Desc) {
+	for _, metrics := range collector.statusMetrics {
+		ch <- metrics.gauge.Desc()
+	}
+}
+
+func (collector *BlobMetadataStoreV2Collector) Collect(ch chan<- prometheus.Metric) {
+	collector.logger.Debug("Prometheus scrape triggered, updating counts")
+	startTime := time.Now()
+
+	// Create a context with timeout for the entire collection.
+	// The default scrape timeout is 10 seconds so we set it to 8 seconds to allow for some time for the collection.
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	// Try to get fresh counts
+	collector.updateCounts(ctx)
+
+	// Send current gauge values (either fresh or stale)
+	for _, metrics := range collector.statusMetrics {
+		ch <- metrics.gauge
+	}
+
+	collector.logger.Debug("Completed blob metadata store v2 collector scrape",
+		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 }

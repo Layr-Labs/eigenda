@@ -17,11 +17,11 @@ concurrency:
 ##       - (stretch) yarn fmt
 ##       - some level of security through automated static analysis (e.g, slither)
 jobs:
-  tests:
+  forge-tests:
     name: Foundry Project
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
           submodules: recursive
 
@@ -51,3 +51,31 @@ jobs:
       - name: Run snapshot
         run: forge snapshot
         working-directory: ./contracts
+
+  binding-verify:
+    name: Verify bindings are updated
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Go 1.21.13
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.13'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      
+      - name: Install forge dependencies
+        run: forge install
+        working-directory: ./contracts
+
+      - name: Install abi gen
+        run: go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+
+      - name: Bindings diff check
+        run: make compile-contracts && git diff --exit-code

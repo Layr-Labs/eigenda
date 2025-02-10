@@ -86,6 +86,13 @@ func (r *TestRandom) String(length int) string {
 	return string(b)
 }
 
+// VariableString generates a random string out of printable ASCII characters of a length between
+// min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableString(min int, max int) string {
+	length := r.Intn(max-min) + min
+	return r.String(length)
+}
+
 // Uint32n generates a random uint32 less than n.
 func (r *TestRandom) Uint32n(n uint32) uint32 {
 	return r.Uint32() % n
@@ -94,6 +101,24 @@ func (r *TestRandom) Uint32n(n uint32) uint32 {
 // Uint64n generates a random uint64 less than n.
 func (r *TestRandom) Uint64n(n uint64) uint64 {
 	return r.Uint64() % n
+}
+
+// Gaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation.
+func (r *TestRandom) Gaussian(mean float64, stddev float64) float64 {
+	return r.NormFloat64()*stddev + mean
+}
+
+// BoundedGaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation,
+// but bounded by the given min and max values. If a generated value exceeds the bounds, the bound is returned instead.
+func (r *TestRandom) BoundedGaussian(mean float64, stddev float64, min float64, max float64) float64 {
+	val := r.Gaussian(mean, stddev)
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
 }
 
 var _ io.Reader = &randIOReader{}

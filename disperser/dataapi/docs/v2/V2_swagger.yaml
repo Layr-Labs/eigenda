@@ -8,16 +8,10 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   core.G2Point:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -41,10 +35,6 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -63,23 +53,15 @@ definitions:
         items:
           type: integer
         type: array
-      "y":
-        items:
-          type: integer
-        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
-        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
-      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -229,10 +211,6 @@ definitions:
         items:
           type: integer
         type: array
-      a1:
-        items:
-          type: integer
-        type: array
     type: object
   semver.SemverMetrics:
     properties:
@@ -286,6 +264,17 @@ definitions:
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'
     type: object
+  v2.BlobAttestationInfoResponse:
+    properties:
+      attestation:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      batch_header_hash:
+        type: string
+      blob_inclusion_info:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+      blob_key:
+        type: string
+    type: object
   v2.BlobCertificateResponse:
     properties:
       blob_certificate:
@@ -299,11 +288,6 @@ definitions:
         type: array
       pagination_token:
         type: string
-    type: object
-  v2.BlobInclusionInfoResponse:
-    properties:
-      blob_inclusion_info:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
     type: object
   v2.BlobInfo:
     properties:
@@ -405,19 +389,8 @@ definitions:
     type: object
   v2.Metric:
     properties:
-      cost_in_gas:
-        type: number
       throughput:
         type: number
-      total_stake:
-        allOf:
-        - $ref: '#/definitions/big.Int'
-        description: 'deprecated: use TotalStakePerQuorum instead. Remove when the
-          frontend is updated.'
-      total_stake_per_quorum:
-        additionalProperties:
-          $ref: '#/definitions/big.Int'
-        type: object
     type: object
   v2.OperatorDispersalResponses:
     properties:
@@ -426,7 +399,7 @@ definitions:
           $ref: '#/definitions/v2.DispersalResponse'
         type: array
     type: object
-  v2.OperatorPortCheckResponse:
+  v2.OperatorLivenessResponse:
     properties:
       dispersal_online:
         type: boolean
@@ -441,12 +414,6 @@ definitions:
       retrieval_socket:
         type: string
       retrieval_status:
-        type: string
-      v2_dispersal_online:
-        type: boolean
-      v2_dispersal_socket:
-        type: string
-      v2_dispersal_status:
         type: string
     type: object
   v2.OperatorSigningInfo:
@@ -481,13 +448,23 @@ definitions:
     type: object
   v2.OperatorsSigningInfoResponse:
     properties:
+      end_block:
+        type: integer
+      end_time_unix_sec:
+        type: integer
       operator_signing_info:
         items:
           $ref: '#/definitions/v2.OperatorSigningInfo'
         type: array
+      start_block:
+        type: integer
+      start_time_unix_sec:
+        type: integer
     type: object
   v2.OperatorsStakeResponse:
     properties:
+      current_block:
+        type: integer
       stake_ranked_operators:
         additionalProperties:
           items:
@@ -544,7 +521,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch batch by the batch header hash
       tags:
-      - Batch
+      - Batches
   /batches/feed:
     get:
       parameters:
@@ -584,7 +561,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch batch feed
       tags:
-      - Batch
+      - Batches
   /blobs/{blob_key}:
     get:
       parameters:
@@ -614,7 +591,37 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch blob metadata by blob key
       tags:
-      - Blob
+      - Blobs
+  /blobs/{blob_key}/attestation-info:
+    get:
+      parameters:
+      - description: Blob key in hex string
+        in: path
+        name: blob_key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobAttestationInfoResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch attestation info for a blob
+      tags:
+      - Blobs
   /blobs/{blob_key}/certificate:
     get:
       parameters:
@@ -644,42 +651,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch blob certificate by blob key v2
       tags:
-      - Blob
-  /blobs/{blob_key}/inclusion-info:
-    get:
-      parameters:
-      - description: Blob key in hex string
-        in: path
-        name: blob_key
-        required: true
-        type: string
-      - description: Batch header hash in hex string
-        in: path
-        name: batch_header_hash
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.BlobInclusionInfoResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob inclusion info by blob key and batch header hash
-      tags:
-      - Blob
+      - Blobs
   /blobs/feed:
     get:
       parameters:
@@ -724,7 +696,7 @@ paths:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch blob feed
       tags:
-      - Blob
+      - Blobs
   /metrics/summary:
     get:
       parameters:
@@ -827,7 +799,36 @@ paths:
       summary: Fetch operator attestation response for a batch
       tags:
       - Operators
-  /operators/nodeinfo:
+  /operators/liveness:
+    get:
+      parameters:
+      - description: 'Operator ID in hex string [default: all operators if unspecified]'
+        in: query
+        name: operator_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.OperatorLivenessResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Check operator v2 node liveness
+      tags:
+      - Operators
+  /operators/node-info:
     get:
       produces:
       - application/json
@@ -841,35 +842,6 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Active operator semver
-      tags:
-      - Operators
-  /operators/reachability:
-    get:
-      parameters:
-      - description: 'Operator ID in hex string [default: all operators if unspecified]'
-        in: query
-        name: operator_id
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.OperatorPortCheckResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-      summary: Operator node reachability check
       tags:
       - Operators
   /operators/signing-info:

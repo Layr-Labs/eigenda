@@ -130,12 +130,6 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NODE_REQUEST_TIMEOUT"),
 	}
-	NumConnectionsToNodesFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "num-connections-to-nodes"),
-		Usage:    "Max number of connections to nodes",
-		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_CONNECTIONS_TO_NODES"),
-	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
 		Usage:    "Number of blocks to wait before finalizing",
@@ -203,7 +197,6 @@ var requiredFlags = []cli.Flag{
 
 	DispatcherPullIntervalFlag,
 	NodeRequestTimeoutFlag,
-	NumConnectionsToNodesFlag,
 }
 
 var optionalFlags = []cli.Flag{

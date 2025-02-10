@@ -21,7 +21,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Batch"
+                    "Batches"
                 ],
                 "summary": "Fetch batch feed",
                 "parameters": [
@@ -78,7 +78,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Batch"
+                    "Batches"
                 ],
                 "summary": "Fetch batch by the batch header hash",
                 "parameters": [
@@ -124,7 +124,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
                 "summary": "Fetch blob feed",
                 "parameters": [
@@ -187,7 +187,7 @@ const docTemplateV2 = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
                 "summary": "Fetch blob metadata by blob key",
                 "parameters": [
@@ -227,15 +227,15 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/certificate": {
+        "/blobs/{blob_key}/attestation-info": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob certificate by blob key v2",
+                "summary": "Fetch attestation info for a blob",
                 "parameters": [
                     {
                         "type": "string",
@@ -249,7 +249,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobCertificateResponse"
+                            "$ref": "#/definitions/v2.BlobAttestationInfoResponse"
                         }
                     },
                     "400": {
@@ -273,27 +273,20 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/{blob_key}/inclusion-info": {
+        "/blobs/{blob_key}/certificate": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Blob"
+                    "Blobs"
                 ],
-                "summary": "Fetch blob inclusion info by blob key and batch header hash",
+                "summary": "Fetch blob certificate by blob key v2",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Blob key in hex string",
                         "name": "blob_key",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
                         "in": "path",
                         "required": true
                     }
@@ -302,7 +295,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.BlobInclusionInfoResponse"
+                            "$ref": "#/definitions/v2.BlobCertificateResponse"
                         }
                     },
                     "400": {
@@ -431,7 +424,52 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/operators/nodeinfo": {
+        "/operators/liveness": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Check operator v2 node liveness",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Operator ID in hex string [default: all operators if unspecified]",
+                        "name": "operator_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorLivenessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/node-info": {
             "get": {
                 "produces": [
                     "application/json"
@@ -445,51 +483,6 @@ const docTemplateV2 = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/v2.SemverReportResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/operators/reachability": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Operators"
-                ],
-                "summary": "Operator node reachability check",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Operator ID in hex string [default: all operators if unspecified]",
-                        "name": "operator_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.OperatorPortCheckResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
                         }
                     },
                     "500": {
@@ -674,12 +667,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -687,9 +674,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -723,12 +707,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -757,12 +735,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -771,9 +743,6 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -781,9 +750,6 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -987,12 +953,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "a1": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -1076,6 +1036,23 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.BlobAttestationInfoResponse": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "blob_inclusion_info": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                },
+                "blob_key": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.BlobCertificateResponse": {
             "type": "object",
             "properties": {
@@ -1095,14 +1072,6 @@ const docTemplateV2 = `{
                 },
                 "pagination_token": {
                     "type": "string"
-                }
-            }
-        },
-        "v2.BlobInclusionInfoResponse": {
-            "type": "object",
-            "properties": {
-                "blob_inclusion_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
                 }
             }
         },
@@ -1246,25 +1215,8 @@ const docTemplateV2 = `{
         "v2.Metric": {
             "type": "object",
             "properties": {
-                "cost_in_gas": {
-                    "type": "number"
-                },
                 "throughput": {
                     "type": "number"
-                },
-                "total_stake": {
-                    "description": "deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/big.Int"
-                        }
-                    ]
-                },
-                "total_stake_per_quorum": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/big.Int"
-                    }
                 }
             }
         },
@@ -1279,7 +1231,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorPortCheckResponse": {
+        "v2.OperatorLivenessResponse": {
             "type": "object",
             "properties": {
                 "dispersal_online": {
@@ -1301,15 +1253,6 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "retrieval_status": {
-                    "type": "string"
-                },
-                "v2_dispersal_online": {
-                    "type": "boolean"
-                },
-                "v2_dispersal_socket": {
-                    "type": "string"
-                },
-                "v2_dispersal_status": {
                     "type": "string"
                 }
             }
@@ -1363,17 +1306,32 @@ const docTemplateV2 = `{
         "v2.OperatorsSigningInfoResponse": {
             "type": "object",
             "properties": {
+                "end_block": {
+                    "type": "integer"
+                },
+                "end_time_unix_sec": {
+                    "type": "integer"
+                },
                 "operator_signing_info": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/v2.OperatorSigningInfo"
                     }
+                },
+                "start_block": {
+                    "type": "integer"
+                },
+                "start_time_unix_sec": {
+                    "type": "integer"
                 }
             }
         },
         "v2.OperatorsStakeResponse": {
             "type": "object",
             "properties": {
+                "current_block": {
+                    "type": "integer"
+                },
                 "stake_ranked_operators": {
                     "type": "object",
                     "additionalProperties": {
