@@ -30,7 +30,7 @@ func testBasicDispersal(
 	payload []byte,
 	quorums []core.QuorumID) error {
 
-	c := client.GetTestClient(t)
+	c := client.GetTestClient(t, client.PreprodEnv)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -50,7 +50,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	blobBytes := []byte{}
 	quorums := []core.QuorumID{0, 1}
 
-	c := client.GetTestClient(t)
+	c := client.GetTestClient(t, client.PreprodEnv)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -98,7 +98,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 func TestLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 
-	config, err := client.GetConfig()
+	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 
@@ -124,7 +124,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 	quorums := []core.QuorumID{0, 1}
 
-	config, err := client.GetConfig()
+	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 	dataLength := maxBlobSize
@@ -140,7 +140,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	// TODO refactor this to use exactly 1 byte more than max size after padding and header data
 
-	config, err := client.GetConfig()
+	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 	maxBlobSize := int(config.MaxBlobSize)
 
@@ -154,7 +154,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 
 func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetTestClient(t)
+	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
@@ -174,7 +174,7 @@ func TestDoubleDispersal(t *testing.T) {
 
 func TestUnauthorizedGetChunks(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetTestClient(t)
+	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
@@ -206,7 +206,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 
 	rand := random.NewTestRandom(t)
 
-	c := client.GetTestClient(t)
+	c := client.GetTestClient(t, client.PreprodEnv)
 
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))

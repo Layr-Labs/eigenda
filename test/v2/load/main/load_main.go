@@ -18,8 +18,7 @@ func main() {
 	envFile := os.Args[1]
 	loadFile := os.Args[2]
 
-	client.SetTargetConfigFile(envFile)
-	c, err := client.GetClient()
+	c, err := client.GetClient(envFile)
 	if err != nil {
 		panic(err)
 	}

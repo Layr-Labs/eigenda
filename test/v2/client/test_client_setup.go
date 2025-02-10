@@ -14,36 +14,28 @@ import (
 )
 
 var (
-	targetConfigFile = "../config/environment/preprod.json"
-	configLock       sync.Mutex
-	config           *TestClientConfig
-	clientLock       sync.Mutex
-	client           *TestClient
-	//clientMap        = make(map[string]*TestClient)
-	logger  logging.Logger
-	metrics *testClientMetrics
+	configLock sync.Mutex
+	clientLock sync.Mutex
+	configMap  = make(map[string]*TestClientConfig)
+	clientMap  = make(map[string]*TestClient)
+	logger     logging.Logger
+	metrics    *testClientMetrics
 )
 
-func SetTargetConfigFile(file string) {
-	clientLock.Lock()
-	defer clientLock.Unlock()
+const (
+	PreprodEnv = "../config/environment/preprod.json"
+)
 
-	targetConfigFile = file
-	client.Stop()
-	client = nil // TODO
-	//clientMap = make(map[string]*TestClient)
-}
-
-// GetConfig returns a TestClientConfig instance, creating one if it does not exist.
-func GetConfig() (*TestClientConfig, error) {
+// GetConfig returns a TestClientConfig instance parsed from the config file.
+func GetConfig(configPath string) (*TestClientConfig, error) {
 	configLock.Lock()
 	defer configLock.Unlock()
 
-	if config != nil {
+	if config, ok := configMap[configPath]; ok {
 		return config, nil
 	}
 
-	configFile, err := ResolveTildeInPath(targetConfigFile)
+	configFile, err := ResolveTildeInPath(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
 	}
@@ -52,12 +44,13 @@ func GetConfig() (*TestClientConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config = &TestClientConfig{}
+	config := &TestClientConfig{}
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
-		config = nil
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
+
+	configMap[configPath] = config
 
 	return config, nil
 }
@@ -65,9 +58,9 @@ func GetConfig() (*TestClientConfig, error) {
 // GetTestClient is the same as GetClient, but also performs a check to ensure that the test is not
 // running in a CI environment. If using a TestClient in a unit test, it is critical to use this method
 // to ensure that the test is not running in a CI environment.
-func GetTestClient(t *testing.T) *TestClient {
+func GetTestClient(t *testing.T, configPath string) *TestClient {
 	skipInCI(t)
-	c, err := GetClient()
+	c, err := GetClient(configPath)
 	require.NoError(t, err)
 	return c
 }
@@ -75,47 +68,52 @@ func GetTestClient(t *testing.T) *TestClient {
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes ~1 minute
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient() (*TestClient, error) {
+func GetClient(configPath string) (*TestClient, error) {
 	clientLock.Lock()
 	defer clientLock.Unlock()
 
-	if client != nil {
+	if client, ok := clientMap[configPath]; ok {
 		return client, nil
 	}
 
-	testConfig, err := GetConfig()
+	testConfig, err := GetConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
 
-	//if len(clientMap) == 0 { // TODO
-	var loggerConfig common.LoggerConfig
-	if os.Getenv("CI") != "" {
-		loggerConfig = common.DefaultLoggerConfig()
-	} else {
-		loggerConfig = common.DefaultConsoleLoggerConfig()
+	if len(clientMap) == 0 {
+		// do one time setup
+
+		var loggerConfig common.LoggerConfig
+		if os.Getenv("CI") != "" {
+			loggerConfig = common.DefaultLoggerConfig()
+		} else {
+			loggerConfig = common.DefaultConsoleLoggerConfig()
+		}
+
+		testLogger, err := common.NewLogger(loggerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create logger: %w", err)
+		}
+		logger = testLogger
+
+		// only do this stuff once
+		err = setupFilesystem(logger, testConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
+		}
+
+		testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
+		metrics = testMetrics
+		testMetrics.start()
 	}
 
-	testLogger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
-	}
-	logger = testLogger
-
-	// only do this stuff once
-	err = setupFilesystem(logger, testConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup filesystem: %w", err)
-	}
-
-	testMetrics := newTestClientMetrics(logger, config.MetricsPort)
-	metrics = testMetrics
-	testMetrics.start()
-
-	client, err = NewTestClient(logger, metrics, testConfig)
+	client, err := NewTestClient(logger, metrics, testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test client: %w", err)
 	}
+
+	clientMap[configPath] = client
 
 	return client, nil
 }
@@ -134,7 +132,7 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	}
 
 	// Create the SRS directories if they do not exist
-	srsPath, err := config.path(SRSPath)
+	srsPath, err := config.Path(SRSPath)
 	if err != nil {
 		return fmt.Errorf("failed to get SRS path: %w", err)
 	}
@@ -142,7 +140,7 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create SRS directory: %w", err)
 	}
-	srsTablesPath, err := config.path(SRSPathSRSTables)
+	srsTablesPath, err := config.Path(SRSPathSRSTables)
 	if err != nil {
 		return fmt.Errorf("failed to get SRS tables path: %w", err)
 	}
@@ -152,7 +150,7 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	}
 
 	// If any of the srs files do not exist, download them.
-	filePath, err := config.path(SRSPathG1)
+	filePath, err := config.Path(SRSPathG1)
 	if err != nil {
 		return fmt.Errorf("failed to get SRS G1 path: %w", err)
 	}
@@ -177,7 +175,7 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 		}
 	}
 
-	filePath, err = config.path(SRSPathG2)
+	filePath, err = config.Path(SRSPathG2)
 	if err != nil {
 		return fmt.Errorf("failed to get SRS G2 path: %w", err)
 	}
@@ -202,7 +200,7 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 		}
 	}
 
-	filePath, err = config.path(SRSPathG2PowerOf2)
+	filePath, err = config.Path(SRSPathG2PowerOf2)
 	if err != nil {
 		return fmt.Errorf("failed to get SRS G2 power of 2 path: %w", err)
 	}

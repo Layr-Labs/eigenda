@@ -94,19 +94,19 @@ func NewTestClient(
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Infof("Account ID: %s", accountId.String())
 
-	g1Path, err := config.path(SRSPathG1)
+	g1Path, err := config.Path(SRSPathG1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G1 file: %w", err)
 	}
-	g2Path, err := config.path(SRSPathG2)
+	g2Path, err := config.Path(SRSPathG2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 file: %w", err)
 	}
-	g2PowerOf2Path, err := config.path(SRSPathG2PowerOf2)
+	g2PowerOf2Path, err := config.Path(SRSPathG2PowerOf2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 power of 2 file: %w", err)
 	}
-	srsTablesPath, err := config.path(SRSPathSRSTables)
+	srsTablesPath, err := config.Path(SRSPathSRSTables)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to SRS tables: %w", err)
 	}
@@ -304,7 +304,7 @@ func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.Payl
 	c.logger.Debugf("Creating payload disperser for quorums %v", quorums)
 
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.EigenDACertVerifierAddr = config.EigenDACertVerifierAddress
+	payloadClientConfig.EigenDACertVerifierAddr = c.config.EigenDACertVerifierAddress
 
 	payloadDisperserConfig := &clients.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,

@@ -38,8 +38,8 @@ type TestClientConfig struct {
 	MetricsPort int
 }
 
-// path returns the full path to a file in the test data directory.
-func (c *TestClientConfig) path(elements ...string) (string, error) {
+// Path returns the full path to a file in the test data directory.
+func (c *TestClientConfig) Path(elements ...string) (string, error) {
 	root, err := ResolveTildeInPath(c.TestDataPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
