@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ func main() {
 	loadFile := os.Args[2]
 
 	client.SetTargetConfigFile(envFile)
-	c, err := client.GetClient([]core.QuorumID{0, 1})
+	c, err := client.GetClient()
 	if err != nil {
 		panic(err)
 	}

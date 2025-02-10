@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -19,9 +18,10 @@ var (
 	configLock       sync.Mutex
 	config           *TestClientConfig
 	clientLock       sync.Mutex
-	clientMap        = make(map[string]*TestClient)
-	logger           logging.Logger
-	metrics          *testClientMetrics
+	client           *TestClient
+	//clientMap        = make(map[string]*TestClient)
+	logger  logging.Logger
+	metrics *testClientMetrics
 )
 
 func SetTargetConfigFile(file string) {
@@ -29,7 +29,9 @@ func SetTargetConfigFile(file string) {
 	defer clientLock.Unlock()
 
 	targetConfigFile = file
-	clientMap = make(map[string]*TestClient)
+	client.Stop()
+	client = nil // TODO
+	//clientMap = make(map[string]*TestClient)
 }
 
 // GetConfig returns a TestClientConfig instance, creating one if it does not exist.
@@ -63,64 +65,57 @@ func GetConfig() (*TestClientConfig, error) {
 // GetTestClient is the same as GetClient, but also performs a check to ensure that the test is not
 // running in a CI environment. If using a TestClient in a unit test, it is critical to use this method
 // to ensure that the test is not running in a CI environment.
-func GetTestClient(t *testing.T, quorums []core.QuorumID) *TestClient {
+func GetTestClient(t *testing.T) *TestClient {
 	skipInCI(t)
-	client, err := GetClient(quorums)
+	c, err := GetClient()
 	require.NoError(t, err)
-	return client
+	return c
 }
 
 // GetClient returns a TestClient instance, creating one if it does not exist.
 // This uses a global static client... this is icky, but it takes ~1 minute
 // to read the SRS points, so it's the lesser of two evils to keep it around.
-func GetClient(quorums []core.QuorumID) (*TestClient, error) {
+func GetClient() (*TestClient, error) {
 	clientLock.Lock()
 	defer clientLock.Unlock()
+
+	if client != nil {
+		return client, nil
+	}
 
 	testConfig, err := GetConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config: %w", err)
 	}
 
-	quorumsString := ""
-	for _, quorum := range quorums {
-		quorumsString += string(quorum) + ","
-	}
-	if clientMap[quorumsString] != nil {
-		return clientMap[quorumsString], nil
-	}
-
-	if len(clientMap) == 0 {
-		var loggerConfig common.LoggerConfig
-		if os.Getenv("CI") != "" {
-			loggerConfig = common.DefaultLoggerConfig()
-		} else {
-			loggerConfig = common.DefaultConsoleLoggerConfig()
-		}
-
-		testLogger, err := common.NewLogger(loggerConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create logger: %w", err)
-		}
-		logger = testLogger
-
-		// only do this stuff once
-		err = setupFilesystem(logger, testConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
-		}
-
-		testMetrics := newTestClientMetrics(logger, config.MetricsPort)
-		metrics = testMetrics
-		testMetrics.start()
+	//if len(clientMap) == 0 { // TODO
+	var loggerConfig common.LoggerConfig
+	if os.Getenv("CI") != "" {
+		loggerConfig = common.DefaultLoggerConfig()
+	} else {
+		loggerConfig = common.DefaultConsoleLoggerConfig()
 	}
 
-	client, err := NewTestClient(logger, metrics, testConfig, quorums)
+	testLogger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+	logger = testLogger
+
+	// only do this stuff once
+	err = setupFilesystem(logger, testConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup filesystem: %w", err)
+	}
+
+	testMetrics := newTestClientMetrics(logger, config.MetricsPort)
+	metrics = testMetrics
+	testMetrics.start()
+
+	client, err = NewTestClient(logger, metrics, testConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create test client: %w", err)
 	}
-
-	clientMap[quorumsString] = client
 
 	return client, nil
 }

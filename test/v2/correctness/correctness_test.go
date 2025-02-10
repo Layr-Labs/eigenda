@@ -30,12 +30,12 @@ func testBasicDispersal(
 	payload []byte,
 	quorums []core.QuorumID) error {
 
-	c := client.GetTestClient(t, quorums)
+	c := client.GetTestClient(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, payload, rand.Uint32())
+	err := c.DisperseAndVerify(ctx, quorums, payload, rand.Uint32())
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -50,14 +50,14 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	blobBytes := []byte{}
 	quorums := []core.QuorumID{0, 1}
 
-	c := client.GetTestClient(t, quorums)
+	c := client.GetTestClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.DisperserClient.DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blob size must be greater than 0")
 }
@@ -154,33 +154,35 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 
 func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetTestClient(t, []core.QuorumID{0, 1})
+	c := client.GetTestClient(t)
 
+	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, payload, salt)
+	err := c.DisperseAndVerify(ctx, quorums, payload, salt)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, payload, salt)
+	err = c.DisperseAndVerify(ctx, quorums, payload, salt)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
 	rand := random.NewTestRandom(t)
-	c := client.GetTestClient(t, []core.QuorumID{0, 1})
+	c := client.GetTestClient(t)
 
+	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, payload, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, quorums, payload, rand.Uint32())
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
@@ -194,7 +196,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 		Start:   0,
 		End:     1,
 	}
-	_, err = c.RelayClient.GetChunksByRange(ctx, targetRelay, chunkRequests)
+	_, err = c.GetRelayClient().GetChunksByRange(ctx, targetRelay, chunkRequests)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to get operator key: operator not found")
 }
@@ -204,7 +206,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 
 	rand := random.NewTestRandom(t)
 
-	c := client.GetTestClient(t, quorums)
+	c := client.GetTestClient(t)
 
 	// Create a dispersal client with a random key
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
@@ -216,8 +218,8 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	fmt.Printf("Account ID: %s\n", accountId.String())
 
 	disperserConfig := &clients.DisperserClientConfig{
-		Hostname:          c.Config.DisperserHostname,
-		Port:              fmt.Sprintf("%d", c.Config.DisperserPort),
+		Hostname:          c.GetConfig().DisperserHostname,
+		Port:              fmt.Sprintf("%d", c.GetConfig().DisperserPort),
 		UseSecureGrpcFlag: true,
 	}
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)

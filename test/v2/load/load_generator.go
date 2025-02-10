@@ -75,7 +75,7 @@ func NewLoadGenerator(
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
-	metrics := newLoadGeneratorMetrics(client.MetricsRegistry)
+	metrics := newLoadGeneratorMetrics(client.GetMetricsRegistry())
 
 	return &LoadGenerator{
 		ctx:                ctx,
@@ -136,10 +136,10 @@ func (l *LoadGenerator) submitBlob() {
 		l.config.AverageBlobSizeMB*units.MiB,
 		l.config.BlobSizeStdDev*units.MiB,
 		1.0,
-		float64(l.client.Config.MaxBlobSize+1)))
+		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload := l.rand.Bytes(payloadSize)
 
-	eigenDACert, err := l.client.DispersePayload(ctx, payload, rand.Uint32())
+	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload, rand.Uint32())
 	if err != nil {
 		fmt.Printf("failed to disperse blob: %v\n", err)
 		return

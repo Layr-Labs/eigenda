@@ -1,5 +1,10 @@
 package client
 
+import (
+	"fmt"
+	"path"
+)
+
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	// The location where persistent test data is stored (e.g. SRS files). Often private keys are stored here too.
@@ -31,4 +36,18 @@ type TestClientConfig struct {
 	MinimumSigningPercent int
 	// The port to use for metrics (if metrics are being collected)
 	MetricsPort int
+}
+
+// path returns the full path to a file in the test data directory.
+func (c *TestClientConfig) path(elements ...string) (string, error) {
+	root, err := ResolveTildeInPath(c.TestDataPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+	}
+
+	combinedElements := make([]string, 0, len(elements)+1)
+	combinedElements = append(combinedElements, root)
+	combinedElements = append(combinedElements, elements...)
+
+	return path.Join(combinedElements...), nil
 }
