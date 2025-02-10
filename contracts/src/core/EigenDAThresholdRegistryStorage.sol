@@ -10,7 +10,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * @notice This storage contract is separate from the logic to simplify the upgrade process.
  */
 abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
-
     /// @notice The adversary threshold percentage for the quorum at position `quorumNumber`
     bytes public quorumAdversaryThresholdPercentages;
 

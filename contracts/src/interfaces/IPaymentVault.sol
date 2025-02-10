@@ -2,13 +2,12 @@
 pragma solidity ^0.8.9;
 
 interface IPaymentVault {
-
     struct Reservation {
         uint64 symbolsPerSecond; // Number of symbols reserved per second
-        uint64 startTimestamp;   // timestamp of epoch where reservation begins
-        uint64 endTimestamp;     // timestamp of epoch where reservation ends
-        bytes quorumNumbers;     // quorum numbers in an ordered bytes array
-        bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
+        uint64 startTimestamp; // timestamp of epoch where reservation begins
+        uint64 endTimestamp; // timestamp of epoch where reservation ends
+        bytes quorumNumbers; // quorum numbers in an ordered bytes array
+        bytes quorumSplits; // quorum splits in a bytes array that correspond to the quorum numbers
     }
 
     struct OnDemandPayment {
@@ -27,11 +26,11 @@ interface IPaymentVault {
     event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
     /// @notice Emitted when priceParams are updated
     event PriceParamsUpdated(
-        uint64 previousMinNumSymbols, 
-        uint64 newMinNumSymbols, 
-        uint64 previousPricePerSymbol, 
-        uint64 newPricePerSymbol, 
-        uint64 previousPriceUpdateCooldown, 
+        uint64 previousMinNumSymbols,
+        uint64 newMinNumSymbols,
+        uint64 previousPricePerSymbol,
+        uint64 newPricePerSymbol,
+        uint64 previousPriceUpdateCooldown,
         uint64 newPriceUpdateCooldown
     );
 
@@ -40,10 +39,7 @@ interface IPaymentVault {
      * @param _account is the address to submit the reservation for
      * @param _reservation is the Reservation struct containing details of the reservation
      */
-    function setReservation(
-        address _account, 
-        Reservation memory _reservation
-    ) external;
+    function setReservation(address _account, Reservation memory _reservation) external;
 
     /**
      * @notice This function is called to deposit funds for on demand payment

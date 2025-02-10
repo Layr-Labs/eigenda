@@ -4,10 +4,9 @@ pragma solidity =0.8.12;
 import "../MockEigenDADeployer.sol";
 
 contract EigenDARelayRegistryUnit is MockEigenDADeployer {
-
     event RelayAdded(address indexed relay, uint32 indexed key, string relayURL);
 
-    function setUp() virtual public {
+    function setUp() public virtual {
         _deployDA();
     }
 
@@ -28,7 +27,9 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
         vm.prank(registryCoordinatorOwner);
         eigenDARelayRegistry.addRelayInfo(relayInfo);
 
-        assertEq(eigenDARelayRegistry.relayKeyToAddress(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayAddress);
+        assertEq(
+            eigenDARelayRegistry.relayKeyToAddress(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayAddress
+        );
         assertEq(eigenDARelayRegistry.relayKeyToUrl(eigenDARelayRegistry.nextRelayKey() - 1), relayInfo.relayURL);
     }
 

@@ -12,7 +12,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * @author Layr Labs, Inc.
  */
 contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpgradeable {
-
     constructor() {
         _disableInitializers();
     }
@@ -29,13 +28,17 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
         quorumNumbersRequired = _quorumNumbersRequired;
-        
+
         for (uint256 i = 0; i < _versionedBlobParams.length; ++i) {
             _addVersionedBlobParams(_versionedBlobParams[i]);
         }
     }
 
-    function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) external onlyOwner returns (uint16) {
+    function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams)
+        external
+        onlyOwner
+        returns (uint16)
+    {
         return _addVersionedBlobParams(_versionedBlobParams);
     }
 
@@ -48,27 +51,31 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     ///////////////////////// V1 ///////////////////////////////
 
     /// @notice Gets the adversary threshold percentage for a quorum
-    function getQuorumAdversaryThresholdPercentage(
-        uint8 quorumNumber
-    ) public view virtual returns (uint8 adversaryThresholdPercentage) {
-        if(quorumAdversaryThresholdPercentages.length > quorumNumber){
+    function getQuorumAdversaryThresholdPercentage(uint8 quorumNumber)
+        public
+        view
+        virtual
+        returns (uint8 adversaryThresholdPercentage)
+    {
+        if (quorumAdversaryThresholdPercentages.length > quorumNumber) {
             adversaryThresholdPercentage = uint8(quorumAdversaryThresholdPercentages[quorumNumber]);
         }
     }
 
     /// @notice Gets the confirmation threshold percentage for a quorum
-    function getQuorumConfirmationThresholdPercentage(
-        uint8 quorumNumber
-    ) public view virtual returns (uint8 confirmationThresholdPercentage) {
-        if(quorumConfirmationThresholdPercentages.length > quorumNumber){
+    function getQuorumConfirmationThresholdPercentage(uint8 quorumNumber)
+        public
+        view
+        virtual
+        returns (uint8 confirmationThresholdPercentage)
+    {
+        if (quorumConfirmationThresholdPercentages.length > quorumNumber) {
             confirmationThresholdPercentage = uint8(quorumConfirmationThresholdPercentages[quorumNumber]);
         }
     }
 
     /// @notice Checks if a quorum is required
-    function getIsQuorumRequired(
-        uint8 quorumNumber
-    ) public view virtual returns (bool) {
+    function getIsQuorumRequired(uint8 quorumNumber) public view virtual returns (bool) {
         uint256 quorumBitmap = BitmapUtils.setBit(0, quorumNumber);
         return (quorumBitmap & BitmapUtils.orderedBytesArrayToBitmap(quorumNumbersRequired) == quorumBitmap);
     }

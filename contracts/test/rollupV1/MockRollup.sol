@@ -14,7 +14,6 @@ struct Commitment {
 }
 
 contract MockRollup {
-
     IEigenDAServiceManager public eigenDAServiceManager; // EigenDASM contract
     BN254.G1Point public tau; //power of tau
 
@@ -31,10 +30,9 @@ contract MockRollup {
      * @param blobHeader the blob header
      * @param blobVerificationProof the blob verification proof
      */
-    function postCommitment(
-        BlobHeader memory blobHeader, 
-        BlobVerificationProof memory blobVerificationProof
-    ) external { 
+    function postCommitment(BlobHeader memory blobHeader, BlobVerificationProof memory blobVerificationProof)
+        external
+    {
         // require commitment has not already been posted
         // require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
 
@@ -49,10 +47,13 @@ contract MockRollup {
      * @notice a function for users to challenge a commitment against a provided value
      * @param timestamp the timestamp of the commitment being challenged
      * @param point the point on the polynomial to evaluate
-     * @param proof revelvant KZG proof 
+     * @param proof revelvant KZG proof
      * @param challengeValue The value expected upon opening the commitment
      */
-    function challengeCommitment(uint256 timestamp, uint256 point, BN254.G2Point memory proof, uint256 challengeValue) external returns (bool) {
+    function challengeCommitment(uint256 timestamp, uint256 point, BN254.G2Point memory proof, uint256 challengeValue)
+        external
+        returns (bool)
+    {
         Commitment memory commitment = commitments[timestamp];
         // require the commitment exists
         require(commitment.confirmer != address(0), "MockRollup.challengeCommitment: Commitment not posted");
@@ -63,5 +64,4 @@ contract MockRollup {
         // verify that the commitment contains the challenge value
         return EigenDARollupUtils.openCommitment(point, challengeValue, tau, commitment.polynomialCommitment, proof);
     }
-
 }

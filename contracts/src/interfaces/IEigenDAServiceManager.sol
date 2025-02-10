@@ -9,7 +9,7 @@ import "./IEigenDAStructs.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     // EVENTS
-    
+
     /**
      * @notice Emitted when a Batch is confirmed.
      * @param batchHeaderHash The hash of the batch header
@@ -36,7 +36,7 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     ) external;
 
     /// @notice mapping between the batchId to the hash of the metadata of the corresponding Batch
-    function batchIdToBatchMetadataHash(uint32 batchId) external view returns(bytes32);
+    function batchIdToBatchMetadataHash(uint32 batchId) external view returns (bytes32);
 
     /// @notice Returns the current batchId
     function taskNumber() external view returns (uint32);

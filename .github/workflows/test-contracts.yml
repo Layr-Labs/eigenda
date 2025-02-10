@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  test:
     name: Foundry Project
     runs-on: ubuntu-22.04
     steps:
@@ -25,6 +25,11 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: "Forge Fmt"
+        run: |
+          forge fmt --check
+        working-directory: ./contracts
 
       - name: Install forge dependencies
         run: forge install

@@ -11,14 +11,11 @@ import "../interfaces/IEigenDAStructs.sol";
  * @author Layr Labs, Inc.
  */
 contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage, IEigenDARelayRegistry {
-
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(
-        address _initialOwner
-    ) external initializer {
+    function initialize(address _initialOwner) external initializer {
         _transferOwnership(_initialOwner);
     }
 
