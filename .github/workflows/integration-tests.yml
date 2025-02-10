@@ -60,7 +60,11 @@ jobs:
       - name: Get Forge version
         run: forge --version
 
-      - name: Build contracts
+      - name: Build contract dependencies
+        run: |
+          cd contracts && yarn
+
+      - name: Compile contracts
         run: |
           cd contracts && forge build
 

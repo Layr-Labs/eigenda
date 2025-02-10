@@ -12,6 +12,10 @@ concurrency:
   group: ${{github.workflow}}-${{github.ref}}
   cancel-in-progress: true
 
+## TODO: Add automations specifically to ensure:
+##       - changes that affect storage are caught by CI
+##       - (stretch) yarn fmt
+##       - some level of security through automated static analysis (e.g, slither)
 jobs:
   forge-tests:
     name: Foundry Project
@@ -29,6 +33,16 @@ jobs:
       - name: Install forge dependencies
         run: forge install
         working-directory: ./contracts
+
+      - name: Set Node.js 16.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+
+      - name: Run install
+        uses: borales/actions-yarn@v4
+        with:
+          cmd: install
 
       - name: Run tests
         run: forge test -vvv
