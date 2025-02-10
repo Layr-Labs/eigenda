@@ -590,3 +590,8 @@ type BlobVersionParameters struct {
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
 }
+
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActiveByMicroTimestamp(currentTimestamp uint64) bool {
+	return ar.StartTimestamp <= currentTimestamp/1e6 && ar.EndTimestamp >= currentTimestamp/1e6
+}

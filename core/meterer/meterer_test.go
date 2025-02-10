@@ -182,8 +182,8 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
-	now := time.Now().Unix()
-	reservationPeriod := meterer.GetReservationPeriod(now, mt.ChainPaymentState.GetReservationWindow())
+	now := time.Now().UnixMicro()
+	reservationPeriod := meterer.GetReservationPeriodByMicroTimestamp(now, mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -197,17 +197,22 @@ func TestMetererReservations(t *testing.T) {
 	})).Return(account3Reservations, nil)
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
 
-	// test invalid quorom ID
+	// test not active reservation
 	header := createPaymentHeader(1, big.NewInt(0), accountID1)
 	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
-	assert.ErrorContains(t, err, "quorum number mismatch")
+	assert.ErrorContains(t, err, "reservation not active")
+
+	// test invalid quorom ID
+	header = createPaymentHeader(now, big.NewInt(0), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2})
+	assert.ErrorContains(t, err, "invalid quorum for reservation")
 
 	// overwhelming bin overflow for empty bin
-	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
+	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow())*1e6, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
 	// overwhelming bin overflow for empty bins
-	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
+	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow())*1e6, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
@@ -227,7 +232,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid reservation period
-	header = createPaymentHeader(now-3*int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID1)
+	header = createPaymentHeader(now-2*int64(mt.ChainPaymentState.GetReservationWindow())*1e6, big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
@@ -235,7 +240,9 @@ func TestMetererReservations(t *testing.T) {
 	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
+		fmt.Println("-----------------\nnow", now, "i", i)
 		header = createPaymentHeader(now, big.NewInt(0), accountID2)
+		fmt.Println("header", header)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers)
 		assert.NoError(t, err)
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{

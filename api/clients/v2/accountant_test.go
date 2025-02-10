@@ -73,7 +73,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, symbolLength, quorums)
 
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetReservationPeriod(time.Now().Unix(), reservationWindow), meterer.GetReservationPeriodByNanoTimestamp(int64(header.Timestamp), reservationWindow))
+	assert.Equal(t, meterer.GetReservationPeriod(time.Now().Unix(), reservationWindow), meterer.GetReservationPeriodByMicroTimestamp(int64(header.Timestamp), reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
