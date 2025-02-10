@@ -39,24 +39,6 @@ const (
 	SRSPathSRSTables  = SRSPath + "/SRSTables"
 )
 
-// TestClientConfig is the configuration for the test client.
-type TestClientConfig struct {
-	TestDataPath                  string
-	KeyPath                       string
-	DisperserHostname             string
-	DisperserPort                 int
-	EthRPCURLs                    []string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	EigenDACertVerifierAddress    string
-	SubgraphURL                   string
-	SRSOrder                      uint64
-	SRSNumberToLoad               uint64
-	MaxBlobSize                   uint64
-	MinimumSigningPercent         int // out of 100
-	MetricsPort                   int
-}
-
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	Config                    *TestClientConfig
@@ -135,7 +117,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to get account ID: %w", err)
 	}
 	accountId := gethcommon.HexToAddress(signerAccountId)
-	logger.Infof("Account ID: %s\n", accountId.String())
+	logger.Infof("Account ID: %s", accountId.String())
 
 	g1Path, err := config.path(SRSPathG1)
 	if err != nil {
@@ -180,6 +162,12 @@ func NewTestClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disperser client: %w", err)
 	}
+	err = disperserClient.PopulateAccountant(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate accountant: %w", err)
+	} else {
+		logger.Warn("Accountant populated") // TODO delete
+	}
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          config.EthRPCURLs,
@@ -207,6 +195,7 @@ func NewTestClient(
 	payloadDisperserConfig := &clients.PayloadDisperserConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		Quorums:             quorums,
+		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.BlobEncodingVersion)
@@ -267,6 +256,7 @@ func NewTestClient(
 
 	relayPayloadRetrieverConfig := &clients.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *payloadClientConfig,
+		RelayTimeout:        1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	relayPayloadRetriever, err := clients.NewRelayPayloadRetriever(
@@ -295,6 +285,7 @@ func NewTestClient(
 		MaxConnectionCount:            20,
 		BlsOperatorStateRetrieverAddr: config.BLSOperatorStateRetrieverAddr,
 		EigenDAServiceManagerAddr:     config.EigenDAServiceManagerAddr,
+		RetrievalTimeout:              1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	retrievalClient := clients.NewRetrievalClient(
@@ -408,7 +399,7 @@ func (c *TestClient) DispersePayload(
 	payload []byte,
 	salt uint32) (*verification.EigenDACert, error) {
 
-	c.Logger.Debugf("Dispersing payload of length %d\n", len(payload))
+	c.Logger.Debugf("Dispersing payload of length %d", len(payload))
 	start := time.Now()
 
 	cert, err := c.PayloadDisperser.SendPayload(ctx, payload, salt)
@@ -502,7 +493,7 @@ func (c *TestClient) ReadBlobFromRelays(
 	for _, relayID := range relayKeys {
 		start := time.Now()
 
-		c.Logger.Debugf("Reading blob from relay %d\n", relayID)
+		c.Logger.Debugf("Reading blob from relay %d", relayID)
 		blobFromRelay, err := c.RelayClient.GetBlob(ctx, relayID, key)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay: %w", err)
@@ -538,7 +529,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	for _, quorumID := range quorums {
-		c.Logger.Debugf("Reading blob from validators for quorum %d\n", quorumID)
+		c.Logger.Debugf("Reading blob from validators for quorum %d", quorumID)
 
 		start := time.Now()
 
