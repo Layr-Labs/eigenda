@@ -109,7 +109,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	requestReservationPeriod := GetReservationPeriod(uint64(header.Timestamp), reservationWindow)
+	requestReservationPeriod := GetReservationPeriodByNanoTimestamp(int64(header.Timestamp), reservationWindow)
 	if !m.ValidateReservationPeriod(header, reservation, requestReservationPeriod) {
 		return fmt.Errorf("invalid reservation period for reservation")
 	}
@@ -143,11 +143,11 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
 func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ReservedPayment, requestReservationPeriod uint32) bool {
-	now := uint64(time.Now().Unix())
+	now := time.Now().Unix()
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
 	// Valid reservation periodes are either the current bin or the previous bin
-	if (requestReservationPeriod != currentReservationPeriod && requestReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(reservation.StartTimestamp, reservationWindow) > requestReservationPeriod || requestReservationPeriod > GetReservationPeriod(reservation.EndTimestamp, reservationWindow)) {
+	if (requestReservationPeriod != currentReservationPeriod && requestReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow) > requestReservationPeriod || requestReservationPeriod > GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)) {
 		return false
 	}
 	return true
@@ -168,7 +168,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		// metered usage before updating the size already exceeded the limit
 		return fmt.Errorf("bin has already been filled")
 	}
-	if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(reservation.EndTimestamp, m.ChainPaymentState.GetReservationWindow()) {
+	if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), m.ChainPaymentState.GetReservationWindow()) {
 		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), newUsage-usageLimit)
 		if err != nil {
 			return err
@@ -180,11 +180,17 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
+func GetReservationPeriodByNanoTimestamp(nano_timestamp int64, binInterval uint32) uint32 {
+	return GetReservationPeriod(nano_timestamp/1e9, binInterval)
+}
+
+// GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
+// bin interval used by the disperser should be public information
+func GetReservationPeriod(timestamp int64, binInterval uint32) uint32 {
 	if binInterval == 0 {
 		return 0
 	}
-	return uint32(timestamp) / binInterval
+	return uint32(timestamp / int64(binInterval))
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
@@ -273,7 +279,7 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
-	globalPeriod := GetReservationPeriod(uint64(time.Now().Unix()), m.ChainPaymentState.GetGlobalRatePeriodInterval())
+	globalPeriod := GetReservationPeriod(time.Now().Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {

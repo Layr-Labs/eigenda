@@ -182,7 +182,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
-	now := uint64(time.Now().Unix())
+	now := time.Now().Unix()
 	reservationPeriod := meterer.GetReservationPeriod(now, mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
@@ -203,11 +203,11 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "quorum number mismatch")
 
 	// overwhelming bin overflow for empty bin
-	header = createPaymentHeader(now-uint64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
+	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 10, quoromNumbers)
 	assert.NoError(t, err)
 	// overwhelming bin overflow for empty bins
-	header = createPaymentHeader(now-uint64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
+	header = createPaymentHeader(now-int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers)
 	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
 
@@ -227,7 +227,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid reservation period
-	header = createPaymentHeader(now-3*uint64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID1)
+	header = createPaymentHeader(now-3*int64(mt.ChainPaymentState.GetReservationWindow()), big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 2000, quoromNumbers)
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
@@ -277,7 +277,7 @@ func TestMetererOnDemand(t *testing.T) {
 	quorumNumbers := []uint8{0, 1}
 	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint32(2), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
-	now := uint64(time.Now().Unix())
+	now := time.Now().Unix()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
@@ -485,10 +485,10 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 	}
 }
 
-func createPaymentHeader(timestamp uint64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
+func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
 	return &core.PaymentMetadata{
 		AccountID:         accountID.Hex(),
-		Timestamp:         timestamp,
+		Timestamp:         uint64(timestamp),
 		CumulativePayment: cumulativePayment,
 	}
 }

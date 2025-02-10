@@ -73,7 +73,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, symbolLength, quorums)
 
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetReservationPeriod(uint64(time.Now().Unix()), reservationWindow), meterer.GetReservationPeriod(uint64(header.Timestamp), reservationWindow))
+	assert.Equal(t, meterer.GetReservationPeriod(time.Now().Unix(), reservationWindow), meterer.GetReservationPeriodByNanoTimestamp(int64(header.Timestamp), reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
@@ -177,13 +177,13 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	// First call: Use reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetReservationPeriod(uint64(now), reservationWindow), header.Timestamp/uint64(reservationWindow))
+	assert.Equal(t, meterer.GetReservationPeriod(now, reservationWindow), header.Timestamp/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
 	header, err = accountant.AccountBlob(ctx, 300, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetReservationPeriod(uint64(now), reservationWindow), header.Timestamp/uint64(reservationWindow))
+	assert.Equal(t, meterer.GetReservationPeriod(now, reservationWindow), header.Timestamp/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
@@ -309,7 +309,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	// Okay reservation
 	header, err := accountant.AccountBlob(ctx, 800, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, meterer.GetReservationPeriod(uint64(now), reservationWindow), header.Timestamp/uint64(reservationWindow))
+	assert.Equal(t, meterer.GetReservationPeriod(now, reservationWindow), header.Timestamp/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
