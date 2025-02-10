@@ -11,6 +11,9 @@ import (
 // This ensures every 32 bytes is within the valid range of a field element for bn254 curve.
 // If the input data is not a multiple of 31, the remainder is added to the output by
 // inserting a 0 and the remainder. The output is thus not necessarily a multiple of 32.
+//
+// TODO (litt3): usage of this function should be migrated to use PadPayload instead. I've left it unchanged for now,
+//  since v1 logic and tests rely on the specific assumptions of this implementation.
 func ConvertByPaddingEmptyByte(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL - 1
@@ -43,6 +46,9 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 // The function does not assume the input is a multiple of BYTES_PER_SYMBOL(32 bytes).
 // For the reminder of the input, the first byte is taken out, and the rest is appended to
 // the output.
+//
+// TODO (litt3): usage of this function should be migrated to use RemoveInternalPadding instead. I've left it unchanged
+//  for now, since v1 logic and tests rely on the specific assumptions of this implementation.
 func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL
@@ -72,6 +78,10 @@ func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 // the data will be a valid field element for the bn254 curve
 //
 // Additionally, this function will add necessary padding to align the output to 32 bytes
+//
+// NOTE: this method is a reimplementation of ConvertByPaddingEmptyByte, with one meaningful difference: the alignment
+// of the output to encoding.BYTES_PER_SYMBOL. This alignment actually makes the padding logic simpler, and the
+// code that uses this function needs an aligned output anyway.
 func PadPayload(inputData []byte) []byte {
 	// 31 bytes, for the bn254 curve
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
@@ -100,25 +110,14 @@ func PadPayload(inputData []byte) []byte {
 	return paddedOutput
 }
 
-// GetPaddedDataLength accepts the length of a byte array, and returns the length that the array would be after
-// adding internal byte padding
-//
-// The value returned from this function will always be a multiple of encoding.BYTES_PER_SYMBOL
-func GetPaddedDataLength(inputLen uint32) uint32 {
-	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
-	chunkCount := inputLen / bytesPerChunk
-
-	if inputLen%bytesPerChunk != 0 {
-		chunkCount++
-	}
-
-	return chunkCount * encoding.BYTES_PER_SYMBOL
-}
-
 // RemoveInternalPadding accepts an array of padded data, and removes the internal padding that was added in PadPayload
 //
-// This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the output
-// from this function is not guaranteed to align to 32 bytes.
+// This function assumes that the input aligns to 32 bytes. Since it is removing 1 byte for every 31 bytes kept, the
+// output from this function is not guaranteed to align to 32 bytes.
+//
+// NOTE: this method is a reimplementation of RemoveEmptyByteFromPaddedBytes, with one meaningful difference: this
+// function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
+// removal logic simpler.
 func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
@@ -142,4 +141,19 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	}
 
 	return outputData, nil
+}
+
+// GetPaddedDataLength accepts the length of a byte array, and returns the length that the array would be after
+// adding internal byte padding
+//
+// The value returned from this function will always be a multiple of encoding.BYTES_PER_SYMBOL
+func GetPaddedDataLength(inputLen uint32) uint32 {
+	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
+	chunkCount := inputLen / bytesPerChunk
+
+	if inputLen%bytesPerChunk != 0 {
+		chunkCount++
+	}
+
+	return chunkCount * encoding.BYTES_PER_SYMBOL
 }
