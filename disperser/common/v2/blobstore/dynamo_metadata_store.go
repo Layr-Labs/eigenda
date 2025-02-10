@@ -293,7 +293,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 // queryBucketBlobMetadata returns blobs (as metadata) within range [startKey, endKey] from a single bucket.
 // Results are ordered by <RequestedAt, Bobkey> in ascending order.
 //
-// The function handles DynamoDB's 1MB response size limitation by performing multiple queries  if necessary.
+// The function handles DynamoDB's 1MB response size limitation by performing multiple queries if necessary.
 func (s *BlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
@@ -308,7 +308,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 		if lastEvaledKey != nil {
 			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse the RequestedAt from the LastEvaluatedKey: %w", err)
+				return nil, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
 			}
 			start = requestedAtBlobkey
 		}
