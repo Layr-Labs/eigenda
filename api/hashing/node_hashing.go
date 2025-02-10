@@ -39,7 +39,6 @@ func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) {
 	}
 	hashBlobCommitment(hasher, header.Commitment)
 	hashPaymentHeader(hasher, header.PaymentHeader)
-	hashUint32(hasher, header.Salt)
 }
 
 func hashBatchHeader(hasher hash.Hash, header *common.BatchHeader) {
@@ -56,6 +55,6 @@ func hashBlobCommitment(hasher hash.Hash, commitment *commonv1.BlobCommitment) {
 
 func hashPaymentHeader(hasher hash.Hash, header *common.PaymentHeader) {
 	hasher.Write([]byte(header.AccountId))
-	hashUint32(hasher, header.ReservationPeriod)
+	hashUint64(hasher, header.Timestamp)
 	hasher.Write(header.CumulativePayment)
 }

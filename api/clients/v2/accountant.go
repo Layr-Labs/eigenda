@@ -66,7 +66,7 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // and both fields are used to create the payment header and signature.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint32, *big.Int, error) {
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint64, *big.Int, error) {
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
 	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
@@ -82,7 +82,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentReservationPeriod, big.NewInt(0), nil
+		return uint64(now), big.NewInt(0), nil
 	}
 
 	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
@@ -92,7 +92,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return currentReservationPeriod, big.NewInt(0), nil
+		return uint64(now), big.NewInt(0), nil
 	}
 
 	// reservation not available, rollback reservation records, attempt on-demand
@@ -112,14 +112,14 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
-	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+	timestamp, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
 	if err != nil {
 		return nil, err
 	}
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		ReservationPeriod: reservationPeriod,
+		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
 

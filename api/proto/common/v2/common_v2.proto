@@ -24,10 +24,6 @@ message BlobHeader {
   common.BlobCommitment commitment = 3;
   // payment_header contains payment information for the blob
   PaymentHeader payment_header = 4;
-  // salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
-  // reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
-  // payments already have unique cumulative_payment values for intentionally unique dispersal requests.
-  uint32 salt = 5;
 }
 
 // BlobCertificate contains a full description of a blob and how it is dispersed. Part of the certificate
@@ -78,6 +74,8 @@ message PaymentHeader {
   // corresponding to the key used by the client to sign the BlobHeader.
   string account_id = 1;
   
+  // The timestamp should be set as the time of the dispersal request, and will be used to determine the reservation period.
+  // If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected.
   // The reservation period of the dispersal request is used for rate-limiting the user's account against their dedicated 
   // bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
   // on-chain record of reserved bandwidth for the user for some period of time. The dispersal client's accountant will set 
@@ -88,19 +86,21 @@ message PaymentHeader {
   // Example Usage Flow:
   //   1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp,
   //      endTimestamp, and reservationPeriodInterval.
-  //   2. When sending a dispersal request at time t, the client computes reservation_period = floor(t / reservationPeriodInterval).
-  //   3. The request includes this reservation_period index. The disperser checks:
+  //   2. When sending a dispersal request at time t, the client fill in the timestamp field with t.
+  //   3. The disperser take timestamp t and checks the reservation period and the user's bandwidth capacity:
   //       - If the reservation is active (t >= startTimestamp and t < endTimestamp).
   //       - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
   //         (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
-  //   4. Server always go ahead with recording the received request, and then categorize the scenarios 
+  //       - The request is ratelimited against the current reservation period, and calculated as reservation_period = t / reservationPeriodInterval.
+  //         the request's reservation period must either be the disperser server's current reservation period or the previous reservation period. 
+  //   4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
   //       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
   //       - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin.
   //       - If the bandwidth has already been exhausted, the request is rejected. 
   //   5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records.
   //      Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 
   //   6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand.
-  uint32 reservation_period = 2;
+  uint64 timestamp = 2;
 
   // Cumulative payment is the total amount of tokens paid by the requesting account, including the current request.
   // This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits

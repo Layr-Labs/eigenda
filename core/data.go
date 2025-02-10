@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"golang.org/x/crypto/sha3"
@@ -490,8 +488,8 @@ type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID string `json:"account_id"`
 
-	// ReservationPeriod represents the range of time at which the dispersal is made
-	ReservationPeriod uint32 `json:"reservation_period"`
+	// Timestamp represents the time of the dispersal request
+	Timestamp uint64 `json:"timestamp"`
 	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
@@ -507,8 +505,8 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "reservationPeriod",
-			Type: "uint32",
+			Name: "timestamp",
+			Type: "uint64",
 		},
 		{
 			Name: "cumulativePayment",
@@ -538,56 +536,13 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 	return hash, nil
 }
 
-func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
-	if pm == nil {
-		return nil, errors.New("payment metadata is nil")
-	}
-
-	return &types.AttributeValueMemberM{
-		Value: map[string]types.AttributeValue{
-			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.ReservationPeriod)},
-			"CumulativePayment": &types.AttributeValueMemberN{
-				Value: pm.CumulativePayment.String(),
-			},
-		},
-	}, nil
-}
-
-func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
-	m, ok := av.(*types.AttributeValueMemberM)
-	if !ok {
-		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
-	}
-	accountID, ok := m.Value["AccountID"].(*types.AttributeValueMemberS)
-	if !ok {
-		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
-	}
-	pm.AccountID = accountID.Value
-	rp, ok := m.Value["ReservationPeriod"].(*types.AttributeValueMemberN)
-	if !ok {
-		return fmt.Errorf("expected *types.AttributeValueMemberN for ReservationPeriod, got %T", m.Value["ReservationPeriod"])
-	}
-	reservationPeriod, err := strconv.ParseUint(rp.Value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
-	}
-	pm.ReservationPeriod = uint32(reservationPeriod)
-	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
-	if !ok {
-		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
-	}
-	pm.CumulativePayment, _ = new(big.Int).SetString(cp.Value, 10)
-	return nil
-}
-
 func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 	if pm == nil {
 		return nil
 	}
 	return &commonpbv2.PaymentHeader{
 		AccountId:         pm.AccountID,
-		ReservationPeriod: pm.ReservationPeriod,
+		Timestamp:         pm.Timestamp,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
 	}
 }
@@ -600,7 +555,7 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
 
 	return &PaymentMetadata{
 		AccountID:         ph.AccountId,
-		ReservationPeriod: ph.ReservationPeriod,
+		Timestamp:         ph.Timestamp,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
 	}
 }

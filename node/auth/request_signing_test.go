@@ -116,10 +116,10 @@ func TestHashing(t *testing.T) {
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
-	// within a blob cert, modify the PaymentHeader.ReservationPeriod
+	// within a blob cert, modify the PaymentHeader.Timestamp
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.ReservationPeriod = rand.Uint32()
+	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.Timestamp = rand.Uint64()
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -127,13 +127,6 @@ func TestHashing(t *testing.T) {
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.CumulativePayment = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
-	require.NotEqual(t, originalRequestHash, hash)
-
-	// within a blob cert, modify the PaymentHeader.Salt
-	rand.Reset()
-	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Salt = rand.Uint32()
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 

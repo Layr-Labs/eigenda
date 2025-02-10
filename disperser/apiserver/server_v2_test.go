@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"math/big"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -68,7 +69,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -137,7 +138,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -157,7 +158,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -175,7 +176,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -193,7 +194,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -210,7 +211,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -229,7 +230,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 0,
+			Timestamp:         0,
 			CumulativePayment: big.NewInt(0).Bytes(),
 		},
 	}
@@ -254,7 +255,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    invalidCommitment,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -284,7 +285,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -310,7 +311,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x1234",
-			ReservationPeriod: 0,
+			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},
 	}
@@ -580,7 +581,7 @@ func TestInvalidLength(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -631,7 +632,7 @@ func TestTooShortCommitment(t *testing.T) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         accountID,
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}

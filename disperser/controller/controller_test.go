@@ -159,7 +159,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(256))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         uint64(timestamp.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
 	}

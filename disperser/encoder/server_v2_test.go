@@ -200,7 +200,7 @@ func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x1234",
-			ReservationPeriod: 0,
+			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},
 	}

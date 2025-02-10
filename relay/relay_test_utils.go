@@ -211,7 +211,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         tu.RandomString(10),
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
