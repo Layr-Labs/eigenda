@@ -140,7 +140,7 @@ func ensureFileIsPresent(
 	if os.IsNotExist(err) {
 		command := make([]string, 3)
 		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
+		command[1] = url
 		command[2] = "--output-document=" + path
 		logger.Info("executing %s", command)
 

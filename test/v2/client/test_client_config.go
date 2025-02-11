@@ -32,8 +32,6 @@ type TestClientConfig struct {
 	SRSNumberToLoad uint64
 	// The maximum blob size supported by the EigenDA network
 	MaxBlobSize uint64
-	// Required signing percentage for a quorum to be considered valid, out of 100
-	MinimumSigningPercent int
 	// The port to use for metrics (if metrics are being collected)
 	MetricsPort int
 }
