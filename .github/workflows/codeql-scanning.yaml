@@ -49,7 +49,7 @@ jobs:
     - name: Custom build using make
       run: |
         go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-        make compile-el
+        make compile-contracts
         
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
