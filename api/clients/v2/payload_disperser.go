@@ -138,10 +138,6 @@ func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	// payload is the raw data to be stored on eigenDA
 	payload []byte,
-	// salt is added while constructing the blob header
-	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
-	// different blob key, when using reserved bandwidth payments.
-	salt uint32,
 ) (*verification.EigenDACert, error) {
 
 	blobBytes, err := pd.codec.EncodeBlob(payload)
@@ -157,7 +153,7 @@ func (pd *PayloadDisperser) SendPayload(
 		blobBytes,
 		pd.config.BlobVersion,
 		pd.config.Quorums,
-		salt)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}

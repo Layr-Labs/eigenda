@@ -261,8 +261,6 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	accountID := hex.EncodeToString(accountBytes)
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
-	salt, err := rand.Int(rand.Reader, big.NewInt(1000))
-	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -277,7 +275,6 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 			Timestamp:         uint64(timestamp.Int64()),
 			CumulativePayment: cumulativePayment,
 		},
-		Salt: uint32(salt.Int64()),
 	}
 }
 

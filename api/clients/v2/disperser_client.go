@@ -3,8 +3,9 @@ package clients
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"sync"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -24,7 +25,7 @@ type DisperserClientConfig struct {
 
 type DisperserClient interface {
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID, salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
@@ -125,7 +126,6 @@ func (c *disperserClient) DisperseBlob(
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-	salt uint32,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
@@ -188,7 +188,6 @@ func (c *disperserClient) DisperseBlob(
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
 		PaymentMetadata: *payment,
-		Salt:            salt,
 	}
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)

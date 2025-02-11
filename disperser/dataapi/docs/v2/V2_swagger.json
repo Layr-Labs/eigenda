@@ -876,10 +876,6 @@
                     "items": {
                         "type": "integer"
                     }
-                },
-                "salt": {
-                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
-                    "type": "integer"
                 }
             }
         },

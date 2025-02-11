@@ -123,8 +123,7 @@ library EigenDAHasher {
                     abi.encode(
                         blobHeader.version,
                         blobHeader.quorumNumbers,
-                        blobHeader.commitment,
-                        blobHeader.salt
+                        blobHeader.commitment
                     )
                 ),
                 blobHeader.paymentHeaderHash

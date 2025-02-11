@@ -60,7 +60,7 @@ const (
 	// its required threshold, and resubmit a new blob dispersal request if not.
 	BlobStatus_COMPLETE BlobStatus = 4
 	// FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
-	// retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).
+	// retry the blob, the client must submit the blob again (blob key is required to be unique).
 	BlobStatus_FAILED BlobStatus = 5
 )
 

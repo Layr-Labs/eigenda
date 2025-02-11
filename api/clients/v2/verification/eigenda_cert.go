@@ -54,7 +54,7 @@ func (c *EigenDACert) ComputeBlobKey() (*v2.BlobKey, error) {
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
 		blobHeader.PaymentHeaderHash,
-		blobHeader.Salt)
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
