@@ -66,7 +66,7 @@ func GetTestClient(t *testing.T, configPath string) *TestClient {
 }
 
 // GetClient returns a TestClient instance, creating one if it does not exist.
-// This uses a global static client... this is icky, but it takes ~1 minute
+// This uses a global static client... this is icky, but it takes a long time
 // to read the SRS points, so it's the lesser of two evils to keep it around.
 func GetClient(configPath string) (*TestClient, error) {
 	clientLock.Lock()
@@ -124,6 +124,40 @@ func skipInCI(t *testing.T) {
 	}
 }
 
+// ensureFileIsPresent checks if a file exists at the given path. If it does not, it downloads the file from the
+// given URL into the given path.
+func ensureFileIsPresent(
+	config *TestClientConfig,
+	path string,
+	url string) error {
+
+	path, err := config.Path(path)
+	if err != nil {
+		return fmt.Errorf("failed to get path: %w", err)
+	}
+
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		command := make([]string, 3)
+		command[0] = "wget"
+		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
+		command[2] = "--output-document=" + path
+		logger.Info("executing %s", command)
+
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to download %s: %w", url, err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to check if file exists: %w", err)
+	}
+
+	return nil
+}
+
 func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	// Create the test data directory if it does not exist
 	err := os.MkdirAll(config.TestDataPath, 0755)
@@ -149,84 +183,8 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 		return fmt.Errorf("failed to create SRS tables directory: %w", err)
 	}
 
-	// If any of the srs files do not exist, download them.
-	filePath, err := config.Path(SRSPathG1)
-	if err != nil {
-		return fmt.Errorf("failed to get SRS G1 path: %w", err)
-	}
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
-		command[2] = "--output-document=" + filePath
-		logger.Info("executing %s", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to download G1 point: %w", err)
-		}
-	} else {
-		if err != nil {
-			return fmt.Errorf("failed to check if G1 point exists: %w", err)
-		}
-	}
-
-	filePath, err = config.Path(SRSPathG2)
-	if err != nil {
-		return fmt.Errorf("failed to get SRS G2 path: %w", err)
-	}
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
-		command[2] = "--output-document=" + filePath
-		logger.Info("executing %s", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to download G2 point: %w", err)
-		}
-	} else {
-		if err != nil {
-			return fmt.Errorf("failed to check if G2 point exists: %w", err)
-		}
-	}
-
-	filePath, err = config.Path(SRSPathG2PowerOf2)
-	if err != nil {
-		return fmt.Errorf("failed to get SRS G2 power of 2 path: %w", err)
-	}
-	_, err = os.Stat(filePath)
-	if os.IsNotExist(err) {
-		command := make([]string, 3)
-		command[0] = "wget"
-		command[1] = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
-		command[2] = "--output-document=" + filePath
-		logger.Info("executing %s", command)
-
-		cmd := exec.Command(command[0], command[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to download G2 power of 2 point: %w", err)
-		}
-	} else {
-		if err != nil {
-			return fmt.Errorf("failed to check if G2 power of 2 point exists: %w", err)
-		}
-	}
-
 	// Check to see if the private key file exists. If not, stop the test.
-	filePath, err = ResolveTildeInPath(config.KeyPath)
+	filePath, err := ResolveTildeInPath(config.KeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve tilde in path: %w", err)
 	}
@@ -234,6 +192,20 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	if err != nil {
 		return fmt.Errorf("private key file %s does not exist. This file should "+
 			"contain the private key for the account used in the test, in hex: %w", filePath, err)
+	}
+
+	// If any of the srs files do not exist, download them.
+	err = ensureFileIsPresent(config, SRSPathG1, G1URL)
+	if err != nil {
+		return fmt.Errorf("failed to locate G1 point: %w", err)
+	}
+	err = ensureFileIsPresent(config, SRSPathG2, G2URL)
+	if err != nil {
+		return fmt.Errorf("failed to locate G2 point: %w", err)
+	}
+	err = ensureFileIsPresent(config, SRSPathG2PowerOf2, G2PowerOf2URL)
+	if err != nil {
+		return fmt.Errorf("failed to locate G2 power of 2 point: %w", err)
 	}
 
 	return nil

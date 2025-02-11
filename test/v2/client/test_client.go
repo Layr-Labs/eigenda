@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -15,7 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
@@ -36,6 +36,10 @@ const (
 	SRSPathG2         = SRSPath + "/g2.point"
 	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
 	SRSPathSRSTables  = SRSPath + "/SRSTables"
+
+	G1URL         = "https://eigenda.s3.amazonaws.com/srs/g1.point"
+	G2URL         = "https://eigenda.s3.amazonaws.com/srs/g2.point"
+	G2PowerOf2URL = "https://eigenda.s3.amazonaws.com/srs/g2.point.powerOf2"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -43,9 +47,10 @@ type TestClient struct {
 	config          *TestClientConfig
 	logger          logging.Logger
 	disperserClient clients.DisperserClient
-	// Each payload disperser servers a specific subset of quorums. The key in this map is a string representation
+	// Each payload disperser serves a specific subset of quorums. The key in this map is a string representation
 	// of the quorum IDs served by the payload disperser.
 	payloadDispersers         map[string]*clients.PayloadDisperser
+	payloadDisperserLock      sync.Mutex
 	relayClient               clients.RelayClient
 	relayPayloadRetriever     *clients.RelayPayloadRetriever
 	indexedChainState         core.IndexedChainState
@@ -297,6 +302,13 @@ func (c *TestClient) GetDisperserClient() clients.DisperserClient {
 // GetPayloadDisperser returns the test client's payload disperser for a specific set of quorums.
 func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.PayloadDisperser, error) {
 	quorumsString := ""
+	for _, quorum := range quorums {
+		quorumsString += fmt.Sprintf("%d,", quorum)
+	}
+
+	c.payloadDisperserLock.Lock()
+	defer c.payloadDisperserLock.Unlock()
+
 	if payloadDisperser, ok := c.payloadDispersers[quorumsString]; ok {
 		return payloadDisperser, nil
 	}
@@ -326,6 +338,8 @@ func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.Payl
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}
+
+	c.payloadDispersers[quorumsString] = payloadDisperser
 
 	return payloadDisperser, nil
 }
@@ -462,77 +476,6 @@ func (c *TestClient) DispersePayload(
 	c.metrics.reportDispersalTime(time.Since(start))
 
 	return cert, nil
-}
-
-// VerifyBlobCertification verifies that the blob has been properly certified by the network.
-func (c *TestClient) VerifyBlobCertification(
-	key corev2.BlobKey,
-	expectedQuorums []core.QuorumID,
-	signedBatch *v2.SignedBatch,
-	inclusionInfo *v2.BlobInclusionInfo) error {
-
-	blobCert := inclusionInfo.BlobCertificate
-	if blobCert == nil {
-		return fmt.Errorf("missing blob certificate")
-	}
-	if len(blobCert.RelayKeys) == 0 {
-		return fmt.Errorf("missing relay keys")
-	}
-
-	// make sure the returned header hash matches the expected blob key
-	bh, err := corev2.BlobHeaderFromProtobuf(blobCert.BlobHeader)
-	if err != nil {
-		return fmt.Errorf("failed to convert blob header: %w", err)
-	}
-	computedBlobKey, err := bh.BlobKey()
-	if err != nil {
-		return fmt.Errorf("failed to compute blob key: %w", err)
-	}
-	if !bytes.Equal(key[:], computedBlobKey[:]) {
-		return fmt.Errorf("blob key mismatch: expected %x, got %x", key, computedBlobKey)
-	}
-
-	// verify that expected quorums are present
-	quorumSet := make(map[core.QuorumID]struct{}, len(expectedQuorums))
-	for _, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
-		quorumSet[core.QuorumID(quorumNumber)] = struct{}{}
-	}
-	// There may be other quorums in the batch. No biggie as long as the expected ones are there.
-	if len(expectedQuorums) > len(quorumSet) {
-		return fmt.Errorf("missing quorums: expected %v, got %v", expectedQuorums, quorumSet)
-	}
-	for expectedQuorum := range quorumSet {
-		if _, ok := quorumSet[expectedQuorum]; !ok {
-			return fmt.Errorf("missing quorum %d", expectedQuorum)
-		}
-	}
-
-	// Check the signing percentages
-	signingPercents := make(map[core.QuorumID]int, len(signedBatch.Attestation.QuorumNumbers))
-	for i, quorumNumber := range signedBatch.Attestation.QuorumNumbers {
-		percent := int(signedBatch.Attestation.QuorumSignedPercentages[i])
-		signingPercents[core.QuorumID(quorumNumber)] = percent
-	}
-	for _, quorum := range expectedQuorums {
-		percent, ok := signingPercents[quorum]
-		if !ok {
-			return fmt.Errorf("missing quorum %d", quorum)
-		}
-		if percent < 0 || percent > 100 {
-			return fmt.Errorf("invalid signing percentage %d", percent)
-		}
-		if percent < c.config.MinimumSigningPercent {
-			return fmt.Errorf("quorum %d signed by only %d%%", quorum, percent)
-		}
-	}
-
-	// On-chain verification
-	err = c.certVerifier.VerifyCertV2FromSignedBatch(context.Background(), signedBatch, inclusionInfo)
-	if err != nil {
-		return fmt.Errorf("failed to verify cert: %w", err)
-	}
-
-	return nil
 }
 
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
