@@ -2,7 +2,7 @@ package correctness
 
 import (
 	"context"
-	"fmt"it
+	"fmt"
 	"strings"
 	"testing"
 	"time"
