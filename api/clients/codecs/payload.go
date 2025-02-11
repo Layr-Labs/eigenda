@@ -51,7 +51,6 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 
 	// it's possible that the number of field elements might already be a power of 2
 	// in that case, calling NextPowerOf2 will just return the input value
-	// TODO: write a test to check this
 	blobLength := uint32(encoding.NextPowerOf2(len(coeffPolynomial.fieldElements)))
 
 	return BlobFromPolynomial(coeffPolynomial, blobLength)
