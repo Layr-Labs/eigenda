@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/go-units"
-	"math/rand"
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
@@ -139,7 +139,7 @@ func (l *LoadGenerator) submitBlob() {
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload := l.rand.Bytes(payloadSize)
 
-	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload, rand.Uint32())
+	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload)
 	if err != nil {
 		fmt.Printf("failed to disperse blob: %v\n", err)
 		return

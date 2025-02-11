@@ -209,7 +209,6 @@ func (writer *BlobWriter) sendRequest(data []byte) (key v2.BlobKey, err error) {
 		data,
 		0,
 		customQuorums,
-		0,
 	)
 	if err != nil {
 		writer.logger.Error("failed to send blob request", "name", writer.name, "err", err)
