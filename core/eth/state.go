@@ -15,10 +15,13 @@ import (
 )
 
 type ChainState struct {
-	Client                common.EthClient
-	Tx                    core.Reader
-	SocketMap             map[core.OperatorID]*string
-	socketMu              sync.Mutex
+	Client common.EthClient
+	Tx     core.Reader
+	// A cache map of the operator registry, key: operator id, value: socket string
+	SocketMap map[core.OperatorID]*string
+	// Mutex to access socket map
+	socketMu sync.Mutex
+	// The previous block number the socket map was updated at, inclusive
 	socketPrevBlockNumber uint32
 }
 
@@ -42,12 +45,12 @@ var _ core.ChainState = (*ChainState)(nil)
 func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
 	operatorsByQuorum, _, err := cs.Tx.GetOperatorStakes(ctx, operator, uint32(blockNumber))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get operator stakes for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 
 	err = cs.refreshSocketMap(ctx, operatorsByQuorum)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to refresh socket map for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
@@ -56,12 +59,12 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
 	operatorsByQuorum, err := cs.Tx.GetOperatorStakesForQuorums(ctx, quorums, uint32(blockNumber))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get operator stakes for quorums %v at block %d: %w", quorums, blockNumber, err)
 	}
 
 	err = cs.refreshSocketMap(ctx, operatorsByQuorum)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to refresh socket map for quorums %v at block %d: %w", quorums, blockNumber, err)
 	}
 
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
@@ -71,7 +74,7 @@ func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
 	ctx := context.Background()
 	header, err := cs.Client.HeaderByNumber(ctx, nil)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get current block header: %w", err)
 	}
 
 	return uint(header.Number.Uint64()), nil
@@ -80,7 +83,7 @@ func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
 func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
 	socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get socket for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 	return socket, nil
 }
@@ -95,7 +98,7 @@ func (cs *ChainState) buildSocketMap(ctx context.Context, operatorIds []core.Ope
 		}
 		socket, err := cs.Tx.GetOperatorSocket(ctx, operatorID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get socket for operator %x: %w", operatorID, err)
 		}
 		socketMap[operatorID] = &socket
 	}
@@ -113,12 +116,12 @@ func (cs *ChainState) buildSocketMap(ctx context.Context, operatorIds []core.Ope
 func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	currentBlockNumber, err := cs.GetCurrentBlockNumber()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get current block number: %w", err)
 	}
 
 	registryCoordinator, err := cs.Tx.RegistryCoordinator(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get registry coordinator address: %w", err)
 	}
 
 	logs, err := cs.Client.FilterLogs(ctx, ethereum.FilterQuery{
@@ -130,7 +133,7 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to filter logs from block %d to %d: %w", cs.socketPrevBlockNumber, currentBlockNumber, err)
 	}
 	if len(logs) == 0 {
 		return nil
@@ -142,10 +145,10 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	for _, log := range logs {
 		tx, isPending, err := cs.Client.TransactionByHash(ctx, log.TxHash)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get transaction %s: %w", log.TxHash.Hex(), err)
 		}
 		if isPending {
-			return fmt.Errorf("transaction pending for operator socket update event")
+			return fmt.Errorf("transaction %s is still pending for operator socket update event", log.TxHash.Hex())
 		}
 
 		calldata := tx.Data()
