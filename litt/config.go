@@ -1,25 +1,34 @@
-package littdb
+package litt
 
 import "time"
 
-type LittDBConfig struct {
+type DBType int
+
+const DiskDB DBType = 0
+const MemDB DBType = 1
+
+// Config is configuration for a litt.DB.
+type Config struct {
 	// The path where the database will store its files. If the path does not exist, it will be created.
 	// If the path exists, the database will attempt to open the existing database at that path.
 	Path string
 
+	// The type of the DB. Choices are DiskDB and MemDB. Default is DiskDB.
+	Type DBType
+
 	// The time-to-live for values in the database. Values will be automatically deleted after this duration.
 	// If the database is reloaded with a different TTL, the new TTL will apply to all values, even values
 	// written with the old TTL. If zero, values will never be deleted. The default is zero.
-	TTL time.Duration
+	TTL time.Duration // TODO this is better described as a default TTL
 
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
 	TimeSource func() time.Time
 }
 
-// DefaultLittDBConfig returns a LittDBConfig with default values.
-func DefaultLittDBConfig() *LittDBConfig {
-	return &LittDBConfig{
+// DefaultConfig returns a Config with default values.
+func DefaultConfig() *Config {
+	return &Config{
 		TimeSource: time.Now,
 	}
 }
