@@ -104,7 +104,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
 			return 0, big.NewInt(0), err
 		}
-		return 0, a.cumulativePayment, nil
+		return uint64(now), a.cumulativePayment, nil
 	}
 
 	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
