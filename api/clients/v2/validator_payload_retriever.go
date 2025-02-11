@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -37,7 +36,6 @@ func BuildValidatorPayloadRetriever(
 	logger logging.Logger,
 	validatorPayloadRetrieverConfig ValidatorPayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
-	thegraphConfig thegraph.Config,
 	kzgConfig kzg.KzgConfig,
 ) (*ValidatorPayloadRetriever, error) {
 	err := validatorPayloadRetrieverConfig.checkAndSetDefaults()

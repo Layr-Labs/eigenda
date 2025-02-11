@@ -21,7 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -53,7 +52,7 @@ type TestClient struct {
 	payloadDisperserLock      sync.Mutex
 	relayClient               clients.RelayClient
 	relayPayloadRetriever     *clients.RelayPayloadRetriever
-	indexedChainState         core.IndexedChainState
+	chainState                core.ChainState
 	retrievalClient           clients.RetrievalClient
 	validatorPayloadRetriever *clients.ValidatorPayloadRetriever
 	certVerifier              *verification.CertVerifier
@@ -234,12 +233,6 @@ func NewTestClient(
 	// Construct the retrieval client
 
 	chainState := eth.NewChainState(ethReader, ethClient)
-	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
-		PullInterval: 100 * time.Millisecond,
-		MaxRetries:   5,
-	}
-	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
 	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig:           *payloadClientConfig,
@@ -252,7 +245,7 @@ func NewTestClient(
 	retrievalClient := clients.NewRetrievalClient(
 		logger,
 		ethReader,
-		indexedChainState,
+		chainState,
 		blobVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 
@@ -273,7 +266,7 @@ func NewTestClient(
 		payloadDispersers:         make(map[string]*clients.PayloadDisperser),
 		relayClient:               relayClient,
 		relayPayloadRetriever:     relayPayloadRetriever,
-		indexedChainState:         indexedChainState,
+		chainState:                chainState,
 		retrievalClient:           retrievalClient,
 		validatorPayloadRetriever: validatorPayloadRetriever,
 		certVerifier:              certVerifier,
@@ -518,7 +511,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	quorums []core.QuorumID,
 	expectedPayload []byte) error {
 
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
+	currentBlockNumber, err := c.chainState.GetCurrentBlockNumber()
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
