@@ -21,10 +21,10 @@ type LittDB interface {
 	// Put stores a value in the database. May not be used to overwrite an existing value.
 	// Note that when this method returns, data written may not be crash durable on disk
 	// (although the write does have atomicity). In order to ensure crash durability, call Flush().
-	Put(key *LittKey, value []byte) error
+	Put(table string, key []byte, value []byte) error
 
 	// Get retrieves a value from the database. Returns an error if the value does not exist.
-	Get(key *LittKey) ([]byte, error)
+	Get(table string, key []byte) ([]byte, error)
 
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
 	// all data written by Put() operations is guaranteed to be crash durable. Put() operations called synchronously
