@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -23,6 +25,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,6 +48,11 @@ var (
 	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 
 	mockCommitment = encoding.BlobCommitments{}
+
+	heartbeatChan      = make(chan time.Time, 10) // Stores last 10 heartbeats
+	heartbeatsReceived []time.Time
+	mu                 sync.Mutex
+	doneListening      = make(chan struct{})
 )
 
 func TestMain(m *testing.M) {
@@ -149,6 +157,21 @@ func setup(m *testing.M) {
 }
 
 func teardown() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(heartbeatsReceived) == 0 {
+		logger.Error("Expected heartbeats, but none were received")
+	}
+
+	close(heartbeatChan) // Ensure the goroutine exits properly
+
+	select {
+	case <-doneListening:
+	default:
+		close(doneListening)
+	}
+
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
@@ -179,4 +202,51 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 	bk, err := bh.BlobKey()
 	require.NoError(t, err)
 	return bk, bh
+}
+
+func TestHeartbeatMonitoring(t *testing.T) {
+	// Reset heartbeats before running the test
+	mu.Lock()
+	heartbeatsReceived = nil
+	mu.Unlock()
+
+	startHeartbeatMonitoring()
+
+	defer func() {
+		heartbeats := getHeartbeats()
+		assert.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+		assert.GreaterOrEqual(t, len(heartbeats), 3, "Expected at least 3 heartbeats, but got %d", len(heartbeats))
+	}()
+
+	// Simulate heartbeats being sent
+	for i := 0; i < 3; i++ {
+		heartbeatChan <- time.Now()
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Stop listening after test
+	close(doneListening)
+}
+
+func startHeartbeatMonitoring() {
+	go func() {
+		for {
+			select {
+			case hb := <-heartbeatChan:
+				mu.Lock()
+				if len(heartbeatsReceived) < cap(heartbeatChan) {
+					heartbeatsReceived = append(heartbeatsReceived, hb)
+				}
+				mu.Unlock()
+			case <-doneListening:
+				return
+			}
+		}
+	}()
+}
+
+func getHeartbeats() []time.Time {
+	mu.Lock()
+	defer mu.Unlock()
+	return heartbeatsReceived
 }

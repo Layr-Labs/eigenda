@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,6 +25,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
@@ -34,6 +36,11 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	controllerReadinessProbePath string        = "/tmp/controller-ready"
+	controllerHealthProbePath    string        = "/tmp/controller-health"
+	controllerMaxStallDuration   time.Duration = 240 * time.Second
+	controllerLivenessChan                     = make(chan time.Time, 1)
 )
 
 func main() {
@@ -49,6 +56,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
+
+	if _, err := os.Create(controllerHealthProbePath); err != nil {
+		log.Printf("Failed to create healthProbe file: %v", err)
+	}
+
+	// Start heartbeat monitor
+	go heartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration)
+
 	select {}
 }
 
@@ -61,6 +76,13 @@ func RunController(ctx *cli.Context) error {
 	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Reset readiness probe upon start-up
+	if _, err := os.Stat(controllerReadinessProbePath); err == nil {
+		if err := os.Remove(controllerReadinessProbePath); err != nil {
+			logger.Warn("Failed to clean up readiness file", "error", err, "path", controllerReadinessProbePath)
+		}
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -112,6 +134,7 @@ func RunController(ctx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
+		func() { signalHeartbeat(controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -178,6 +201,7 @@ func RunController(ctx *cli.Context) error {
 		nodeClientManager,
 		logger,
 		metricsRegistry,
+		func() { signalHeartbeat(controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -201,5 +225,51 @@ func RunController(ctx *cli.Context) error {
 		}
 	}()
 
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(controllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
+	}
+
 	return nil
+}
+
+// Function to process and send controller liveness probe to goroutine
+func heartbeatMonitor(filePath string, controllerMaxStallDuration time.Duration) {
+	var lastHeartbeat time.Time
+	stallTimer := time.NewTimer(controllerMaxStallDuration)
+
+	for {
+		select {
+		// Heartbeat from goroutine on controller pull interval
+		case heartbeat, ok := <-controllerLivenessChan:
+			if !ok {
+				log.Println("controllerLivenessChan closed, stopping health probe.")
+				return
+			}
+			log.Printf("Received heartbeat from controller goroutine: %v\n", heartbeat)
+			lastHeartbeat = heartbeat
+			if err := os.WriteFile(filePath, []byte(lastHeartbeat.String()), 0666); err != nil {
+				log.Printf("Failed to update heartbeat file: %v", err)
+			} else {
+				log.Printf("Updated heartbeat file: %v with time %v\n", filePath, lastHeartbeat)
+			}
+			stallTimer.Reset(controllerMaxStallDuration) // Reset timer on new heartbeat
+
+		case <-stallTimer.C:
+			// Instead of stopping the function, log a warning
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Reset the timer to continue monitoring
+			stallTimer.Reset(controllerMaxStallDuration)
+		}
+	}
+}
+
+func signalHeartbeat(controllerLivenessChan chan time.Time, logger logging.Logger) {
+	select {
+	case controllerLivenessChan <- time.Now():
+		logger.Info("Heartbeat signal sent from Controller")
+	default:
+		// Avoid blocking if the channel is full or no receiver is actively consuming
+		logger.Warn("Heartbeat signal skipped, no receiver on the channel")
+	}
 }
