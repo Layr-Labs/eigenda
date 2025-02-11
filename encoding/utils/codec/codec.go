@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
 )
 
 // ConvertByPaddingEmptyByte takes bytes and insert an empty byte at the front of every 31 byte.
@@ -77,11 +78,12 @@ func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 // PadPayload internally pads the input data by prepending a 0x00 to each chunk of 31 bytes. This guarantees that
 // the data will be a valid field element for the bn254 curve
 //
-// Additionally, this function will add necessary padding to align the output to 32 bytes
+// # Additionally, this function will add necessary padding to align the output to 32 bytes
 //
 // NOTE: this method is a reimplementation of ConvertByPaddingEmptyByte, with one meaningful difference: the alignment
 // of the output to encoding.BYTES_PER_SYMBOL. This alignment actually makes the padding logic simpler, and the
 // code that uses this function needs an aligned output anyway.
+// TODO: test, especially lower bound
 func PadPayload(inputData []byte) []byte {
 	// 31 bytes, for the bn254 curve
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
@@ -118,6 +120,7 @@ func PadPayload(inputData []byte) []byte {
 // NOTE: this method is a reimplementation of RemoveEmptyByteFromPaddedBytes, with one meaningful difference: this
 // function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
 // removal logic simpler.
+// TODO: test, especially lower bound
 func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
@@ -147,6 +150,7 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 // adding internal byte padding
 //
 // The value returned from this function will always be a multiple of encoding.BYTES_PER_SYMBOL
+// TODO: test, especially lower bound
 func GetPaddedDataLength(inputLen uint32) uint32 {
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
 	chunkCount := inputLen / bytesPerChunk
@@ -156,4 +160,51 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 	}
 
 	return chunkCount * encoding.BYTES_PER_SYMBOL
+}
+
+// GetUnpaddedDataLength accepts the length of an array that has been padded with PadPayload
+//
+// It returns what the length of the output array would be, if you called RemoveInternalPadding on it.
+// TODO: test, especially lower bound
+func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
+	if inputLen == 0 {
+		return 0, fmt.Errorf("input length is zero")
+	}
+
+	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {
+		return 0, fmt.Errorf(
+			"%d isn't a multiple of encoding.BYTES_PER_SYMBOL (%d)",
+			inputLen, encoding.BYTES_PER_SYMBOL)
+	}
+
+	chunkCount := inputLen / encoding.BYTES_PER_SYMBOL
+	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
+
+	unpaddedLength := chunkCount * bytesPerChunk
+
+	return unpaddedLength, nil
+}
+
+// GetMaxPermissiblePayloadLength accepts a blob length IN SYMBOLS, and returns the size IN BYTES of the largest payload
+// that could fit inside the blob.
+// TODO: test, especially lower bound
+func GetMaxPermissiblePayloadLength(blobLength uint32) (uint32, error) {
+	if blobLength == 0 {
+		return 0, fmt.Errorf("input blob length is zero")
+	}
+
+	// TODO (litt3): it's awkward to use a method defined in fft for this, but it's not trivial to move to a better
+	//  location, due to the resulting cyclic imports, and I'd prefer not to reimplement. Ideally, a proper location
+	//  would be found for this important utility function
+	if !fft.IsPowerOfTwo(uint64(blobLength)) {
+		return 0, fmt.Errorf("blobLength %d is not a power of two", blobLength)
+	}
+
+	// subtract 32 from the blob length before doing the unpad operation, to account for the encoded payload header
+	maxPayloadLength, err := GetUnpaddedDataLength(blobLength*encoding.BYTES_PER_SYMBOL - 32)
+	if err != nil {
+		return 0, fmt.Errorf("get unpadded data length: %w", err)
+	}
+
+	return maxPayloadLength, nil
 }

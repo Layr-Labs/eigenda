@@ -11,7 +11,7 @@ import (
 func TestBlobConversion(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
 
-	iterations := 100
+	iterations := 1000
 
 	for i := 0; i < iterations; i++ {
 		originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
@@ -27,7 +27,7 @@ func testBlobConversionForForm(t *testing.T, payloadBytes []byte, form Polynomia
 	require.NoError(t, err)
 
 	blobBytes := blob.GetBytes()
-	blobFromBytes, err := BlobFromBytes(blobBytes)
+	blobFromBytes, err := BlobFromBytes(blobBytes, blob.blobLength)
 	require.NoError(t, err)
 
 	decodedPayload, err := blobFromBytes.ToPayload(form)

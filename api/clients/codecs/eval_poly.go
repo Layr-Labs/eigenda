@@ -42,8 +42,7 @@ func (p *evalPoly) toCoeffPoly() (*coeffPoly, error) {
 
 // toEncodedPayload converts an evalPoly into an encoded payload
 //
-// This conversion entails removing the power-of-2 padding which is added to an encodedPayload when originally creating
-// an evalPoly.
-func (p *evalPoly) toEncodedPayload() (*encodedPayload, error) {
-	return encodedPayloadFromElements(p.fieldElements)
+// blobLength is required, to be able to perform length checks on the encoded payload during construction
+func (p *evalPoly) toEncodedPayload(blobLength uint32) (*encodedPayload, error) {
+	return encodedPayloadFromElements(p.fieldElements, blobLength)
 }

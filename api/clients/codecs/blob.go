@@ -9,21 +9,26 @@ import (
 // A Blob is represented under the hood by a coeff polynomial
 type Blob struct {
 	coeffPolynomial *coeffPoly
+	// blobLength must be a power of 2, and should match the blobLength claimed in the BlobCommitment
+	// This is the blob length in symbols, NOT in bytes
+	blobLength uint32
 }
 
-// BlobFromBytes initializes a Blob from bytes
-func BlobFromBytes(bytes []byte) (*Blob, error) {
+// BlobFromBytes initializes a Blob from bytes, and a blobLength in symbols
+func BlobFromBytes(bytes []byte, blobLength uint32) (*Blob, error) {
 	poly, err := coeffPolyFromBytes(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("polynomial from bytes: %w", err)
 	}
 
-	return BlobFromPolynomial(poly)
+	return BlobFromPolynomial(poly, blobLength)
 }
 
-// BlobFromPolynomial initializes a blob from a polynomial
-func BlobFromPolynomial(coeffPolynomial *coeffPoly) (*Blob, error) {
-	return &Blob{coeffPolynomial: coeffPolynomial}, nil
+// BlobFromPolynomial initializes a blob from a polynomial, and a blobLength in symbols
+func BlobFromPolynomial(coeffPolynomial *coeffPoly, blobLength uint32) (*Blob, error) {
+	return &Blob{
+		coeffPolynomial: coeffPolynomial,
+		blobLength:      blobLength}, nil
 }
 
 // GetBytes gets the raw bytes of the Blob
@@ -41,7 +46,7 @@ func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
 	switch payloadStartingForm {
 	case PolynomialFormCoeff:
 		// the payload started off in coefficient form, so no conversion needs to be done
-		encodedPayload, err = b.coeffPolynomial.toEncodedPayload()
+		encodedPayload, err = b.coeffPolynomial.toEncodedPayload(b.blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("coeff poly to encoded payload: %w", err)
 		}
@@ -52,7 +57,7 @@ func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
 			return nil, fmt.Errorf("coeff poly to eval poly: %w", err)
 		}
 
-		encodedPayload, err = evalPoly.toEncodedPayload()
+		encodedPayload, err = evalPoly.toEncodedPayload(b.blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("eval poly to encoded payload: %w", err)
 		}

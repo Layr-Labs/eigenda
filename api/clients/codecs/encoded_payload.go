@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -50,10 +51,25 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 		return nil, fmt.Errorf("remove internal padding: %w", err)
 	}
 
-	if uint32(len(unpaddedData)) < claimedLength {
+	unpaddedDataLength := uint32(len(unpaddedData))
+
+	// data length is checked when constructing an encoded payload. If this error is encountered, that means there
+	// must be a flaw in the logic at construction time (or someone was bad and didn't use the proper construction methods)
+	if unpaddedDataLength < claimedLength {
 		return nil, fmt.Errorf(
-			"length of unpadded data %d is less than length claimed in encoded payload header %d",
-			len(unpaddedData), claimedLength)
+			"length of unpadded data %d is less than length claimed in encoded payload header %d. this should never happen",
+			unpaddedDataLength, claimedLength)
+	}
+
+	// unpadded data length can be slightly bigger than the claimed length, since RemoveInternalPadding doesn't
+	// do anything to remove trailing zeros that may have been added when the data was initially padded.
+	// however, this extra padding shouldn't exceed 31 bytes, because that's the most that would be added
+	// when padding the data length to 32 bytes. If this error occurs, that means there must be a flaw in the logic at
+	// construction time (or someone was bad and didn't use the proper construction methods)
+	if unpaddedDataLength > claimedLength+31 {
+		return nil, fmt.Errorf(
+			"length of unpadded data %d is more than 31 bytes longer than claimed length %d. this should never happen",
+			unpaddedDataLength, claimedLength)
 	}
 
 	return NewPayload(unpaddedData[0:claimedLength]), nil
@@ -80,23 +96,73 @@ func (ep *encodedPayload) toCoeffPoly() (*coeffPoly, error) {
 }
 
 // encodedPayloadFromElements accepts an array of field elements, and converts them into an encoded payload
-func encodedPayloadFromElements(fieldElements []fr.Element) (*encodedPayload, error) {
+//
+// blobLength is the length of the blob IN SYMBOLS, as claimed by the blob commitment. This is needed to make sure
+// that the claimed length in the encoded payload header is valid relative to the total blob length
+func encodedPayloadFromElements(fieldElements []fr.Element, blobLength uint32) (*encodedPayload, error) {
 	polynomialBytes := rs.FieldElementsToBytes(fieldElements)
-
-	// this is the payload length, as claimed by the encoded payload header
+	// this is the payload length in bytes, as claimed by the encoded payload header
 	payloadLength := binary.BigEndian.Uint32(polynomialBytes[2:6])
+
+	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
+	if err != nil {
+		return nil, fmt.Errorf("get max permissible payload length: %w", err)
+	}
+
+	if payloadLength > maxPermissiblePayloadLength {
+		return nil, fmt.Errorf(
+			`length claimed in encoded payload header (%d bytes) exceeds the max permissible length (%d bytes)
+					that could be contained in a blob of length %d symbols (%d bytes)`,
+			payloadLength, maxPermissiblePayloadLength, blobLength, blobLength*encoding.BYTES_PER_SYMBOL)
+	}
+
+	// this is the length you would get if you padded a payload of the length claimed in the encoded payload header
+	paddedLength := codec.GetPaddedDataLength(payloadLength)
 	// add 32 to the padded data length, since the encoded payload includes an encoded payload header
-	encodedPayloadLength := codec.GetPaddedDataLength(payloadLength) + 32
+	encodedPayloadLength := paddedLength + 32
 
-	// no matter what, this will be a multiple of 32, since both encodedPayloadLength and polynomialBytes are a multiple of 32
-	// we can't just copy to length of encodedPayloadLength, since it's possible that the polynomial truncated 0s that
-	// are counted in the length of the encoded data payload.
-	lengthToCopy := min(encodedPayloadLength, uint32(len(polynomialBytes)))
+	polynomialByteCount := uint32(len(polynomialBytes))
 
-	// TODO: we need to check the claimed payload length before creating this, to make sure it doesn't exceed the max blob size?
-	//  Otherwise, I think there is an attack vector to maliciously say a payload is super huge, and OOM clients
+	// no matter what, this will be a multiple of 32, since the two possible values, encodedPayloadLength and
+	// polynomialBytes, are multiples of 32. This is important, since the encoded payload being created is
+	// expected to have a byte count that's a multiple of 32.
+	lengthToCopy := encodedPayloadLength
+
+	// if encodedPayloadLength is greater than the polynomial bytes, that indicates that the polynomial bytes we have
+	// are missing trailing 0 bytes which were originally part of the dispersed blob. For this to happen, it means
+	// that whichever source provided us with these bytes truncated the trailing 0s. This probably won't happen in
+	// practice, but if it were to happen, it wouldn't be caught when verifying commitments, since trailing 0s don't
+	// affect the commitment. This isn't a problem, though: we can handle this edge case here.
+	if encodedPayloadLength > polynomialByteCount {
+		// we are copying from the polynomialBytes, so make sure that we don't try to copy more data than actually exists
+		lengthToCopy = polynomialByteCount
+	} else if encodedPayloadLength < polynomialByteCount {
+		// we assume that the polynomialBytes might have additional trailing 0s beyond the expected size of the encoded
+		// payload. Here, we check the assumption that all trailing values are 0. If there are any non-zero trailing
+		// values, something has gone wrong in the data pipeline, and this should produce a loud failure. Either a
+		// dispersing client is playing sneaky games, or there's a bug somewhere.
+		err := checkTrailingZeros(polynomialBytes, encodedPayloadLength)
+		if err != nil {
+			return nil, fmt.Errorf("check that trailing values in polynomial are zeros: %w", err)
+		}
+	}
+
 	encodedPayloadBytes := make([]byte, encodedPayloadLength)
 	copy(encodedPayloadBytes, polynomialBytes[:lengthToCopy])
 
 	return &encodedPayload{encodedPayloadBytes}, nil
+}
+
+// checkTrailingZeros accepts an array of bytes, and the number of bytes at the front of the array which are permitted
+// to be non-zero
+//
+// This function returns an error if any byte in the array after these permitted non-zero values is found to be non-zero
+func checkTrailingZeros(inputBytes []byte, nonZeroLength uint32) error {
+	for i := uint32(len(inputBytes)) - 1; i >= nonZeroLength; i-- {
+		if inputBytes[i] != 0x0 {
+			return fmt.Errorf("byte at index %d was expected to be 0x0, but instead was %x", i, inputBytes[i])
+		}
+	}
+
+	return nil
 }

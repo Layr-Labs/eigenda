@@ -2,6 +2,8 @@ package codecs
 
 import (
 	"fmt"
+
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 // Payload represents arbitrary user data, without any processing.
@@ -47,7 +49,12 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 		return nil, fmt.Errorf("unknown polynomial form: %v", form)
 	}
 
-	return BlobFromPolynomial(coeffPolynomial)
+	// it's possible that the number of field elements might already be a power of 2
+	// in that case, calling NextPowerOf2 will just return the input value
+	// TODO: write a test to check this
+	blobLength := uint32(encoding.NextPowerOf2(len(coeffPolynomial.fieldElements)))
+
+	return BlobFromPolynomial(coeffPolynomial, blobLength)
 }
 
 // GetBytes returns the bytes that underlie the payload, i.e. the unprocessed user data
