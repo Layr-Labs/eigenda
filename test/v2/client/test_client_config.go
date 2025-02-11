@@ -9,9 +9,15 @@ import (
 type TestClientConfig struct {
 	// The location where persistent test data is stored (e.g. SRS files). Often private keys are stored here too.
 	TestDataPath string
-	// The location where the test client's private key is stored.
-	// This is the key for the account that is paying for dispersals.
+	// The location where the test client's private key is stored. This is the key for the account that is
+	// paying for dispersals.
+	//
+	// Either this or KeyVar must be set. If both are set, KeyPath is used.
 	KeyPath string
+	// The environment variable that contains the private key for the account that is paying for dispersals.
+	//
+	// This is used if KeyPath is not set.
+	KeyVar string
 	// The disperser's hostname (url or IP address)
 	DisperserHostname string
 	// The disperser's port

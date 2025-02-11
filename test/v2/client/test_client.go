@@ -75,20 +75,12 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKeyFile, err := ResolveTildeInPath(config.KeyPath)
+	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
-	}
-	privateKey, err := os.ReadFile(privateKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file: %w", err)
+		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
-	privateKeyString := string(privateKey)
-	privateKeyString = strings.Trim(privateKeyString, "\n \t")
-	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -149,7 +141,7 @@ func NewTestClient(
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          config.EthRPCURLs,
-		PrivateKeyString: privateKeyString,
+		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -277,11 +269,43 @@ func NewTestClient(
 		retrievalClient:           retrievalClient,
 		validatorPayloadRetriever: validatorPayloadRetriever,
 		certVerifier:              certVerifier,
-		privateKey:                privateKeyString,
+		privateKey:                privateKey,
 		metricsRegistry:           metrics.registry,
 		metrics:                   metrics,
 		blobCodec:                 blobCodec,
 	}, nil
+}
+
+// loadPrivateKey loads the private key from the file/env var specified in the config.
+func loadPrivateKey(keyPath string, keyVar string) (string, error) {
+	if keyPath != "" {
+		privateKeyFile, err := ResolveTildeInPath(keyPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		}
+		privateKey, err := os.ReadFile(privateKeyFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to read private key file: %w", err)
+		}
+
+		return formatPrivateKey(string(privateKey)), nil
+	}
+
+	if keyVar == "" {
+		return "", fmt.Errorf("either KeyPath or KeyVar must be set")
+	}
+	privateKey := os.Getenv(keyVar)
+	if privateKey == "" {
+		return "", fmt.Errorf("key not found in environment variable %s", keyVar)
+	}
+	return formatPrivateKey(privateKey), nil
+}
+
+// formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
+func formatPrivateKey(privateKey string) string {
+	privateKey = strings.Trim(privateKey, "\n \t")
+	privateKey, _ = strings.CutPrefix(privateKey, "0x")
+	return privateKey
 }
 
 // GetConfig returns the test client's configuration.

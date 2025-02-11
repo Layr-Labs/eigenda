@@ -183,17 +183,6 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 		return fmt.Errorf("failed to create SRS tables directory: %w", err)
 	}
 
-	// Check to see if the private key file exists. If not, stop the test.
-	filePath, err := ResolveTildeInPath(config.KeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to resolve tilde in path: %w", err)
-	}
-	_, err = os.Stat(filePath)
-	if err != nil {
-		return fmt.Errorf("private key file %s does not exist. This file should "+
-			"contain the private key for the account used in the test, in hex: %w", filePath, err)
-	}
-
 	// If any of the srs files do not exist, download them.
 	err = ensureFileIsPresent(config, SRSPathG1, G1URL)
 	if err != nil {
