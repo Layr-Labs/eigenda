@@ -31,7 +31,7 @@ func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 	return &ChainState{
 		Client: client,
 		Tx:     tx,
-		// TODO: consider a more reasonable init value
+		// only start filtering for socket updates from current block
 		socketPrevBlockNumber: uint32(currentBlockNumber.Number().Uint64()),
 		SocketMap:             make(map[core.OperatorID]*string),
 	}

@@ -46,7 +46,6 @@ func NewServer(
 
 func (s *Server) Start(ctx context.Context) {
 	s.metrics.Start(ctx)
-	// return s.chainState.Start(ctx)
 }
 
 func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.BlobReply, error) {

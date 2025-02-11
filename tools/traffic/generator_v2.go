@@ -10,11 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 
-	// "github.com/Layr-Labs/eigenda/common/geth"
-	// "github.com/Layr-Labs/eigenda/core/auth"
-	// "github.com/Layr-Labs/eigenda/core/eth"
-	// "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	// retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	trafficconfig "github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
@@ -200,34 +195,6 @@ func (generator *Generator) handleConfigUpdate(runtimeConfig *trafficconfig.Runt
 		}
 		delete(generator.writerGroups, name)
 	}
-
-	// cs := eth.NewChainState(tx, gethClient)
-
-	// var assignmentCoordinator core.AssignmentCoordinator = &core.StdAssignmentCoordinator{}
-
-	// nodeClient := clients.NewNodeClient(config.NodeClientTimeout)
-
-	// config.RetrievalClientConfig.EncoderConfig.LoadG2Points = true
-	// v, err := verifier.NewVerifier(&config.RetrievalClientConfig.EncoderConfig, nil)
-	// if err != nil {
-	// 	panic(fmt.Sprintf("Unable to build statusTracker: %s", err))
-	// }
-
-	// retriever, err := clients.NewRetrievalClient(
-	// 	logger,
-	// 	cs,
-	// 	assignmentCoordinator,
-	// 	nodeClient,
-	// 	v,
-	// 	config.RetrievalClientConfig.NumConnections)
-
-	// if err != nil {
-	// 	panic(fmt.Sprintf("Unable to build retriever: %s", err))
-	// }
-
-	// chainClient := retrivereth.NewChainClient(gethClient, logger)
-
-	// return retriever, chainClient
 }
 
 // Start instantiates goroutines that generate read/write traffic.

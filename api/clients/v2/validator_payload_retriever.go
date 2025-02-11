@@ -60,7 +60,6 @@ func BuildValidatorPayloadRetriever(
 	}
 
 	chainState := eth.NewChainState(reader, ethClient)
-	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
 
 	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
 	if err != nil {
@@ -70,7 +69,7 @@ func BuildValidatorPayloadRetriever(
 	retrievalClient := NewRetrievalClient(
 		logger,
 		reader,
-		indexedChainState,
+		chainState,
 		kzgVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 

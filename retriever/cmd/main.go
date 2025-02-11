@@ -111,9 +111,6 @@ func RetrieverMain(ctx *cli.Context) error {
 		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, cs, chainClient)
 		// This only start the metrics server; consider unwrapping the function
 		retrieverServiceServer.Start(context.Background())
-		// if err = retrieverServiceServer.Start(context.Background()); err != nil {
-		// 	log.Fatalln("failed to start retriever service server", err)
-		// }
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -133,9 +130,6 @@ func RetrieverMain(ctx *cli.Context) error {
 		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, v, config.NumConnections)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
-		// if err = retrieverServiceServer.Start(context.Background()); err != nil {
-		// 	log.Fatalln("failed to start retriever service server", err)
-		// }
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -149,29 +143,6 @@ func RetrieverMain(ctx *cli.Context) error {
 
 		log.Printf("server listening at %s", addr)
 		return gs.Serve(listener)
-
-		// retrievalClient, err := clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, config.NumConnections)
-		// if err != nil {
-		// 	log.Fatalln("could not start tcp listener", err)
-		// }
-
-		// chainClient := retrivereth.NewChainClient(gethClient, logger)
-		// retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, cs, chainClient)
-		// // This only start the metrics server; consider unwrapping the function
-		// retrieverServiceServer.Start(context.Background())
-
-		// // Register reflection service on gRPC server
-		// // This makes "grpcurl -plaintext localhost:9000 list" command work
-		// reflection.Register(gs)
-
-		// pb.RegisterRetrieverServer(gs, retrieverServiceServer)
-
-		// // Register Server for Health Checks
-		// name := pb.Retriever_ServiceDesc.ServiceName
-		// healthcheck.RegisterHealthServer(name, gs)
-
-		// log.Printf("server listening at %s", addr)
-		// return gs.Serve(listener)
 	}
 
 	return errors.New("invalid EigenDA version")
