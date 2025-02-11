@@ -23,6 +23,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
 
+	s.logger.Debug("received a new blob dispersal request", "payment", req.GetBlobHeader().GetPaymentHeader())
 	// Validate the request
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
@@ -52,6 +53,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err != nil {
 		return nil, err
 	}
+	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
 
 	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
@@ -62,6 +64,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 }
 
 func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, signature []byte, requestedAt time.Time, ttl time.Duration) (corev2.BlobKey, error) {
+	s.logger.Debug("storing blob", "blobHeader", blobHeader)
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return corev2.BlobKey{}, api.NewErrorInvalidArg(fmt.Sprintf("failed to get blob key: %v", err))
@@ -76,6 +79,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob: %v", err))
 	}
 
+	s.logger.Debug("storing blob metadata", "blobHeader", blobHeader)
 	blobMetadata := &dispv2.BlobMetadata{
 		BlobHeader:  blobHeader,
 		Signature:   signature,

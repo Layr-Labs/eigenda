@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"golang.org/x/crypto/sha3"
@@ -534,6 +536,49 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 	copy(hash[:], hasher.Sum(nil)[:32])
 
 	return hash, nil
+}
+
+func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	if pm == nil {
+		return nil, errors.New("payment metadata is nil")
+	}
+
+	return &types.AttributeValueMemberM{
+		Value: map[string]types.AttributeValue{
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
+			"CumulativePayment": &types.AttributeValueMemberN{
+				Value: pm.CumulativePayment.String(),
+			},
+		},
+	}, nil
+}
+
+func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
+	}
+	accountID, ok := m.Value["AccountID"].(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
+	}
+	pm.AccountID = accountID.Value
+	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
+	}
+	timestamp, err := strconv.ParseUint(rp.Value, 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse Timestamp: %w", err)
+	}
+	pm.Timestamp = timestamp
+	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
+	}
+	pm.CumulativePayment, _ = new(big.Int).SetString(cp.Value, 10)
+	return nil
 }
 
 func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {

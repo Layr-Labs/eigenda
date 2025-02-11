@@ -74,6 +74,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		},
 	}
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
+	fmt.Println("blobHeader", blobHeader)
 	assert.NoError(t, err)
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
