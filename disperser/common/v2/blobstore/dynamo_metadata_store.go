@@ -325,6 +325,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 			},
 			0, // no limit within a bucket
 			lastEvaledKey,
+			false,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
@@ -443,6 +444,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, 
 			},
 			0, // no limit within a bucket
 			lastEvaledKey,
+			false,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
@@ -570,7 +572,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-	}, limit, cursor)
+	}, limit, cursor, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -710,7 +712,7 @@ func (s *BlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []
 		}
 	}
 
-	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, true)
 	if err != nil {
 		return nil, nil, err
 	}

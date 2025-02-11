@@ -296,7 +296,7 @@ func TestBatchOperations(t *testing.T) {
 		}
 	}
 
-	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys)
+	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys, true)
 	assert.NoError(t, err)
 	assert.Len(t, fetchedItems, numItems)
 	blobKeys := make([]string, numItems)
@@ -427,7 +427,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, nil)
+		}}, 1, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 1)
 	assert.Equal(t, "key0", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -442,7 +442,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, lastEvaluatedKey)
+		}}, 1, lastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Nil(t, queryResult.Items)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -473,7 +473,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 0, nil)
+		}}, 0, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 30)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -486,7 +486,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 2, lastEvaluatedKey)
+		}}, 2, lastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 2)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -502,7 +502,7 @@ func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, nil)
+		}}, 1, nil, true)
 	assert.NoError(t, err)
 	assert.Nil(t, queryResult.Items)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -542,7 +542,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, nil)
+		}}, 10, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -554,7 +554,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key10", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -563,7 +563,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key0", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -572,7 +572,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -603,7 +603,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, nil)
+		}}, 10, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 
@@ -611,7 +611,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 
@@ -619,18 +619,18 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
-	assert.Len(t, queryResult.Items, 10)
+	assert.Len(t, queryResult.Items, 10, true)
 
 	// Empty result Since all items are processed
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
-	assert.Nil(t, queryResult.LastEvaluatedKey)
+	assert.Nil(t, queryResult.LastEvaluatedKey, true)
 }
 
 func TestQueryWithInput(t *testing.T) {
