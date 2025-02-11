@@ -1516,23 +1516,17 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
 	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
-	assert.Equal(t, 3, len(response.StakeRankedOperators))
+	require.Equal(t, 2, len(response.StakeRankedOperators))
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
-	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
-	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
-	// "total"
-	ops, ok = response.StakeRankedOperators["total"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
 }

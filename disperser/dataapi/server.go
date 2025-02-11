@@ -130,6 +130,7 @@ type (
 	}
 
 	OperatorsStakeResponse struct {
+		CurrentBlock         uint32                      `json:"current_block"`
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
@@ -267,7 +268,7 @@ func NewServer(
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
 		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
-		metricsHandler:            NewMetricsHandler(promClient),
+		metricsHandler:            NewMetricsHandler(promClient, V1),
 	}
 }
 

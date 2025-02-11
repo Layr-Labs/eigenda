@@ -1,0 +1,30 @@
+{
+  "name": "@eigenda/contracts",
+  "version": "0.1.0-rc-2",
+  "description": "EigenDA core contracts",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test",
+    "src": "src"
+  },
+  "files": [
+    "out/",
+    "src/",
+    "lib/"
+  ],
+  "scripts": {
+    "test": "forge test -v",
+    "build": "forge build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/Layr-Labs/eigenda"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@openzeppelin/contracts": "4.7.0",
+    "@openzeppelin/contracts-upgradeable": "4.7.0"
+  }
+}

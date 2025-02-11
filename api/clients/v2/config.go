@@ -228,8 +228,8 @@ func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
 func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	return &PayloadDisperserConfig{
 		PayloadClientConfig:    *GetDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    5 * time.Second,
-		BlobCertifiedTimeout:   10 * time.Second,
+		DisperseBlobTimeout:    2 * time.Minute,
+		BlobCertifiedTimeout:   2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
 		Quorums:                []core.QuorumID{0, 1},
 	}

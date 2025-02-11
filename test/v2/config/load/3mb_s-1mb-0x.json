@@ -1,9 +1,9 @@
 {
-  "MBPerSecond": 0.1,
+  "MBPerSecond": 3,
   "AverageBlobSizeMB": 1,
   "BlobSizeStdDevMB": 0.25,
-  "RelayReadAmplification": 3,
-  "ValidatorReadAmplification": 3,
+  "RelayReadAmplification": 0,
+  "ValidatorReadAmplification": 0,
   "MaxParallelism": 100,
   "DispersalTimeout": 300,
   "Quorums": [

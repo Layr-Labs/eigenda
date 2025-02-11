@@ -14,16 +14,24 @@ const (
 type MetricsHandler struct {
 	// For accessing metrics info
 	promClient PrometheusClient
+	version    DataApiVersion
 }
 
-func NewMetricsHandler(promClient PrometheusClient) *MetricsHandler {
+func NewMetricsHandler(promClient PrometheusClient, version DataApiVersion) *MetricsHandler {
 	return &MetricsHandler{
 		promClient: promClient,
+		version:    version,
 	}
 }
 
 func (mh *MetricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
-	result, err := mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	var result *PrometheusResult
+	var err error
+	if mh.version == V1 {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	} else {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecondV2(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -41,7 +49,15 @@ func (mh *MetricsHandler) GetThroughputTimeseries(ctx context.Context, startTime
 	if endTime-startTime >= 7*24*60*60 {
 		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
 	}
-	result, err := mh.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0), throughputRateSecs)
+
+	var result *PrometheusResult
+	var err error
+	if mh.version == V1 {
+		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0), throughputRateSecs)
+	} else {
+		result, err = mh.promClient.QueryDisperserAvgThroughputBlobSizeBytesV2(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0), throughputRateSecs)
+	}
+
 	if err != nil {
 		return nil, err
 	}

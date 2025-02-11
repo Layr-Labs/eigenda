@@ -363,6 +363,69 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 	}
 }
 
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithDynamoPagination(t *testing.T) {
+	ctx := context.Background()
+
+	// Make all blobs happen in 120s
+	numBlobs := 1200
+	nanoSecsPerBlob := uint64(1e8) // 10 blob per second
+
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(10*time.Minute.Nanoseconds())
+	// Adjust "now" so all blobs will deterministically fall in just one
+	// bucket.
+	startBucket, endBucket := blobstore.GetRequestedAtBucketIDRange(firstBlobTime-1, now)
+	if startBucket < endBucket {
+		now -= uint64(11 * time.Minute.Nanoseconds())
+		firstBlobTime = now - uint64(10*time.Minute.Nanoseconds())
+	}
+	startBucket, endBucket = blobstore.GetAttestedAtBucketIDRange(firstBlobTime-1, now)
+	require.Equal(t, startBucket, endBucket)
+
+	// Create blobs for testing
+	// The num of blobs here are large enough to make it more than 1MB (the max response
+	// size of DyanamoDB) so it will have to use DynamoDB's pagination to get all desired
+	// results.
+	keys := make([]corev2.BlobKey, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: firstBlobTime + nanoSecsPerBlob*uint64(i),
+		}
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	startCursor := blobstore.BlobFeedCursor{
+		RequestedAt: firstBlobTime,
+		BlobKey:     nil,
+	}
+	endCursor := blobstore.BlobFeedCursor{
+		RequestedAt: now + 1,
+		BlobKey:     nil,
+	}
+	blobs, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	require.NoError(t, err)
+	require.Equal(t, numBlobs, len(blobs))
+	require.NotNil(t, lastProcessedCursor)
+	assert.Equal(t, firstBlobTime+nanoSecsPerBlob*uint64(numBlobs-1), lastProcessedCursor.RequestedAt)
+	assert.Equal(t, keys[numBlobs-1], *lastProcessedCursor.BlobKey)
+}
+
 func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 	ctx := context.Background()
 	numBlobs := 103
@@ -661,7 +724,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreGetAttestationByAttestedAtPagination(t *testing.T) {
+func TestBlobMetadataStoreGetAttestationByAttestedAtWithDynamoPagination(t *testing.T) {
 	ctx := context.Background()
 
 	now := uint64(time.Now().UnixNano())
