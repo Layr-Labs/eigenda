@@ -2580,7 +2580,7 @@ its required threshold, and resubmit a new blob dispersal request if not.</p></t
                 <td>FAILED</td>
                 <td>5</td>
                 <td><p>FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
-retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).</p></td>
+retry the blob, the client must submit the blob again (blob key is required to be unique).</p></td>
               </tr>
             
           </tbody>
@@ -4097,11 +4097,10 @@ https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.
   e. digest certificate.BlobHeader.Commitment.LengthProof
   f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
   g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
+  h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, unsigned big endian)
   i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  k. digest certificate.BlobHeader.Signature
-  l. for each relay in certificate.Relays:
+  j. digest certificate.BlobHeader.Signature
+  k. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
 4. digest disperserID (4 bytes, unsigned big endian)
 
