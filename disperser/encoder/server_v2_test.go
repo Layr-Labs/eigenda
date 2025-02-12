@@ -2,6 +2,7 @@ package encoder_test
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"math/big"
 	"runtime"
 	"testing"
@@ -157,7 +158,9 @@ func TestEncodeBlob(t *testing.T) {
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
 		// Check proofs
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
-		proofs, err := c.chunkStoreReader.GetFrameProofs(ctx, blobKey)
+		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
+		require.NoError(t, err, "Failed to get chunk proofs")
+		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
@@ -166,8 +169,10 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, coefExist, "Coefficients should exist")
 		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
 
-		coefficients, err := c.chunkStoreReader.GetFrameCoefficients(ctx, blobKey, expectedFragmentInfo)
+		elementCount, binarycoefficients, err :=
+			c.chunkStoreReader.GetBinaryChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
 		assert.NoError(t, err, "Failed to get chunk coefficients")
+		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binarycoefficients)
 		assert.Len(t, coefficients, int(numChunks), "Unexpected number of coefficients")
 	})
 

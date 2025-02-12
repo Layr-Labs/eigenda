@@ -36,8 +36,8 @@ func SerializeFrameProofs(proofs []*encoding.Proof) ([]byte, error) {
 // DeserializeFrameProof deserializes an encoding.Proof. Only the first proof is deserialized
 // from the first SerializedProofLength bytes of the input array.
 func DeserializeFrameProof(bytes []byte) (*encoding.Proof, error) {
-	if len(bytes) < SerializedProofLength {
-		return nil, fmt.Errorf("input byte array is too short")
+	if len(bytes) != SerializedProofLength {
+		return nil, fmt.Errorf("unexpected proof length: expected %d, got %d", SerializedProofLength, len(bytes))
 	}
 	proof := encoding.Proof{}
 	err := proof.Unmarshal(bytes)
@@ -54,18 +54,12 @@ func DeserializeFrameProofs(bytes []byte) ([]*encoding.Proof, error) {
 		return nil, fmt.Errorf("input byte array is not a multiple of proof length")
 	}
 
-	proofCount := len(bytes) / SerializedProofLength
-	proofs := make([]*encoding.Proof, proofCount)
-
-	for i := 0; i < proofCount; i++ {
-		var err error
-		proofs[i], err = DeserializeFrameProof(bytes[i*SerializedProofLength:])
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal proof: %w", err)
-		}
+	splitProofs, err := SplitSerializedFrameProofs(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to split proofs: %w", err)
 	}
 
-	return proofs, nil
+	return DeserializeSplitFrameProofs(splitProofs), nil
 }
 
 // SplitSerializedFrameProofs splits a serialized slice of proofs (as found in encoding.Proof, but without
@@ -86,4 +80,13 @@ func SplitSerializedFrameProofs(bytes []byte) ([][]byte, error) {
 	}
 
 	return proofs, nil
+}
+
+// DeserializeSplitFrameProofs deserializes a slice of byte slices into a slice of encoding.Proof objects.
+func DeserializeSplitFrameProofs(proofs [][]byte) []*encoding.Proof {
+	proofsSlice := make([]*encoding.Proof, len(proofs))
+	for i, proof := range proofs {
+		proofsSlice[i], _ = DeserializeFrameProof(proof)
+	}
+	return proofsSlice
 }

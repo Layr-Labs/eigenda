@@ -52,41 +52,21 @@ func SerializeFrameCoeffsSlice(coeffs []FrameCoeffs) ([]byte, error) {
 // DeserializeFrameCoeffsSlice is the inverse of SerializeFrameCoeffsSlice.
 // It deserializes a byte slice into a slice of FrameCoeffs.
 func DeserializeFrameCoeffsSlice(serializedData []byte) ([]FrameCoeffs, error) {
-	// ElementCount is the number of elements in each FrameCoeffs object
-	elementCount := binary.BigEndian.Uint32(serializedData)
-	if elementCount == 0 {
-		return nil, fmt.Errorf("element count cannot be 0")
+	elementCount, splitData, err := SplitSerializedFrameCoeffs(serializedData)
+	if err != nil {
+		return nil, err
 	}
-
-	index := uint32(4)
-
-	// coeffsByteSize is the number of bytes required to store all the coefficients in a single FrameCoeffs object
-	coeffsByteSize := encoding.BYTES_PER_SYMBOL * int(elementCount)
-	remainingSize := len(serializedData[index:])
-	if remainingSize%coeffsByteSize != 0 {
-		return nil, fmt.Errorf("invalid data size: %d", len(serializedData))
-	}
-	coeffsCount := len(serializedData[index:]) / coeffsByteSize
-
-	coeffs := make([]FrameCoeffs, coeffsCount)
-
-	for i := 0; i < coeffsCount; i++ {
-		coeffs[i] = make(FrameCoeffs, elementCount)
-		for j := 0; j < int(elementCount); j++ {
-			coeff := fr.Element{}
-			coeff.Unmarshal(serializedData[index : index+encoding.BYTES_PER_SYMBOL])
-			coeffs[i][j] = coeff
-			index += encoding.BYTES_PER_SYMBOL
-		}
-	}
-
-	return coeffs, nil
+	return DeserializeSplitFrameCoeffs(elementCount, splitData), nil
 }
 
 // SplitSerializedFrameCoeffs splits data as serialized by SerializeFrameCoeffsSlice into a slice of byte slices.
 // Each byte slice contains the serialized data for a single FrameCoeffs object as serialized by FrameCoeffs.Serialize.
 // Also returns ElementCount, the number of elements in each FrameCoeffs object.
 func SplitSerializedFrameCoeffs(serializedData []byte) (elementCount uint32, binaryFrameCoeffs [][]byte, err error) {
+	if len(serializedData) < 4 {
+		return 0, nil, fmt.Errorf("invalid data size: %d", len(serializedData))
+	}
+
 	elementCount = binary.BigEndian.Uint32(serializedData)
 	index := uint32(4)
 
@@ -109,4 +89,20 @@ func SplitSerializedFrameCoeffs(serializedData []byte) (elementCount uint32, bin
 	}
 
 	return elementCount, binaryFrameCoeffs, nil
+}
+
+// DeserializeSplitFrameCoeffs deserializes a slice of byte slices into a slice of FrameCoeffs.
+func DeserializeSplitFrameCoeffs(elementCount uint32, binaryFrameCoeffs [][]byte) []FrameCoeffs {
+	coeffs := make([]FrameCoeffs, len(binaryFrameCoeffs))
+
+	for i, data := range binaryFrameCoeffs {
+		coeffs[i] = make(FrameCoeffs, elementCount)
+		for j := 0; j < int(elementCount); j++ {
+			coeff := fr.Element{}
+			coeff.Unmarshal(data[j*encoding.BYTES_PER_SYMBOL : (j+1)*encoding.BYTES_PER_SYMBOL])
+			coeffs[i][j] = coeff
+		}
+	}
+
+	return coeffs
 }

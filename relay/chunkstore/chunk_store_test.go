@@ -167,7 +167,8 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 
 	// Read data
 	for key, expectedProofs := range expectedValues {
-		proofs, err := reader.GetFrameProofs(context.Background(), key)
+		binaryProofs, err := reader.GetBinaryChunkProofs(context.Background(), key)
+		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
 		require.NoError(t, err)
 		require.Equal(t, expectedProofs, proofs)
 	}
@@ -231,7 +232,10 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
-		coefficients, err := reader.GetFrameCoefficients(context.Background(), key, metadataMap[key])
+		elementCount, binaryCoefficients, err :=
+			reader.GetBinaryChunkCoefficients(context.Background(), key, metadataMap[key])
+		require.NoError(t, err)
+		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binaryCoefficients)
 		require.NoError(t, err)
 		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {
