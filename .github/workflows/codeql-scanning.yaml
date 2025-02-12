@@ -18,7 +18,7 @@ on:
       - 'common/**'
       - 'api/**'
       - '.github/codeql/**'
-      - '.github/workflows/codeql-analysis.yml'
+      - '.github/workflows/codeql-scanning.yaml'
   schedule:
     - cron: '0 9 * * *'
 
