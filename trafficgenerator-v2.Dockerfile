@@ -4,6 +4,8 @@ RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
 WORKDIR /app
 
+RUN apk add --no-cache make
+
 # Copy Entire Repo here in order to not copy individual dependencies
 COPY . .
 
