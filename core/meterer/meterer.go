@@ -184,8 +184,8 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetReservationPeriodByMicroTimestamp(micro_timestamp int64, binInterval uint32) uint32 {
-	return GetReservationPeriod(micro_timestamp/1e6, binInterval)
+func GetReservationPeriodByMicroTimestamp(microTimestamp int64, binInterval uint32) uint32 {
+	return GetReservationPeriod(int64((time.Duration(microTimestamp) * time.Microsecond).Seconds()), binInterval)
 }
 
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;

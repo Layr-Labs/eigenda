@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -638,5 +639,6 @@ func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActiveByMicroTimestamp(currentTimestamp uint64) bool {
-	return ar.StartTimestamp <= currentTimestamp/1e6 && ar.EndTimestamp >= currentTimestamp/1e6
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Microsecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

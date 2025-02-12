@@ -23,7 +23,6 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
 
-	s.logger.Debug("received a new blob dispersal request", "payment", req.GetBlobHeader().GetPaymentHeader())
 	// Validate the request
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
