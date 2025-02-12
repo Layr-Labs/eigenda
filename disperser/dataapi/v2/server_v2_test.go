@@ -597,12 +597,22 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob inclusion info
+	now := time.Now()
 	blobHeader := makeBlobHeaderV2(t)
+	metadata := &commonv2.BlobMetadata{
+		BlobHeader: blobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
-		ReferenceBlockNumber: 100,
+		ReferenceBlockNumber: 1,
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
@@ -627,18 +637,23 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
 	})
 
+	operatorPubKeys := []*core.G1Point{
+		core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
+		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+	}
+
 	// Set up attestation
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
 	apk := keyPair.GetPubKeyG2()
+	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		AttestedAt:  uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
-			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
-		},
-		APKG2: apk,
+		BatchHeader:      batchHeader,
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nonsignerPubKeys,
+		APKG2:            apk,
 		QuorumAPKs: map[uint8]*core.G1Point{
 			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
 			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
@@ -655,6 +670,51 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
 	assert.NoError(t, err)
 
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		1: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[1].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(3),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[3].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
+	}
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
+
 	t.Run("found attestation info", func(t *testing.T) {
 		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
 		w := executeRequest(t, r, http.MethodGet, reqStr)
@@ -663,7 +723,28 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, blobKey.Hex(), response.BlobKey)
 		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
-		assert.Equal(t, attestation, response.Attestation)
+		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
+
+		signers := map[uint8][]string{
+			0: {
+				operatorPubKeys[2].GetOperatorID().Hex(),
+			},
+			1: {
+				operatorPubKeys[2].GetOperatorID().Hex(),
+				operatorPubKeys[3].GetOperatorID().Hex(),
+			},
+		}
+		nonsigners := map[uint8][]string{
+			0: {
+				operatorPubKeys[0].GetOperatorID().Hex(),
+				operatorPubKeys[1].GetOperatorID().Hex(),
+			},
+			1: {
+				operatorPubKeys[0].GetOperatorID().Hex(),
+			},
+		}
+		assert.Equal(t, signers, response.AttestationInfo.SigningOperatorIds)
+		assert.Equal(t, nonsigners, response.AttestationInfo.NonsigningOperatorIds)
 	})
 
 	deleteItems(t, []commondynamodb.Key{

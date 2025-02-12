@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/gin-gonic/gin"
@@ -225,6 +226,8 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 //	@Router		/blobs/{blob_key}/attestation-info [get]
 func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	handlerStart := time.Now()
+
+	ctx := c.Request.Context()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobAttestationInfo")
@@ -246,11 +249,59 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
+	// Get quorums that this blob was dispersed to
+	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch blob metadat: %w", err))
+		return
+	}
+	blobQuorums := make(map[uint8]struct{}, 0)
+	for _, q := range metadata.BlobHeader.QuorumNumbers {
+		blobQuorums[q] = struct{}{}
+	}
+
+	// Get all nonsigners (some may be not in blob's quorums)
+	nonsigners := make(map[core.OperatorID]struct{}, 0)
+	for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
+		opId := attestationInfo.Attestation.NonSignerPubKeys[i].GetOperatorID()
+		nonsigners[opId] = struct{}{}
+	}
+
+	// Get all operators at the reference block number
+	rbn := attestationInfo.Attestation.ReferenceBlockNumber
+	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, attestationInfo.Attestation.QuorumNumbers, uint32(rbn))
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch operator at reference block number: %w", err))
+		return
+	}
+
+	// Compute the signers and nonsigners for the blob, for each blob's quorums
+	signerIds := make(map[uint8][]string, 0)
+	nonsignerIds := make(map[uint8][]string, 0)
+	for q, innerMap := range operatorsByQuorum {
+		if _, exist := blobQuorums[q]; !exist {
+			continue
+		}
+		for _, op := range innerMap {
+			if _, exist := nonsigners[op.OperatorID]; exist {
+				nonsignerIds[q] = append(nonsignerIds[q], op.OperatorID.Hex())
+			} else {
+				signerIds[q] = append(signerIds[q], op.OperatorID.Hex())
+			}
+		}
+	}
+
 	response := &BlobAttestationInfoResponse{
 		BlobKey:         blobKey.Hex(),
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 		InclusionInfo:   attestationInfo.InclusionInfo,
-		Attestation:     attestationInfo.Attestation,
+		AttestationInfo: &AttestationInfo{
+			Attestation:           attestationInfo.Attestation,
+			SigningOperatorIds:    signerIds,
+			NonsigningOperatorIds: nonsignerIds,
+		},
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
