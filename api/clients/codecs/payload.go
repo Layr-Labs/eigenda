@@ -25,27 +25,22 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 		return nil, fmt.Errorf("encoding payload: %w", err)
 	}
 
+	fieldElements, err := encodedPayload.toFieldElements()
+	if err != nil {
+		return nil, fmt.Errorf("encoded payload to field elements: %w", err)
+	}
+
+	blobLength := uint32(encoding.NextPowerOf2(len(fieldElements)))
+
 	var coeffPolynomial *coeffPoly
-	var blobLength uint32
 	switch form {
 	case PolynomialFormCoeff:
 		// the payload is already in coefficient form. no conversion needs to take place, since blobs are also in
 		// coefficient form
-		coeffPolynomial, err = encodedPayload.toCoeffPoly()
-		if err != nil {
-			return nil, fmt.Errorf("coeff poly from elements: %w", err)
-		}
-
-		blobLength = uint32(encoding.NextPowerOf2(len(coeffPolynomial.fieldElements)))
+		coeffPolynomial = coeffPolyFromElements(fieldElements)
 	case PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form
-		evalPolynomial, err := encodedPayload.toEvalPoly()
-		if err != nil {
-			return nil, fmt.Errorf("eval poly from elements: %w", err)
-		}
-
-		blobLength = uint32(encoding.NextPowerOf2(len(evalPolynomial.fieldElements)))
-
+		evalPolynomial := evalPolyFromElements(fieldElements)
 		coeffPolynomial, err = evalPolynomial.toCoeffPoly(blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
@@ -53,7 +48,6 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 	default:
 		return nil, fmt.Errorf("unknown polynomial form: %v", form)
 	}
-
 
 	return BlobFromPolynomial(coeffPolynomial, blobLength)
 }

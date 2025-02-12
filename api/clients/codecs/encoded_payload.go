@@ -75,24 +75,14 @@ func (ep *encodedPayload) decode() (*Payload, error) {
 	return NewPayload(unpaddedData[0:claimedLength]), nil
 }
 
-// toEvalPoly converts the encoded payload to a polynomial in evaluation form
-func (ep *encodedPayload) toEvalPoly() (*evalPoly, error) {
+// toFieldElements converts the encoded payload to an array of field elements
+func (ep *encodedPayload) toFieldElements() ([]fr.Element, error) {
 	fieldElements, err := rs.ToFrArray(ep.bytes)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize field elements: %w", err)
 	}
 
-	return evalPolyFromElements(fieldElements), nil
-}
-
-// toCoeffPoly converts the encoded payload to a polynomial in coefficient form
-func (ep *encodedPayload) toCoeffPoly() (*coeffPoly, error) {
-	fieldElements, err := rs.ToFrArray(ep.bytes)
-	if err != nil {
-		return nil, fmt.Errorf("deserialize field elements: %w", err)
-	}
-
-	return coeffPolyFromElements(fieldElements), nil
+	return fieldElements, nil
 }
 
 // encodedPayloadFromElements accepts an array of field elements, and converts them into an encoded payload

@@ -54,27 +54,19 @@ func TestEncodeTooManyElements(t *testing.T) {
 		almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
 		almostTooLongEncodedPayload, err := newEncodedPayload(NewPayload(almostTooLongData))
 		require.NoError(t, err)
-		require.NotNil(t, almostTooLongEncodedPayload)
-
-		almostTooLongCoeffPoly, err := almostTooLongEncodedPayload.toCoeffPoly()
+		almostTooLongFieldElements, err := almostTooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
-		require.NotNil(t, almostTooLongCoeffPoly)
-
 		// there are almost too many field elements for the defined blob length, but not quite
-		_, err = encodedPayloadFromElements(almostTooLongCoeffPoly.fieldElements, blobLength)
+		_, err = encodedPayloadFromElements(almostTooLongFieldElements, blobLength)
 		require.NoError(t, err)
 
 		tooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength) + 1)
 		tooLongEncodedPayload, err := newEncodedPayload(NewPayload(tooLongData))
 		require.NoError(t, err)
-		require.NotNil(t, tooLongEncodedPayload)
-
-		tooLongCoeffPoly, err := tooLongEncodedPayload.toCoeffPoly()
+		tooLongFieldElements, err := tooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
-		require.NotNil(t, tooLongCoeffPoly)
-
 		// there is one too many field elements for the defined blob length
-		_, err = encodedPayloadFromElements(tooLongCoeffPoly.fieldElements, blobLength)
+		_, err = encodedPayloadFromElements(tooLongFieldElements, blobLength)
 		require.Error(t, err)
 	}
 }
@@ -112,15 +104,21 @@ func TestEncodeWithFewerElements(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
 
-	blob, err := NewPayload(originalData).ToBlob(PolynomialFormCoeff)
+	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
 	require.NoError(t, err)
 
-	fieldElements := make([]fr.Element, len(blob.coeffPolynomial.fieldElements) - 1)
+	originalFieldElements, err := encodedPayload.toFieldElements()
+	require.NoError(t, err)
+
+	truncatedFieldElements := make([]fr.Element, len(originalFieldElements)-1)
 	// intentionally don't copy all the elements
-	copy(fieldElements, blob.coeffPolynomial.fieldElements[:len(blob.coeffPolynomial.fieldElements) - 1])
+	copy(truncatedFieldElements, originalFieldElements[:len(originalFieldElements)-1])
+
+	// next power of 2 bytes, converted into symbol length
+	blobLength := encoding.NextPowerOf2(len(originalData)) / encoding.BYTES_PER_SYMBOL
 
 	// even though the actual length will be less than the claimed length, we shouldn't see any error
-	encodedPayload, err := encodedPayloadFromElements(fieldElements, blob.blobLength)
+	reconstructedEncodedPayload, err := encodedPayloadFromElements(originalFieldElements, uint32(blobLength))
 	require.NoError(t, err)
-	require.NotNil(t, encodedPayload)
+	require.NotNil(t, reconstructedEncodedPayload)
 }
