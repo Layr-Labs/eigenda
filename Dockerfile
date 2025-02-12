@@ -90,7 +90,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -o ./bin/relay ./cmd
 
 # Traffic Generator V2 build stage
-FROM common-builder as generator2-builder
+FROM common-builder AS generator2-builder
 WORKDIR app/test/v2
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -138,5 +138,5 @@ COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
 ENTRYPOINT ["relay"]
 
 FROM alpine:3.18 AS generator2
-COPY --from=builder /app/test/v2/bin/load /usr/local/bin
+COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load", "-", "-"]
