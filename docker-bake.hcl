@@ -205,7 +205,7 @@ target "traffic-generator-internal" {
 
 target "traffic-generator-v2" {
   context    = "."
-  dockerfile = "./Dockerfile"
+  dockerfile = "./trafficgenerator-v2.Dockerfile"
   target     = "generator2"
   tags       = ["${REGISTRY}/${REPO}/traffic-generator-v2:${BUILD_TAG}"]
 }
