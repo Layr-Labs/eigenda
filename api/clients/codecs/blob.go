@@ -10,11 +10,13 @@ import (
 type Blob struct {
 	coeffPolynomial *coeffPoly
 	// blobLength must be a power of 2, and should match the blobLength claimed in the BlobCommitment
-	// This is the blob length in symbols, NOT in bytes
+	// This is the blob length IN SYMBOLS, not in bytes
 	blobLength uint32
 }
 
-// BlobFromBytes initializes a Blob from bytes, and a blobLength in symbols
+// BlobFromBytes initializes a Blob from bytes
+//
+// blobLength is the length of the blob IN SYMBOLS
 func BlobFromBytes(bytes []byte, blobLength uint32) (*Blob, error) {
 	poly, err := coeffPolyFromBytes(bytes)
 	if err != nil {
@@ -24,11 +26,14 @@ func BlobFromBytes(bytes []byte, blobLength uint32) (*Blob, error) {
 	return BlobFromPolynomial(poly, blobLength)
 }
 
-// BlobFromPolynomial initializes a blob from a polynomial, and a blobLength in symbols
+// BlobFromPolynomial initializes a blob from a polynomial
+//
+// blobLength is the length of the blob IN SYMBOLS
 func BlobFromPolynomial(coeffPolynomial *coeffPoly, blobLength uint32) (*Blob, error) {
 	return &Blob{
 		coeffPolynomial: coeffPolynomial,
-		blobLength:      blobLength}, nil
+		blobLength:      blobLength,
+	}, nil
 }
 
 // GetBytes gets the raw bytes of the Blob
@@ -52,7 +57,7 @@ func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
 		}
 	case PolynomialFormEval:
 		// the payload started off in evaluation form, so we first need to convert the blob's coeff poly into an eval poly
-		evalPoly, err := b.coeffPolynomial.toEvalPoly()
+		evalPoly, err := b.coeffPolynomial.toEvalPoly(b.blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("coeff poly to eval poly: %w", err)
 		}

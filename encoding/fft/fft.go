@@ -27,6 +27,8 @@
 package fft
 
 import (
+	"math"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 
@@ -87,4 +89,10 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 		ExpandedRootsOfUnity: rootz,
 		ReverseRootsOfUnity:  rootzReverse,
 	}
+}
+
+// FFTSettingsFromBlobLength accepts a blob length in symbols, and returns a new instance of FFT settings
+func FFTSettingsFromBlobLength(blobLength uint32) *FFTSettings {
+	maxScale := uint8(math.Log2(float64(blobLength)))
+	return NewFFTSettings(maxScale)
 }

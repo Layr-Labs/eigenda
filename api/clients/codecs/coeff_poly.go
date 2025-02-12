@@ -2,9 +2,7 @@ package codecs
 
 import (
 	"fmt"
-	"math"
 
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -34,14 +32,16 @@ func coeffPolyFromElements(elements []fr.Element) *coeffPoly {
 }
 
 // toEvalPoly converts a coeffPoly to an evalPoly, using the FFT operation
-func (p *coeffPoly) toEvalPoly() (*evalPoly, error) {
-	// we need to pad to the next power of 2, to be able to take the FFT
-	paddedLength := encoding.NextPowerOf2(len(p.fieldElements))
-	padding := make([]fr.Element, paddedLength-len(p.fieldElements))
-	paddedElements := append(p.fieldElements, padding...)
+//
+// blobLength (in SYMBOLS) is required, to be able to choose the correct parameters when performing FFT
+func (p *coeffPoly) toEvalPoly(blobLength uint32) (*evalPoly, error) {
+	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
+	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
+	//  to present a computational burden, consider making this change.
+	fftSettings := fft.FFTSettingsFromBlobLength(blobLength)
 
-	maxScale := uint8(math.Log2(float64(len(paddedElements))))
-	fftedElements, err := fft.NewFFTSettings(maxScale).FFT(paddedElements, false)
+	// the FFT method pads to the next power of 2, so we don't need to do that manually
+	fftedElements, err := fftSettings.FFT(p.fieldElements, false)
 	if err != nil {
 		return nil, fmt.Errorf("perform FFT: %w", err)
 	}
