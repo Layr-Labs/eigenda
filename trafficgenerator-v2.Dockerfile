@@ -9,6 +9,7 @@ RUN apk add --no-cache make
 # Copy Entire Repo here in order to not copy individual dependencies
 COPY . .
 
+RUN pwd
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -o test/v2/bin/load test/v2/load/main
