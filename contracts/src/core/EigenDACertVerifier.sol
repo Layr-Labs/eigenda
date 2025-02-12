@@ -178,6 +178,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
+     * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
+     * @return signedQuorumNumbers The signed quorum numbers for the given signed batch attestation
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch

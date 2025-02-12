@@ -170,6 +170,7 @@ library EigenDACertVerificationUtils {
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
     ) internal view {
+        // check blob inclusion in the batch from merkle proof
         require(
             Merkle.verifyInclusionKeccak(
                 blobInclusionInfo.inclusionProof, 
@@ -180,6 +181,7 @@ library EigenDACertVerificationUtils {
             "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: inclusion proof is invalid"
         );
 
+        // check BLS signature and get stake signed for batch quorums
         (
             QuorumStakeTotals memory quorumStakeTotals,
             bytes32 signatoryRecordHash
@@ -190,11 +192,13 @@ library EigenDACertVerificationUtils {
             nonSignerStakesAndSignature
         );
 
+        // check relay keys are set
         _verifyRelayKeysSet(
             eigenDARelayRegistry,
             blobInclusionInfo.blobCertificate.relayKeys
         );
 
+        // check the blob version is valid with security thresholds
         _verifyDACertSecurityParams(
             eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
@@ -202,6 +206,7 @@ library EigenDACertVerificationUtils {
 
         uint256 confirmedQuorumsBitmap;
 
+        // record confirmed quorums where signatories own at least the threshold percentage of the quorum
         for (uint i = 0; i < signedQuorumNumbers.length; i++) {
             if(
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR >=
@@ -216,6 +221,7 @@ library EigenDACertVerificationUtils {
 
         uint256 blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers);
 
+        // check if the blob quorums are a subset of the confirmed quorums
         require(
             BitmapUtils.isSubsetOf(
                 blobQuorumsBitmap,
@@ -224,6 +230,7 @@ library EigenDACertVerificationUtils {
             "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: blob quorums are not a subset of the confirmed quorums"
         );
 
+        // check if the required quorums are a subset of the blob quorums
         require(
             BitmapUtils.isSubsetOf(
                 BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers),
