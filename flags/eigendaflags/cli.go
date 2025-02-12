@@ -134,7 +134,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Usage: "Number of Ethereum blocks to wait after the blob's batch has been included on-chain, " +
 				"before returning from PutBlob calls. Can either be a number or 'finalized'.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CONFIRMATION_DEPTH")},
-			Value:    "0",
+			Value:    "8",
 			Category: category,
 			Action: func(_ *cli.Context, val string) error {
 				return validateConfirmationFlag(val)
