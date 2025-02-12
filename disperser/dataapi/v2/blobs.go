@@ -253,7 +253,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch blob metadat: %w", err))
+		errorResponse(c, fmt.Errorf("failed to fetch blob metadata: %w", err))
 		return
 	}
 	blobQuorums := make(map[uint8]struct{}, 0)
@@ -261,7 +261,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		blobQuorums[q] = struct{}{}
 	}
 
-	// Get all nonsigners (some may be not in blob's quorums)
+	// Get all nonsigners (of the batch that this blob is part of)
 	nonsigners := make(map[core.OperatorID]struct{}, 0)
 	for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
 		opId := attestationInfo.Attestation.NonSignerPubKeys[i].GetOperatorID()
@@ -273,14 +273,15 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, attestationInfo.Attestation.QuorumNumbers, uint32(rbn))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch operator at reference block number: %w", err))
+		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
 		return
 	}
 
-	// Compute the signers and nonsigners for the blob, for each blob's quorums
+	// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
 	signerIds := make(map[uint8][]string, 0)
 	nonsignerIds := make(map[uint8][]string, 0)
 	for q, innerMap := range operatorsByQuorum {
+		// Make sure the blob was dispersed to the quorum
 		if _, exist := blobQuorums[q]; !exist {
 			continue
 		}
