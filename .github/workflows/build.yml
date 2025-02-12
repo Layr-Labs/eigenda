@@ -17,8 +17,23 @@ jobs:
       with:
         go-version: 1.22
 
-    - name: Build App
+    - name: Check that build succeeds
       run: make eigenda-proxy
+  
+  flags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.22
+
+      # This checks that the flags in .env.holesky.example are valid and allow the proxy to start
+      - name: Run flag test
+        run: ${{ github.workspace }}/scripts/test-proxy-startup-with-env-vars.sh
 
   docker:
     runs-on: ubuntu-latest
