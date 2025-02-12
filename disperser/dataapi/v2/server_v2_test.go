@@ -411,6 +411,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobKey, err := blobHeader.BlobKey()
@@ -435,10 +436,16 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
 	}
 	sort.Slice(firstBlobKeys, func(i, j int) bool {
 		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
 	})
+
+	defer deleteItems(t, dynamoKeys)
 
 	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
@@ -612,7 +619,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
-		ReferenceBlockNumber: 1,
+		ReferenceBlockNumber: 10,
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
@@ -671,7 +678,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	assert.NoError(t, err)
 
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
-		1: core.OperatorStakes{
+		10: core.OperatorStakes{
 			0: {
 				0: {
 					OperatorID: operatorPubKeys[0].GetOperatorID(),
@@ -747,6 +754,8 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, nonsigners, response.AttestationInfo.NonsigningOperatorIds)
 	})
 
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
@@ -759,6 +768,10 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		},
 	})
 }
