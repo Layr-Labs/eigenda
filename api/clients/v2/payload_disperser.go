@@ -249,7 +249,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
 				return blobStatusReply, nil
-			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
+			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
 				continue
 			default:
 				return nil, fmt.Errorf(
