@@ -12,6 +12,7 @@ COPY . .
 RUN pwd
 RUN ls
 RUN tree -L 2
+RUN tree test/v2
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go build -o test/v2/bin/load test/v2/load/main
