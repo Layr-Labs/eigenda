@@ -173,7 +173,13 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 	}
 
 	var blsSignerConfig blssignerTypes.SignerConfig
-	if !testMode {
+	if testMode && ctx.GlobalString(flags.TestPrivateBlsFlag.Name) != "" {
+		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
+		blsSignerConfig = blssignerTypes.SignerConfig{
+			SignerType: blssignerTypes.PrivateKey,
+			PrivateKey: privateBls,
+		}
+	} else {
 		blsSignerCertFilePath := ctx.GlobalString(flags.BLSSignerCertFileFlag.Name)
 		enableTLS := len(blsSignerCertFilePath) > 0
 		signerType := blssignerTypes.Local
@@ -211,12 +217,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 			EnableTLS:        enableTLS,
 			TLSCertFilePath:  ctx.GlobalString(flags.BLSSignerCertFileFlag.Name),
 			CerberusAPIKey:   blsSignerAPIKey,
-		}
-	} else {
-		privateBls := ctx.GlobalString(flags.TestPrivateBlsFlag.Name)
-		blsSignerConfig = blssignerTypes.SignerConfig{
-			SignerType: blssignerTypes.PrivateKey,
-			PrivateKey: privateBls,
 		}
 	}
 

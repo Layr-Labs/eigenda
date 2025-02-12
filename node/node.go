@@ -49,7 +49,7 @@ const (
 	gcPercentageTime = 0.1
 
 	v1CheckPath = "api/v1/operators-info/port-check"
-	v2CheckPath = "api/v2/operators/reachability"
+	v2CheckPath = "api/v2/operators/liveness"
 )
 
 var (
@@ -158,6 +158,7 @@ func NewNode(
 	var blockStaleMeasure, storeDurationBlocks uint32
 	if config.EnableTestMode && config.OverrideBlockStaleMeasure > 0 {
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
+		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
 		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 		if err != nil {
@@ -167,6 +168,7 @@ func NewNode(
 	}
 	if config.EnableTestMode && config.OverrideStoreDurationBlocks > 0 {
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
+		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
 		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
 		if err != nil {

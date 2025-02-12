@@ -32,6 +32,8 @@ type TestRandom struct {
 
 // NewTestRandom creates a new instance of TestRandom
 // This method may either be seeded, or not seeded. If no seed is provided, then current unix nano time is used.
+//
+// The testing.T object is optional, but if it is nil then this utility will panic if an internal error occurs.
 func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
 	var seed int64
 	if len(fixedSeed) == 0 {
@@ -103,6 +105,24 @@ func (r *TestRandom) Uint64n(n uint64) uint64 {
 	return r.Uint64() % n
 }
 
+// Gaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation.
+func (r *TestRandom) Gaussian(mean float64, stddev float64) float64 {
+	return r.NormFloat64()*stddev + mean
+}
+
+// BoundedGaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation,
+// but bounded by the given min and max values. If a generated value exceeds the bounds, the bound is returned instead.
+func (r *TestRandom) BoundedGaussian(mean float64, stddev float64, min float64, max float64) float64 {
+	val := r.Gaussian(mean, stddev)
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
+}
+
 var _ io.Reader = &randIOReader{}
 
 // randIOReader is an io.Reader that reads from a random number generator.
@@ -126,7 +146,7 @@ func (r *TestRandom) IOReader() io.Reader {
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
 func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
-	require.NoError(r.t, err)
+	r.requireNoError(err)
 	return &key.PublicKey, key
 }
 
@@ -140,8 +160,16 @@ func (r *TestRandom) BLS() *core.KeyPair {
 
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := crand.Int(r.IOReader(), maxValue)
-	require.NoError(r.t, err)
+	r.requireNoError(err)
 
 	sk := new(core.PrivateKey).SetBigInt(n)
 	return core.MakeKeyPair(sk)
+}
+
+func (r *TestRandom) requireNoError(err error) {
+	if r.t != nil {
+		require.NoError(r.t, err)
+	} else if err != nil {
+		panic(err)
+	}
 }

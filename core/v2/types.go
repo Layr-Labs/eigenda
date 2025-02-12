@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -107,6 +108,7 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		}
 		quorumNumbers[i] = core.QuorumID(q)
 	}
+	slices.Sort(quorumNumbers)
 
 	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
 	if paymentMetadata == nil {
@@ -147,8 +149,8 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 	}, nil
 }
 
-func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(b.BlobCommitments.Length), blobParams)
+func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := GetChunkLength(uint32(blobLength), blobParams)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}

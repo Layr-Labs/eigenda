@@ -162,18 +162,18 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		defer cancel()
 	}
 
-	err := s.blobRateLimiter.BeginGetBlobOperation(time.Now())
-	if err != nil {
-		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
-	}
-	defer s.blobRateLimiter.FinishGetBlobOperation()
-
+	// Validate the request params before any further processing (as validation is cheaper)
 	key, err := v2.BytesToBlobKey(request.BlobKey)
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
 	}
-
 	s.logger.Debug("GetBlob request received", "key", key.Hex())
+
+	err = s.blobRateLimiter.BeginGetBlobOperation(time.Now())
+	if err != nil {
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
+	}
+	defer s.blobRateLimiter.FinishGetBlobOperation()
 
 	keys := []v2.BlobKey{key}
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
@@ -232,7 +232,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
 		if !ok {
-			return nil, api.NewErrorInternal("could not get peer information")
+			return nil, api.NewErrorInvalidArg("could not get peer information")
 		}
 		clientAddress := client.Addr.String()
 

@@ -26,7 +26,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -78,7 +77,6 @@ var (
 
 	serverVersion     = uint(2)
 	mockLogger        = testutils.GetLogger()
-	blobstore         = inmem.NewBlobStore()
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
@@ -104,7 +102,6 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
 	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
 		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
@@ -335,7 +332,7 @@ func deleteItems(t *testing.T, keys []commondynamodb.Key) {
 	assert.Len(t, failed, 0)
 }
 
-func TestFetchBlobHandlerV2(t *testing.T) {
+func TestFetchBlob(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob metadata in metadata store
@@ -354,7 +351,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
+	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlob)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex())
 	response := decodeResponseBody[serverv2.BlobResponse](t, w)
@@ -366,7 +363,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
-func TestFetchBlobCertificateHandler(t *testing.T) {
+func TestFetchBlobCertificate(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob certificate in metadata store
@@ -385,7 +382,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobCertificate(context.Background(), blobCert, fragmentInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificateHandler)
+	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
 	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
@@ -395,7 +392,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	assert.Equal(t, blobCert.Signature, response.Certificate.Signature)
 }
 
-func TestFetchBlobFeedHandler(t *testing.T) {
+func TestFetchBlobFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -443,7 +440,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
 	})
 
-	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
@@ -595,22 +592,20 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchBlobInclusionInfoHandler(t *testing.T) {
+func TestFetchBlobAttestationInfo(t *testing.T) {
+	ctx := context.Background()
 	r := setUpRouter()
 
-	// Set up blob inclusion info in metadata store
+	// Set up blob inclusion info
 	blobHeader := makeBlobHeaderV2(t)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
-
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 100,
 	}
-	batchHeaderHash, err := batchHeader.Hash()
-	require.NoError(t, err)
-
-	ctx := context.Background()
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -622,16 +617,72 @@ func TestFetchBlobInclusionInfoHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/inclusion-info", testDataApiServerV2.FetchBlobInclusionInfoHandler)
+	r.GET("/v2/blobs/:blob_key/attestation-info", testDataApiServerV2.FetchBlobAttestationInfo)
 
-	reqStr := fmt.Sprintf("/v2/blobs/%s/inclusion-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.BlobInclusionInfoResponse](t, w)
+	t.Run("no attestation found", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+	})
 
-	assert.Equal(t, inclusionInfo.InclusionProof, response.InclusionInfo.InclusionProof)
+	// Set up attestation
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	t.Run("found attestation info", func(t *testing.T) {
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		w := executeRequest(t, r, http.MethodGet, reqStr)
+		response := decodeResponseBody[serverv2.BlobAttestationInfoResponse](t, w)
+
+		assert.Equal(t, blobKey.Hex(), response.BlobKey)
+		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
+		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, attestation, response.Attestation)
+	})
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+	})
 }
 
-func TestFetchBatchHandlerV2(t *testing.T) {
+func TestFetchBatch(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up batch header in metadata store
@@ -671,7 +722,7 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	}
 	defer deleteItems(t, []commondynamodb.Key{dk})
 
-	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
+	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatch)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/batches/"+batchHeaderHash)
 	response := decodeResponseBody[serverv2.BatchResponse](t, w)
@@ -683,7 +734,7 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
 }
 
-func TestFetchBatchFeedHandler(t *testing.T) {
+func TestFetchBatchFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -736,7 +787,7 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	}
 	defer deleteItems(t, dynamoKeys)
 
-	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeedHandler)
+	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
@@ -1334,7 +1385,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 
 }
 
-func TestCheckOperatorsReachability(t *testing.T) {
+func TestCheckOperatorsLiveness(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
@@ -1343,9 +1394,9 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
 
-	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
@@ -1360,7 +1411,7 @@ func TestCheckOperatorsReachability(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestCheckOperatorsReachabilityLegacyV1SocketRegistration(t *testing.T) {
+func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
@@ -1369,9 +1420,9 @@ func TestCheckOperatorsReachabilityLegacyV1SocketRegistration(t *testing.T) {
 	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
 	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
 
-	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
@@ -1465,28 +1516,22 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
 	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
-	assert.Equal(t, 3, len(response.StakeRankedOperators))
+	require.Equal(t, 2, len(response.StakeRankedOperators))
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
-	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
-	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
-	// "total"
-	ops, ok = response.StakeRankedOperators["total"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
 }
 
-func TestFetchMetricsSummaryHandler(t *testing.T) {
+func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
@@ -1497,7 +1542,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummaryHandler)
+	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummary)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
@@ -1505,7 +1550,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
 }
 
-func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
+func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
@@ -1516,7 +1561,7 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v2/metrics/timeseries/throughput", testDataApiServer.FetchMetricsThroughputHandler)
+	r.GET("/v2/metrics/timeseries/throughput", testDataApiServerV2.FetchMetricsThroughputTimeseries)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/throughput")
 	response := decodeResponseBody[[]*dataapi.Throughput](t, w)

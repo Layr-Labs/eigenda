@@ -21,11 +21,8 @@ endif
 
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
-compile-el:
-	cd contracts && ./compile.sh compile-el
-
-compile-dl:
-	cd contracts && ./compile.sh compile-dl
+compile-contracts:
+	cd contracts && ./compile.sh
 
 clean:
 	./api/builder/clean.sh

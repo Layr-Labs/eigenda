@@ -3,11 +3,12 @@ package node_test
 import (
 	"context"
 	"errors"
-	"github.com/docker/go-units"
 	"os"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -165,8 +166,8 @@ func TestGetReachabilityURL(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v1/operators-info/port-check?operator_id=123123123", url)
 
-	v2CheckPath := "api/v2/operators/reachability"
+	v2CheckPath := "api/v2/operators/liveness"
 	url, err = node.GetReachabilityURL("https://dataapi.eigenda.xyz", v2CheckPath, "123123123")
 	assert.NoError(t, err)
-	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v2/operators/reachability?operator_id=123123123", url)
+	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v2/operators/liveness?operator_id=123123123", url)
 }

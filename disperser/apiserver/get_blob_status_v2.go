@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -30,6 +31,10 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	if err != nil {
+		if strings.Contains(err.Error(), "metadata not found") {
+			s.logger.Info("blob metadata not found", "err", err, "blobKey", blobKey.Hex())
+			return nil, api.NewErrorNotFound(fmt.Sprintf("blob metadata not found for blob key: %s", blobKey.Hex()))
+		}
 		s.logger.Warn("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob metadata: %s", err.Error()))
 	}

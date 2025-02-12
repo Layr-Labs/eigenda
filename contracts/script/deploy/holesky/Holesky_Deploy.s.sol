@@ -2,21 +2,21 @@
 /*
 pragma solidity =0.8.12;
 
-import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
-import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
+import {PauserRegistry} from "../lib/eigenlayer-middleware/src/contracts/permissions/PauserRegistry.sol";
+import {EmptyContract} from "../lib/eigenlayer-middleware/src/test/mocks/EmptyContract.sol";
 
-import {BLSApkRegistry} from "eigenlayer-middleware/BLSApkRegistry.sol";
-import {IBLSApkRegistry} from "eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
-import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
-import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
-import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
-import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
-import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
-import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {BLSApkRegistry} from "../lib/eigenlayer-middleware/BLSApkRegistry.sol";
+import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/interfaces/IBLSApkRegistry.sol";
+import {RegistryCoordinator} from "../lib/eigenlayer-middleware/RegistryCoordinator.sol";
+import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
+import {IndexRegistry} from "../lib/eigenlayer-middleware/IndexRegistry.sol";
+import {IIndexRegistry} from "../lib/eigenlayer-middleware/interfaces/IIndexRegistry.sol";
+import {StakeRegistry} from "../lib/eigenlayer-middleware/StakeRegistry.sol";
+import {IStakeRegistry} from "../lib/eigenlayer-middleware/interfaces/IStakeRegistry.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
-import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
-import {OperatorStateRetriever} from "eigenlayer-middleware/OperatorStateRetriever.sol";
-import {ServiceManagerRouter} from "eigenlayer-middleware/ServiceManagerRouter.sol";
+import {IServiceManager} from "../lib/eigenlayer-middleware/interfaces/IServiceManager.sol";
+import {OperatorStateRetriever} from "../lib/eigenlayer-middleware/OperatorStateRetriever.sol";
+import {ServiceManagerRouter} from "../lib/eigenlayer-middleware/ServiceManagerRouter.sol";
 import {MockRollup, BN254, IEigenDAServiceManager} from "src/rollup/MockRollup.sol";
 
 import "eigenlayer-scripts/utils/ExistingDeploymentParser.sol";
