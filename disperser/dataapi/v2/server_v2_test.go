@@ -750,8 +750,16 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 				operatorPubKeys[0].GetOperatorID().Hex(),
 			},
 		}
-		assert.Equal(t, signers, response.AttestationInfo.SigningOperatorIds)
-		assert.Equal(t, nonsigners, response.AttestationInfo.NonsigningOperatorIds)
+		for key, expectedSigners := range signers {
+			actualSigners, exists := response.AttestationInfo.SigningOperatorIds[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedSigners, actualSigners)
+		}
+		for key, expectedNonsigners := range nonsigners {
+			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorIds[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+		}
 	})
 
 	mockTx.ExpectedCalls = nil
