@@ -59,7 +59,7 @@ func StringToBackendType(s string) BackendType {
 }
 
 type Store interface {
-	// Backend returns the backend type provider of the store.
+	// BackendType returns the backend type provider of the store.
 	BackendType() BackendType
 	// Verify verifies the given key-value pair.
 	Verify(ctx context.Context, key []byte, value []byte) error

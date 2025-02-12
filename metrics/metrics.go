@@ -157,7 +157,7 @@ func (m *Metrics) RecordRPCServerRequest(method string) func(status, mode, ver s
 	}
 }
 
-// RecordSecondaryPut records a secondary put/get operation.
+// RecordSecondaryRequest records a secondary put/get operation.
 func (m *Metrics) RecordSecondaryRequest(bt string, method string) func(status string) {
 	timer := prometheus.NewTimer(m.SecondaryRequestDurationSec.WithLabelValues(bt))
 

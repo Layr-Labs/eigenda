@@ -147,7 +147,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	return bytes, nil
 }
 
-// Backend returns the backend type for EigenDA Store
+// BackendType returns the backend type for EigenDA Store
 func (e Store) BackendType() common.BackendType {
 	return common.EigenDABackendType
 }

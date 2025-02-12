@@ -83,7 +83,7 @@ func (sm *SecondaryManager) FallbackEnabled() bool {
 	return len(sm.fallbacks) > 0
 }
 
-// handleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
+// HandleRedundantWrites ... writes to both sets of backends (i.e, fallback, cache)
 // and returns an error if NONE of them succeed
 func (sm *SecondaryManager) HandleRedundantWrites(ctx context.Context, commitment []byte, value []byte) error {
 	sources := sm.caches
