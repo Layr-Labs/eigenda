@@ -15,7 +15,7 @@ RUN pwd
 RUN tree -L 2
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o ./bin/load ./load/main
+    make build
 
 FROM alpine:3.18 AS generator2
 
