@@ -147,7 +147,11 @@ func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reserva
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
 	// Valid reservation periodes are either the current bin or the previous bin
-	if (requestReservationPeriod != currentReservationPeriod && requestReservationPeriod != (currentReservationPeriod-1)) || (GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow) > requestReservationPeriod || requestReservationPeriod > GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)) {
+	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
+	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
+	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
+	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod <= endPeriod
+	if !isCurrentOrPreviousPeriod || !isWithinReservationWindow {
 		return false
 	}
 	return true
@@ -186,11 +190,11 @@ func GetReservationPeriodByMicroTimestamp(micro_timestamp int64, binInterval uin
 
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
+func GetReservationPeriod(timestamp int64, binInterval uint32) uint32 {
 	if binInterval == 0 {
 		return 0
 	}
-	return uint32(timestamp / uint64(binInterval))
+	return uint32(timestamp / int64(binInterval))
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
