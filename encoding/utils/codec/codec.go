@@ -167,10 +167,6 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 // It returns what the length of the output array would be, if you called RemoveInternalPadding on it.
 // TODO: test, especially lower bound
 func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
-	if inputLen == 0 {
-		return 0, fmt.Errorf("input length is zero")
-	}
-
 	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {
 		return 0, fmt.Errorf(
 			"%d isn't a multiple of encoding.BYTES_PER_SYMBOL (%d)",

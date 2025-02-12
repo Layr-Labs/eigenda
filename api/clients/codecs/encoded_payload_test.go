@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/stretchr/testify/require"
@@ -42,39 +43,40 @@ func TestDecodeLongBytes(t *testing.T) {
 // TestEncodeTooManyElements checks that encodedPayloadFromElements fails at the expect limit, relative to payload
 // length and blob length
 func TestEncodeTooManyElements(t *testing.T) {
-	// length in symbols
-	blobLength := uint32(16)
-
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
-	require.NoError(t, err)
-
 	testRandom := random.NewTestRandom(t)
+	powersOf2 := encoding.GeneratePowersOfTwo(uint32(12))
 
-	almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
-	almostTooLongEncodedPayload, err := newEncodedPayload(NewPayload(almostTooLongData))
-	require.NoError(t, err)
-	require.NotNil(t, almostTooLongEncodedPayload)
+	for i := 0; i < len(powersOf2); i++ {
+		blobLength := powersOf2[i]
+		maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
+		require.NoError(t, err)
 
-	almostTooLongCoeffPoly, err := almostTooLongEncodedPayload.toCoeffPoly()
-	require.NoError(t, err)
-	require.NotNil(t, almostTooLongCoeffPoly)
+		almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
+		almostTooLongEncodedPayload, err := newEncodedPayload(NewPayload(almostTooLongData))
+		require.NoError(t, err)
+		require.NotNil(t, almostTooLongEncodedPayload)
 
-	// there are almost too many field elements for the defined blob length, but not quite
-	_, err = encodedPayloadFromElements(almostTooLongCoeffPoly.fieldElements, blobLength)
-	require.NoError(t, err)
+		almostTooLongCoeffPoly, err := almostTooLongEncodedPayload.toCoeffPoly()
+		require.NoError(t, err)
+		require.NotNil(t, almostTooLongCoeffPoly)
 
-	tooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength) + 1)
-	tooLongEncodedPayload, err := newEncodedPayload(NewPayload(tooLongData))
-	require.NoError(t, err)
-	require.NotNil(t, tooLongEncodedPayload)
+		// there are almost too many field elements for the defined blob length, but not quite
+		_, err = encodedPayloadFromElements(almostTooLongCoeffPoly.fieldElements, blobLength)
+		require.NoError(t, err)
 
-	tooLongCoeffPoly, err := tooLongEncodedPayload.toCoeffPoly()
-	require.NoError(t, err)
-	require.NotNil(t, tooLongCoeffPoly)
+		tooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength) + 1)
+		tooLongEncodedPayload, err := newEncodedPayload(NewPayload(tooLongData))
+		require.NoError(t, err)
+		require.NotNil(t, tooLongEncodedPayload)
 
-	// there is one too many field elements for the defined blob length
-	_, err = encodedPayloadFromElements(tooLongCoeffPoly.fieldElements, blobLength)
-	require.Error(t, err)
+		tooLongCoeffPoly, err := tooLongEncodedPayload.toCoeffPoly()
+		require.NoError(t, err)
+		require.NotNil(t, tooLongCoeffPoly)
+
+		// there is one too many field elements for the defined blob length
+		_, err = encodedPayloadFromElements(tooLongCoeffPoly.fieldElements, blobLength)
+		require.Error(t, err)
+	}
 }
 
 // TestTrailingNonZeros checks that any non-zero values that come after the end of the claimed payload length

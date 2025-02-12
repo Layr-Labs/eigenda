@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
@@ -50,12 +51,38 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 	}
 }
 
-// TestGetPaddedDataLength tests that GetPaddedDataLength is behaving as expected
-func TestGetPaddedDataLength(t *testing.T) {
+// TestGetPaddedDataLength tests that GetPaddedDataLength behaves relative to hardcoded expected results
+func TestGetPaddedDataLengthAgainstKnowns(t *testing.T) {
 	startLengths := []uint32{30, 31, 32, 33, 68}
 	expectedResults := []uint32{32, 32, 64, 64, 96}
 
 	for i := range startLengths {
 		require.Equal(t, codec.GetPaddedDataLength(startLengths[i]), expectedResults[i])
+	}
+}
+
+// TestPadUnpad makes sure that padding and unpadding doesn't corrupt underlying data
+func TestPadUnpad(t *testing.T) {
+	testRandom := random.NewTestRandom(t)
+	testIterations := 1000
+
+	for i := 0; i < testIterations; i++ {
+		originalBytes := testRandom.Bytes(testRandom.Intn(1024) + 1)
+
+		paddedBytes := codec.PadPayload(originalBytes)
+		require.Equal(t, len(paddedBytes)%32, 0)
+
+		unpaddedBytes, err := codec.RemoveInternalPadding(paddedBytes)
+		require.Nil(t, err)
+
+		expectedUnpaddedLength, err := codec.GetUnpaddedDataLength(uint32(len(paddedBytes)))
+		require.Nil(t, err)
+		require.Equal(t, expectedUnpaddedLength, uint32(len(unpaddedBytes)))
+
+		// unpadded payload may have up to 31 extra trailing zeros, since RemoveInternalPadding doesn't consider these
+		require.Greater(t, len(originalBytes), len(unpaddedBytes)-32)
+		require.LessOrEqual(t, len(originalBytes), len(unpaddedBytes))
+
+		require.Equal(t, originalBytes, unpaddedBytes[:len(originalBytes)])
 	}
 }

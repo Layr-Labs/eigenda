@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,11 +10,8 @@ func TestNextPowerOf2(t *testing.T) {
 	testHeight := 65536
 
 	// 2 ^ 16 = 65536
-	powersToGenerate := 17
-	powers := make([]int, powersToGenerate)
-	for i := 0; i < powersToGenerate; i++ {
-		powers[i] = int(math.Pow(2, float64(i)))
-	}
+	// i.e., the last element generated here == testHeight
+	powers := GeneratePowersOfTwo(17)
 
 	powerIndex := 0
 	for i := 1; i <= testHeight; i++ {
@@ -30,6 +26,7 @@ func TestNextPowerOf2(t *testing.T) {
 	// sanity check the test logic
 	require.Equal(t, powerIndex, len(powers))
 
-	// extra sanity check
+	// extra sanity check, since we *really* rely on NextPowerOf2 returning
+	// the same value, if it's already a power of 2
 	require.Equal(t, 16, NextPowerOf2(16))
 }
