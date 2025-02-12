@@ -90,11 +90,11 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -o ./bin/relay ./cmd
 
 # Traffic Generator V2 build stage
-#FROM common-builder as generator2-builder
-#WORKDIR app/test/v2
-#RUN --mount=type=cache,target=/go/pkg/mod \
-#    --mount=type=cache,target=/root/.cache/go-build \
-#    make build
+FROM common-builder as generator2-builder
+WORKDIR app/test/v2
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make build
 
 # Final stages for each component
 FROM alpine:3.18 AS churner
@@ -137,6 +137,6 @@ FROM alpine:3.18 AS relay
 COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
 ENTRYPOINT ["relay"]
 
-#FROM alpine:3.18 AS generator2
-#COPY --from=builder /app/test/v2/bin/load /usr/local/bin/load
-#ENTRYPOINT ["load", "-", "-"]
+FROM alpine:3.18 AS generator2
+COPY --from=builder /app/test/v2/bin/load /usr/local/bin
+ENTRYPOINT ["load", "-", "-"]
