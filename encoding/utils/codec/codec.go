@@ -83,7 +83,6 @@ func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 // NOTE: this method is a reimplementation of ConvertByPaddingEmptyByte, with one meaningful difference: the alignment
 // of the output to encoding.BYTES_PER_SYMBOL. This alignment actually makes the padding logic simpler, and the
 // code that uses this function needs an aligned output anyway.
-// TODO: test, especially lower bound
 func PadPayload(inputData []byte) []byte {
 	// 31 bytes, for the bn254 curve
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
@@ -120,7 +119,6 @@ func PadPayload(inputData []byte) []byte {
 // NOTE: this method is a reimplementation of RemoveEmptyByteFromPaddedBytes, with one meaningful difference: this
 // function relies on the assumption that the input is aligned to encoding.BYTES_PER_SYMBOL, which makes the padding
 // removal logic simpler.
-// TODO: test, especially lower bound
 func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 	if len(paddedData)%encoding.BYTES_PER_SYMBOL != 0 {
 		return nil, fmt.Errorf(
@@ -150,7 +148,6 @@ func RemoveInternalPadding(paddedData []byte) ([]byte, error) {
 // adding internal byte padding
 //
 // The value returned from this function will always be a multiple of encoding.BYTES_PER_SYMBOL
-// TODO: test, especially lower bound
 func GetPaddedDataLength(inputLen uint32) uint32 {
 	bytesPerChunk := uint32(encoding.BYTES_PER_SYMBOL - 1)
 	chunkCount := inputLen / bytesPerChunk
@@ -165,7 +162,6 @@ func GetPaddedDataLength(inputLen uint32) uint32 {
 // GetUnpaddedDataLength accepts the length of an array that has been padded with PadPayload
 //
 // It returns what the length of the output array would be, if you called RemoveInternalPadding on it.
-// TODO: test, especially lower bound
 func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 	if inputLen%encoding.BYTES_PER_SYMBOL != 0 {
 		return 0, fmt.Errorf(
@@ -183,7 +179,6 @@ func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 
 // GetMaxPermissiblePayloadLength accepts a blob length IN SYMBOLS, and returns the size IN BYTES of the largest payload
 // that could fit inside the blob.
-// TODO: test, especially lower bound
 func GetMaxPermissiblePayloadLength(blobLength uint32) (uint32, error) {
 	if blobLength == 0 {
 		return 0, fmt.Errorf("input blob length is zero")

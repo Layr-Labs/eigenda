@@ -53,12 +53,29 @@ func TestSimplePaddingCodec_Fuzz(t *testing.T) {
 
 // TestGetPaddedDataLength tests that GetPaddedDataLength behaves relative to hardcoded expected results
 func TestGetPaddedDataLengthAgainstKnowns(t *testing.T) {
-	startLengths := []uint32{30, 31, 32, 33, 68}
-	expectedResults := []uint32{32, 32, 64, 64, 96}
+	startLengths := []uint32{0, 30, 31, 32, 33, 68}
+	expectedResults := []uint32{0, 32, 32, 64, 64, 96}
 
 	for i := range startLengths {
 		require.Equal(t, codec.GetPaddedDataLength(startLengths[i]), expectedResults[i])
 	}
+}
+
+// TestGetUnpaddedDataLengthAgainstKnowns tests that GetPaddedDataLength behaves relative to hardcoded expected results
+func TestGetUnpaddedDataLengthAgainstKnowns(t *testing.T) {
+	startLengths := []uint32{0, 32, 64, 128}
+	expectedResults := []uint32{0, 31, 62, 124}
+
+	for i := range startLengths {
+		unpaddedDataLength, err := codec.GetUnpaddedDataLength(startLengths[i])
+		require.Nil(t, err)
+
+		require.Equal(t, expectedResults[i], unpaddedDataLength)
+	}
+
+	unpaddedDataLength, err := codec.GetUnpaddedDataLength(129)
+	require.Error(t, err)
+	require.Equal(t, uint32(0), unpaddedDataLength)
 }
 
 // TestPadUnpad makes sure that padding and unpadding doesn't corrupt underlying data
@@ -67,7 +84,7 @@ func TestPadUnpad(t *testing.T) {
 	testIterations := 1000
 
 	for i := 0; i < testIterations; i++ {
-		originalBytes := testRandom.Bytes(testRandom.Intn(1024) + 1)
+		originalBytes := testRandom.Bytes(testRandom.Intn(1024))
 
 		paddedBytes := codec.PadPayload(originalBytes)
 		require.Equal(t, len(paddedBytes)%32, 0)
