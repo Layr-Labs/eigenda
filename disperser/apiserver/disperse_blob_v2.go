@@ -64,7 +64,6 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 }
 
 func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHeader *corev2.BlobHeader, signature []byte, requestedAt time.Time, ttl time.Duration) (corev2.BlobKey, error) {
-	s.logger.Debug("storing blob", "blobHeader", blobHeader)
 	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return corev2.BlobKey{}, api.NewErrorInvalidArg(fmt.Sprintf("failed to get blob key: %v", err))

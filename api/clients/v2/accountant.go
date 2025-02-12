@@ -62,8 +62,9 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. The returned values are
-// reservation period for reservation payments and cumulative payment for on-demand payments,
-// and both fields are used to create the payment header and signature.
+// timestamp at the current UNIX time in microseconds, and specified cumulative payment
+// for on-demand payments in units of wei. Both fields are used to create the payment
+// header and signature, with non-zero cumulative payment indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint64, *big.Int, error) {
