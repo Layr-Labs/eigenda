@@ -15,7 +15,7 @@ type IndexedChainState struct {
 }
 
 func (m *IndexedChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
-	args := m.Mock.Called(ctx)
+	args := m.Mock.Called()
 	return args.Get(0).(uint), args.Error(1)
 }
 
