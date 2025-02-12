@@ -9,14 +9,12 @@ RUN apk add --no-cache make
 # Copy Entire Repo here in order to not copy individual dependencies
 COPY . .
 
-WORKDIR /app/test/v2
-
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    go build -o bin/load load/main
+    go build -o test/v2/bin/load test/v2/load/main
 
 FROM alpine:3.18 AS generator2
 
-COPY --from=builder /app/test/v2/bin/load /usr/local/bin/load
+COPY --from=builder /app/test/v2/bin/load /usr/local/bin
 
 ENTRYPOINT ["generator"]
