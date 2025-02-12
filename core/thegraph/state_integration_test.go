@@ -107,7 +107,7 @@ func TestIndexerIntegration(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	state, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)

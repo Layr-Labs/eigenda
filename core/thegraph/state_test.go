@@ -84,7 +84,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -152,7 +152,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	_, err = cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -233,7 +233,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -250,7 +250,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 		1: 1,
 		2: 1,
 	})
-	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	chainState.On("GetCurrentBlockNumber", context.Background()).Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
@@ -287,7 +287,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	opID := ethcomm.HexToHash(id)

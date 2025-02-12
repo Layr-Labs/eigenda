@@ -130,7 +130,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 		d.metrics.reportHandleBatchLatency(time.Since(start))
 	}()
 
-	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber()
+	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
