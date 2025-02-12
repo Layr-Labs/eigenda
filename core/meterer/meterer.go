@@ -186,11 +186,11 @@ func GetReservationPeriodByMicroTimestamp(micro_timestamp int64, binInterval uin
 
 // GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
 // bin interval used by the disperser should be public information
-func GetReservationPeriod(timestamp int64, binInterval uint32) uint32 {
+func GetReservationPeriod(timestamp uint64, binInterval uint32) uint32 {
 	if binInterval == 0 {
 		return 0
 	}
-	return uint32(timestamp / int64(binInterval))
+	return uint32(timestamp / uint64(binInterval))
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests

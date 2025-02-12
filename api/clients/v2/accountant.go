@@ -67,9 +67,8 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // header and signature, with non-zero cumulative payment indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint64, *big.Int, error) {
-	now := time.Now().UnixMicro()
-	currentReservationPeriod := meterer.GetReservationPeriodByMicroTimestamp(now, a.reservationWindow)
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
+	currentReservationPeriod := meterer.GetReservationPeriodByMicroTimestamp(timestamp, a.reservationWindow)
 	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
 
 	a.usageLock.Lock()
@@ -81,9 +80,9 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return uint64(now), big.NewInt(0), nil
+		return big.NewInt(0), nil
 	}
 
 	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
@@ -91,9 +90,9 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return uint64(now), big.NewInt(0), nil
+		return big.NewInt(0), nil
 	}
 
 	// reservation not available, rollback reservation records, attempt on-demand
@@ -103,24 +102,25 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return uint64(now), a.cumulativePayment, nil
+		return a.cumulativePayment, nil
 	}
 
-	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
+	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
-	timestamp, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+	timestamp := time.Now().UnixMicro()
+	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, err
 	}
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		Timestamp:         timestamp,
+		Timestamp:         uint64(timestamp),
 		CumulativePayment: cumulativePayment,
 	}
 
