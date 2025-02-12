@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -311,6 +312,7 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 		}
 		return fmt.Errorf("all quorums received no attestation for batch %s", batchHeaderHash)
 	}
+	slices.Sort(nonZeroQuorums)
 
 	aggSig, err := d.aggregator.AggregateSignatures(ctx, d.chainState, uint(batchData.Batch.BatchHeader.ReferenceBlockNumber), quorumAttestation, nonZeroQuorums)
 	aggregateSignaturesFinished := time.Now()

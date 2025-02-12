@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
@@ -71,7 +71,7 @@ func BlobStatusFromProtobuf(s pb.BlobStatus) (BlobStatus, error) {
 
 // BlobMetadata is an internal representation of a blob's metadata.
 type BlobMetadata struct {
-	BlobHeader *core.BlobHeader
+	BlobHeader *corev2.BlobHeader
 	Signature  []byte
 
 	// BlobStatus indicates the current status of the blob
@@ -88,4 +88,13 @@ type BlobMetadata struct {
 	UpdatedAt uint64
 
 	*encoding.FragmentInfo
+}
+
+// BlobAttestationInfo describes the attestation information for a blob regarding to the batch
+// that the blob belongs to and the validators' attestation to that batch.
+//
+// Note: for a blob, there will be at most one attested/signed batch that contains the blob.
+type BlobAttestationInfo struct {
+	InclusionInfo *corev2.BlobInclusionInfo
+	Attestation   *corev2.Attestation
 }

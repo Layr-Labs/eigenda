@@ -126,6 +126,7 @@ func TestEncodeBlob(t *testing.T) {
 			ChunkLength: uint64(chunkLength),
 			NumChunks:   uint64(numChunks),
 		},
+		BlobSize: uint64(blobSize),
 	}
 
 	expectedUploadCalls := 1

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -289,35 +290,61 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
-// queryBucketBlobMetadata queries a single bucket for blob metadata within the given key range.
+// queryBucketBlobMetadata returns blobs (as metadata) within range [startKey, endKey] from a single bucket.
+// Results are ordered by <RequestedAt, Bobkey> in ascending order.
+//
+// The function handles DynamoDB's 1MB response size limitation by performing multiple queries if necessary.
 func (s *BlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
 	startKey string,
 	endKey string,
 ) ([]*v2.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(
-		ctx,
-		s.tableName,
-		RequestedAtIndexName,
-		"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
-		commondynamodb.ExpressionValues{
-			":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-			":start": &types.AttributeValueMemberS{Value: startKey},
-			":end":   &types.AttributeValueMemberS{Value: endKey},
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
-	}
+	metadata := make([]*v2.BlobMetadata, 0)
+	var lastEvaledKey map[string]types.AttributeValue
 
-	metadata := make([]*v2.BlobMetadata, 0, len(items))
-	for _, item := range items {
-		bm, err := UnmarshalBlobMetadata(item)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+	for {
+		start := startKey
+		if lastEvaledKey != nil {
+			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
+			}
+			start = requestedAtBlobkey
 		}
-		metadata = append(metadata, bm)
+
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			RequestedAtIndexName,
+			"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
+				":start": &types.AttributeValueMemberS{Value: start},
+				":end":   &types.AttributeValueMemberS{Value: endKey},
+			},
+			0, // no limit within a bucket
+			lastEvaledKey,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			bm, err := UnmarshalBlobMetadata(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+			}
+			metadata = append(metadata, bm)
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
 	}
 
 	return metadata, nil
@@ -338,7 +365,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 		return nil, nil, errors.New("start cursor is expected to be less than end cursor")
 	}
 
-	startBucket, endBucket := getRequestedAtBucketIDRange(start.RequestedAt, end.RequestedAt)
+	startBucket, endBucket := GetRequestedAtBucketIDRange(start.RequestedAt, end.RequestedAt)
 	startKey := start.ToCursorKey()
 	endKey := end.ToCursorKey()
 
@@ -464,7 +491,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAt(
 		return nil, errors.New("start must be less than end")
 	}
 
-	startBucket, endBucket := getAttestedAtBucketIDRange(start, end)
+	startBucket, endBucket := GetAttestedAtBucketIDRange(start, end)
 
 	result := make([]*corev2.Attestation, 0)
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
@@ -976,6 +1003,44 @@ func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey co
 	return info, nil
 }
 
+func (s *BlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobAttestationInfo, error) {
+	blobInclusionInfos, err := s.GetBlobInclusionInfos(ctx, blobKey)
+	if err != nil {
+		s.logger.Error("failed to get blob inclusion info for blob", "err", err, "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob inclusion info: %s", err.Error()))
+	}
+
+	if len(blobInclusionInfos) == 0 {
+		s.logger.Error("no blob inclusion info found for blob", "blobKey", blobKey.Hex())
+		return nil, api.NewErrorInternal("no blob inclusion info found")
+	}
+
+	if len(blobInclusionInfos) > 1 {
+		s.logger.Warn("multiple inclusion info found for blob", "blobKey", blobKey.Hex())
+	}
+
+	for _, inclusionInfo := range blobInclusionInfos {
+		// get the signed batch from this inclusion info
+		batchHeaderHash, err := inclusionInfo.BatchHeader.Hash()
+		if err != nil {
+			s.logger.Error("failed to get batch header hash from blob inclusion info", "err", err, "blobKey", blobKey.Hex())
+			continue
+		}
+		_, attestation, err := s.GetSignedBatch(ctx, batchHeaderHash)
+		if err != nil {
+			s.logger.Error("failed to get signed batch", "err", err, "blobKey", blobKey.Hex())
+			continue
+		}
+
+		return &v2.BlobAttestationInfo{
+			InclusionInfo: inclusionInfo,
+			Attestation:   attestation,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("no attestation info found for blobkey: %s", blobKey.Hex())
+}
+
 func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
 	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
@@ -1318,6 +1383,20 @@ func UnmarshalBatchHeaderHash(item commondynamodb.Item) ([32]byte, error) {
 	return hexToHash(root)
 }
 
+func UnmarshalRequestedAtBlobKey(item commondynamodb.Item) (string, error) {
+	type Object struct {
+		RequestedAtBlobKey string
+	}
+
+	obj := Object{}
+	err := attributevalue.UnmarshalMap(item, &obj)
+	if err != nil {
+		return "", err
+	}
+
+	return obj.RequestedAtBlobKey, nil
+}
+
 func UnmarshalAttestedAt(item commondynamodb.Item) (uint64, error) {
 	type Object struct {
 		AttestedAt uint64
@@ -1531,9 +1610,9 @@ func computeAttestedAtBucket(attestedAt uint64) string {
 	return fmt.Sprintf("%d", id)
 }
 
-// getRequestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// GetRequestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
 // the allowed time range for blobs.
-func getRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+func GetRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	now := uint64(time.Now().UnixNano())
 	oldestAllowed := now - maxBlobAgeInNano
 
@@ -1550,9 +1629,9 @@ func getRequestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	return startBucket, endBucket
 }
 
-// getAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
+// GetAttestedAtBucketIDRange returns the adjusted start and end bucket IDs based on
 // the allowed time range for blobs.
-func getAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
+func GetAttestedAtBucketIDRange(startTime, endTime uint64) (uint64, uint64) {
 	now := uint64(time.Now().UnixNano())
 	oldestAllowed := now - maxBlobAgeInNano
 

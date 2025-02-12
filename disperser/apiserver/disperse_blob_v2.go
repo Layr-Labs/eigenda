@@ -28,7 +28,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
+	if err := s.validateDispersalRequest(req, onchainState); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
@@ -40,9 +40,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	finishedValidation := time.Now()
 	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
 
-	s.metrics.reportDisperseBlobSize(len(req.GetBlob()))
-
 	blob := req.GetBlob()
+	s.metrics.reportDisperseBlobSize(len(blob))
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %v", err))
@@ -118,15 +117,19 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	err = s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}
+	s.metrics.reportDisperseMeteredBytes(int(symbolsCharged) * encoding.BYTES_PER_SYMBOL)
 
 	return nil
 }
 
-func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *pb.DisperseBlobRequest, onchainState *OnchainState) error {
+func (s *DispersalServerV2) validateDispersalRequest(
+	req *pb.DisperseBlobRequest,
+	onchainState *OnchainState) error {
+
 	signature := req.GetSignature()
 	if len(signature) != 65 {
 		return fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
@@ -149,9 +152,13 @@ func (s *DispersalServerV2) validateDispersalRequest(ctx context.Context, req *p
 	if blobHeaderProto.GetCommitment() == nil {
 		return errors.New("blob header must contain a commitment")
 	}
-	commitmentLength := blobHeaderProto.GetCommitment().GetLength()
-	if commitmentLength == 0 || commitmentLength != encoding.NextPowerOf2(commitmentLength) {
+	commitedBlobLength := blobHeaderProto.GetCommitment().GetLength()
+	if commitedBlobLength == 0 || commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
 		return errors.New("invalid commitment length, must be a power of 2")
+	}
+	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
+	if lengthPowerOf2 > uint(commitedBlobLength) {
+		return fmt.Errorf("commitment length %d is less than blob length %d", commitedBlobLength, lengthPowerOf2)
 	}
 
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)

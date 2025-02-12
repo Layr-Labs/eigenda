@@ -3,6 +3,7 @@ package v2_test
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
@@ -19,12 +20,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -35,9 +36,11 @@ import (
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
@@ -57,6 +60,8 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
+	UUID                = uuid.New()
+	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
@@ -68,8 +73,10 @@ var (
 	dockertestResource *dockertest.Resource
 	deployLocalStack   bool
 
+	dynamoClient dynamodb.Client
+
+	serverVersion     = uint(2)
 	mockLogger        = testutils.GetLogger()
-	blobstore         = inmem.NewBlobStore()
 	mockPrometheusApi = &prommock.MockPrometheusApi{}
 	prometheusClient  = dataapi.NewPrometheusClient(mockPrometheusApi, "test-cluster")
 	mockSubgraphApi   = &subgraphmock.MockSubgraphApi{}
@@ -95,9 +102,8 @@ var (
 		1: 10,
 		2: 10,
 	})
-	testDataApiServer = dataapi.NewServer(config, blobstore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger), &MockGRPCConnection{}, nil, nil)
 
-	operatorInfo = &subgraph.IndexedOperatorInfo{
+	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
 		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
 		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
 		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
@@ -112,6 +118,25 @@ var (
 		SocketUpdates: []subgraph.SocketUpdates{
 			{
 				Socket: "23.93.76.1:32005;32006",
+			},
+		},
+	}
+
+	operatorInfoV2 = &subgraph.IndexedOperatorInfo{
+		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
+		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
+		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
+		PubkeyG2_X: []graphql.String{
+			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
+			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
+		},
+		PubkeyG2_Y: []graphql.String{
+			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
+			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
+		},
+		SocketUpdates: []subgraph.SocketUpdates{
+			{
+				Socket: "23.93.76.1:31005;31006;32005;32006",
 			},
 		},
 	}
@@ -183,7 +208,6 @@ func setup(m *testing.M) {
 		SecretAccessKey: "localstack",
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
-	metadataTableName := fmt.Sprintf("test-BlobMetadata-%v", uuid.New())
 	_, err := test_utils.CreateTable(context.Background(), cfg, metadataTableName, blobstorev2.GenerateTableSchema(metadataTableName, 10, 10))
 	if err != nil {
 		teardown()
@@ -191,13 +215,13 @@ func setup(m *testing.M) {
 	}
 
 	// Create BlobMetadataStore
-	dynamoClient, err := dynamodb.NewClient(cfg, logger)
+	dynamoClient, err = dynamodb.NewClient(cfg, logger)
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
-	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(nil, "9001", mockLogger))
+	testDataApiServerV2 = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 }
 
 // makeCommitment returns a test hardcoded BlobCommitments
@@ -287,13 +311,28 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
+func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.OperatorSigningInfo) {
+	assert.Equal(t, expected.OperatorId, actual.OperatorId)
+	assert.Equal(t, expected.OperatorAddress, actual.OperatorAddress)
+	assert.Equal(t, expected.QuorumId, actual.QuorumId)
+	assert.Equal(t, expected.TotalUnsignedBatches, actual.TotalUnsignedBatches)
+	assert.Equal(t, expected.TotalResponsibleBatches, actual.TotalResponsibleBatches)
+	assert.Equal(t, expected.TotalBatches, actual.TotalBatches)
+}
+
 func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
 	require.NoError(t, err)
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
-func TestFetchBlobHandlerV2(t *testing.T) {
+func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
+	assert.NoError(t, err)
+	assert.Len(t, failed, 0)
+}
+
+func TestFetchBlob(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob metadata in metadata store
@@ -312,7 +351,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlobHandler)
+	r.GET("/v2/blobs/:blob_key", testDataApiServerV2.FetchBlob)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex())
 	response := decodeResponseBody[serverv2.BlobResponse](t, w)
@@ -324,7 +363,7 @@ func TestFetchBlobHandlerV2(t *testing.T) {
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
-func TestFetchBlobCertificateHandler(t *testing.T) {
+func TestFetchBlobCertificate(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob certificate in metadata store
@@ -343,7 +382,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobCertificate(context.Background(), blobCert, fragmentInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificateHandler)
+	r.GET("/v2/blobs/:blob_key/certificate", testDataApiServerV2.FetchBlobCertificate)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/blobs/"+blobKey.Hex()+"/certificate")
 	response := decodeResponseBody[serverv2.BlobCertificateResponse](t, w)
@@ -353,7 +392,7 @@ func TestFetchBlobCertificateHandler(t *testing.T) {
 	assert.Equal(t, blobCert.Signature, response.Certificate.Signature)
 }
 
-func TestFetchBlobFeedHandler(t *testing.T) {
+func TestFetchBlobFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -401,7 +440,7 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
 	})
 
-	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeedHandler)
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
@@ -553,22 +592,20 @@ func TestFetchBlobFeedHandler(t *testing.T) {
 	})
 }
 
-func TestFetchBlobInclusionInfoHandler(t *testing.T) {
+func TestFetchBlobAttestationInfo(t *testing.T) {
+	ctx := context.Background()
 	r := setUpRouter()
 
-	// Set up blob inclusion info in metadata store
+	// Set up blob inclusion info
 	blobHeader := makeBlobHeaderV2(t)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
-
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
 		ReferenceBlockNumber: 100,
 	}
-	batchHeaderHash, err := batchHeader.Hash()
-	require.NoError(t, err)
-
-	ctx := context.Background()
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
 	err = blobMetadataStore.PutBatchHeader(ctx, batchHeader)
 	require.NoError(t, err)
 	inclusionInfo := &corev2.BlobInclusionInfo{
@@ -580,16 +617,72 @@ func TestFetchBlobInclusionInfoHandler(t *testing.T) {
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	require.NoError(t, err)
 
-	r.GET("/v2/blobs/:blob_key/inclusion-info", testDataApiServerV2.FetchBlobInclusionInfoHandler)
+	r.GET("/v2/blobs/:blob_key/attestation-info", testDataApiServerV2.FetchBlobAttestationInfo)
 
-	reqStr := fmt.Sprintf("/v2/blobs/%s/inclusion-info?batch_header_hash=%s", blobKey.Hex(), hex.EncodeToString(batchHeaderHash[:]))
-	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.BlobInclusionInfoResponse](t, w)
+	t.Run("no attestation found", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		req := httptest.NewRequest(http.MethodGet, reqStr, nil)
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+	})
 
-	assert.Equal(t, inclusionInfo.InclusionProof, response.InclusionInfo.InclusionProof)
+	// Set up attestation
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	attestation := &corev2.Attestation{
+		BatchHeader: batchHeader,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
+	err = blobMetadataStore.PutAttestation(ctx, attestation)
+	assert.NoError(t, err)
+
+	t.Run("found attestation info", func(t *testing.T) {
+		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
+		w := executeRequest(t, r, http.MethodGet, reqStr)
+		response := decodeResponseBody[serverv2.BlobAttestationInfoResponse](t, w)
+
+		assert.Equal(t, blobKey.Hex(), response.BlobKey)
+		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
+		assert.Equal(t, inclusionInfo, response.InclusionInfo)
+		assert.Equal(t, attestation, response.Attestation)
+	})
+
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+	})
 }
 
-func TestFetchBatchHandlerV2(t *testing.T) {
+func TestFetchBatch(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up batch header in metadata store
@@ -623,8 +716,13 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	}
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
+	dk := commondynamodb.Key{
+		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+	}
+	defer deleteItems(t, []commondynamodb.Key{dk})
 
-	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatchHandler)
+	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatch)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/batches/"+batchHeaderHash)
 	response := decodeResponseBody[serverv2.BatchResponse](t, w)
@@ -636,7 +734,7 @@ func TestFetchBatchHandlerV2(t *testing.T) {
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
 }
 
-func TestFetchBatchFeedHandler(t *testing.T) {
+func TestFetchBatchFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -647,11 +745,14 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
 			ReferenceBlockNumber: uint64(i + 1),
 		}
+		bhh, err := batchHeaders[i].Hash()
+		require.NoError(t, err)
 		keyPair, err := core.GenRandomBlsKeys()
 		assert.NoError(t, err)
 		apk := keyPair.GetPubKeyG2()
@@ -678,10 +779,15 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 			},
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
-		assert.NoError(t, err)
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
 	}
+	defer deleteItems(t, dynamoKeys)
 
-	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeedHandler)
+	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
@@ -752,25 +858,580 @@ func TestFetchBatchFeedHandler(t *testing.T) {
 	})
 }
 
-func TestCheckOperatorsReachability(t *testing.T) {
+func TestFetchOperatorSigningInfo(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	/*
+		Test data setup
+
+		Column definitions:
+		- Batch:            Batch number
+		- AttestedAt:       Timestamp of attestation (sortkey of this table)
+		- RefBlockNum:      Reference block number
+		- Quorums:          Quorum numbers used by the batch
+		- Nonsigners:       Operators that didn't sign for the batch
+		- Active operators: Mapping of operator ID to their quorum assignments at the block
+
+		Data:
+		+-------+------------+-------------+---------+------------+------------------------+
+		| Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     1 |          A |           1 | 0,1     | 3          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     2 |          B |           3 | 1       | 4          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     3 |          C |           2 | 0       | 3          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     4 |          D |           2 | 0,1     | None       | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 4: {0,1}              |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     5 |          E |           4 | 0,1     | 3,5        | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
+		|     6 |          F |           5 | 0       | 5          | 1: {2}                |
+		|       |            |             |         |            | 2: {0,1}              |
+		|       |            |             |         |            | 3: {0,1}              |
+		|       |            |             |         |            | 5: {0}                |
+		+-------+------------+-------------+---------+------------+------------------------+
+	*/
+
+	// Create test operators
+	// Note: the operator numbered 1-5 in the above tables are corresponding to the
+	// operatorIds[0], ..., operatorIds[4] here
+	numOperators := 5
+	operatorIds := make([]core.OperatorID, numOperators)
+	operatorAddresses := make([]gethcommon.Address, numOperators)
+	operatorG1s := make([]*core.G1Point, numOperators)
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	operatorAddrToID := make(map[string]core.OperatorID)
+	for i := 0; i < numOperators; i++ {
+		operatorG1s[i] = core.NewG1Point(big.NewInt(int64(i)), big.NewInt(int64(i+1)))
+		operatorIds[i] = operatorG1s[i].GetOperatorID()
+		privateKey, err := ecdsa.GenerateKey(crypto.S256(), rand.Reader)
+		require.NoError(t, err)
+		publicKey := privateKey.Public().(*ecdsa.PublicKey)
+		operatorAddresses[i] = crypto.PubkeyToAddress(*publicKey)
+
+		operatorIDToAddr[operatorIds[i].Hex()] = operatorAddresses[i]
+		operatorAddrToID[operatorAddresses[i].Hex()] = operatorIds[i]
+	}
+
+	// Mocking using a map function so we can always maintain the ID and address mapping
+	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+	mockTx.On("BatchOperatorAddressToID").Return(
+		func(addrs []gethcommon.Address) []core.OperatorID {
+			result := make([]core.OperatorID, len(addrs))
+			for i, addr := range addrs {
+				result[i] = operatorAddrToID[addr.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
+	// Mocking using a map function so we can always maintain the ID and address mapping
+	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
+	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
+	operatorIntialQuorumsByBlock := map[uint32]map[core.OperatorID]*big.Int{
+		1: map[core.OperatorID]*big.Int{
+			operatorIds[0]: big.NewInt(4), // quorum 2
+			operatorIds[1]: big.NewInt(3), // quorum 0,1
+			operatorIds[2]: big.NewInt(3), // quorum 0,1
+			operatorIds[3]: big.NewInt(0), // no quorum
+			operatorIds[4]: big.NewInt(0), // no quorum
+		},
+		4: map[core.OperatorID]*big.Int{
+			operatorIds[0]: big.NewInt(4), // quorum 2
+			operatorIds[1]: big.NewInt(3), // quorum 0,1
+			operatorIds[2]: big.NewInt(3), // quorum 0,1
+			operatorIds[3]: big.NewInt(0), // no quorum
+			operatorIds[4]: big.NewInt(1), // quorum 0
+		},
+	}
+	mockTx.On("GetQuorumBitmapForOperatorsAtBlockNumber").Return(
+		func(ids []core.OperatorID, blockNum uint32) []*big.Int {
+			bitmaps := make([]*big.Int, len(ids))
+			for i, id := range ids {
+				bitmaps[i] = operatorIntialQuorumsByBlock[blockNum][id]
+			}
+			return bitmaps
+		},
+		nil,
+	)
+
+	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		1: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorIds[0],
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
+		4: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorIds[4],
+					Stake:      big.NewInt(2),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorIds[1],
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorIds[2],
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorIds[0],
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
+	}
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
+
+	// operatorIds[3], operatorIds[4] were not active at the first block, but were added to
+	// quorums after startBlock (see the above table).
+	operatorAddedToQuorum := []*subgraph.OperatorQuorum{
+		{
+			Operator:       graphql.String(operatorAddresses[3].Hex()),
+			QuorumNumbers:  "0x0001",
+			BlockNumber:    "2",
+			BlockTimestamp: "1702666070",
+		},
+		{
+			Operator:       graphql.String(operatorAddresses[4].Hex()),
+			QuorumNumbers:  "0x00",
+			BlockNumber:    "3",
+			BlockTimestamp: "1702666070",
+		},
+	}
+	operatorRemovedFromQuorum := []*subgraph.OperatorQuorum{
+		{
+			Operator:       graphql.String(operatorAddresses[3].Hex()),
+			QuorumNumbers:  "0x0001",
+			BlockNumber:    "4",
+			BlockTimestamp: "1702666058",
+		},
+	}
+	mockSubgraphApi.On("QueryOperatorAddedToQuorum").Return(operatorAddedToQuorum, nil)
+	mockSubgraphApi.On("QueryOperatorRemovedFromQuorum").Return(operatorRemovedFromQuorum, nil)
+
+	// Create a timeline of test batches
+	// See the above table for the choices of reference block number, quorums and nonsigners
+	// for each batch
+	numBatches := 6
+	now := uint64(time.Now().UnixNano())
+	firstBatchTime := now - uint64(32*time.Minute.Nanoseconds())
+	nanoSecsPerBatch := uint64(5 * time.Minute.Nanoseconds()) // 1 batch per 5 minutes
+	attestedAt := make([]uint64, numBatches)
+	for i := 0; i < numBatches; i++ {
+		attestedAt[i] = firstBatchTime + uint64(i)*nanoSecsPerBatch
+	}
+	referenceBlockNum := []uint64{1, 3, 2, 2, 4, 5}
+	quorums := [][]uint8{{0, 1}, {1}, {0}, {0, 1}, {0, 1}, {0}}
+	nonsigners := [][]*core.G1Point{
+		{operatorG1s[2]},
+		{operatorG1s[3]},
+		{operatorG1s[2]},
+		{},
+		{operatorG1s[2], operatorG1s[4]},
+		{operatorG1s[4]},
+	}
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
+		err := blobMetadataStore.PutAttestation(ctx, attestation)
+		require.NoError(t, err)
+		bhh, err := attestation.BatchHeader.Hash()
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	/*
+		Resulting Operator SigningInfo (for block range [1, 5])
+
+		Column definitions:
+		- <operator, quorum>:    Operator ID and quorum pair
+		- Total responsible:     Total number of batches the operator was responsible for
+		- Total nonsigning:      Number of batches where operator did not sign
+		- Signing rate:          Percentage of batches signed by <operator, quorum>
+
+		Data:
+		+------------------+-------------------+------------------+--------------+
+		| <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 0>           |                 5 |                0 |        100%  |
+		+------------------+-------------------+------------------+--------------+
+		| <2, 1>           |                 4 |                0 |        100%  |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 0>           |                 5 |                3 |         40%  |
+		+------------------+-------------------+------------------+--------------+
+		| <3, 1>           |                 4 |                2 |         50%  |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 0>           |                 2 |                0 |        100%  |
+		+------------------+-------------------+------------------+--------------+
+		| <4, 1>           |                 2 |                1 |         50%  |
+		+------------------+-------------------+------------------+--------------+
+		| <5, 0>           |                 2 |                2 |          0%  |
+		+------------------+-------------------+------------------+--------------+
+	*/
+
+	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
+
+	t.Run("invalid params", func(t *testing.T) {
+		reqUrls := []string{
+			"/v2/operators/signing-info?interval=abc",
+			"/v2/operators/signing-info?interval=-1",
+			"/v2/operators/signing-info?end=2006-01-02T15:04:05",
+			"/v2/operators/signing-info?end=2006-01-02T15:04:05Z",
+			"/v2/operators/signing-info?quorums=-1",
+			"/v2/operators/signing-info?quorums=abc",
+			"/v2/operators/signing-info?quorums=10000000",
+			"/v2/operators/signing-info?quorums=-1",
+			"/v2/operators/signing-info?nonsigner_only=-1",
+			"/v2/operators/signing-info?nonsigner_only=deadbeef",
+		}
+		for _, url := range reqUrls {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		}
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 7, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[5], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    3,
+			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[6], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
+		})
+	})
+
+	t.Run("nonsigner only", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info?nonsigner_only=true")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 4, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    3,
+			TotalResponsibleBatches: 5,
+			TotalBatches:            5,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            5,
+		})
+	})
+
+	t.Run("quorum 1 only", func(t *testing.T) {
+		w := executeRequest(t, r, http.MethodGet, "/v2/operators/signing-info?quorums=1")
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 3, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[3].Hex(),
+			OperatorAddress:         operatorAddresses[3].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            4,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 4,
+			TotalBatches:            4,
+		})
+	})
+
+	t.Run("custom time range", func(t *testing.T) {
+		// We query 800 seconds before "now", it should hit the last 2 batches (block 4, 5)
+		// in the setup table:
+		//
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// | Batch | AttestedAt | RefBlockNum | Quorums | Nonsigners | Active operators      |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// |     5 |          5 |           4 | 0,1     | 3,5        | 1: {2}                |
+		// |       |            |             |         |            | 2: {0,1}              |
+		// |       |            |             |         |            | 3: {0,1}              |
+		// |       |            |             |         |            | 5: {0}                |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		// |     6 |          6 |           5 | 0       | 5          | 1: {2}                |
+		// |       |            |             |         |            | 2: {0,1}              |
+		// |       |            |             |         |            | 3: {0,1}              |
+		// |       |            |             |         |            | 5: {0}                |
+		// +-------+------------+-------------+---------+------------+------------------------+
+		//
+		// which results in:
+		//
+		// +------------------+-------------------+------------------+--------------+
+		// | <operator,quorum>| Total responsible | Total nonsigning | Signing rate |
+		// +------------------+-------------------+------------------+--------------+
+		// | <2, 0>           |                 2 |                0 |        100%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <2, 1>           |                 1 |                0 |        100%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <3, 0>           |                 2 |                1 |         50%  |
+		// +------------------+-------------------+------------------+--------------+
+		// | <3, 1>           |                 1 |                1 |         0%   |
+		// +------------------+-------------------+------------------+--------------+
+		// | <5, 0>           |                 2 |                2 |         0%   |
+		// +------------------+-------------------+------------------+--------------+
+
+		tm := time.Unix(0, int64(now)+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl := fmt.Sprintf("/v2/operators/signing-info?end=%s&interval=1000", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
+		osi := response.OperatorSigningInfo
+		require.Equal(t, 5, len(osi))
+		checkOperatorSigningInfoEqual(t, osi[0], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[1], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[1].Hex(),
+			OperatorAddress:         operatorAddresses[1].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    0,
+			TotalResponsibleBatches: 1,
+			TotalBatches:            1,
+		})
+		checkOperatorSigningInfoEqual(t, osi[2], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[3], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[4].Hex(),
+			OperatorAddress:         operatorAddresses[4].Hex(),
+			QuorumId:                0,
+			TotalUnsignedBatches:    2,
+			TotalResponsibleBatches: 2,
+			TotalBatches:            2,
+		})
+		checkOperatorSigningInfoEqual(t, osi[4], &serverv2.OperatorSigningInfo{
+			OperatorId:              operatorIds[2].Hex(),
+			OperatorAddress:         operatorAddresses[2].Hex(),
+			QuorumId:                1,
+			TotalUnsignedBatches:    1,
+			TotalResponsibleBatches: 1,
+			TotalBatches:            1,
+		})
+	})
+
+}
+
+func TestCheckOperatorsLiveness(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
 	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfo, nil)
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
 
-	r.GET("/v2/operators/reachability", testDataApiServerV2.CheckOperatorsReachability)
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/reachability?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
 
 	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
 	assert.Equal(t, false, response.DispersalOnline)
+	assert.Equal(t, "v2 dispersal port closed or unreachable", response.DispersalStatus)
 	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
 	assert.Equal(t, false, response.RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port closed or unreachable", response.RetrievalStatus)
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+}
+
+func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
+	r := setUpRouter()
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+
+	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
+	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
+
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
+
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+
+	assert.Equal(t, "", response.DispersalSocket)
+	assert.Equal(t, false, response.DispersalOnline)
+	assert.Equal(t, "v2 dispersal port is not registered", response.DispersalStatus)
+	assert.Equal(t, "", response.RetrievalSocket)
+	assert.Equal(t, false, response.RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port is not registered", response.RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -855,28 +1516,22 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
 	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
-	assert.Equal(t, 3, len(response.StakeRankedOperators))
+	require.Equal(t, 2, len(response.StakeRankedOperators))
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
-	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
-	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
-	// "total"
-	ops, ok = response.StakeRankedOperators["total"]
-	assert.True(t, ok)
-	assert.Equal(t, 2, len(ops))
+	require.True(t, ok)
+	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
 }
 
-func TestFetchMetricsSummaryHandler(t *testing.T) {
+func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
@@ -887,7 +1542,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummaryHandler)
+	r.GET("/v2/metrics/summary", testDataApiServerV2.FetchMetricsSummary)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
@@ -895,7 +1550,7 @@ func TestFetchMetricsSummaryHandler(t *testing.T) {
 	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
 }
 
-func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
+func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
@@ -906,7 +1561,7 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	matrix = append(matrix, s)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
 
-	r.GET("/v2/metrics/timeseries/throughput", testDataApiServer.FetchMetricsThroughputHandler)
+	r.GET("/v2/metrics/timeseries/throughput", testDataApiServerV2.FetchMetricsThroughputTimeseries)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/throughput")
 	response := decodeResponseBody[[]*dataapi.Throughput](t, w)
@@ -920,4 +1575,41 @@ func TestFetchMetricsThroughputTimeseriesHandler(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func createAttestation(
+	t *testing.T,
+	refBlockNumber uint64,
+	attestedAt uint64,
+	nonsigners []*core.G1Point,
+	quorums []uint8,
+) *corev2.Attestation {
+	br := make([]byte, 32)
+	_, err := rand.Read(br)
+	require.NoError(t, err)
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            ([32]byte)(br),
+		ReferenceBlockNumber: refBlockNumber,
+	}
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	return &corev2.Attestation{
+		BatchHeader:      batchHeader,
+		AttestedAt:       attestedAt,
+		NonSignerPubKeys: nonsigners,
+		APKG2:            apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: quorums,
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
+		},
+	}
 }

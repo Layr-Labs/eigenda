@@ -1,7 +1,7 @@
 package clients
 
 import (
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -13,9 +13,6 @@ import (
 type PayloadClientConfig struct {
 	// The blob encoding version to use when writing and reading blobs
 	BlobEncodingVersion codecs.BlobEncodingVersion
-
-	// The Ethereum RPC URL to use for querying an Ethereum network
-	EthRpcUrl string
 
 	// The address of the EigenDACertVerifier contract
 	EigenDACertVerifierAddr string
@@ -38,6 +35,13 @@ type PayloadClientConfig struct {
 	// The timeout duration for contract calls
 	ContractCallTimeout time.Duration
 
+	// BlockNumberPollInterval is how frequently to check latest block number when waiting for the internal eth client
+	// to advance to a certain block.
+	//
+	// If this is configured to be <= 0, then contract calls which require the internal eth client to have reached a
+	// certain block height will fail if the internal client is behind.
+	BlockNumberPollInterval time.Duration
+
 	// The BlobVersion to use when creating new blobs, or interpreting blob bytes.
 	//
 	// BlobVersion needs to point to a version defined in the threshold registry contract.
@@ -52,6 +56,25 @@ type RelayPayloadRetrieverConfig struct {
 
 	// The timeout duration for relay calls to retrieve blobs.
 	RelayTimeout time.Duration
+}
+
+// ValidatorPayloadRetrieverConfig contains an embedded PayloadClientConfig, plus all additional configuration values
+// needed by a ValidatorPayloadRetriever
+type ValidatorPayloadRetrieverConfig struct {
+	PayloadClientConfig
+
+	// The timeout duration for retrieving chunks from a given quorum, and reassembling the chunks into a blob.
+	// Once this timeout triggers, the retriever will give up on the quorum, and retry with the next quorum (if one exists)
+	RetrievalTimeout time.Duration
+
+	// The address of the BlsOperatorStateRetriever contract
+	BlsOperatorStateRetrieverAddr string
+
+	// The address of the EigenDAServiceManager contract
+	EigenDAServiceManagerAddr string
+
+	// The maximum number of simultaneous connections to use when fetching chunks during validator retrieval
+	MaxConnectionCount uint
 }
 
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -86,39 +109,38 @@ type PayloadDisperserConfig struct {
 
 // GetDefaultPayloadClientConfig creates a PayloadClientConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
-func getDefaultPayloadClientConfig() *PayloadClientConfig {
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
+func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
-		BlobEncodingVersion:   codecs.DefaultBlobEncoding,
-		PayloadPolynomialForm: codecs.PolynomialFormEval,
-		ContractCallTimeout:   5 * time.Second,
-		BlobVersion:           0,
+		BlobEncodingVersion:     codecs.DefaultBlobEncoding,
+		PayloadPolynomialForm:   codecs.PolynomialFormEval,
+		ContractCallTimeout:     5 * time.Second,
+		BlockNumberPollInterval: 1 * time.Second,
+		BlobVersion:             0,
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
 
-	if cc.EthRpcUrl == "" {
-		return fmt.Errorf("EthRpcUrl is required")
-	}
-
 	if cc.EigenDACertVerifierAddr == "" {
-		return fmt.Errorf("EigenDACertVerifierAddr is required")
+		return errors.New("EigenDACertVerifierAddr is required")
 	}
 
 	// Nothing to do for PayloadPolynomialForm
 
-	defaultConfig := getDefaultPayloadClientConfig()
+	defaultConfig := GetDefaultPayloadClientConfig()
 
 	if cc.ContractCallTimeout == 0 {
 		cc.ContractCallTimeout = defaultConfig.ContractCallTimeout
 	}
+
+	// BlockNumberPollInterval may be 0, so don't do anything
 
 	// BlobVersion may be 0, so don't do anything
 
@@ -127,19 +149,19 @@ func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 
 // GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	return &RelayPayloadRetrieverConfig{
-		PayloadClientConfig: *getDefaultPayloadClientConfig(),
+		PayloadClientConfig: *GetDefaultPayloadClientConfig(),
 		RelayTimeout:        5 * time.Second,
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	err := rc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
@@ -154,24 +176,68 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	return nil
 }
 
+// GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
+//
+// NOTE: The following fields do not have defined defaults and must always be specifically configured:
+// - EigenDACertVerifierAddr
+// - BlsOperatorStateRetrieverAddr
+// - EigenDAServiceManagerAddr
+func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
+	return &ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: *GetDefaultPayloadClientConfig(),
+		RetrievalTimeout:    30 * time.Second,
+		MaxConnectionCount:  100,
+	}
+}
+
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
+//
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
+func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
+	err := rc.PayloadClientConfig.checkAndSetDefaults()
+	if err != nil {
+		return err
+	}
+
+	if rc.BlsOperatorStateRetrieverAddr == "" {
+		return errors.New("BlsOperatorStateRetrieverAddr is required")
+	}
+
+	if rc.EigenDAServiceManagerAddr == "" {
+		return errors.New("EigenDAServiceManagerAddr is required")
+	}
+
+	defaultConfig := GetDefaultValidatorPayloadRetrieverConfig()
+	if rc.RetrievalTimeout == 0 {
+		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
+	}
+	if rc.MaxConnectionCount == 0 {
+		rc.MaxConnectionCount = defaultConfig.MaxConnectionCount
+	}
+
+	return nil
+}
+
 // GetDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values
 //
-// NOTE: EthRpcUrl and EigenDACertVerifierAddr do not have defined defaults. These must always be specifically configured.
+// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	return &PayloadDisperserConfig{
-		PayloadClientConfig:    *getDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    5 * time.Second,
-		BlobCertifiedTimeout:   10 * time.Second,
+		PayloadClientConfig:    *GetDefaultPayloadClientConfig(),
+		DisperseBlobTimeout:    2 * time.Minute,
+		BlobCertifiedTimeout:   2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
 		Quorums:                []core.QuorumID{0, 1},
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct and performs the following actions:
+// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
 //
-// 1. If a config value is 0, and a 0 value makes sense, do nothing.
-// 2. If a config value is 0, but a 0 value doesn't make sense and a default value is defined, then set it to the default.
-// 3. If a config value is 0, but a 0 value doesn't make sense and a default value isn't defined, return an error.
+// 1. If 0 is an acceptable value for the field, do nothing.
+// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
+// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 	err := dc.PayloadClientConfig.checkAndSetDefaults()
 	if err != nil {
