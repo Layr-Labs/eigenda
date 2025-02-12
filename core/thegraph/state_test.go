@@ -250,7 +250,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 		1: 1,
 		2: 1,
 	})
-	chainState.On("GetCurrentBlockNumber", context.Background()).Return(uint(1), nil)
+	chainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	state, err := chainState.GetOperatorState(context.Background(), 1, quorums)
 	assert.NoError(t, err)
