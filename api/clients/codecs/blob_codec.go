@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type PayloadEncodingVersion byte
+type PayloadEncodingVersion uint8
 
 const (
 	// PayloadEncodingVersion0 entails a 32 byte header = [0x00, version byte, big-endian uint32 len of payload, 0x00, 0x00,...]
