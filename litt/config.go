@@ -16,10 +16,12 @@ type Config struct {
 	// The type of the DB. Choices are DiskDB and MemDB. Default is DiskDB.
 	Type DBType
 
-	// The time-to-live for values in the database. Values will be automatically deleted after this duration.
-	// If the database is reloaded with a different TTL, the new TTL will apply to all values, even values
-	// written with the old TTL. If zero, values will never be deleted. The default is zero.
-	TTL time.Duration // TODO this is better described as a default TTL
+	// The default TTL for newly created tables (either ones with data on disk or new tables).
+	// The default is 0 (no TTL).
+	TTL time.Duration
+
+	// The period between garbage collection runs. The default is 5 minutes.
+	GCPeriod time.Duration
 
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
@@ -30,5 +32,6 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		TimeSource: time.Now,
+		GCPeriod:   5 * time.Minute,
 	}
 }

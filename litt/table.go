@@ -14,6 +14,9 @@ type Table interface {
 	Put(key []byte, value []byte) error
 
 	// Get retrieves a value from the database. Returns an error if the value does not exist.
+	//
+	// For the sake of performance, the returned data is NOT safe to mutate. If you need to modify the data,
+	// make a copy of it first. Better to avoid a copy if it's not necessary, though.
 	Get(key []byte) ([]byte, error)
 
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
@@ -28,4 +31,18 @@ type Table interface {
 	// SetTTL sets the time to live for data in this table. This TTL is immediately applied to data already in
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
 	SetTTL(ttl time.Duration)
+
+	// TODO: methods that return size in keys, size of keys in bytes, and size of data in bytes
+}
+
+// ManagedTable is a Table that can perform garbage collection on its data. This type should not be directly used
+// by clients, and is a type that is used internally by the database.
+type ManagedTable interface {
+	Table
+
+	// DoGarbageCollection performs garbage collection on the table, deleting values that have outlived their TTL.
+	DoGarbageCollection() error
+
+	// Destroy cleans up resources used by the table. Table will not be usable after this method is called.
+	Destroy() error
 }

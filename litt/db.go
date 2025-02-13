@@ -1,5 +1,10 @@
 package litt
 
+import (
+	"fmt"
+	"time"
+)
+
 // DB is a highly specialized key-value store. It is intentionally very feature poor, sacrificing
 // unnecessary features for simplicity, high performance, and low memory usage.
 //
@@ -19,21 +24,44 @@ package litt
 // - fine granularity for TTL (all data in the same table must have the same TTL)
 type DB interface {
 	// GetTable gets a table by name, creating one if it does not exist.
+	//
+	// The first time a table is fetched (either a new table or an existing one loaded from disk), its TTL is always
+	// set to 0 (i.e. it has no TTL). If you want to set a TTL, you must call Table.SetTTL() to do so. This is
+	// necessary after each time the database is started/restarted.
 	GetTable(name string) (Table, error)
 
 	// DropTable deletes a table and all of its data.
+	//
+	// Note that it is NOT thread safe to drop a table concurrently with any operation that accesses the table.
+	// The table returned by GetTable() before DropTable() is called must not be used once DropTable() is called.
 	DropTable(name string) error
 
 	// Start starts the database. This method must be called before any other method is called.
-	Start() error
+	Start()
 
 	// Stop stops the database. This method must be called when the database is no longer needed.
 	// Stop ensures that all non-flushed data is crash durable on disk before returning. Calls to
 	// Put() concurrent with Stop() may not be crash durable after Stop() returns.¬
-	Stop() error
+	Stop()
 }
 
 // NewDB builds a new litt.DB.
 func NewDB(config *Config) (DB, error) {
-	return nil, nil // TODO
+
+	var tb tableBuilder
+	switch config.Type {
+	case DiskDB:
+		tb = func(timeSource func() time.Time, name string, ttl time.Duration) (ManagedTable, error) {
+			return nil, nil // TODO
+		}
+	case MemDB:
+		tb = func(timeSource func() time.Time, name string, ttl time.Duration) (ManagedTable, error) {
+			return NewMemTable(timeSource, name, ttl), nil
+		}
+	default:
+		return nil, fmt.Errorf("unsupported DB type: %v", config.Type)
+	}
+
+	database := newDB(config.TimeSource, config.TTL, config.GCPeriod, tb)
+	return database, nil
 }
