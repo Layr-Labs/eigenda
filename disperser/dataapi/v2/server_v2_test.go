@@ -1485,6 +1485,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		})
 	})
 
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
 }
 
 func TestCheckOperatorsLiveness(t *testing.T) {
