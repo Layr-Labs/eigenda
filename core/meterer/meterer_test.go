@@ -133,9 +133,9 @@ func setup(_ *testing.M) {
 	accountID1 = crypto.PubkeyToAddress(privateKey1.PublicKey)
 	accountID2 = crypto.PubkeyToAddress(privateKey2.PublicKey)
 	accountID3 = crypto.PubkeyToAddress(privateKey3.PublicKey)
-	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
-	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
-	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 200, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account1Reservations = &core.ReservedPayment{SymbolsPerSecond: 20, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}
+	account2Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: now - 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
+	account3Reservations = &core.ReservedPayment{SymbolsPerSecond: 40, StartTimestamp: now + 120, EndTimestamp: now + 180, QuorumSplits: []byte{30, 70}, QuorumNumbers: []uint8{0, 1}}
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
@@ -177,7 +177,7 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(1), nil)
+	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
@@ -254,7 +254,6 @@ func TestMetererReservations(t *testing.T) {
 		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
-
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now, big.NewInt(0), accountID2)
