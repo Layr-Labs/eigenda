@@ -9,6 +9,7 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+
 	"github.com/Layr-Labs/eigenda/tools/traffic/config"
 	trafficconfig "github.com/Layr-Labs/eigenda/tools/traffic/config"
 	"github.com/Layr-Labs/eigenda/tools/traffic/metrics"
