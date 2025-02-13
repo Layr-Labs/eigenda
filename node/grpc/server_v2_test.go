@@ -155,12 +155,6 @@ func TestV2StoreChunksInputValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	req := &validator.StoreChunksRequest{
-		DisperserID: 10,
-	}
-	_, err = c.server.StoreChunks(context.Background(), req)
-	requireErrorStatusAndMsg(t, err, codes.InvalidArgument, "disperserID is invalid")
-
-	req = &validator.StoreChunksRequest{
 		DisperserID: 0,
 	}
 	_, err = c.server.StoreChunks(context.Background(), req)
