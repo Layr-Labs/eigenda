@@ -954,7 +954,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	}
 	assert.Len(t, timestamps, numCerts)
 	for i := 0; i < numCerts; i++ {
-		assert.Contains(t, timestamps, uint64(i))
+		assert.Contains(t, timestamps, int64(i))
 	}
 
 	deleteItems(t, []commondynamodb.Key{
@@ -1343,8 +1343,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
-	require.NoError(t, err)
+	timestamp := time.Now().UnixMicro()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -1356,7 +1355,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         reservationPeriod.Int64(),
+			Timestamp:         timestamp,
 			CumulativePayment: cumulativePayment,
 		},
 	}
