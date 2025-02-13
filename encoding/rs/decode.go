@@ -15,9 +15,9 @@ import (
 // the coefficient of the interpolating polynomina, hence interpolation is needed before
 // recovery.
 // maxInputSize is the upper bound of the original data size. This is needed because
-// the frames and indices don't encode the length of the original data. If maxInputSize
+// the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
-func (e *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
+func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
 	// Get encoder
 	g, err := e.GetRsEncoder(params)
 	if err != nil {
@@ -39,7 +39,7 @@ func (e *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64, 
 			return nil, err
 		}
 
-		evals, err := g.GetInterpolationPolyEval(f.Coeffs, uint32(e))
+		evals, err := g.GetInterpolationPolyEval(f, uint32(e))
 		if err != nil {
 			return nil, err
 		}
