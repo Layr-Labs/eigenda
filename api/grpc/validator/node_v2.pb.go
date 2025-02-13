@@ -49,7 +49,7 @@ type StoreChunksRequest struct {
 	//     e. digest certificate.BlobHeader.Commitment.LengthProof
 	//     f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
 	//     g. digest certificate.BlobHeader.PaymentHeader.AccountId
-	//     h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, unsigned big endian)
+	//     h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
 	//     i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
 	//     j. digest certificate.BlobHeader.Signature
 	//     k. for each relay in certificate.Relays:
