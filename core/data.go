@@ -491,7 +491,7 @@ type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID string `json:"account_id"`
 
-	// Timestamp represents the microsecond of the dispersal request creation
+	// Timestamp represents the nanosecond of the dispersal request creation
 	Timestamp int64 `json:"timestamp"`
 	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`

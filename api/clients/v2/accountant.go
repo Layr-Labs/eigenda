@@ -61,7 +61,7 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. It takes in a timestamp at
-// the current UNIX time in microseconds, and returns a cumulative payment for on-
+// the current UNIX time in nanoseconds, and returns a cumulative payment for on-
 // demand payments in units of wei. Both timestamp and cumulative payment are used
 // to create the payment header and signature, with non-zero cumulative payment
 // indicating on-demand payment.
