@@ -316,9 +316,9 @@ type PaymentHeader struct {
 	// The account ID of the disperser client. This account ID is an eth wallet address of the user,
 	// corresponding to the key used by the client to sign the BlobHeader.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// The timestamp should be set as the UNIX timestamp in units of microseconds at the time of the dispersal request,
+	// The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request,
 	// and will be used to determine the reservation period, and compared against the reservation active start and end timestamps
-	// On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in microseconds for greater precision.
+	// On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision.
 	// If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected.
 	// The reservation period of the dispersal request is used for rate-limiting the user's account against their dedicated
 	// bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an
