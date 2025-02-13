@@ -121,7 +121,7 @@ func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 
 	key, err := a.getDisperserKey(ctx, now, request.DisperserID)
 	if err != nil {
-		return api.WrapGRPCError(err, "failed to get operator key")
+		return fmt.Errorf("failed to get operator key: %w", err)
 	}
 
 	err = VerifyStoreChunksRequest(*key, request)
@@ -153,7 +153,7 @@ func (a *requestAuthenticator) getDisperserKey(
 
 	address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
 	if err != nil {
-		return nil, api.WrapAsInternal(err, "failed to get disperser address")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get disperser address: %v", err))
 	}
 
 	a.keyCache.Add(disperserID, &keyWithTimeout{

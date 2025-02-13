@@ -133,20 +133,20 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
 		if err != nil {
-			return nil, api.WrapAsUnauthenticated(err, "failed to authenticate request")
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
 	}
 
 	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
 	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
 	if err != nil {
-		return nil, api.WrapAsInternal(err, "failed to get the operator state")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
 	stageTimer := time.Now()
 	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState)
 	if err != nil {
-		return nil, api.WrapAsInternal(err, "failed to download batch")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
 
@@ -183,18 +183,18 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 				s.logger.Error("failed to delete keys", "err", deleteErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
 			}
 		}
-		return nil, api.WrapAsInternal(err, "failed to validate batch")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
 	}
 	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	res := <-storeChan
 	if res.err != nil {
-		return nil, api.WrapAsInternal(res.err, "failed to store batch")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
 	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
 	if err != nil {
-		return nil, api.WrapAsInternal(err, "failed to sign batch")
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
 	}
 
 	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
@@ -206,6 +206,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
 func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
+	// Disperser is authenticated and currently only api.EigenLabsDisperserID is registered.
 	if req.GetDisperserID() != api.EigenLabsDisperserID {
 		return nil, fmt.Errorf("disperserID is invalid: %d", req.GetDisperserID())
 	}
