@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type ChainState struct {
@@ -87,8 +88,8 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 	return socket, nil
 }
 
-// buildSocketMap returns a map from operatorID to socket address for the operators in the operatorsByQuorum
-func (cs *ChainState) buildSocketMap(ctx context.Context, operatorIds []core.OperatorID) error {
+// updateSocketMap updates socket map from operatorID to socket address for the operators in the operatorsByQuorum
+func (cs *ChainState) updateSocketMap(ctx context.Context, operatorIds []core.OperatorID) error {
 	socketMap := make(map[core.OperatorID]*string)
 	for _, operatorID := range operatorIds {
 		// if the socket is already in the map, skip
@@ -111,9 +112,10 @@ func (cs *ChainState) buildSocketMap(ctx context.Context, operatorIds []core.Ope
 	return nil
 }
 
-// indexSocketMap indexes a block range of socket update events
+// indexSocketMap filters event logs from the previously checked block number to the current block,
+// to identify all socket update events in that block range, and update the socket map accordingly
 func (cs *ChainState) indexSocketMap(ctx context.Context) error {
-	currentBlockNumber, err := cs.GetCurrentBlockNumber()
+	currentBlockNumber, err := cs.Tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
@@ -142,42 +144,12 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 
 	// logs are in order of block number, so we can just iterate through them
 	for _, log := range logs {
-		tx, isPending, err := cs.Client.TransactionByHash(ctx, log.TxHash)
+		socketUpdate, err := cs.parseSocketUpdateEvent(ctx, &log)
 		if err != nil {
-			return fmt.Errorf("failed to get transaction %s: %w", log.TxHash.Hex(), err)
+			fmt.Println("failed to parse socket update event; skipping", "error", err)
+			continue
 		}
-		if isPending {
-			return fmt.Errorf("transaction %s is still pending for operator socket update event", log.TxHash.Hex())
-		}
-
-		calldata := tx.Data()
-		rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
-		if err != nil {
-			return err
-		}
-		methodSig := calldata[:4]
-		method, err := rcAbi.MethodById(methodSig)
-		if err != nil {
-			return err
-		}
-		inputs, err := method.Inputs.Unpack(calldata[4:])
-		if err != nil {
-			return err
-		}
-
-		var socket string
-		if method.Name == "registerOperator" || method.Name == "registerOperatorWithChurn" {
-			socket = inputs[1].(string)
-		} else if method.Name == "updateOperatorSocket" {
-			socket = inputs[0].(string)
-		} else {
-			return fmt.Errorf("unknown method filtered for socket update event: %s", method.Name)
-		}
-		operatorID := core.OperatorID(log.Topics[1].Bytes())
-		socketUpdates = append(socketUpdates, &socketUpdateParams{
-			Socket:     socket,
-			OperatorID: operatorID,
-		})
+		socketUpdates = append(socketUpdates, socketUpdate)
 	}
 
 	cs.socketMu.Lock()
@@ -190,17 +162,59 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	return nil
 }
 
+func (cs *ChainState) parseSocketUpdateEvent(ctx context.Context, log *types.Log) (*socketUpdateParams, error) {
+	tx, isPending, err := cs.Client.TransactionByHash(ctx, log.TxHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction %s: %w", log.TxHash.Hex(), err)
+	}
+	if isPending {
+		return nil, fmt.Errorf("transaction %s is still pending for operator socket update event", log.TxHash.Hex())
+	}
+
+	calldata := tx.Data()
+	rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
+	if err != nil {
+		return nil, err
+	}
+	methodSig := calldata[:4]
+	method, err := rcAbi.MethodById(methodSig)
+	if err != nil {
+		return nil, err
+	}
+	inputs, err := method.Inputs.Unpack(calldata[4:])
+	if err != nil {
+		return nil, err
+	}
+
+	var socket string
+	if method.Name == "registerOperator" || method.Name == "registerOperatorWithChurn" {
+		socket = inputs[1].(string)
+	} else if method.Name == "updateSocket" {
+		socket = inputs[0].(string)
+	} else {
+		// this should never happen; we are going to return nil, so it will be skipped
+		return nil, fmt.Errorf("unknown method filtered for socket update event: %s", method.Name)
+	}
+	operatorID := core.OperatorID(log.Topics[1].Bytes())
+	return &socketUpdateParams{
+		Socket:     socket,
+		OperatorID: operatorID,
+	}, nil
+}
+
 // refreshSocketMap refresh the socket map for the given operators by quorums at the current block.
 func (cs *ChainState) refreshSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) error {
 	// for all operators in operatorsByQuorum, check if the socket is in the map
 	missingOperatorIds := make([]core.OperatorID, 0)
 	for _, quorum := range operatorsByQuorum {
 		for _, operator := range quorum {
-			missingOperatorIds = append(missingOperatorIds, operator.OperatorID)
+			if _, ok := cs.SocketMap[operator.OperatorID]; !ok {
+				missingOperatorIds = append(missingOperatorIds, operator.OperatorID)
+			}
 		}
 	}
 
-	if err := cs.buildSocketMap(ctx, missingOperatorIds); err != nil {
+	if err := cs.updateSocketMap(ctx, missingOperatorIds); err != nil {
 		return err
 	}
 
