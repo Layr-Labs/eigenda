@@ -80,7 +80,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 
 	symbolLength = uint32(700)
 
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, symbolLength, quorums)
 
 	assert.NoError(t, err)
@@ -89,7 +89,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.Equal(t, isRotation([]uint64{1200, 0, 200}, mapRecordUsage(accountant.periodRecords)), true)
 
 	// Second call should use on-demand payment
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, 300, quorums)
 
 	assert.NoError(t, err)
@@ -180,27 +180,27 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	// First call: Use reservation
 	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
-	timestamp := (time.Duration(header.Timestamp) * time.Microsecond).Seconds()
+	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
 	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, 300, quorums)
 	assert.NoError(t, err)
-	timestamp = (time.Duration(header.Timestamp) * time.Microsecond).Seconds()
+	timestamp = (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
 	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Fourth call: Insufficient on-demand
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "neither reservation nor on-demand payment is available")
@@ -239,13 +239,13 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Second call
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 300, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
 	// Third call
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 800, 0}, mapRecordUsage(accountant.periodRecords)), true)
@@ -321,7 +321,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	// Okay reservation
 	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
-	timestamp := (time.Duration(header.Timestamp) * time.Microsecond).Seconds()
+	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
 	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
@@ -333,7 +333,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.periodRecords)), true)
 
 	// Third call: Should use on-demand payment
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, 200, quorums)
 	assert.NoError(t, err)
 	assert.NotEqual(t, uint64(0), header.Timestamp)
@@ -371,7 +371,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
 	// no overflow
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	header, err := accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
@@ -381,7 +381,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	time.Sleep(time.Duration(reservationWindow) * time.Second)
 
 	// Third call: Should use new bin and allow overflow again
-	now = time.Now().UnixMicro()
+	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 500, 0}, mapRecordUsage(accountant.periodRecords)), true)
