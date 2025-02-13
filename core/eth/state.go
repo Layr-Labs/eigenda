@@ -172,6 +172,11 @@ func (cs *ChainState) parseSocketUpdateEvent(ctx context.Context, log *types.Log
 	}
 
 	calldata := tx.Data()
+	// Add length check for method name and input data
+	if len(calldata) <= 4 {
+		return nil, fmt.Errorf("calldata too short: expected more than 4 bytes for method name and input data, got %d bytes", len(calldata))
+	}
+
 	rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
 	if err != nil {
 		return nil, err
@@ -181,21 +186,28 @@ func (cs *ChainState) parseSocketUpdateEvent(ctx context.Context, log *types.Log
 	if err != nil {
 		return nil, err
 	}
+
 	inputs, err := method.Inputs.Unpack(calldata[4:])
 	if err != nil {
 		return nil, err
 	}
 
 	var socket string
-	if method.Name == "registerOperator" || method.Name == "registerOperatorWithChurn" {
+	if (method.Name == "registerOperator" || method.Name == "registerOperatorWithChurn") && len(inputs) >= 2 {
 		socket = inputs[1].(string)
-	} else if method.Name == "updateSocket" {
+	} else if method.Name == "updateSocket" && len(inputs) >= 1 {
 		socket = inputs[0].(string)
 	} else {
 		// this should never happen; we are going to return nil, so it will be skipped
-		return nil, fmt.Errorf("unknown method filtered for socket update event: %s", method.Name)
+		return nil, fmt.Errorf("method and input length mismatch for socket update event: %s", method.Name)
+	}
+	if len(log.Topics) < 2 {
+		return nil, fmt.Errorf("log topics too short: expected at least 2 topics, got %d", len(log.Topics))
 	}
 	operatorID := core.OperatorID(log.Topics[1].Bytes())
+	if len(operatorID) != 32 {
+		return nil, fmt.Errorf("operatorID is expecting 32 bytes, got %d", len(operatorID))
+	}
 	return &socketUpdateParams{
 		Socket:     socket,
 		OperatorID: operatorID,
