@@ -36,7 +36,7 @@ func RandomStoreChunksRequest(rand *random.TestRandom) *grpc.StoreChunksRequest 
 				},
 				PaymentHeader: &v2.PaymentHeader{
 					AccountId:         rand.String(32),
-					Timestamp:         rand.Uint64(),
+					Timestamp:         rand.Time().UnixMicro(),
 					CumulativePayment: rand.Bytes(32),
 				},
 			},

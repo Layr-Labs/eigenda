@@ -119,7 +119,7 @@ func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbol
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		Timestamp:         uint64(timestamp),
+		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
 

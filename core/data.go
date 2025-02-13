@@ -492,7 +492,7 @@ type PaymentMetadata struct {
 	AccountID string `json:"account_id"`
 
 	// Timestamp represents the microsecond of the dispersal request creation
-	Timestamp uint64 `json:"timestamp"`
+	Timestamp int64 `json:"timestamp"`
 	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
@@ -509,7 +509,7 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		},
 		{
 			Name: "timestamp",
-			Type: "uint64",
+			Type: "int64",
 		},
 		{
 			Name: "cumulativePayment",
@@ -569,7 +569,7 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
 	}
-	timestamp, err := strconv.ParseUint(rp.Value, 10, 64)
+	timestamp, err := strconv.ParseInt(rp.Value, 10, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse Timestamp: %w", err)
 	}
@@ -638,7 +638,7 @@ func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 }
 
 // IsActive returns true if the reservation is active at the given timestamp
-func (ar *ReservedPayment) IsActiveByMicroTimestamp(currentTimestamp uint64) bool {
+func (ar *ReservedPayment) IsActiveByMicroTimestamp(currentTimestamp int64) bool {
 	timestamp := uint64((time.Duration(currentTimestamp) * time.Microsecond).Seconds())
 	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

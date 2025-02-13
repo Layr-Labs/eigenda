@@ -102,7 +102,7 @@ message PaymentHeader {
   //   5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records.
   //      Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 
   //   6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand.
-  uint64 timestamp = 2;
+  int64 timestamp = 2;
 
   // Cumulative payment is the total amount of tokens paid by the requesting account, including the current request.
   // This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits

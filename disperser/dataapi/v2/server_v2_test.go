@@ -272,7 +272,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: makeCommitment(t),
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         uint64(timestamp.Int64()),
+			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
 	}

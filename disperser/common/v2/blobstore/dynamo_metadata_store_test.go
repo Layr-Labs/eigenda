@@ -929,7 +929,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "0x123",
-					Timestamp:         uint64(i),
+					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
 			},
@@ -947,7 +947,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, certs, numCerts)
 	assert.Len(t, fragmentInfos, numCerts)
-	timestamps := make(map[uint64]struct{})
+	timestamps := make(map[int64]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
 		timestamps[certs[i].BlobHeader.PaymentMetadata.Timestamp] = struct{}{}
@@ -1356,7 +1356,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         uint64(reservationPeriod.Int64()),
+			Timestamp:         reservationPeriod.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
 	}

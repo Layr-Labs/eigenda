@@ -172,7 +172,7 @@ func newBlob(t *testing.T, quorumNumbers []core.QuorumID) (corev2.BlobKey, *core
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			Timestamp:         uint64(timestamp.Int64()),
+			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
 	}

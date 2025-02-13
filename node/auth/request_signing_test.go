@@ -119,7 +119,7 @@ func TestHashing(t *testing.T) {
 	// within a blob cert, modify the PaymentHeader.Timestamp
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.Timestamp = rand.Uint64()
+	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.Timestamp = rand.Time().UnixMicro()
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
