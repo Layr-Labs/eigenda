@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -148,9 +149,17 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	for opID, op := range state.IndexedOperators {
 		opID := opID
 		op := op
-		host, _, _, v2DispersalPort, err := core.ParseOperatorSocket(op.Socket)
+		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err)
+			d.logger.Warn("failed to parse operator socket, check if the socket format is correct", "operator", opID.Hex(), "socket", op.Socket, "err", err)
+			sigChan <- core.SigningMessage{
+				Signature:            nil,
+				Operator:             opID,
+				BatchHeaderHash:      batchData.BatchHeaderHash,
+				AttestationLatencyMs: 0,
+				Err:                  fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+			}
+			continue
 		}
 
 		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
@@ -303,6 +312,7 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 		}
 		return fmt.Errorf("all quorums received no attestation for batch %s", batchHeaderHash)
 	}
+	slices.Sort(nonZeroQuorums)
 
 	aggSig, err := d.aggregator.AggregateSignatures(ctx, d.chainState, uint(batchData.Batch.BatchHeader.ReferenceBlockNumber), quorumAttestation, nonZeroQuorums)
 	aggregateSignaturesFinished := time.Now()
@@ -560,24 +570,24 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 		}
 
 		if failed {
-			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.InsufficientSignatures)
+			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
-				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.InsufficientSignatures)
+				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
 			}
 			continue
 		}
 
-		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Certified)
+		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Complete)
 		if err != nil {
-			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to certified: %w", blobKey.Hex(), err))
+			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to complete: %w", blobKey.Hex(), err))
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
 			d.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
-			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Certified)
+			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Complete)
 		}
 	}
 

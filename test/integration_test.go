@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/docker/go-units"
 	"log"
 	"math"
 	"math/big"
@@ -17,6 +16,8 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/stretchr/testify/require"
 
@@ -359,6 +360,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			InternalRetrievalPort:               op.RetrievalPort,
 			InternalDispersalPort:               op.DispersalPort,
 			V2DispersalPort:                     op.V2DispersalPort,
+			V2RetrievalPort:                     op.V2RetrievalPort,
 			EnableMetrics:                       false,
 			Timeout:                             10,
 			ExpirationPollIntervalSec:           10,
@@ -369,6 +371,8 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			DispersalAuthenticationKeyCacheSize: 1024,
 			DisableDispersalAuthentication:      false,
 			RelayMaxMessageSize:                 units.GiB,
+			EnableV1:                            true,
+			EnableV2:                            false,
 		}
 
 		// creating a new instance of encoder instead of sharing enc because enc is not thread safe
@@ -383,7 +387,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		tx.On("GetBlockStaleMeasure").Return(nil)
 		tx.On("GetStoreDurationBlocks").Return(nil)
 		tx.On("OperatorIDToAddress").Return(gethcommon.Address{1}, nil)
-		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort)
+		socket := core.MakeOperatorSocket(config.Hostname, config.DispersalPort, config.RetrievalPort, config.V2DispersalPort, config.V2RetrievalPort)
 		tx.On("GetOperatorSocket", mock.Anything, mock.Anything).Return(socket.String(), nil)
 
 		noopMetrics := metrics.NewNoopMetrics()

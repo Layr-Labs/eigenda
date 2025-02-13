@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -30,11 +31,16 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	if err != nil {
+		if strings.Contains(err.Error(), "metadata not found") {
+			s.logger.Info("blob metadata not found", "err", err, "blobKey", blobKey.Hex())
+			return nil, api.NewErrorNotFound(fmt.Sprintf("blob metadata not found for blob key: %s", blobKey.Hex()))
+		}
 		s.logger.Warn("failed to get blob metadata", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob metadata: %s", err.Error()))
 	}
 
-	if metadata.BlobStatus != dispv2.Certified {
+	// If the blob is not complete or gathering signatures, return the status without the signed batch
+	if metadata.BlobStatus != dispv2.Complete && metadata.BlobStatus != dispv2.GatheringSignatures {
 		return &pb.BlobStatusReply{
 			Status: metadata.BlobStatus.ToProfobuf(),
 		}, nil
@@ -42,27 +48,27 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 
 	cert, _, err := s.blobMetadataStore.GetBlobCertificate(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob certificate for certified blob", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Error("failed to get blob certificate for blob in GatheringSignatures/Complete status", "err", err, "blobKey", blobKey.Hex())
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
 			return nil, api.NewErrorNotFound("no such blob certificate found")
 		}
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob certificate: %s", err.Error()))
 	}
 
-	// For certified blobs, include signed batch and blob inclusion info
+	// For blobs in GatheringSignatures/Complete status, include signed batch and blob inclusion info
 	blobInclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(ctx, blobKey)
 	if err != nil {
-		s.logger.Error("failed to get blob inclusion info for certified blob", "err", err, "blobKey", blobKey.Hex())
+		s.logger.Error("failed to get blob inclusion info for blob", "err", err, "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get blob inclusion info: %s", err.Error()))
 	}
 
 	if len(blobInclusionInfos) == 0 {
-		s.logger.Error("no blob inclusion info found for certified blob", "blobKey", blobKey.Hex())
+		s.logger.Error("no blob inclusion info found for blob", "blobKey", blobKey.Hex())
 		return nil, api.NewErrorInternal("no blob inclusion info found")
 	}
 
 	if len(blobInclusionInfos) > 1 {
-		s.logger.Warn("multiple inclusion info found for certified blob", "blobKey", blobKey.Hex())
+		s.logger.Warn("multiple inclusion info found for blob", "blobKey", blobKey.Hex())
 	}
 
 	for _, inclusionInfo := range blobInclusionInfos {
@@ -101,6 +107,6 @@ func (s *DispersalServerV2) GetBlobStatus(ctx context.Context, req *pb.BlobStatu
 		}, nil
 	}
 
-	s.logger.Error("no signed batch found for certified blob", "blobKey", blobKey.Hex())
+	s.logger.Error("no signed batch found for blob", "blobKey", blobKey.Hex())
 	return nil, api.NewErrorInternal("no signed batch found")
 }

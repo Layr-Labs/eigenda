@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EigenDADisperserRegistryStorage} from "./EigenDADisperserRegistryStorage.sol";
 import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";

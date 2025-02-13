@@ -3,11 +3,12 @@ package node_test
 import (
 	"context"
 	"errors"
-	"github.com/docker/go-units"
 	"os"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -160,10 +161,13 @@ func TestNodeStartOperatorIDDoesNotMatch(t *testing.T) {
 }
 
 func TestGetReachabilityURL(t *testing.T) {
-	url, err := node.GetReachabilityURL("https://dataapi.eigenda.xyz/", "123123123")
+	v1CheckPath := "api/v1/operators-info/port-check"
+	url, err := node.GetReachabilityURL("https://dataapi.eigenda.xyz/", v1CheckPath, "123123123")
 	assert.NoError(t, err)
 	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v1/operators-info/port-check?operator_id=123123123", url)
-	url, err = node.GetReachabilityURL("https://dataapi.eigenda.xyz", "123123123")
+
+	v2CheckPath := "api/v2/operators/liveness"
+	url, err = node.GetReachabilityURL("https://dataapi.eigenda.xyz", v2CheckPath, "123123123")
 	assert.NoError(t, err)
-	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v1/operators-info/port-check?operator_id=123123123", url)
+	assert.Equal(t, "https://dataapi.eigenda.xyz/api/v2/operators/liveness?operator_id=123123123", url)
 }

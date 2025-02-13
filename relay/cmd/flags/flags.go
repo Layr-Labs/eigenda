@@ -67,7 +67,7 @@ var (
 		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    8 * units.GiB,
+		Value:    units.GiB,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
@@ -81,7 +81,7 @@ var (
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
-		Value:    units.GiB,
+		Value:    8 * units.GiB,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -226,7 +226,7 @@ var (
 		Usage:    "Duration to keep authentication results",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_TIMEOUT"),
-		Value:    5 * time.Minute,
+		Value:    0, // TODO(cody-littley) remove this feature
 	}
 	AuthenticationDisabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),

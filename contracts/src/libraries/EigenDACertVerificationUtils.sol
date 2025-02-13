@@ -2,15 +2,15 @@
 
 pragma solidity ^0.8.9;
 
-import {Merkle} from "eigenlayer-core/contracts/libraries/Merkle.sol";
-import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {Merkle} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
+import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {EigenDAHasher} from "./EigenDAHasher.sol";
-import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+import {BitmapUtils} from "../../lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
@@ -220,6 +220,29 @@ library EigenDACertVerificationUtils {
                 confirmedQuorumsBitmap
             ),
             "EigenDACertVerificationUtils._verifyDACertV2ForQuorums: required quorums are not a subset of the confirmed quorums"
+        );
+    }
+
+    /// @dev External function needed for try-catch wrapper
+    function verifyDACertV2ForQuorumsExternal(
+        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier _signatureVerifier,
+        IEigenDARelayRegistry _eigenDARelayRegistry,
+        BatchHeaderV2 memory _batchHeader,
+        BlobInclusionInfo memory _blobInclusionInfo,
+        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature,
+        SecurityThresholds memory _securityThresholds,
+        bytes memory _requiredQuorumNumbers
+    ) external view {
+        EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
+            _eigenDAThresholdRegistry,
+            _signatureVerifier,
+            _eigenDARelayRegistry,
+            _batchHeader,
+            _blobInclusionInfo,
+            _nonSignerStakesAndSignature,
+            _securityThresholds,
+            _requiredQuorumNumbers
         );
     }
 

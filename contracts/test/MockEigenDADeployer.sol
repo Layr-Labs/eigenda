@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
+import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDACertVerificationUtils} from "../src/libraries/EigenDACertVerificationUtils.sol";
@@ -14,7 +14,7 @@ import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
-import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
 import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
@@ -150,8 +150,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumAdversaryThresholdPercentages,
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
-                versionedBlobParams,
-                defaultSecurityThresholds
+                versionedBlobParams
             )
         );
 
@@ -204,7 +203,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IEigenDARelayRegistry(address(eigenDARelayRegistry)),
             OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator))
+            IRegistryCoordinator(address(registryCoordinator)),
+            defaultSecurityThresholds,
+            quorumNumbersRequired
         );
     }
 

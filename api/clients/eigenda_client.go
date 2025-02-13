@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -21,6 +20,7 @@ import (
 	edasm "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/auth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // IEigenDAClient is a wrapper around the DisperserClient interface which
@@ -40,7 +40,7 @@ type EigenDAClient struct {
 	// TODO: all of these should be private, to prevent users from using them directly,
 	// which breaks encapsulation and makes it hard for us to do refactors or changes
 	Config      EigenDAClientConfig
-	Log         log.Logger
+	Log         logging.Logger
 	Client      DisperserClient
 	ethClient   *ethclient.Client
 	edasmCaller *edasm.ContractEigenDAServiceManagerCaller
@@ -76,7 +76,7 @@ var _ IEigenDAClient = &EigenDAClient{}
 //	if err != nil {
 //	  return err
 //	}
-func NewEigenDAClient(log log.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
+func NewEigenDAClient(log logging.Logger, config EigenDAClientConfig) (*EigenDAClient, error) {
 	err := config.CheckAndSetDefaults()
 	if err != nil {
 		return nil, err
@@ -326,7 +326,7 @@ func (m *EigenDAClient) putBlob(ctxFinality context.Context, rawData []byte, res
 				// Some quorum failed to sign the blob, indicating that the whole network is having issues.
 				// We hence return api.ErrorFailover to let the batcher failover to ethda. This could however be a very unlucky
 				// temporary issue, so the caller should retry at least one more time before failing over.
-				errChan <- api.NewErrorFailover(fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. eigenda nodes are probably down.", base64RequestID))
+				errChan <- api.NewErrorFailover(fmt.Errorf("blob dispersal (requestID=%s) failed with insufficient signatures. eigenda nodes are probably down", base64RequestID))
 				return
 			case grpcdisperser.BlobStatus_CONFIRMED:
 				if m.Config.WaitForFinalization {

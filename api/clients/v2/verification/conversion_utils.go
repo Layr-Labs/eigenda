@@ -10,8 +10,10 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"golang.org/x/exp/slices"
 )
 
 func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.SignedBatch, error) {
@@ -59,32 +61,51 @@ func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEige
 }
 
 func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*contractEigenDACertVerifier.Attestation, error) {
+	if len(inputAttestation.QuorumApks) != len(inputAttestation.QuorumNumbers) {
+		return nil, fmt.Errorf(
+			"quorum apks and quorum numbers must have the same length (apks: %d, numbers: %d)",
+			len(inputAttestation.QuorumApks),
+			len(inputAttestation.QuorumNumbers))
+	}
 	nonSignerPubkeys, err := repeatedBytesToBN254G1Points(inputAttestation.GetNonSignerPubkeys())
 	if err != nil {
 		return nil, fmt.Errorf("convert non signer pubkeys to g1 points: %s", err)
 	}
 
-	quorumApks, err := repeatedBytesToBN254G1Points(inputAttestation.GetQuorumApks())
-	if err != nil {
-		return nil, fmt.Errorf("convert quorum apks to g1 points: %s", err)
-	}
-
 	sigma, err := bytesToBN254G1Point(inputAttestation.GetSigma())
 	if err != nil {
-		return nil, fmt.Errorf("convert sigma to g1 point: %s", err)
+		return nil, fmt.Errorf("failed to convert sigma to g1 point: %s", err)
 	}
 
 	apkG2, err := bytesToBN254G2Point(inputAttestation.GetApkG2())
 	if err != nil {
-		return nil, fmt.Errorf("convert apk g2 to g2 point: %s", err)
+		return nil, fmt.Errorf("failed to convert apk g2 to g2 point: %s", err)
 	}
 
+	// contract expects quorum numbers to be sorted in ascending order
+	// and quorum apks to be in the same order as the quorum numbers
+	sortedQuorumNumbers := make([]uint32, len(inputAttestation.GetQuorumNumbers()))
+	copy(sortedQuorumNumbers, inputAttestation.GetQuorumNumbers())
+	slices.Sort(sortedQuorumNumbers)
+	quorumAPKMap := make(map[core.QuorumID]contractEigenDACertVerifier.BN254G1Point, len(inputAttestation.GetQuorumApks()))
+	for i, quorumNumber := range inputAttestation.GetQuorumNumbers() {
+		apkBytes := inputAttestation.GetQuorumApks()[i]
+		g1Point, err := bytesToBN254G1Point(apkBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize g1 point: %s", err)
+		}
+		quorumAPKMap[core.QuorumID(quorumNumber)] = *g1Point
+	}
+	sortedQuorumAPKs := make([]contractEigenDACertVerifier.BN254G1Point, len(inputAttestation.GetQuorumNumbers()))
+	for i, quorumNumber := range sortedQuorumNumbers {
+		sortedQuorumAPKs[i] = quorumAPKMap[core.QuorumID(quorumNumber)]
+	}
 	convertedAttestation := &contractEigenDACertVerifier.Attestation{
 		NonSignerPubkeys: nonSignerPubkeys,
-		QuorumApks:       quorumApks,
+		QuorumApks:       sortedQuorumAPKs,
 		Sigma:            *sigma,
 		ApkG2:            *apkG2,
-		QuorumNumbers:    inputAttestation.GetQuorumNumbers(),
+		QuorumNumbers:    sortedQuorumNumbers,
 	}
 
 	return convertedAttestation, nil
@@ -153,6 +174,7 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		QuorumNumbers:     quorumNumbers,
 		Commitment:        *convertedBlobCommitment,
 		PaymentHeaderHash: paymentHeaderHash,
+		Salt:              inputHeader.GetSalt(),
 	}, nil
 }
 
@@ -176,7 +198,7 @@ func blobCommitmentProtoToBinding(inputCommitment *common.BlobCommitment) (*cont
 		Commitment:       *convertedCommitment,
 		LengthCommitment: *convertedLengthCommitment,
 		LengthProof:      *convertedLengthProof,
-		Length:       inputCommitment.GetLength(),
+		Length:           inputCommitment.GetLength(),
 	}, nil
 }
 
@@ -270,4 +292,19 @@ func repeatedBytesToBN254G1Points(repeatedBytes [][]byte) ([]contractEigenDACert
 	}
 
 	return outputPoints, nil
+}
+
+// BlobCommitmentsBindingToInternal converts a blob commitment from an eigenDA cert into the internal
+// encoding.BlobCommitments type
+func BlobCommitmentsBindingToInternal(
+	blobCommitmentBinding *contractEigenDACertVerifier.BlobCommitment,
+) (*encoding.BlobCommitments, error) {
+
+	blobCommitment, err := encoding.BlobCommitmentsFromProtobuf(BlobCommitmentBindingToProto(blobCommitmentBinding))
+
+	if err != nil {
+		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
+	}
+
+	return blobCommitment, nil
 }

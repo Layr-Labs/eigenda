@@ -11,6 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
 	github.com/consensys/gnark-crypto v0.12.1
+	github.com/docker/go-units v0.5.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/fxamacker/cbor/v2 v2.5.0
@@ -18,7 +19,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/ingonyama-zk/icicle/v3 v3.1.0
+	github.com/ingonyama-zk/icicle/v3 v3.4.0
 	github.com/jedib0t/go-pretty/v6 v6.5.9
 	github.com/joho/godotenv v1.5.1
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -85,7 +86,6 @@ require (
 	github.com/docker/cli v25.0.3+incompatible // indirect
 	github.com/docker/docker v25.0.6+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/docker/go-units v0.5.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
