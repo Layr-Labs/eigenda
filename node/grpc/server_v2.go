@@ -206,11 +206,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
 func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
-	// Disperser is authenticated and currently only api.EigenLabsDisperserID is registered.
-	if req.GetDisperserID() != api.EigenLabsDisperserID {
-		return nil, fmt.Errorf("disperserID is invalid: %d", req.GetDisperserID())
-	}
-
 	// The signature is created by go-ethereum library, which contains 1 additional byte (for
 	// recovering the public key from signature), so it's 65 bytes.
 	if len(req.GetSignature()) != 65 {
