@@ -3,13 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/Layr-Labs/eigenda/api"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"time"
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
@@ -140,7 +139,7 @@ func (a *requestAuthenticator) getDisperserKey(
 	disperserID uint32) (*gethcommon.Address, error) {
 
 	if !a.disperserIDFilter(disperserID) {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid disperser ID: %d", disperserID))
+		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
 	}
 
 	key, ok := a.keyCache.Get(disperserID)
@@ -153,7 +152,7 @@ func (a *requestAuthenticator) getDisperserKey(
 
 	address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get disperser address: %v", err))
+		return nil, fmt.Errorf("failed to get disperser address: %w", err)
 	}
 
 	a.keyCache.Add(disperserID, &keyWithTimeout{
