@@ -160,7 +160,7 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
 
-	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber(c.Request.Context())
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
 		errorResponse(c, fmt.Errorf("failed to get current block number: %w", err))
