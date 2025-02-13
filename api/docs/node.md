@@ -246,6 +246,8 @@ Node info reply
 | os | [string](#string) |  |  |
 | num_cpu | [uint32](#uint32) |  |  |
 | mem_bytes | [uint64](#uint64) |  |  |
+| override_store_duration_blocks | [uint64](#uint64) |  |  |
+| override_block_stale_measure | [uint64](#uint64) |  |  |
 
 
 

@@ -107,4 +107,8 @@ message GetNodeInfoReply {
   uint32 num_cpu = 4;
   // The amount of memory on the node in bytes.
   uint64 mem_bytes = 5;
+  // The store duration blocks value if overridden.
+  uint64 override_store_duration_blocks = 6;
+  // The block stale measure value if overridden.
+  uint64 override_block_stale_measure = 7;
 }
