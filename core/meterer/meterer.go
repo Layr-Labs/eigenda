@@ -109,8 +109,8 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	requestReservationPeriod := GetReservationPeriodByMicroTimestamp(int64(header.Timestamp), reservationWindow)
-	if !m.ValidateReservationPeriod(header, reservation, requestReservationPeriod) {
+	requestReservationPeriod := GetReservationPeriodByMicroTimestamp(header.Timestamp, reservationWindow)
+	if !m.ValidateReservationPeriod(reservation, requestReservationPeriod) {
 		return fmt.Errorf("invalid reservation period for reservation")
 	}
 
@@ -142,7 +142,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
-func (m *Meterer) ValidateReservationPeriod(header core.PaymentMetadata, reservation *core.ReservedPayment, requestReservationPeriod uint32) bool {
+func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint32) bool {
 	now := time.Now().Unix()
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
