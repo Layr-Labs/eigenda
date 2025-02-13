@@ -53,7 +53,7 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 		return nil, fmt.Errorf("failed to refresh socket map for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
+	return cs.getOperatorState(operatorsByQuorum, uint32(blockNumber))
 }
 
 func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
@@ -67,7 +67,7 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 		return nil, fmt.Errorf("failed to refresh socket map for quorums %v at block %d: %w", quorums, blockNumber, err)
 	}
 
-	return getOperatorState(operatorsByQuorum, uint32(blockNumber), cs.SocketMap)
+	return cs.getOperatorState(operatorsByQuorum, uint32(blockNumber))
 }
 
 func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
@@ -237,7 +237,7 @@ func (cs *ChainState) refreshSocketMap(ctx context.Context, operatorsByQuorum co
 	return nil
 }
 
-func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32, socketMap map[core.OperatorID]*string) (*core.OperatorState, error) {
+func (cs *ChainState) getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
 
@@ -247,9 +247,16 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32,
 
 		for ind, op := range quorum {
 			operators[quorumID][op.OperatorID] = &core.OperatorInfo{
-				Stake:  op.Stake,
-				Index:  core.OperatorIndex(ind),
-				Socket: *socketMap[op.OperatorID],
+				Stake: op.Stake,
+				Index: core.OperatorIndex(ind),
+				Socket: func() string {
+					cs.socketMu.Lock()
+					defer cs.socketMu.Unlock()
+					if socket, ok := cs.SocketMap[op.OperatorID]; socket != nil && ok {
+						return *socket
+					}
+					return ""
+				}(),
 			}
 			totalStake.Add(totalStake, op.Stake)
 		}
