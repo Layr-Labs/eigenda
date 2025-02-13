@@ -3,6 +3,7 @@ package memstore
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -27,9 +29,15 @@ const (
 type Config struct {
 	MaxBlobSizeBytes uint64
 	BlobExpiration   time.Duration
+	// TODO: we should probably add an admin api to set the below values
+	//       without having to restart the server
 	// artificial latency added for memstore backend to mimic eigenda's latency
 	PutLatency time.Duration
 	GetLatency time.Duration
+	// when true, put requests will return an errorFailover error,
+	// after sleeping PutLatency duration.
+	// This can be used to simulate eigenda being down.
+	PutReturnsFailoverError bool
 }
 
 /*
@@ -38,7 +46,7 @@ time to evict blobs to best emulate the ephemeral nature of blobs dispersed to
 EigenDA operators.
 */
 type MemStore struct {
-	sync.RWMutex
+	mu sync.RWMutex
 
 	config    Config
 	log       logging.Logger
@@ -90,8 +98,8 @@ func (e *MemStore) pruningLoop(ctx context.Context) {
 
 // pruneExpired ... removes expired blobs from the store based on the expiration time.
 func (e *MemStore) pruneExpired() {
-	e.Lock()
-	defer e.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	for commit, dur := range e.keyStarts {
 		if time.Since(dur) >= e.config.BlobExpiration {
@@ -107,8 +115,8 @@ func (e *MemStore) pruneExpired() {
 func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 	time.Sleep(e.config.GetLatency)
 	e.reads++
-	e.RLock()
-	defer e.RUnlock()
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(commit, &cert)
@@ -134,6 +142,9 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 // Put inserts a value into the store.
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	time.Sleep(e.config.PutLatency)
+	if e.config.PutReturnsFailoverError {
+		return nil, api.NewErrorFailover(errors.New("memstore in failover simulation mode"))
+	}
 	encodedVal, err := e.codec.EncodeBlob(value)
 	if err != nil {
 		return nil, err
@@ -143,8 +154,8 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", common.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes)
 	}
 
-	e.Lock()
-	defer e.Unlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
 	commitment, err := e.verifier.Commit(encodedVal)
 	if err != nil {

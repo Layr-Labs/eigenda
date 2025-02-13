@@ -1,3 +1,5 @@
+# From https://github.com/marketplace/actions/release-drafter
+# Works in pair with the actual ../release-drafter.yml
 name: Release Drafter
 
 on:

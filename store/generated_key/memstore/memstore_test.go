@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -131,4 +132,30 @@ func TestLatency(t *testing.T) {
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, time.Since(timeBeforeGet), getLatency)
 
+}
+
+func TestPutRetursFailoverErrorConfig(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	verifier, err := verify.NewVerifier(getDefaultVerifierTestConfig(), nil)
+	require.NoError(t, err)
+
+	config := getDefaultMemStoreTestConfig()
+	ms, err := New(ctx, verifier, testLogger, config)
+	require.NoError(t, err)
+
+	validKey, err := ms.Put(ctx, []byte("some-value"))
+	require.NoError(t, err)
+
+	ms.config.PutReturnsFailoverError = true
+
+	// failover mode should only affect Put route
+	_, err = ms.Get(ctx, validKey)
+	require.NoError(t, err)
+
+	_, err = ms.Put(ctx, []byte("some-value"))
+	require.ErrorIs(t, err, &api.ErrorFailover{})
 }
