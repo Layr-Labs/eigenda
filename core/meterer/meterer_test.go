@@ -183,7 +183,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
 
 	now := time.Now().UnixMicro()
-	reservationPeriod := meterer.GetReservationPeriodByMicroTimestamp(now, mt.ChainPaymentState.GetReservationWindow())
+	reservationPeriod := meterer.GetReservationPeriodByNanosecond(now, mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {

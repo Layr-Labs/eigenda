@@ -68,7 +68,7 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
-	currentReservationPeriod := meterer.GetReservationPeriodByMicroTimestamp(timestamp, a.reservationWindow)
+	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
 	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
 
 	a.usageLock.Lock()

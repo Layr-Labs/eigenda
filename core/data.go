@@ -638,7 +638,7 @@ func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 }
 
 // IsActive returns true if the reservation is active at the given timestamp
-func (ar *ReservedPayment) IsActiveByMicroTimestamp(currentTimestamp int64) bool {
-	timestamp := uint64((time.Duration(currentTimestamp) * time.Microsecond).Seconds())
+func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
 	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }
