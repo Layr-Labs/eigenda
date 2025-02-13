@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"slices"
 	"sync"
-	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
@@ -61,10 +60,11 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
-// then on-demand if the reservation is not available. The returned values are
-// timestamp at the current UNIX time in microseconds, and specified cumulative payment
-// for on-demand payments in units of wei. Both fields are used to create the payment
-// header and signature, with non-zero cumulative payment indicating on-demand payment.
+// then on-demand if the reservation is not available. It takes in a timestamp at
+// the current UNIX time in microseconds, and returns a cumulative payment for on-
+// demand payments in units of wei. Both timestamp and cumulative payment are used
+// to create the payment header and signature, with non-zero cumulative payment
+// indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
 func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
@@ -111,8 +111,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
-	timestamp := time.Now().UnixMicro()
+func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, err

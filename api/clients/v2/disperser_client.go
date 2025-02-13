@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/docker/go-units"
 
@@ -141,7 +142,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixMicro(), uint32(symbolLength), quorums)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
