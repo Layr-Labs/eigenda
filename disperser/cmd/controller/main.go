@@ -122,7 +122,10 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
 	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
-	chainState := eth.NewChainState(chainReader, gethClient)
+	chainState, err := eth.NewChainState(chainReader, gethClient)
+	if err != nil {
+		return fmt.Errorf("failed to create chain state: %w", err)
+	}
 	var ics core.IndexedChainState
 	if config.UseGraph {
 		logger.Info("Using graph node")

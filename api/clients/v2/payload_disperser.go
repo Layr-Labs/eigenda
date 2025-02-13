@@ -157,7 +157,7 @@ func (pd *PayloadDisperser) SendPayload(
 		blobBytes,
 		pd.config.BlobVersion,
 		pd.config.Quorums,
-		salt)
+	)
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}

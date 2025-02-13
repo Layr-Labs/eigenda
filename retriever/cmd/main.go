@@ -94,9 +94,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	cs := eth.NewChainState(tx, gethClient)
+	cs, err := eth.NewChainState(tx, gethClient)
 	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+		log.Fatalln("could not start chain state", err)
 	}
 
 	if config.EigenDAVersion == 1 {

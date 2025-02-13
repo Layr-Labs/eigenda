@@ -124,7 +124,10 @@ func NewNode(
 	}
 
 	// Create ChainState Client
-	cst := eth.NewChainState(tx, client)
+	cst, err := eth.NewChainState(tx, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chain state: %w", err)
+	}
 
 	blsSigner, err := blssigner.NewSigner(config.BlsSignerConfig)
 	if err != nil {

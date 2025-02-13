@@ -25,11 +25,10 @@ type ChainState struct {
 	socketPrevBlockNumber uint32
 }
 
-func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
+func NewChainState(tx core.Reader, client common.EthClient) (*ChainState, error) {
 	currentBlockNumber, err := client.BlockByNumber(context.Background(), nil)
-	// TODO: consider changing function signature to return error
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
 	return &ChainState{
 		Client: client,
@@ -37,7 +36,7 @@ func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 		// only start filtering for socket updates from current block
 		socketPrevBlockNumber: uint32(currentBlockNumber.Number().Uint64()),
 		SocketMap:             make(map[core.OperatorID]*string),
-	}
+	}, nil
 }
 
 var _ core.ChainState = (*ChainState)(nil)

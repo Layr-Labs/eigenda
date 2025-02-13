@@ -232,7 +232,10 @@ func NewTestClient(
 
 	// Construct the retrieval client
 
-	chainState := eth.NewChainState(ethReader, ethClient)
+	chainState, err := eth.NewChainState(ethReader, ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chain state: %w", err)
+	}
 
 	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig:           *payloadClientConfig,
@@ -345,11 +348,6 @@ func (c *TestClient) GetRelayClient() clients.RelayClient {
 // GetRelayPayloadRetriever returns the test client's relay payload retriever.
 func (c *TestClient) GetRelayPayloadRetriever() *clients.RelayPayloadRetriever {
 	return c.relayPayloadRetriever
-}
-
-// GetIndexedChainState returns the test client's indexed chain state.
-func (c *TestClient) GetIndexedChainState() core.IndexedChainState {
-	return c.indexedChainState
 }
 
 // GetRetrievalClient returns the test client's retrieval client.

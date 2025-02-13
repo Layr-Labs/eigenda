@@ -177,7 +177,11 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	cs := eth.NewChainState(tx, ethClient)
+	cs, err := eth.NewChainState(tx, ethClient)
+	if err != nil {
+		log.Fatalln("could not create chain state:", err)
+		return fmt.Errorf("could not create chain state: %w", err)
+	}
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)

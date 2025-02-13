@@ -46,7 +46,6 @@ func testBasicDispersal(
 // Disperse a 0 byte blob.
 // Empty blobs are not allowed by the disperser
 func TestEmptyBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
 	blobBytes := []byte{}
 	quorums := []core.QuorumID{0, 1}
 
@@ -57,7 +56,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blob size must be greater than 0")
 }
@@ -231,7 +230,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums, rand.Uint32())
+	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

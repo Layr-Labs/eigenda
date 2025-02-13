@@ -57,7 +57,10 @@ func BuildValidatorPayloadRetriever(
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
-	chainState := eth.NewChainState(reader, ethClient)
+	chainState, err := eth.NewChainState(reader, ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("new chain state: %w", err)
+	}
 
 	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
 	if err != nil {

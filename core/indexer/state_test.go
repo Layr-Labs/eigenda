@@ -126,9 +126,11 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 
 	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
+	chainState, err := eth.NewChainState(tx, client)
+	Expect(err).ToNot(HaveOccurred())
 
 	var (
-		cs            = eth.NewChainState(tx, client)
+		cs            = chainState
 		indexerConfig = indexer.Config{
 			PullInterval: 1 * time.Second,
 		}
@@ -143,11 +145,11 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 	)
 	Expect(err).ToNot(HaveOccurred())
 
-	chainState, err := indexedstate.NewIndexedChainState(cs, indexer)
+	indexedChainState, err := indexedstate.NewIndexedChainState(cs, indexer)
 	if err != nil {
 		panic(err)
 	}
-	return chainState
+	return indexedChainState
 }
 
 var _ = Describe("Indexer", func() {

@@ -78,7 +78,10 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	cs := coreeth.NewChainState(tx, client)
+	cs, err := coreeth.NewChainState(tx, client)
+	if err != nil {
+		return fmt.Errorf("failed to create chain state: %w", err)
+	}
 	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
 
 	server, err := relay.NewServer(

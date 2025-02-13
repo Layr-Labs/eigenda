@@ -79,7 +79,10 @@ func run(ctx *cli.Context) error {
 		log.Fatalln("could not create new transactor", err)
 	}
 
-	cs := coreeth.NewChainState(tx, gethClient)
+	cs, err := coreeth.NewChainState(tx, gethClient)
+	if err != nil {
+		log.Fatalln("could not create chain state", err)
+	}
 
 	logger.Info("Using graph node")
 
