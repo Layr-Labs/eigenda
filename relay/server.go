@@ -389,28 +389,35 @@ func gatherChunkDataToSend(
 }
 
 // computeChunkRequestRequiredBandwidth computes the bandwidth required to fulfill a GetChunks request.
-func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) (int, error) {
-	requiredBandwidth := 0
+func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap metadataMap) (uint32, error) {
+	requiredBandwidth := uint32(0)
 	for _, req := range request.ChunkRequests {
 		var metadata *blobMetadata
 		var key v2.BlobKey
-		var requestedChunks int
+		var requestedChunks uint32
 
 		if req.GetByIndex() != nil {
 			key = v2.BlobKey(req.GetByIndex().GetBlobKey())
 			metadata = mMap[key]
-			requestedChunks = len(req.GetByIndex().ChunkIndices)
+			requestedChunks = uint32(len(req.GetByIndex().ChunkIndices))
 		} else {
 			key = v2.BlobKey(req.GetByRange().GetBlobKey())
 			metadata = mMap[key]
-			requestedChunks = int(req.GetByRange().EndIndex - req.GetByRange().StartIndex)
+
+			if req.GetByRange().EndIndex < req.GetByRange().StartIndex {
+				return 0, fmt.Errorf(
+					"chunk range %d-%d is invalid for key %s, start index must be less than or equal to end index",
+					req.GetByRange().StartIndex, req.GetByRange().EndIndex, key.Hex())
+			}
+
+			requestedChunks = req.GetByRange().EndIndex - req.GetByRange().StartIndex
 		}
 
 		if metadata == nil {
 			return 0, fmt.Errorf("metadata not found for key %s", key.Hex())
 		}
 
-		requiredBandwidth += requestedChunks * int(metadata.chunkSizeBytes)
+		requiredBandwidth += requestedChunks * metadata.chunkSizeBytes
 	}
 
 	return requiredBandwidth, nil
@@ -420,7 +427,7 @@ func computeChunkRequestRequiredBandwidth(request *pb.GetChunksRequest, mMap met
 // bandwidth to serve a GetChunks() request.
 func buildInsufficientGetChunksBandwidthError(
 	request *pb.GetChunksRequest,
-	requiredBandwidth int,
+	requiredBandwidth uint32,
 	originalError error) error {
 
 	chunkCount := 0
