@@ -280,7 +280,7 @@ func (d *ChainDataMock) GetIndexedOperators(ctx context.Context, blockNumber uin
 	return state.IndexedOperatorState.IndexedOperators, nil
 }
 
-func (d *ChainDataMock) GetCurrentBlockNumber() (uint, error) {
+func (d *ChainDataMock) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	args := d.Called()
 	return args.Get(0).(uint), args.Error(1)
 }
