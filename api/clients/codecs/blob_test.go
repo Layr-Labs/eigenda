@@ -1,23 +1,24 @@
 package codecs
 
 import (
+	"bytes"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
 )
 
 // TestBlobConversion checks that internal blob conversion methods produce consistent results
-func TestBlobConversion(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
-
-	iterations := 1000
-
-	for i := 0; i < iterations; i++ {
-		originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
-		testBlobConversionForForm(t, originalData, PolynomialFormEval)
-		testBlobConversionForForm(t, originalData, PolynomialFormCoeff)
+func FuzzBlobConversion(f *testing.F) {
+	for _, seed := range [][]byte{{}, {0x00}, {0xFF}, {0x00, 0x00}, {0xFF, 0xFF}, bytes.Repeat([]byte{0x55}, 1000)} {
+		f.Add(seed)
 	}
+
+	f.Fuzz(
+		func(t *testing.T, originalData []byte) {
+			testBlobConversionForForm(t, originalData, PolynomialFormEval)
+			testBlobConversionForForm(t, originalData, PolynomialFormCoeff)
+		})
+
 }
 
 func testBlobConversionForForm(t *testing.T, payloadBytes []byte, form PolynomialForm) {
