@@ -26,7 +26,7 @@ type Metrics struct {
 	NumEncodeBlobRequests *prometheus.CounterVec
 	BlobSizeTotal         *prometheus.CounterVec
 	Latency               *prometheus.SummaryVec
-	BlobQueue             *prometheus.GaugeVec
+	BlobSet               *prometheus.GaugeVec
 	QueueCapacity         prometheus.Gauge
 	QueueUtilization      prometheus.Gauge
 }
@@ -64,7 +64,7 @@ func NewMetrics(reg *prometheus.Registry, httpPort string, logger logging.Logger
 			},
 			[]string{"time"}, // time is either encoding or total
 		),
-		BlobQueue: promauto.With(reg).NewGaugeVec(
+		BlobSet: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: "eigenda_encoder",
 				Name:      "blob_queue",
@@ -124,7 +124,7 @@ func (m *Metrics) ObserveLatency(stage string, duration time.Duration) {
 func (m *Metrics) ObserveQueue(queueStats map[string]int) {
 	total := 0
 	for bucket, num := range queueStats {
-		m.BlobQueue.With(prometheus.Labels{"size_bucket": bucket}).Set(float64(num))
+		m.BlobSet.With(prometheus.Labels{"size_bucket": bucket}).Set(float64(num))
 		total += num
 	}
 	m.QueueUtilization.Set(float64(total))

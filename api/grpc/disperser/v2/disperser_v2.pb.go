@@ -52,8 +52,6 @@ const (
 	// and in doing so requesting that the validators sign to acknowledge receipt of the blob.
 	// Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser,
 	// after which the BlobStatus becomes COMPLETE.
-	//
-	// Note: this status is not currently implemented, and is a placeholder for future functionality.
 	BlobStatus_GATHERING_SIGNATURES BlobStatus = 3
 	// COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed.
 	// This status does not guarantee any signer percentage, so a client should check that the signature has met

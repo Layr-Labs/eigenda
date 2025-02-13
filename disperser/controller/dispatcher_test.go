@@ -53,10 +53,18 @@ type dispatcherComponents struct {
 	ChainState        *coremock.ChainDataMock
 	SigAggregator     *core.StdSignatureAggregator
 	NodeClientManager *controller.MockClientManager
+	BeforeDispatch    controller.BlobCallback
+	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
+	CallbackBlobSet *controller.MockBlobSet
+	BlobSet         *controller.MockBlobSet
 }
 
 func TestDispatcherHandleBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	ctx := context.Background()
 
@@ -92,8 +100,19 @@ func TestDispatcherHandleBatch(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
+	for _, key := range objs.blobKeys {
+		components.CallbackBlobSet.AssertCalled(t, "RemoveBlob", key)
+		components.BlobSet.AssertCalled(t, "AddBlob", key)
+		components.BlobSet.AssertCalled(t, "Contains", key)
+	}
+	components.CallbackBlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(objs.blobKeys))
+	components.BlobSet.AssertNumberOfCalls(t, "AddBlob", len(objs.blobKeys))
+	components.BlobSet.AssertNumberOfCalls(t, "Contains", len(objs.blobKeys))
 	err = components.Dispatcher.HandleSignatures(ctx, batchData, sigChan)
 	require.NoError(t, err)
+	for _, key := range objs.blobKeys {
+		components.BlobSet.AssertCalled(t, "RemoveBlob", key)
+	}
 
 	// Test that the blob metadata status are updated
 	bm0, err := components.BlobMetadataStore.GetBlobMetadata(ctx, objs.blobKeys[0])
@@ -128,6 +147,10 @@ func TestDispatcherHandleBatch(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures(t *testing.T) {
 	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	failedObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	successfulObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -207,6 +230,10 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 
 func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
@@ -260,10 +287,15 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	bhh, err := vis[0].BatchHeader.Hash()
 	require.NoError(t, err)
 
-	// Test that attestation is written
+	// Test that empty attestation is written
 	att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
-	require.Error(t, err)
-	require.Nil(t, att)
+	require.NoError(t, err)
+	require.Nil(t, att.APKG2)
+	require.Len(t, att.QuorumAPKs, 0)
+	require.Nil(t, att.Sigma)
+	require.Len(t, att.QuorumNumbers, 0)
+	require.Len(t, att.QuorumResults, 0)
+	require.Len(t, att.NonSignerPubKeys, 0)
 
 	deleteBlobs(t, components.BlobMetadataStore, objsInBothQuorum.blobKeys, [][32]byte{bhh})
 	deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
@@ -271,6 +303,10 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 func TestDispatcherMaxBatchSize(t *testing.T) {
 	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	numBlobs := 12
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
 	ctx := context.Background()
@@ -284,6 +320,12 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 			require.Len(t, batchData.Batch.BlobCertificates, numBlobs%int(maxBatchSize))
 		}
 	}
+
+	for _, key := range objs.blobKeys {
+		err := blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
 	_, err := components.Dispatcher.NewBatch(ctx, blockNumber)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
@@ -292,6 +334,10 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 
 func TestDispatcherNewBatch(t *testing.T) {
 	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	require.Len(t, objs.blobHedaers, 2)
 	require.Len(t, objs.blobKeys, 2)
@@ -341,11 +387,33 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, verified)
 
+	for _, key := range objs.blobKeys {
+		err = blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
 	// Attempt to create a batch with the same blobs
 	_, err = components.Dispatcher.NewBatch(ctx, blockNumber)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
+}
+
+func TestDispatcherDedupBlobs(t *testing.T) {
+	components := newDispatcherComponents(t)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
+	// It should be dedup'd
+	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
+
+	ctx := context.Background()
+	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	require.ErrorContains(t, err, "no blobs to dispatch")
+	require.Nil(t, batchData)
+
+	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
 }
 
 func TestDispatcherBuildMerkleTree(t *testing.T) {
@@ -472,13 +540,20 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	require.NoError(t, err)
 	nodeClientManager := &controller.MockClientManager{}
 	mockChainState.On("GetCurrentBlockNumber").Return(uint(blockNumber), nil)
+	callBackBlobSet := &controller.MockBlobSet{}
+	beforeDispatch := func(blobKey corev2.BlobKey) error {
+		callBackBlobSet.RemoveBlob(blobKey)
+		return nil
+	}
+	blobSet := &controller.MockBlobSet{}
+	blobSet.On("Size", mock.Anything).Return(0)
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
 		PullInterval:           1 * time.Second,
 		FinalizationBlockDelay: finalizationBlockDelay,
 		NodeRequestTimeout:     1 * time.Second,
 		NumRequestRetries:      3,
 		MaxBatchSize:           maxBatchSize,
-	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry())
+	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
 	require.NoError(t, err)
 	return &dispatcherComponents{
 		Dispatcher:        d,
@@ -488,5 +563,8 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		ChainState:        mockChainState,
 		SigAggregator:     agg,
 		NodeClientManager: nodeClientManager,
+		BeforeDispatch:    beforeDispatch,
+		CallbackBlobSet:   callBackBlobSet,
+		BlobSet:           blobSet,
 	}
 }
