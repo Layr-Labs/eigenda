@@ -15,6 +15,7 @@ type EigenDACert struct {
 	BlobInclusionInfo           contractEigenDACertVerifier.BlobInclusionInfo
 	BatchHeader                 contractEigenDACertVerifier.BatchHeaderV2
 	NonSignerStakesAndSignature contractEigenDACertVerifier.NonSignerStakesAndSignature
+	SignedQuorumNumbers         []byte
 }
 
 // BuildEigenDACert creates a new EigenDACert from a BlobStatusReply, and NonSignerStakesAndSignature
@@ -28,15 +29,23 @@ func BuildEigenDACert(
 		return nil, fmt.Errorf("convert inclusion info to binding: %w", err)
 	}
 
-	bindingBatchHeader, err := BatchHeaderProtoToBinding(blobStatusReply.GetSignedBatch().GetHeader())
+	signedBatch := blobStatusReply.GetSignedBatch()
+
+	bindingBatchHeader, err := BatchHeaderProtoToBinding(signedBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header to binding: %w", err)
+	}
+
+	quorumNumbers, err := QuorumNumbersUint32ToUint8(signedBatch.GetAttestation().GetQuorumNumbers())
+	if err != nil {
+		return nil, fmt.Errorf("convert quorum numbers to uint8: %w", err)
 	}
 
 	return &EigenDACert{
 		BlobInclusionInfo:           *bindingInclusionInfo,
 		BatchHeader:                 *bindingBatchHeader,
 		NonSignerStakesAndSignature: *nonSignerStakesAndSignature,
+		SignedQuorumNumbers:         quorumNumbers,
 	}, nil
 }
 

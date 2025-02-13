@@ -26,7 +26,7 @@ type ICertVerifier interface {
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		signedBatch *disperser.SignedBatch,
-	) (*verifierBindings.NonSignerStakesAndSignature, error)
+	) (*verifierBindings.NonSignerStakesAndSignature, []uint8, error)
 }
 
 // CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
@@ -151,7 +151,8 @@ func (cv *CertVerifier) VerifyCertV2(
 		&bind.CallOpts{Context: ctx},
 		eigenDACert.BatchHeader,
 		eigenDACert.BlobInclusionInfo,
-		eigenDACert.NonSignerStakesAndSignature)
+		eigenDACert.NonSignerStakesAndSignature,
+		eigenDACert.SignedQuorumNumbers)
 
 	if err != nil {
 		return fmt.Errorf("verify cert v2: %w", err)
@@ -161,7 +162,11 @@ func (cv *CertVerifier) VerifyCertV2(
 }
 
 // GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
-// contract, and returns the resulting NonSignerStakesAndSignature object.
+// contract, and returns the resulting NonSignerStakesAndSignature object and signed quorum numbers. The signed quorum
+// numbers are the quorum numbers that directly match the quorum numbers in the SignedBatch.Attestation.
+//
+// TODO (litt3): I don't like that we are simply returning a portion of the input parameter here. I think it's a
+//  potential source of confusion. @reviewers, please consider this structure and opine
 //
 // Before getting the NonSignerStakesAndSignature, this method will wait for the internal client to advance to a
 // sufficient block height. This wait will time out if the duration exceeds the timeout configured for the input ctx
@@ -171,27 +176,27 @@ func (cv *CertVerifier) VerifyCertV2(
 func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
-) (*verifierBindings.NonSignerStakesAndSignature, error) {
+) (*verifierBindings.NonSignerStakesAndSignature, []uint8, error) {
 
 	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
-		return nil, fmt.Errorf("convert signed batch: %w", err)
+		return nil, nil, fmt.Errorf("convert signed batch: %w", err)
 	}
 
 	err = cv.MaybeWaitForBlockNumber(ctx, signedBatch.GetHeader().GetReferenceBlockNumber())
 	if err != nil {
-		return nil, fmt.Errorf("wait for block number: %w", err)
+		return nil, nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	nonSignerStakesAndSignature, err := cv.certVerifierCaller.GetNonSignerStakesAndSignature(
+	nonSignerStakesAndSignature, signedQuorumNumbers, err := cv.certVerifierCaller.GetNonSignerStakesAndSignature(
 		&bind.CallOpts{Context: ctx},
 		*signedBatchBinding)
 
 	if err != nil {
-		return nil, fmt.Errorf("get non signer stakes and signature: %w", err)
+		return nil, nil, fmt.Errorf("get non signer stakes and signature: %w", err)
 	}
 
-	return &nonSignerStakesAndSignature, nil
+	return &nonSignerStakesAndSignature, signedQuorumNumbers, nil
 }
 
 // MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless
