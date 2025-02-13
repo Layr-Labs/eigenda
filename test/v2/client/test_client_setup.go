@@ -41,7 +41,12 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 	}
 	configFileBytes, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		entries, _ := os.ReadDir("/etc/config") // TODO delete
+		files := ""
+		for _, entry := range entries {
+			files += entry.Name() + " "
+		}
+		return nil, fmt.Errorf("failed to read config file: %w, found %s", err, files)
 	}
 
 	config := &TestClientConfig{}
