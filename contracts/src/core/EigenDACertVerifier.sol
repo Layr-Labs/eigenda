@@ -98,11 +98,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
     ) external view {
         EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
             eigenDAThresholdRegistry,
@@ -112,7 +114,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholdsV2,
-            quorumNumbersRequiredV2
+            quorumNumbersRequiredV2,
+            signedQuorumNumbers
         );
     }
 
@@ -145,11 +148,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2ForZKProof(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
     ) external view returns (bool) {
         try EigenDACertVerificationUtils.verifyDACertV2ForQuorumsExternal(
             eigenDAThresholdRegistry,
@@ -159,7 +164,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             blobInclusionInfo,
             nonSignerStakesAndSignature,
             securityThresholdsV2,
-            quorumNumbersRequiredV2
+            quorumNumbersRequiredV2,
+            signedQuorumNumbers
         ) {
             return true;
         } catch {
@@ -172,10 +178,12 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
+     * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
+     * @return signedQuorumNumbers The signed quorum numbers for the given signed batch attestation
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
-    ) external view returns (NonSignerStakesAndSignature memory) {
+    ) external view returns (NonSignerStakesAndSignature memory, bytes memory) {
         return EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
             operatorStateRetriever, 
             registryCoordinator, 

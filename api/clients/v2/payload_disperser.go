@@ -271,7 +271,11 @@ func (pd *PayloadDisperser) buildEigenDACert(
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
+
+	// TODO (litt3): @reviewers I think this method (buildEigenDACert) is the main end user of GetNonSignerStakesAndSignature,
+	//  and we are just discarding the signedQuorumNumbers returned from GetNonSignerStakesAndSignature. IMO this points
+	//  to returning signedQuorumNumbers being the wrong API choice
+	nonSignerStakesAndSignature, _, err := pd.certVerifier.GetNonSignerStakesAndSignature(
 		timeoutCtx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
