@@ -7,8 +7,8 @@ import (
 
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
-	// The location where persistent test data is stored (e.g. SRS files). Often private keys are stored here too.
-	TestDataPath string
+	// The location where the SRS files can be found.
+	SRSPath string
 	// The location where the test client's private key is stored. This is the key for the account that is
 	// paying for dispersals.
 	//
@@ -42,16 +42,11 @@ type TestClientConfig struct {
 	MetricsPort int
 }
 
-// Path returns the full path to a file in the test data directory.
-func (c *TestClientConfig) Path(elements ...string) (string, error) {
-	root, err := ResolveTildeInPath(c.TestDataPath)
+// ResolveSRSPath returns a path relative to the SRSPath root directory.
+func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
+	root, err := ResolveTildeInPath(c.SRSPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
 	}
-
-	combinedElements := make([]string, 0, len(elements)+1)
-	combinedElements = append(combinedElements, root)
-	combinedElements = append(combinedElements, elements...)
-
-	return path.Join(combinedElements...), nil
+	return path.Join(root, srsFile), nil
 }

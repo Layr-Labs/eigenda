@@ -31,11 +31,10 @@ import (
 )
 
 const (
-	SRSPath           = "srs"
-	SRSPathG1         = SRSPath + "/g1.point"
-	SRSPathG2         = SRSPath + "/g2.point"
-	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
-	SRSPathSRSTables  = SRSPath + "/SRSTables"
+	SRSPathG1         = "/g1.point"
+	SRSPathG2         = "/g2.point"
+	SRSPathG2PowerOf2 = "/g2.point.powerOf2"
+	SRSPathSRSTables  = "/SRSTables"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -87,19 +86,19 @@ func NewTestClient(
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Infof("Account ID: %s", accountId.String())
 
-	g1Path, err := config.Path(SRSPathG1)
+	g1Path, err := config.ResolveSRSPath(SRSPathG1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G1 file: %w", err)
 	}
-	g2Path, err := config.Path(SRSPathG2)
+	g2Path, err := config.ResolveSRSPath(SRSPathG2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 file: %w", err)
 	}
-	g2PowerOf2Path, err := config.Path(SRSPathG2PowerOf2)
+	g2PowerOf2Path, err := config.ResolveSRSPath(SRSPathG2PowerOf2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 power of 2 file: %w", err)
 	}
-	srsTablesPath, err := config.Path(SRSPathSRSTables)
+	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to SRS tables: %w", err)
 	}

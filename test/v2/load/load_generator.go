@@ -141,13 +141,13 @@ func (l *LoadGenerator) submitBlob() {
 
 	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload, rand.Uint32())
 	if err != nil {
-		fmt.Printf("failed to disperse blob: %v\n", err)
+		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return
 	}
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
-		fmt.Printf("failed to compute blob key: %v\n", err)
+		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
 		return
 	}
 
@@ -159,14 +159,15 @@ func (l *LoadGenerator) submitBlob() {
 			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
 			payload)
 		if err != nil {
-			fmt.Printf("failed to read blob from relays: %v\n", err)
+			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
 	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
-		fmt.Printf("failed to compute blob commitment: %v\n", err)
+		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		return
 	}
 
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
@@ -178,7 +179,7 @@ func (l *LoadGenerator) submitBlob() {
 			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 			payload)
 		if err != nil {
-			fmt.Printf("failed to read blob from validators: %v\n", err)
+			l.client.GetLogger().Errorf("failed to read blob from validators: %v", err)
 		}
 	}
 }

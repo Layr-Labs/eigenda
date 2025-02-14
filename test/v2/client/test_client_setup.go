@@ -24,9 +24,6 @@ var (
 const (
 	PreprodEnv = "../config/environment/preprod.json"
 
-	//G1URL         = "https://eigenda.s3.amazonaws.com/srs/g1.point"
-	//G2URL         = "https://eigenda.s3.amazonaws.com/srs/g2.point"
-	//G2PowerOf2URL = "https://eigenda.s3.amazonaws.com/srs/g2.point.powerOf2"
 	G1URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
 	G2URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
 	G2PowerOf2URL = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
@@ -97,14 +94,13 @@ func GetClient(configPath string) (*TestClient, error) {
 			loggerConfig = common.DefaultConsoleLoggerConfig()
 		}
 
-		testLogger, err := common.NewLogger(loggerConfig)
+		logger, err = common.NewLogger(loggerConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create logger: %w", err)
 		}
-		logger = testLogger
 
 		// only do this stuff once
-		err = setupFilesystem(logger, testConfig)
+		err = setupFilesystem(testConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
 		}
@@ -130,24 +126,25 @@ func skipInCI(t *testing.T) {
 	}
 }
 
-// ensureFileIsPresent checks if a file exists at the given path. If it does not, it downloads the file from the
+// ensureSRSFileIsPresent checks if a file exists at the given path. If it does not, it downloads the file from the
 // given URL into the given path.
-func ensureFileIsPresent(
+func ensureSRSFileIsPresent(
 	config *TestClientConfig,
-	path string,
+	filePath string,
 	url string) error {
 
-	path, err := config.Path(path)
+	var err error
+	filePath, err = config.ResolveSRSPath(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to get path: %w", err)
+		return fmt.Errorf("failed to resolve SRS path: %w", err)
 	}
 
-	_, err = os.Stat(path)
+	_, err = os.Stat(filePath)
 	if os.IsNotExist(err) {
 		command := make([]string, 3)
 		command[0] = "wget"
 		command[1] = url
-		command[2] = "--output-document=" + path
+		command[2] = "--output-document=" + filePath
 		logger.Info("executing %s", command)
 
 		cmd := exec.Command(command[0], command[1:]...)
@@ -164,25 +161,21 @@ func ensureFileIsPresent(
 	return nil
 }
 
-func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
+func setupFilesystem(config *TestClientConfig) error {
 	// Create the test data directory if it does not exist
-	err := os.MkdirAll(config.TestDataPath, 0755)
+	srsPath, err := ResolveTildeInPath(config.SRSPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve tilde in path: %w", err)
+	}
+	err = os.MkdirAll(srsPath, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create test data directory: %w", err)
 	}
 
 	// Create the SRS directories if they do not exist
-	srsPath, err := config.Path(SRSPath)
+	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
 	if err != nil {
-		return fmt.Errorf("failed to get SRS path: %w", err)
-	}
-	err = os.MkdirAll(srsPath, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create SRS directory: %w", err)
-	}
-	srsTablesPath, err := config.Path(SRSPathSRSTables)
-	if err != nil {
-		return fmt.Errorf("failed to get SRS tables path: %w", err)
+		return fmt.Errorf("failed to resolve SRS tables path: %w", err)
 	}
 	err = os.MkdirAll(srsTablesPath, 0755)
 	if err != nil {
@@ -190,15 +183,15 @@ func setupFilesystem(logger logging.Logger, config *TestClientConfig) error {
 	}
 
 	// If any of the srs files do not exist, download them.
-	err = ensureFileIsPresent(config, SRSPathG1, G1URL)
+	err = ensureSRSFileIsPresent(config, SRSPathG1, G1URL)
 	if err != nil {
 		return fmt.Errorf("failed to locate G1 point: %w", err)
 	}
-	err = ensureFileIsPresent(config, SRSPathG2, G2URL)
+	err = ensureSRSFileIsPresent(config, SRSPathG2, G2URL)
 	if err != nil {
 		return fmt.Errorf("failed to locate G2 point: %w", err)
 	}
-	err = ensureFileIsPresent(config, SRSPathG2PowerOf2, G2PowerOf2URL)
+	err = ensureSRSFileIsPresent(config, SRSPathG2PowerOf2, G2PowerOf2URL)
 	if err != nil {
 		return fmt.Errorf("failed to locate G2 power of 2 point: %w", err)
 	}
