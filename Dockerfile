@@ -138,5 +138,6 @@ COPY --from=relay-builder /app/relay/bin/relay /usr/local/bin
 ENTRYPOINT ["relay"]
 
 FROM alpine:3.18 AS generator2
+RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash tar # TODO remove this before merging
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load", "-", "-"]
