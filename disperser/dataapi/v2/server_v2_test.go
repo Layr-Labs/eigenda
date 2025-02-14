@@ -650,6 +650,26 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
 		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
 	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
 
 	// Set up attestation
 	keyPair, err := core.GenRandomBlsKeys()
@@ -732,7 +752,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
-		signers := map[uint8][]string{
+		signerIds := map[uint8][]string{
 			0: {
 				operatorPubKeys[2].GetOperatorID().Hex(),
 			},
@@ -741,7 +761,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 				operatorPubKeys[3].GetOperatorID().Hex(),
 			},
 		}
-		nonsigners := map[uint8][]string{
+		nonsignerIds := map[uint8][]string{
 			0: {
 				operatorPubKeys[0].GetOperatorID().Hex(),
 				operatorPubKeys[1].GetOperatorID().Hex(),
@@ -750,13 +770,41 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 				operatorPubKeys[0].GetOperatorID().Hex(),
 			},
 		}
-		for key, expectedSigners := range signers {
+		signerAddresses := map[uint8][]string{
+			0: {
+				operatorAddresses[2].Hex(),
+			},
+			1: {
+				operatorAddresses[2].Hex(),
+				operatorAddresses[3].Hex(),
+			},
+		}
+		nonsignerAddresses := map[uint8][]string{
+			0: {
+				operatorAddresses[0].Hex(),
+				operatorAddresses[1].Hex(),
+			},
+			1: {
+				operatorAddresses[0].Hex(),
+			},
+		}
+		for key, expectedSigners := range signerIds {
 			actualSigners, exists := response.AttestationInfo.SigningOperatorIds[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedSigners, actualSigners)
 		}
-		for key, expectedNonsigners := range nonsigners {
+		for key, expectedNonsigners := range nonsignerIds {
 			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorIds[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+		}
+		for key, expectedSigners := range signerAddresses {
+			actualSigners, exists := response.AttestationInfo.SigningOperatorAddresses[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedSigners, actualSigners)
+		}
+		for key, expectedNonsigners := range nonsignerAddresses {
+			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorAddresses[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 		}

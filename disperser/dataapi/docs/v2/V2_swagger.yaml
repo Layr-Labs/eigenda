@@ -231,7 +231,19 @@ definitions:
     properties:
       attestation:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      nonsigning_operator_addresses:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
       nonsigning_operator_ids:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        type: object
+      signing_operator_addresses:
         additionalProperties:
           items:
             type: string

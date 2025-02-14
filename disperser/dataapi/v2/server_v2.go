@@ -72,9 +72,11 @@ type (
 	}
 
 	AttestationInfo struct {
-		Attestation           *corev2.Attestation `json:"attestation"`
-		NonsigningOperatorIds map[uint8][]string  `json:"nonsigning_operator_ids"`
-		SigningOperatorIds    map[uint8][]string  `json:"signing_operator_ids"`
+		Attestation                 *corev2.Attestation `json:"attestation"`
+		NonsigningOperatorIds       map[uint8][]string  `json:"nonsigning_operator_ids"`
+		SigningOperatorIds          map[uint8][]string  `json:"signing_operator_ids"`
+		NonsigningOperatorAddresses map[uint8][]string  `json:"nonsigning_operator_addresses"`
+		SigningOperatorAddresses    map[uint8][]string  `json:"signing_operator_addresses"`
 	}
 	BlobAttestationInfoResponse struct {
 		BlobKey         string                    `json:"blob_key"`

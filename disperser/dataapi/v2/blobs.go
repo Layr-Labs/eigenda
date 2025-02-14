@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/gin-gonic/gin"
 )
 
@@ -261,6 +263,14 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		blobQuorums[q] = struct{}{}
 	}
 
+	// Get all operators for the attestation
+	operatorList, operatorsByQuorum, err := s.getAllOperatorsForAttestation(ctx, attestationInfo.Attestation)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
+		return
+	}
+
 	// Get all nonsigners (of the batch that this blob is part of)
 	nonsigners := make(map[core.OperatorID]struct{}, 0)
 	for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
@@ -268,28 +278,30 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		nonsigners[opId] = struct{}{}
 	}
 
-	// Get all operators at the reference block number
-	rbn := attestationInfo.Attestation.ReferenceBlockNumber
-	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, attestationInfo.Attestation.QuorumNumbers, uint32(rbn))
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
-		return
-	}
-
 	// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
 	signerIds := make(map[uint8][]string, 0)
 	nonsignerIds := make(map[uint8][]string, 0)
+	signerAddresses := make(map[uint8][]string, 0)
+	nonsignerAddresses := make(map[uint8][]string, 0)
 	for q, innerMap := range operatorsByQuorum {
 		// Make sure the blob was dispersed to the quorum
 		if _, exist := blobQuorums[q]; !exist {
 			continue
 		}
 		for _, op := range innerMap {
+			id := op.OperatorID.Hex()
+			addr, exist := operatorList.GetAddress(id)
+			// This should never happen becuase OperatorList ensures the 1:1 mapping
+			if !exist {
+				addr = "Unexpected internal error"
+				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
+			}
 			if _, exist := nonsigners[op.OperatorID]; exist {
-				nonsignerIds[q] = append(nonsignerIds[q], op.OperatorID.Hex())
+				nonsignerIds[q] = append(nonsignerIds[q], id)
+				nonsignerAddresses[q] = append(nonsignerAddresses[q], addr)
 			} else {
-				signerIds[q] = append(signerIds[q], op.OperatorID.Hex())
+				signerIds[q] = append(signerIds[q], id)
+				signerAddresses[q] = append(signerAddresses[q], addr)
 			}
 		}
 	}
@@ -299,9 +311,11 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 		InclusionInfo:   attestationInfo.InclusionInfo,
 		AttestationInfo: &AttestationInfo{
-			Attestation:           attestationInfo.Attestation,
-			SigningOperatorIds:    signerIds,
-			NonsigningOperatorIds: nonsignerIds,
+			Attestation:                 attestationInfo.Attestation,
+			SigningOperatorIds:          signerIds,
+			NonsigningOperatorIds:       nonsignerIds,
+			SigningOperatorAddresses:    signerAddresses,
+			NonsigningOperatorAddresses: nonsignerAddresses,
 		},
 	}
 
@@ -309,4 +323,36 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
 	c.JSON(http.StatusOK, response)
+}
+
+func (s *ServerV2) getAllOperatorsForAttestation(ctx context.Context, attestation *corev2.Attestation) (*dataapi.OperatorList, core.OperatorStakes, error) {
+	rbn := attestation.ReferenceBlockNumber
+	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, attestation.QuorumNumbers, uint32(rbn))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	operatorsSeen := make(map[core.OperatorID]struct{}, 0)
+	for _, ops := range operatorsByQuorum {
+		for _, op := range ops {
+			operatorsSeen[op.OperatorID] = struct{}{}
+		}
+	}
+	operatorIDs := make([]core.OperatorID, 0)
+	for id := range operatorsSeen {
+		operatorIDs = append(operatorIDs, id)
+	}
+
+	// Get the address for the operators.
+	// operatorAddresses[i] is the address for operatorIDs[i].
+	operatorList := dataapi.NewOperatorList()
+	operatorAddresses, err := s.chainReader.BatchOperatorIDToAddress(ctx, operatorIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range operatorIDs {
+		operatorList.Add(operatorIDs[i], operatorAddresses[i].Hex())
+	}
+
+	return operatorList, operatorsByQuorum, nil
 }

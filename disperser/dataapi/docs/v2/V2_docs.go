@@ -985,7 +985,25 @@ const docTemplateV2 = `{
                 "attestation": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
                 },
+                "nonsigning_operator_addresses": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
                 "nonsigning_operator_ids": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "signing_operator_addresses": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "array",
