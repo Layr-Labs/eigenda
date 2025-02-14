@@ -36,10 +36,6 @@ const (
 	SRSPathG2         = SRSPath + "/g2.point"
 	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
 	SRSPathSRSTables  = SRSPath + "/SRSTables"
-
-	G1URL         = "https://eigenda.s3.amazonaws.com/srs/g1.point"
-	G2URL         = "https://eigenda.s3.amazonaws.com/srs/g2.point"
-	G2PowerOf2URL = "https://eigenda.s3.amazonaws.com/srs/g2.point.powerOf2"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.

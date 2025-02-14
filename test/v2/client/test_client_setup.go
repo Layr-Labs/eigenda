@@ -24,6 +24,13 @@ var (
 
 const (
 	PreprodEnv = "../config/environment/preprod.json"
+
+	//G1URL         = "https://eigenda.s3.amazonaws.com/srs/g1.point"
+	//G2URL         = "https://eigenda.s3.amazonaws.com/srs/g2.point"
+	//G2PowerOf2URL = "https://eigenda.s3.amazonaws.com/srs/g2.point.powerOf2"
+	G1URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
+	G2URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
+	G2PowerOf2URL = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point.powerOf2"
 )
 
 // GetConfig returns a TestClientConfig instance parsed from the config file.
