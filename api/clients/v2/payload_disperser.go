@@ -101,13 +101,13 @@ func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
 	codec codecs.BlobCodec,
-	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
-	//
-	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
+// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
+// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+//
+// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
+//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
+//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient DisperserClient,
 	certVerifier verification.ICertVerifier,
 ) (*PayloadDisperser, error) {
@@ -136,11 +136,11 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
-	// payload is the raw data to be stored on eigenDA
+// payload is the raw data to be stored on eigenDA
 	payload []byte,
-	// salt is added while constructing the blob header
-	// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
-	// different blob key, when using reserved bandwidth payments.
+// salt is added while constructing the blob header
+// This salt should be utilized if a blob dispersal fails, in order to retry dispersing the same payload under a
+// different blob key, when using reserved bandwidth payments.
 	salt uint32,
 ) (*verification.EigenDACert, error) {
 
@@ -249,7 +249,9 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
 				return blobStatusReply, nil
-			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
+			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
+				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
+				//  out of this loop early if we have enough signatures
 				continue
 			default:
 				return nil, fmt.Errorf(
