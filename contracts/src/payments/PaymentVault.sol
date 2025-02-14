@@ -77,7 +77,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
 
 
     /**
-     * @notice Schedule symbols per second for a single period
+     * @notice Schedule symbols per second for the reserved periods
      * @param _account address of the user making the reservation
      * @param _reservation Reservation struct containing details of the reservation
      * TODO: add offset for multiple reservations per account
@@ -95,7 +95,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         uint256 payment = calculateReservationPayment(_reservation.symbolsPerSecond, _reservation.endTimestamp - _reservation.startTimestamp);
         require(msg.value == payment, "Incorrect payment amount");
 
-        // identify period loop from the timestamps 
+        // identify period loop from the timestamps ; track the total number reserved
         uint256 startPeriod = _reservation.startTimestamp / reservationPeriodInterval;
         uint256 endPeriod = _reservation.endTimestamp / reservationPeriodInterval;
         for (uint256 period = startPeriod; period <= endPeriod; period++) {
@@ -105,11 +105,11 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
             );
         }
 
-        // update the scheduled map
+        // reservation is valid, update the scheduled map
         for (uint256 period = startPeriod; period <= endPeriod; period++) {
             scheduledSymbolsPerPeriod[period] += _reservation.symbolsPerSecond;
         }
-        reservations[_account] = _reservation;
+        permissionlessReservations[_account] = _reservation;
 
         emit ReservationUpdated(_account, _reservation);
     }
@@ -211,6 +211,19 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         _reservations = new Reservation[](_accounts.length);
         for(uint256 i; i < _accounts.length; ++i){
             _reservations[i] = reservations[_accounts[i]];
+        }
+    }
+
+    /// @notice Fetches the current permissionless reservation for an account
+    function getPermissionlessReservation(address _account) external view returns (Reservation memory) {
+        return permissionlessReservations[_account];
+    }
+
+    /// @notice Fetches the current permissionless reservations for a set of accounts
+    function getPermissionlessReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations) {
+        _reservations = new Reservation[](_accounts.length);
+        for(uint256 i; i < _accounts.length; ++i){
+            _reservations[i] = permissionlessReservations[_accounts[i]];
         }
     }
 

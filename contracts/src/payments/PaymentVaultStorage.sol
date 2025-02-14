@@ -41,8 +41,10 @@ abstract contract PaymentVaultStorage is IPaymentVault {
         uint256 payment
     );
 
-    /// @notice mapping from user address to current reservation 
+    /// @notice mapping from user address to current reservation  for governance approved users
     mapping(address => Reservation) public reservations;
+    /// @notice Tracks all permissionless reservations
+    mapping(uint256 => Reservation) public permissionlessReservations;
     /// @notice mapping from user address to current on-demand payment
     mapping(address => OnDemandPayment) public onDemandPayments;
 
