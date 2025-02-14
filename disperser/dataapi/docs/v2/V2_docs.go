@@ -985,21 +985,21 @@ const docTemplateV2 = `{
                 "attestation": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
                 },
-                "nonsigning_operator_ids": {
+                "nonsigners": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 },
-                "signing_operator_ids": {
+                "signers": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 }
@@ -1254,6 +1254,17 @@ const docTemplateV2 = `{
                     "items": {
                         "$ref": "#/definitions/v2.DispersalResponse"
                     }
+                }
+            }
+        },
+        "v2.OperatorIdentity": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
                 }
             }
         },
