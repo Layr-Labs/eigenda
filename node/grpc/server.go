@@ -65,22 +65,7 @@ func (s *Server) NodeInfo(ctx context.Context, in *pb.NodeInfoRequest) (*pb.Node
 		memBytes = v.Total
 	}
 
-	overrideStoreDurationBlocks := uint64(0)
-	overrideBlockStaleMeasure := uint64(0)
-	if s.node.Config.EnableTestMode {
-		overrideStoreDurationBlocks = s.node.Config.OverrideStoreDurationBlocks
-		overrideBlockStaleMeasure = s.node.Config.OverrideBlockStaleMeasure
-	}
-
-	return &pb.NodeInfoReply{
-		Semver:                      node.SemVer,
-		Os:                          runtime.GOOS,
-		Arch:                        runtime.GOARCH,
-		NumCpu:                      uint32(runtime.GOMAXPROCS(0)),
-		MemBytes:                    memBytes,
-		OverrideStoreDurationBlocks: overrideStoreDurationBlocks,
-		OverrideBlockStaleMeasure:   overrideBlockStaleMeasure,
-	}, nil
+	return &pb.NodeInfoReply{Semver: node.SemVer, Os: runtime.GOOS, Arch: runtime.GOARCH, NumCpu: uint32(runtime.GOMAXPROCS(0)), MemBytes: memBytes}, nil
 }
 
 func (s *Server) handleStoreChunksRequest(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {

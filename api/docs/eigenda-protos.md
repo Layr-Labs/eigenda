@@ -1256,8 +1256,6 @@ Node info reply
 | os | [string](#string) |  |  |
 | num_cpu | [uint32](#uint32) |  |  |
 | mem_bytes | [uint64](#uint64) |  |  |
-| override_store_duration_blocks | [uint64](#uint64) |  |  |
-| override_block_stale_measure | [uint64](#uint64) |  |  |
 
 
 
@@ -1754,8 +1752,6 @@ Node info reply
 | os | [string](#string) |  | The operating system of the node. |
 | num_cpu | [uint32](#uint32) |  | The number of CPUs on the node. |
 | mem_bytes | [uint64](#uint64) |  | The amount of memory on the node in bytes. |
-| override_store_duration_blocks | [uint64](#uint64) |  | The store duration blocks value if overridden. |
-| override_block_stale_measure | [uint64](#uint64) |  | The block stale measure value if overridden. |
 
 
 
