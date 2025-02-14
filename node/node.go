@@ -349,12 +349,33 @@ func (n *Node) Start(ctx context.Context) error {
 
 	n.CurrentSocket = socket
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 {
+	if n.Config.PubIPCheckInterval > 0 && n.allPortsConfigured() {
 		go n.checkRegisteredNodeIpOnChain(ctx)
 		go n.checkCurrentNodeIp(ctx)
 	}
 
 	return nil
+}
+
+// allPortsConfigured checks if all the ports are configured in the config.
+func (n *Node) allPortsConfigured() bool {
+	if err := core.ValidatePort(n.Config.DispersalPort); err != nil {
+		return false
+	}
+
+	if err := core.ValidatePort(n.Config.V2DispersalPort); err != nil {
+		return false
+	}
+
+	if err := core.ValidatePort(n.Config.RetrievalPort); err != nil {
+		return false
+	}
+
+	if err := core.ValidatePort(n.Config.V2RetrievalPort); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // The expireLoop is a loop that is run once per configured second(s) while the node
