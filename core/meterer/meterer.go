@@ -185,6 +185,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 // GetReservationPeriodByNanosecondTimestamp returns the current reservation period by chunking nanosecond timestamp by the bin interval;
 // bin interval used by the disperser should be public information
 func GetReservationPeriodByNanosecond(nanosecondTimestamp int64, binInterval uint32) uint32 {
+	if nanosecondTimestamp < 0 {
+		return 0
+	}
 	return GetReservationPeriod(int64((time.Duration(nanosecondTimestamp) * time.Nanosecond).Seconds()), binInterval)
 }
 
