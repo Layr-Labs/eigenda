@@ -33,6 +33,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -232,6 +233,8 @@ func NewNode(
 
 	var storeV2 StoreV2
 	var blobVersionParams *corev2.BlobVersionParameterMap
+	var mt *meterer.Meterer
+	var authenticator = authv2.NewAuthenticator()
 	if config.EnableV2 {
 		v2Path := config.DbPath + "/chunk_v2"
 		dbV2, err := tablestore.Start(logger, &tablestore.Config{
@@ -275,8 +278,25 @@ func NewNode(
 		}
 
 		n.RelayClient.Store(relayClient)
+		// Create meterer
+		offchainStore, err := meterer.NewOffchainStore(config.AwsClientConfig, config.ReservationsTableName, config.OnDemandTableName, config.GlobalRateTableName, logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create offchain store: %w", err)
+		}
+
+		transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transactor: %w", err)
+		}
+		chainPaymentState, err := meterer.NewOnchainPaymentState(context.Background(), transactor, logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		mt = meterer.NewMeterer(meterer.Config{}, chainPaymentState, offchainStore, logger)
 	}
 
+	n.meterer = mt
+	n.authenticator = authenticator
 	n.StoreV2 = storeV2
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
