@@ -294,11 +294,11 @@ func (m *RelayMetrics) ReportChunkKeyCount(count int) {
 	m.getChunksKeyCount.WithLabelValues().Set(float64(count))
 }
 
-func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size int) {
+func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size uint32) {
 	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
 }
 
-func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size int) {
+func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size uint32) {
 	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 }
 
