@@ -172,8 +172,12 @@ func NewTestClient(
 
 	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
 	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
-	rand := random.NewTestRandom(nil)
-	keypair := rand.BLS()
+	rand := random.NewTestRandom()
+	keypair, err := rand.BLS()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate BLS keypair: %w", err)
+	}
+
 	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
 	}

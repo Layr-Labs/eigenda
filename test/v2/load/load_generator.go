@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/go-units"
-	"math/rand"
 	"os"
 	"sync/atomic"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 )
 
+// LoadGenerator is a utility for generating read and write load for the target network.
 type LoadGenerator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -23,8 +23,6 @@ type LoadGenerator struct {
 	config *LoadGeneratorConfig
 	// The test client to use for the load test.
 	client *client.TestClient
-	// The random number generator to use for the load test.
-	rand *random.TestRandom
 	// The time between starting each blob submission.
 	submissionPeriod time.Duration
 	// The channel to limit the number of parallel blob submissions.
@@ -60,8 +58,7 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 // NewLoadGenerator creates a new LoadGenerator.
 func NewLoadGenerator(
 	config *LoadGeneratorConfig,
-	client *client.TestClient,
-	rand *random.TestRandom) *LoadGenerator {
+	client *client.TestClient) *LoadGenerator {
 
 	bytesPerSecond := config.MBPerSecond * units.MiB
 	averageBlobSize := config.AverageBlobSizeMB * units.MiB
@@ -82,7 +79,6 @@ func NewLoadGenerator(
 		cancel:             cancel,
 		config:             config,
 		client:             client,
-		rand:               rand,
 		submissionPeriod:   submissionPeriodAsDuration,
 		parallelismLimiter: parallelismLimiter,
 		alive:              atomic.Bool{},
@@ -132,12 +128,14 @@ func (l *LoadGenerator) submitBlob() {
 
 	// TODO: failure metrics
 
-	payloadSize := int(l.rand.BoundedGaussian(
+	rand := random.NewTestRandomNoPrint()
+
+	payloadSize := int(rand.BoundedGaussian(
 		l.config.AverageBlobSizeMB*units.MiB,
 		l.config.BlobSizeStdDev*units.MiB,
 		1.0,
 		float64(l.client.GetConfig().MaxBlobSize+1)))
-	payload := l.rand.Bytes(payloadSize)
+	payload := rand.Bytes(payloadSize)
 
 	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload, rand.Uint32())
 	if err != nil {

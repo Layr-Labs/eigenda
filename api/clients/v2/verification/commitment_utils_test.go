@@ -29,7 +29,7 @@ func getRandomPaddedBytes(testRandom *random.TestRandom, count int) []byte {
 }
 
 func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
@@ -52,7 +52,7 @@ func TestComputeAndCompareKzgCommitmentSuccess(t *testing.T) {
 }
 
 func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))
@@ -76,7 +76,7 @@ func TestComputeAndCompareKzgCommitmentFailure(t *testing.T) {
 }
 
 func TestGenerateBlobCommitmentEquality(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	randomBytes := getRandomPaddedBytes(testRandom, 100+testRandom.Intn(1000))
 
 	srsNumberToLoad := computeSrsNumber(len(randomBytes))

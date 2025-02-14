@@ -602,7 +602,7 @@ func TestInvalidLength(t *testing.T) {
 }
 
 func TestTooShortCommitment(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	c := newTestServerV2(t)
 	ctx := peer.NewContext(context.Background(), c.Peer)
