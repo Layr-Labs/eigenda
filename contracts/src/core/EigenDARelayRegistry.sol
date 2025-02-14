@@ -27,6 +27,10 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
     }
 
     function addRelayInfo(RelayInfo memory relayInfo) external returns (uint32) {
+        // Estimate the cost of removing the relay info 
+        // require msg.sender to add value at least as much as the cost of removing the relay info 
+        // put the value in contract wallet
+
         relayKeyToInfo[nextRelayKey] = relayInfo;
         
         // Track if the relay was created by the owner
@@ -36,6 +40,14 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
         
         emit RelayAdded(relayInfo.relayAddress, nextRelayKey, relayInfo.relayURL);
         return nextRelayKey++;
+    }
+
+    function deregisterRelayInfo(uint32 _relayKey) external onlyOwner {
+        delete relayKeyToInfo[_relayKey];
+        delete isOwnerCreatedRelay[_relayKey];
+        
+        emit RelayRemoved(_relayKey);
+        // taking funds from the wallet, refund gas cost to msg.sender
     }
 
     function relayKeyToAddress(uint32 key) external view returns (address) {
