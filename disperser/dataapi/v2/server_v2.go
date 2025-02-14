@@ -71,11 +71,16 @@ type (
 		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
 	}
 
+	AttestationInfo struct {
+		Attestation           *corev2.Attestation `json:"attestation"`
+		NonsigningOperatorIds map[uint8][]string  `json:"nonsigning_operator_ids"`
+		SigningOperatorIds    map[uint8][]string  `json:"signing_operator_ids"`
+	}
 	BlobAttestationInfoResponse struct {
 		BlobKey         string                    `json:"blob_key"`
 		BatchHeaderHash string                    `json:"batch_header_hash"`
 		InclusionInfo   *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
-		Attestation     *corev2.Attestation       `json:"attestation"`
+		AttestationInfo *AttestationInfo          `json:"attestation_info"`
 	}
 
 	BlobInfo struct {

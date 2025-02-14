@@ -1,37 +1,20 @@
-package relay
+package testutils
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"reflect"
 	"unsafe"
 )
-
-// computeInMemoryFrameSize computes the size of a blob's chunks in memory.
-func computeInMemoryFrameSize(frames []*encoding.Frame) (uint64, error) {
-
-	if len(frames) == 0 {
-		return 0, fmt.Errorf("no frames provided")
-	}
-
-	firstFrame := frames[0]
-	firstFrameSize, err := SizeOf(firstFrame)
-	if err != nil {
-		return 0, fmt.Errorf("error calculating size of first frame: %w", err)
-	}
-
-	// all frames for a particular blob are the same size
-	size := firstFrameSize * uint64(len(frames))
-
-	return size, nil
-}
 
 // SizeOf calculates the size of an object in memory using reflection. Includes the memory
 // referenced by the object. This function assumes that there are no circular references
 // in the object graph. If there are, then this function will enter an infinite loop
 // (likely ending with a stack overflow).
 //
-// This has non-trivial performance implications and should be used carefully.
+// This has non-trivial performance implications and should be used carefully. This utility is
+// intended for test and debug use, not production use. The sizes returned by this utility
+// may be off by a few bytes, and the number returned should be treated more as an approximation
+// than as a precise measurement.
 func SizeOf(object any) (uint64, error) {
 	return recursiveSizeOf(object, true)
 }
@@ -126,40 +109,41 @@ func recursiveSizeOf(object any, indirect bool) (uint64, error) {
 			size += valueSize
 		}
 	case reflect.Bool:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Int:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Int8:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Int16:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Int32:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Int64:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Uint:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Uint8:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Uint16:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Uint32:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Uint64:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Float32:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Float64:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Complex64:
-		fallthrough
+		// There is no memory referenced by this type.
 	case reflect.Complex128:
-		// There is no memory referenced by these types.
+		// There is no memory referenced by this type.
 	default:
 		// This utility was created to calculate the size of simple object types, not as a general purpose
 		// memory calculator. If you're seeing this error, then you're trying to calculate the size of
 		// an object with some fancy type in it that I didn't bother with because I didn't need it.
 		// Take your unsafe pointers, functions, and other hoo haa and go calculate the size yourself, thank you.
+		// Or, spend the time to augment this utility. ;)
 		return 0, fmt.Errorf("unsupported object type: %v", objectType)
 	}
 

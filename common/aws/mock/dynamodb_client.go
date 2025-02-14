@@ -59,7 +59,7 @@ func (c *MockDynamoDBClient) GetItem(ctx context.Context, tableName string, key 
 	return args.Get(0).(dynamodb.Item), args.Error(1)
 }
 
-func (c *MockDynamoDBClient) GetItems(ctx context.Context, tableName string, keys []dynamodb.Key) ([]dynamodb.Item, error) {
+func (c *MockDynamoDBClient) GetItems(ctx context.Context, tableName string, keys []dynamodb.Key, consistentRead bool) ([]dynamodb.Item, error) {
 	args := c.Called()
 	return args.Get(0).([]dynamodb.Item), args.Error(1)
 }

@@ -234,7 +234,7 @@ func (e *EncodingStreamer) RequestEncoding(ctx context.Context, encoderChan chan
 
 	if referenceBlockNumber == 0 {
 		// Update the reference block number for the next iteration
-		blockNumber, err := e.chainState.GetCurrentBlockNumber()
+		blockNumber, err := e.chainState.GetCurrentBlockNumber(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get current block number, won't request encoding: %w", err)
 		} else {
@@ -497,7 +497,7 @@ func (e *EncodingStreamer) CreateBatch(ctx context.Context) (*batch, error) {
 
 	// If there were no requested blobs between the last batch and now, there is no need to create a new batch
 	if e.ReferenceBlockNumber == 0 {
-		blockNumber, err := e.chainState.GetCurrentBlockNumber()
+		blockNumber, err := e.chainState.GetCurrentBlockNumber(ctx)
 		if err != nil {
 			e.logger.Error("failed to get current block number. will not clean up the encoded blob store.", "err", err)
 		} else {

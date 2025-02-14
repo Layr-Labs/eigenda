@@ -263,7 +263,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}()
 
 	proofs, coeffs := extractProofsAndCoeffs(frames)
-	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
+	if err := s.chunkWriter.PutFrameProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
 	s.metrics.ObserveLatency("s3_upload_proofs", time.Since(storeStart))
@@ -271,7 +271,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	// Store coefficients
 	coeffStart := time.Now()
-	fragmentInfo, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey, coeffs)
+	fragmentInfo, err := s.chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
@@ -286,13 +286,13 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}, nil
 }
 
-func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.Frame) {
+func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []rs.FrameCoeffs) {
 	proofs := make([]*encoding.Proof, len(frames))
-	coeffs := make([]*rs.Frame, len(frames))
+	coeffs := make([]rs.FrameCoeffs, len(frames))
 
 	for i, frame := range frames {
 		proofs[i] = &frame.Proof
-		coeffs[i] = &rs.Frame{Coeffs: frame.Coeffs}
+		coeffs[i] = frame.Coeffs
 	}
 	return proofs, coeffs
 }

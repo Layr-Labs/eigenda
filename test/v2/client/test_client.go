@@ -538,7 +538,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	quorums []core.QuorumID,
 	expectedPayload []byte) error {
 
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber()
+	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
