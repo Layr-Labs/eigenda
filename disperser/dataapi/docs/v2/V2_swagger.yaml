@@ -234,13 +234,13 @@ definitions:
       nonsigners:
         additionalProperties:
           items:
-            $ref: '#/definitions/v2.OperatorInfo'
+            $ref: '#/definitions/v2.OperatorIdentity'
           type: array
         type: object
       signers:
         additionalProperties:
           items:
-            $ref: '#/definitions/v2.OperatorInfo'
+            $ref: '#/definitions/v2.OperatorIdentity'
           type: array
         type: object
     type: object
@@ -416,7 +416,7 @@ definitions:
           $ref: '#/definitions/v2.DispersalResponse'
         type: array
     type: object
-  v2.OperatorInfo:
+  v2.OperatorIdentity:
     properties:
       operator_address:
         type: string

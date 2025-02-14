@@ -71,14 +71,14 @@ type (
 		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
 	}
 
-	OperatorInfo struct {
+	OperatorIdentity struct {
 		OperatorId      string `json:"operator_id"`
 		OperatorAddress string `json:"operator_address"`
 	}
 	AttestationInfo struct {
-		Attestation *corev2.Attestation      `json:"attestation"`
-		Nonsigners  map[uint8][]OperatorInfo `json:"nonsigners"`
-		Signers     map[uint8][]OperatorInfo `json:"signers"`
+		Attestation *corev2.Attestation          `json:"attestation"`
+		Nonsigners  map[uint8][]OperatorIdentity `json:"nonsigners"`
+		Signers     map[uint8][]OperatorIdentity `json:"signers"`
 	}
 	BlobAttestationInfoResponse struct {
 		BlobKey         string                    `json:"blob_key"`

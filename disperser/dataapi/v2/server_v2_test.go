@@ -752,14 +752,14 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
-		signers := map[uint8][]serverv2.OperatorInfo{
-			0: []serverv2.OperatorInfo{
+		signers := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
 				{
 					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[2].Hex(),
 				},
 			},
-			1: []serverv2.OperatorInfo{
+			1: []serverv2.OperatorIdentity{
 				{
 					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[2].Hex(),
@@ -770,8 +770,8 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 				},
 			},
 		}
-		nonsigners := map[uint8][]serverv2.OperatorInfo{
-			0: []serverv2.OperatorInfo{
+		nonsigners := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
 				{
 					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[0].Hex(),
@@ -781,7 +781,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 					OperatorAddress: operatorAddresses[1].Hex(),
 				},
 			},
-			1: []serverv2.OperatorInfo{
+			1: []serverv2.OperatorIdentity{
 				{
 					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[0].Hex(),

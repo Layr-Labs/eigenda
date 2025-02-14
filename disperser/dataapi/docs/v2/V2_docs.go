@@ -990,7 +990,7 @@ const docTemplateV2 = `{
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/v2.OperatorInfo"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 },
@@ -999,7 +999,7 @@ const docTemplateV2 = `{
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/v2.OperatorInfo"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 }
@@ -1257,7 +1257,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorInfo": {
+        "v2.OperatorIdentity": {
             "type": "object",
             "properties": {
                 "operator_address": {

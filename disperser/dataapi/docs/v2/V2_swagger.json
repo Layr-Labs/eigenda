@@ -987,7 +987,7 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/v2.OperatorInfo"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 },
@@ -996,7 +996,7 @@
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/v2.OperatorInfo"
+                            "$ref": "#/definitions/v2.OperatorIdentity"
                         }
                     }
                 }
@@ -1254,7 +1254,7 @@
                 }
             }
         },
-        "v2.OperatorInfo": {
+        "v2.OperatorIdentity": {
             "type": "object",
             "properties": {
                 "operator_address": {
