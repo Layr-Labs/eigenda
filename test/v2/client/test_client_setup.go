@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -150,6 +151,10 @@ func ensureFileIsPresent(
 
 	_, err = os.Stat(path)
 	if os.IsNotExist(err) {
+
+		fmt.Printf("doing a long sleep, TODO remove this\n")
+		time.Sleep(10 * time.Hour)
+
 		command := make([]string, 3)
 		command[0] = "wget"
 		command[1] = url
