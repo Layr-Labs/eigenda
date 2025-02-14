@@ -231,28 +231,16 @@ definitions:
     properties:
       attestation:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
-      nonsigning_operator_addresses:
+      nonsigners:
         additionalProperties:
           items:
-            type: string
+            $ref: '#/definitions/v2.OperatorInfo'
           type: array
         type: object
-      nonsigning_operator_ids:
+      signers:
         additionalProperties:
           items:
-            type: string
-          type: array
-        type: object
-      signing_operator_addresses:
-        additionalProperties:
-          items:
-            type: string
-          type: array
-        type: object
-      signing_operator_ids:
-        additionalProperties:
-          items:
-            type: string
+            $ref: '#/definitions/v2.OperatorInfo'
           type: array
         type: object
     type: object
@@ -427,6 +415,13 @@ definitions:
         items:
           $ref: '#/definitions/v2.DispersalResponse'
         type: array
+    type: object
+  v2.OperatorInfo:
+    properties:
+      operator_address:
+        type: string
+      operator_id:
+        type: string
     type: object
   v2.OperatorLivenessResponse:
     properties:

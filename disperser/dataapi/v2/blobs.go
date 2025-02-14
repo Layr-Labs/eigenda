@@ -279,10 +279,8 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	}
 
 	// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
-	signerIds := make(map[uint8][]string, 0)
-	nonsignerIds := make(map[uint8][]string, 0)
-	signerAddresses := make(map[uint8][]string, 0)
-	nonsignerAddresses := make(map[uint8][]string, 0)
+	blobSigners := make(map[uint8][]OperatorInfo, 0)
+	blobNonsigners := make(map[uint8][]OperatorInfo, 0)
 	for q, innerMap := range operatorsByQuorum {
 		// Make sure the blob was dispersed to the quorum
 		if _, exist := blobQuorums[q]; !exist {
@@ -297,11 +295,15 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
 			}
 			if _, exist := nonsigners[op.OperatorID]; exist {
-				nonsignerIds[q] = append(nonsignerIds[q], id)
-				nonsignerAddresses[q] = append(nonsignerAddresses[q], addr)
+				blobNonsigners[q] = append(blobNonsigners[q], OperatorInfo{
+					OperatorId:      id,
+					OperatorAddress: addr,
+				})
 			} else {
-				signerIds[q] = append(signerIds[q], id)
-				signerAddresses[q] = append(signerAddresses[q], addr)
+				blobSigners[q] = append(blobSigners[q], OperatorInfo{
+					OperatorId:      id,
+					OperatorAddress: addr,
+				})
 			}
 		}
 	}
@@ -311,11 +313,9 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 		InclusionInfo:   attestationInfo.InclusionInfo,
 		AttestationInfo: &AttestationInfo{
-			Attestation:                 attestationInfo.Attestation,
-			SigningOperatorIds:          signerIds,
-			NonsigningOperatorIds:       nonsignerIds,
-			SigningOperatorAddresses:    signerAddresses,
-			NonsigningOperatorAddresses: nonsignerAddresses,
+			Attestation: attestationInfo.Attestation,
+			Signers:     blobSigners,
+			Nonsigners:  blobNonsigners,
 		},
 	}
 

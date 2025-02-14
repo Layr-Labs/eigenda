@@ -752,59 +752,49 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
-		signerIds := map[uint8][]string{
-			0: {
-				operatorPubKeys[2].GetOperatorID().Hex(),
+		signers := map[uint8][]serverv2.OperatorInfo{
+			0: []serverv2.OperatorInfo{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
 			},
-			1: {
-				operatorPubKeys[2].GetOperatorID().Hex(),
-				operatorPubKeys[3].GetOperatorID().Hex(),
-			},
-		}
-		nonsignerIds := map[uint8][]string{
-			0: {
-				operatorPubKeys[0].GetOperatorID().Hex(),
-				operatorPubKeys[1].GetOperatorID().Hex(),
-			},
-			1: {
-				operatorPubKeys[0].GetOperatorID().Hex(),
-			},
-		}
-		signerAddresses := map[uint8][]string{
-			0: {
-				operatorAddresses[2].Hex(),
-			},
-			1: {
-				operatorAddresses[2].Hex(),
-				operatorAddresses[3].Hex(),
+			1: []serverv2.OperatorInfo{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[3].Hex(),
+				},
 			},
 		}
-		nonsignerAddresses := map[uint8][]string{
-			0: {
-				operatorAddresses[0].Hex(),
-				operatorAddresses[1].Hex(),
+		nonsigners := map[uint8][]serverv2.OperatorInfo{
+			0: []serverv2.OperatorInfo{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[1].Hex(),
+				},
 			},
-			1: {
-				operatorAddresses[0].Hex(),
+			1: []serverv2.OperatorInfo{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
 			},
 		}
-		for key, expectedSigners := range signerIds {
-			actualSigners, exists := response.AttestationInfo.SigningOperatorIds[key]
+		for key, expectedSigners := range signers {
+			actualSigners, exists := response.AttestationInfo.Signers[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedSigners, actualSigners)
 		}
-		for key, expectedNonsigners := range nonsignerIds {
-			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorIds[key]
-			require.True(t, exists)
-			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
-		}
-		for key, expectedSigners := range signerAddresses {
-			actualSigners, exists := response.AttestationInfo.SigningOperatorAddresses[key]
-			require.True(t, exists)
-			assert.ElementsMatch(t, expectedSigners, actualSigners)
-		}
-		for key, expectedNonsigners := range nonsignerAddresses {
-			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorAddresses[key]
+		for key, expectedNonsigners := range nonsigners {
+			actualNonsigners, exists := response.AttestationInfo.Nonsigners[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 		}

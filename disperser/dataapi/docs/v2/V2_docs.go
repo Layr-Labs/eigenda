@@ -985,39 +985,21 @@ const docTemplateV2 = `{
                 "attestation": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
                 },
-                "nonsigning_operator_addresses": {
+                "nonsigners": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/v2.OperatorInfo"
                         }
                     }
                 },
-                "nonsigning_operator_ids": {
+                "signers": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "array",
                         "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "signing_operator_addresses": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "signing_operator_ids": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
+                            "$ref": "#/definitions/v2.OperatorInfo"
                         }
                     }
                 }
@@ -1272,6 +1254,17 @@ const docTemplateV2 = `{
                     "items": {
                         "$ref": "#/definitions/v2.DispersalResponse"
                     }
+                }
+            }
+        },
+        "v2.OperatorInfo": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
                 }
             }
         },
