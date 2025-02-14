@@ -17,6 +17,7 @@ on:
       - 'core/**'
       - 'common/**'
       - 'api/**'
+      - 'relay/**'
       - '.github/codeql/**'
       - '.github/workflows/codeql-scanning.yaml'
   schedule:
