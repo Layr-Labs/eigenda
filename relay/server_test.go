@@ -461,9 +461,9 @@ func TestReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -682,9 +682,9 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -839,9 +839,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		shardMap[blobKey] = shards
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -1133,9 +1133,9 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 

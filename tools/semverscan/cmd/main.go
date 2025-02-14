@@ -64,7 +64,7 @@ func RunScan(ctx *cli.Context) error {
 	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
 	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 
-	currentBlock, err := ics.GetCurrentBlockNumber()
+	currentBlock, err := ics.GetCurrentBlockNumber(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to fetch current block number - %s", err)
 	}

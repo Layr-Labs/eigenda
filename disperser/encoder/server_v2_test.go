@@ -2,6 +2,7 @@ package encoder_test
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"math/big"
 	"runtime"
 	"testing"
@@ -145,7 +146,7 @@ func TestEncodeBlob(t *testing.T) {
 	// Verify encoding results
 	t.Run("Verify Encoding Results", func(t *testing.T) {
 		assert.NotNil(t, resp, "Response should not be nil")
-		assert.Equal(t, uint32(294916), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
+		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
 		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
 	})
 
@@ -158,7 +159,9 @@ func TestEncodeBlob(t *testing.T) {
 	t.Run("Verify Chunk Store Data", func(t *testing.T) {
 		// Check proofs
 		assert.True(t, c.chunkStoreWriter.ProofExists(ctx, blobKey))
-		proofs, err := c.chunkStoreReader.GetChunkProofs(ctx, blobKey)
+		binaryProofs, err := c.chunkStoreReader.GetBinaryChunkProofs(ctx, blobKey)
+		require.NoError(t, err, "Failed to get chunk proofs")
+		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
 		assert.NoError(t, err, "Failed to get chunk proofs")
 		assert.Len(t, proofs, int(numChunks), "Unexpected number of proofs")
 
@@ -167,8 +170,10 @@ func TestEncodeBlob(t *testing.T) {
 		assert.True(t, coefExist, "Coefficients should exist")
 		assert.Equal(t, expectedFragmentInfo, fetchedFragmentInfo, "Unexpected fragment info")
 
-		coefficients, err := c.chunkStoreReader.GetChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
+		elementCount, binarycoefficients, err :=
+			c.chunkStoreReader.GetBinaryChunkCoefficients(ctx, blobKey, expectedFragmentInfo)
 		assert.NoError(t, err, "Failed to get chunk coefficients")
+		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binarycoefficients)
 		assert.Len(t, coefficients, int(numChunks), "Unexpected number of coefficients")
 	})
 
@@ -184,7 +189,7 @@ func TestEncodeBlob(t *testing.T) {
 			return
 		}
 
-		assert.Equal(t, uint32(294916), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
+		assert.Equal(t, uint32(262148), resp.FragmentInfo.TotalChunkSizeBytes, "Unexpected total chunk size")
 		assert.Equal(t, uint32(512*1024), resp.FragmentInfo.FragmentSizeBytes, "Unexpected fragment size")
 		assert.Equal(t, c.s3Client.Called["UploadObject"], expectedUploadCalls)
 		assert.Equal(t, c.s3Client.Called["FragmentedUploadObject"], expectedFragmentedUploadObjectCalls)

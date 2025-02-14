@@ -3,7 +3,7 @@ name: test-contracts
 on:
   push:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 env:
   FOUNDRY_PROFILE: ci
@@ -71,18 +71,18 @@ jobs:
         uses: borales/actions-yarn@v4
         with:
           cmd: install
-  
+
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
-      
+
       - name: Install forge dependencies
         run: |
           yarn
           forge install
         working-directory: ./contracts
-      
+
       - name: Setup Go 1.21.13
         uses: actions/setup-go@v5
         with:

@@ -34,6 +34,7 @@ type testComponents struct {
 	EncodingClient  *dispmock.MockEncoderClientV2
 	ChainReader     *coremock.MockWriter
 	MockPool        *commonmock.MockWorkerpool
+	BlobSet         *controller.MockBlobSet
 }
 
 func TestGetRelayKeys(t *testing.T) {
@@ -122,6 +123,8 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
+	c.BlobSet.On("Contains", mock.Anything).Return(false)
+	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
@@ -130,6 +133,8 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
+	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
+	c.BlobSet.AssertCalled(t, "AddBlob", blobKey1)
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
 	require.NoError(t, err)
@@ -148,30 +153,62 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
+func TestEncodingManagerHandleBatchDedup(t *testing.T) {
+	ctx := context.Background()
+	blobKey1, blobHeader1 := newBlob(t, []core.QuorumID{0, 1})
+	now := time.Now()
+	metadata1 := &commonv2.BlobMetadata{
+		BlobHeader: blobHeader1,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err := blobMetadataStore.PutBlobMetadata(ctx, metadata1)
+	require.NoError(t, err)
+
+	c := newTestComponents(t, false)
+	c.BlobSet.On("Contains", blobKey1).Return(true).Once()
+	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
+		TotalChunkSizeBytes: 100,
+		FragmentSizeBytes:   1024 * 1024 * 4,
+	}, nil)
+
+	err = c.EncodingManager.HandleBatch(ctx)
+	require.ErrorContains(t, err, "no blobs to encode")
+	c.Pool.StopWait()
+	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
+	c.BlobSet.AssertNotCalled(t, "AddBlob", blobKey1)
+	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
+}
+
 func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	ctx := context.Background()
 	numBlobs := 12
-	keys := make([]corev2.BlobKey, numBlobs)
-	headers := make([]*corev2.BlobHeader, numBlobs)
-	metadata := make([]*commonv2.BlobMetadata, numBlobs)
+	keys := make([]corev2.BlobKey, 0)
+	headers := make([]*corev2.BlobHeader, 0)
+	metadata := make([]*commonv2.BlobMetadata, 0)
 	for i := 0; i < numBlobs; i++ {
-		keys[i], headers[i] = newBlob(t, []core.QuorumID{0, 1})
+		k, h := newBlob(t, []core.QuorumID{0, 1})
+		keys = append(keys, k)
+		headers = append(headers, h)
 		now := time.Now()
-		metadata[i] = &commonv2.BlobMetadata{
+		metadata = append(metadata, &commonv2.BlobMetadata{
 			BlobHeader: headers[i],
 			BlobStatus: commonv2.Queued,
 			Expiry:     uint64(now.Add(time.Hour).Unix()),
 			NumRetries: 0,
 			UpdatedAt:  uint64(now.UnixNano()),
-		}
+		})
 		err := blobMetadataStore.PutBlobMetadata(ctx, metadata[i])
 		require.NoError(t, err)
 	}
 
 	c := newTestComponents(t, true)
-	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + 1)
-
+	c.BlobSet.On("Contains", mock.Anything).Return(false)
+	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
+	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + numIterations)
 	expectedNumTasks := 0
 	for i := 0; i < numIterations; i++ {
 		err := c.EncodingManager.HandleBatch(ctx)
@@ -179,32 +216,47 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 		if i < numIterations-1 {
 			expectedNumTasks += int(c.EncodingManager.MaxNumBlobsPerIteration)
 			c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks)
+
+			// add blobs to the queue with UpdatedAt in the past
+			// these should be skipped in this loop
+			key, header := newBlob(t, []core.QuorumID{0, 1})
+			keys = append(keys, key)
+			now := time.Now()
+			meta := &commonv2.BlobMetadata{
+				BlobHeader: header,
+				BlobStatus: commonv2.Queued,
+				Expiry:     uint64(now.Add(time.Hour).Unix()),
+				NumRetries: 0,
+				UpdatedAt:  uint64(now.Add(-time.Hour).UnixNano()),
+			}
+			err := blobMetadataStore.PutBlobMetadata(ctx, meta)
+			require.NoError(t, err)
 		} else {
 			expectedNumTasks += numBlobs % int(c.EncodingManager.MaxNumBlobsPerIteration)
 			c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks)
 		}
 	}
+
+	for i := 0; i < numBlobs; i++ {
+		err := blobMetadataStore.UpdateBlobStatus(ctx, keys[i], commonv2.Encoded)
+		require.NoError(t, err)
+	}
+
+	// should handle blobs with UpdatedAt in the past
 	err := c.EncodingManager.HandleBatch(ctx)
+	require.NoError(t, err)
+	c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks+numIterations-1)
+
+	for i := 0; i < numIterations-1; i++ {
+		err := blobMetadataStore.UpdateBlobStatus(ctx, keys[numBlobs+i], commonv2.Encoded)
+		require.NoError(t, err)
+	}
+
+	// no more blobs to encode
+	err = c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
 
-	// new record
-	key, header := newBlob(t, []core.QuorumID{0, 1})
-	now := time.Now()
-	meta := &commonv2.BlobMetadata{
-		BlobHeader: header,
-		BlobStatus: commonv2.Queued,
-		Expiry:     uint64(now.Add(time.Hour).Unix()),
-		NumRetries: 0,
-		UpdatedAt:  uint64(now.UnixNano()),
-	}
-	err = blobMetadataStore.PutBlobMetadata(ctx, meta)
-	require.NoError(t, err)
-	err = c.EncodingManager.HandleBatch(ctx)
-	require.NoError(t, err)
-	c.MockPool.AssertNumberOfCalls(t, "Submit", expectedNumTasks+1)
-
 	deleteBlobs(t, blobMetadataStore, keys, nil)
-	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{key}, nil)
 }
 
 func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
@@ -230,6 +282,8 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
+	c.BlobSet.On("Contains", mock.Anything).Return(false)
+	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Once()
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(&encoding.FragmentInfo{
 		TotalChunkSizeBytes: 100,
@@ -273,6 +327,8 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	c := newTestComponents(t, false)
+	c.BlobSet.On("Contains", mock.Anything).Return(false)
+	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
 
 	err = c.EncodingManager.HandleBatch(ctx)
@@ -317,7 +373,8 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond
-
+	blobSet := &controller.MockBlobSet{}
+	blobSet.On("Size", mock.Anything).Return(0)
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
 		PullInterval:                1 * time.Second,
 		EncodingRequestTimeout:      5 * time.Second,
@@ -327,7 +384,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry())
+	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
@@ -340,5 +397,6 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		EncodingClient:  encodingClient,
 		ChainReader:     chainReader,
 		MockPool:        mockP,
+		BlobSet:         blobSet,
 	}
 }

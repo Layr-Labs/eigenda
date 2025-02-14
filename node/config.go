@@ -59,8 +59,8 @@ type Config struct {
 	RegisterNodeAtStart            bool
 	ExpirationPollIntervalSec      uint64
 	EnableTestMode                 bool
-	OverrideBlockStaleMeasure      int64
-	OverrideStoreDurationBlocks    int64
+	OverrideBlockStaleMeasure      uint64
+	OverrideStoreDurationBlocks    uint64
 	QuorumIDList                   []core.QuorumID
 	DbPath                         string
 	LogPath                        string
@@ -291,8 +291,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ExpirationPollIntervalSec:           expirationPollIntervalSec,
 		ReachabilityPollIntervalSec:         reachabilityPollIntervalSec,
 		EnableTestMode:                      testMode,
-		OverrideBlockStaleMeasure:           ctx.GlobalInt64(flags.OverrideBlockStaleMeasureFlag.Name),
-		OverrideStoreDurationBlocks:         ctx.GlobalInt64(flags.OverrideStoreDurationBlocksFlag.Name),
+		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
+		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
 		EthClientConfig:                     ethClientConfig,

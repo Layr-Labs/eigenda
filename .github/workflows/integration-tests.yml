@@ -71,8 +71,7 @@ jobs:
       # TODO: add back DA contracts if we will need them in tests.
       # - name: Compile contracts
       #   run: |
-      #     make compile-el
-      #     make compile-dl
+      #     make compile-contracts
 
       - name: Churner
         run: go test -v ./operators/churner/tests

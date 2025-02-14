@@ -979,6 +979,32 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.AttestationInfo": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "nonsigning_operator_ids": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "signing_operator_ids": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "v2.BatchFeedResponse": {
             "type": "object",
             "properties": {
@@ -1039,8 +1065,8 @@ const docTemplateV2 = `{
         "v2.BlobAttestationInfoResponse": {
             "type": "object",
             "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                "attestation_info": {
+                    "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header_hash": {
                     "type": "string"

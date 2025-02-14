@@ -876,16 +876,20 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 			require.Equal(t, cursor.UpdatedAt, expectedCursors[i].UpdatedAt)
 		} else {
 			require.Len(t, metadata, numBlobs%pageSize)
-			require.Equal(t, cursor.BlobKey, &keys[numBlobs-1])
-			require.Equal(t, cursor.UpdatedAt, metadataList[numBlobs-1].UpdatedAt)
+			require.Nil(t, cursor)
 		}
 		i++
 	}
-	lastCursor := cursor
+
+	for i := 0; i < numBlobs; i++ {
+		err = blobMetadataStore.UpdateBlobStatus(ctx, keys[i], v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
 	metadata, cursor, err = blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, cursor, int32(pageSize))
 	require.NoError(t, err)
 	require.Len(t, metadata, 0)
-	require.Equal(t, cursor, lastCursor)
+	require.Nil(t, cursor)
 
 	deleteItems(t, dynamoKeys)
 }
@@ -1310,15 +1314,44 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, attestation, fetchedAttestation)
 
-	// attempt to put attestation with the same key should fail
-	err = blobMetadataStore.PutAttestation(ctx, attestation)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
-
 	// attempt to retrieve batch header and attestation at the same time
 	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
 	assert.NoError(t, err)
 	assert.Equal(t, h, fetchedHeader)
 	assert.Equal(t, attestation, fetchedAttestation)
+
+	// overwrite existing attestation
+	updatedAttestation := &corev2.Attestation{
+		BatchHeader: h,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 90,
+		},
+	}
+
+	err = blobMetadataStore.PutAttestation(ctx, updatedAttestation)
+	assert.NoError(t, err)
+	fetchedAttestation, err = blobMetadataStore.GetAttestation(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
+
+	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
 
 	deleteItems(t, []commondynamodb.Key{
 		{

@@ -40,7 +40,7 @@ func (g *ParametrizedEncoder) PadPolyEval(coeffs []fr.Element) ([]fr.Element, er
 // Every frame is verifiable to the commitment.
 func (g *ParametrizedEncoder) MakeFrames(
 	polyEvals []fr.Element,
-) ([]Frame, []uint32, error) {
+) ([]FrameCoeffs, []uint32, error) {
 	// reverse dataFr making easier to sample points
 	err := rb.ReverseBitOrderFr(polyEvals)
 	if err != nil {
@@ -48,7 +48,7 @@ func (g *ParametrizedEncoder) MakeFrames(
 	}
 
 	indices := make([]uint32, 0)
-	frames := make([]Frame, g.NumChunks)
+	frames := make([]FrameCoeffs, g.NumChunks)
 
 	numWorker := uint64(g.Config.NumWorker)
 	if numWorker > g.NumChunks {
@@ -99,7 +99,7 @@ func (g *ParametrizedEncoder) interpolyWorker(
 	polyEvals []fr.Element,
 	jobChan <-chan JobRequest,
 	results chan<- error,
-	frames []Frame,
+	frames []FrameCoeffs,
 ) {
 
 	for jr := range jobChan {
@@ -117,7 +117,7 @@ func (g *ParametrizedEncoder) interpolyWorker(
 			continue
 		}
 
-		frames[i].Coeffs = coeffs
+		frames[i] = coeffs
 	}
 
 	results <- nil

@@ -389,21 +389,21 @@ var (
 	// Corresponding to the BLOCK_STALE_MEASURE defined onchain in
 	// contracts/src/core/EigenDAServiceManagerStorage.sol
 	// This flag is used to override the value from the chain. The target use case is testing.
-	OverrideBlockStaleMeasureFlag = cli.StringFlag{
+	OverrideBlockStaleMeasureFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "override-block-stale-measure"),
-		Usage:    "The maximum amount of blocks in the past that the service will consider stake amounts to still be valid. This is used to override the value set on chain. <=0 means no override",
+		Usage:    "The maximum amount of blocks in the past that the service will consider stake amounts to still be valid. This is used to override the value set on chain. 0 means no override",
 		Required: false,
-		Value:    "-1",
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_BLOCK_STALE_MEASURE"),
 	}
 	// Corresponding to the STORE_DURATION_BLOCKS defined onchain in
 	// contracts/src/core/EigenDAServiceManagerStorage.sol
 	// This flag is used to override the value from the chain. The target use case is testing.
-	OverrideStoreDurationBlocksFlag = cli.StringFlag{
+	OverrideStoreDurationBlocksFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "override-store-duration-blocks"),
-		Usage:    "Unit of measure (in blocks) for which data will be stored for after confirmation. This is used to override the value set on chain. <=0 means no override",
+		Usage:    "Unit of measure (in blocks) for which data will be stored for after confirmation. This is used to override the value set on chain. 0 means no override",
 		Required: false,
-		Value:    "-1",
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "OVERRIDE_STORE_DURATION_BLOCKS"),
 	}
 	// DO NOT set plain private key in flag in production.

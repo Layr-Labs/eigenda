@@ -350,14 +350,22 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 		quorumResults[i] = a.QuorumResults[q]
 	}
 
-	apkG2Bytes := a.APKG2.Bytes()
-	sigmaBytes := a.Sigma.Bytes()
+	var apkG2Bytes []byte
+	var sigmaBytes []byte
+	if a.APKG2 != nil {
+		b := a.APKG2.Bytes()
+		apkG2Bytes = b[:]
+	}
+	if a.Sigma != nil {
+		b := a.Sigma.Bytes()
+		sigmaBytes = b[:]
+	}
 
 	return &disperserpb.Attestation{
 		NonSignerPubkeys:        nonSignerPubKeys,
-		ApkG2:                   apkG2Bytes[:],
+		ApkG2:                   apkG2Bytes,
 		QuorumApks:              quorumAPKs,
-		Sigma:                   sigmaBytes[:],
+		Sigma:                   sigmaBytes,
 		QuorumNumbers:           quorumNumbers,
 		QuorumSignedPercentages: quorumResults,
 	}, nil
