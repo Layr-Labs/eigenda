@@ -52,6 +52,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if err != nil {
 		return nil, err
 	}
+	s.logger.Debug("stored blob", "blobKey", blobKey.Hex())
 
 	s.metrics.reportStoreBlobLatency(time.Since(finishedValidation))
 
@@ -76,6 +77,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 		return corev2.BlobKey{}, api.NewErrorInternal(fmt.Sprintf("failed to store blob: %v", err))
 	}
 
+	s.logger.Debug("storing blob metadata", "blobHeader", blobHeader)
 	blobMetadata := &dispv2.BlobMetadata{
 		BlobHeader:  blobHeader,
 		Signature:   signature,
@@ -107,13 +109,13 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	blobLength := encoding.GetBlobLengthPowerOf2(uint(len(req.GetBlob())))
 
 	// handle payments and check rate limits
-	reservationPeriod := blobHeaderProto.GetPaymentHeader().GetReservationPeriod()
+	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
 	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
 
 	paymentHeader := core.PaymentMetadata{
 		AccountID:         accountID,
-		ReservationPeriod: reservationPeriod,
+		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
 
@@ -170,7 +172,11 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return errors.New("payment metadata is required")
 	}
 
-	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.ReservationPeriod == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0) {
+	accountIdIsEmpty := len(blobHeader.PaymentMetadata.AccountID) == 0
+	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
+	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
+	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
+	if accountIdIsEmpty || timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
 		return errors.New("invalid payment metadata")
 	}
 

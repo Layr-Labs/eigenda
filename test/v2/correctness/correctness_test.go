@@ -35,7 +35,7 @@ func testBasicDispersal(
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, quorums, payload, rand.Uint32())
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -46,7 +46,6 @@ func testBasicDispersal(
 // Disperse a 0 byte blob.
 // Empty blobs are not allowed by the disperser
 func TestEmptyBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
 	blobBytes := []byte{}
 	quorums := []core.QuorumID{0, 1}
 
@@ -57,7 +56,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blob size must be greater than 0")
 }
@@ -162,12 +161,11 @@ func TestDoubleDispersal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err = c.DisperseAndVerify(ctx, quorums, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -182,7 +180,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
@@ -231,7 +229,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums, rand.Uint32())
+	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

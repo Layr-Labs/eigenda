@@ -156,10 +156,6 @@ definitions:
         items:
           type: integer
         type: array
-      salt:
-        description: Salt is used to make blob intentionally unique when everything
-          else is the same
-        type: integer
     type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
     properties:

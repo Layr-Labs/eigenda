@@ -933,7 +933,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "0x123",
-					ReservationPeriod: uint32(i),
+					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
 			},
@@ -951,14 +951,14 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, certs, numCerts)
 	assert.Len(t, fragmentInfos, numCerts)
-	reservationPeriodes := make(map[uint32]struct{})
+	timestamps := make(map[int64]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
-		reservationPeriodes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
+		timestamps[certs[i].BlobHeader.PaymentMetadata.Timestamp] = struct{}{}
 	}
-	assert.Len(t, reservationPeriodes, numCerts)
+	assert.Len(t, timestamps, numCerts)
 	for i := 0; i < numCerts; i++ {
-		assert.Contains(t, reservationPeriodes, uint32(i))
+		assert.Contains(t, timestamps, int64(i))
 	}
 
 	deleteItems(t, []commondynamodb.Key{
@@ -1376,8 +1376,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
-	require.NoError(t, err)
+	timestamp := time.Now().UnixNano()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -1389,7 +1388,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp,
 			CumulativePayment: cumulativePayment,
 		},
 	}

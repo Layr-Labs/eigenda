@@ -259,9 +259,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(42))
-	require.NoError(t, err)
-	salt, err := rand.Int(rand.Reader, big.NewInt(1000))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
 	require.NoError(t, err)
@@ -274,10 +272,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: makeCommitment(t),
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
-		Salt: uint32(salt.Int64()),
 	}
 }
 
@@ -359,7 +356,7 @@ func TestFetchBlob(t *testing.T) {
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
+	assert.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 

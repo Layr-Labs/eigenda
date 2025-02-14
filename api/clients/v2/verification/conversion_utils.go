@@ -174,7 +174,6 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		QuorumNumbers:     quorumNumbers,
 		Commitment:        *convertedBlobCommitment,
 		PaymentHeaderHash: paymentHeaderHash,
-		Salt:              inputHeader.GetSalt(),
 	}, nil
 }
 
