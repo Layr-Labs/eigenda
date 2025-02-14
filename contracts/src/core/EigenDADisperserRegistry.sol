@@ -25,6 +25,10 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
     }
 
     function setDisperserInfo(uint32 _disperserKey, DisperserInfo memory _disperserInfo) external {
+        // Estimate the cost of deregistering the disperser info 
+        // require msg.sender to add value at least as much as the cost of deregistering the disperser info 
+        // put the value in contract wallet
+
         // Set disperser info
         disperserKeyToInfo[_disperserKey] = _disperserInfo;
         
@@ -34,6 +38,15 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
         }
         
         emit DisperserAdded(_disperserKey, _disperserInfo.disperserAddress);
+    }
+
+    function deregisterDisperserInfo(uint32 _disperserKey) external onlyOwner {
+        // Deregister disperser info
+        delete disperserKeyToInfo[_disperserKey];
+        delete isOwnerCreatedDisperser[_disperserKey];
+        
+        emit DisperserRemoved(_disperserKey);
+        // taking funds from the wallet, refund gas cost to msg.sender
     }
 
     function disperserKeyToAddress(uint32 _key) external view returns (address) {
