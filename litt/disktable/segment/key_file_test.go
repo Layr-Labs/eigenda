@@ -101,7 +101,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 	readKeys, err := file.readKeys()
 	require.NoError(t, err)
 
-	require.Equal(t, keyCount-1, len(readKeys))
+	require.Equal(t, int(keyCount-1), len(readKeys))
 	for i, key := range keys[:keyCount-1] {
 		assert.Equal(t, key, readKeys[i])
 	}
@@ -117,7 +117,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 	keys, err = file.readKeys()
 	require.NoError(t, err)
 
-	require.Equal(t, keyCount-1, len(keys))
+	require.Equal(t, int(keyCount-1), len(keys))
 	for i, key := range keys[:keyCount-1] {
 		assert.Equal(t, key, keys[i])
 	}

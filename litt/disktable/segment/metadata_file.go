@@ -193,31 +193,3 @@ func (m *metadataFile) delete() error {
 
 	return nil
 }
-
-// TODO perhaps this doesn't belong here
-
-//// purgeRogueSwapFiles deletes any swap files that are present in the targetDirectory.
-//func purgeRogueSwapFiles(logger logging.Logger, targetDirectory string) error {
-//	files, err := os.ReadDir(targetDirectory)
-//	if err != nil {
-//		return fmt.Errorf("failed to read directory %s: %v", targetDirectory, err)
-//	}
-//
-//	for _, file := range files {
-//		if file.IsDir() {
-//			continue
-//		}
-//
-//		if path.Ext(file.Name()) == MetadataSwapExtension {
-//			swapPath := path.Join(targetDirectory, file.Name())
-//			err = os.Remove(swapPath)
-//			if err != nil {
-//				return fmt.Errorf("failed to remove swap file %s: %v", swapPath, err)
-//			}
-//
-//			logger.Warnf("Removed rogue swap file %s", swapPath)
-//		}
-//	}
-//
-//	return nil
-//}
