@@ -169,6 +169,7 @@ func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.L
 }
 
 func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
+	s.logger.Debug("store put blob metadata", "blobMetadata", blobMetadata)
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {
 		return err

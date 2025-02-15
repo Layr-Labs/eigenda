@@ -259,9 +259,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(42))
-	require.NoError(t, err)
-	salt, err := rand.Int(rand.Reader, big.NewInt(1000))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
 	require.NoError(t, err)
@@ -274,10 +272,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: makeCommitment(t),
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
-		Salt: uint32(salt.Int64()),
 	}
 }
 
@@ -359,7 +356,7 @@ func TestFetchBlob(t *testing.T) {
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
+	assert.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
@@ -650,6 +647,26 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
 		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
 	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
 
 	// Set up attestation
 	keyPair, err := core.GenRandomBlsKeys()
@@ -732,31 +749,49 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
-		signers := map[uint8][]string{
-			0: {
-				operatorPubKeys[2].GetOperatorID().Hex(),
+		signers := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
 			},
-			1: {
-				operatorPubKeys[2].GetOperatorID().Hex(),
-				operatorPubKeys[3].GetOperatorID().Hex(),
+			1: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[3].Hex(),
+				},
 			},
 		}
-		nonsigners := map[uint8][]string{
-			0: {
-				operatorPubKeys[0].GetOperatorID().Hex(),
-				operatorPubKeys[1].GetOperatorID().Hex(),
+		nonsigners := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[1].Hex(),
+				},
 			},
-			1: {
-				operatorPubKeys[0].GetOperatorID().Hex(),
+			1: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
 			},
 		}
 		for key, expectedSigners := range signers {
-			actualSigners, exists := response.AttestationInfo.SigningOperatorIds[key]
+			actualSigners, exists := response.AttestationInfo.Signers[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedSigners, actualSigners)
 		}
 		for key, expectedNonsigners := range nonsigners {
-			actualNonsigners, exists := response.AttestationInfo.NonsigningOperatorIds[key]
+			actualNonsigners, exists := response.AttestationInfo.Nonsigners[key]
 			require.True(t, exists)
 			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 		}

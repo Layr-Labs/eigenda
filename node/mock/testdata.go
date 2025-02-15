@@ -21,7 +21,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -31,7 +31,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x456",
-			ReservationPeriod: 6,
+			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
 	}
@@ -41,7 +41,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		QuorumNumbers:   []core.QuorumID{1, 2},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x789",
-			ReservationPeriod: 7,
+			Timestamp:         7,
 			CumulativePayment: big.NewInt(300),
 		},
 	}

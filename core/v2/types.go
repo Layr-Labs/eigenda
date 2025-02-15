@@ -70,9 +70,6 @@ type BlobHeader struct {
 
 	// PaymentMetadata contains the payment information for the blob
 	PaymentMetadata core.PaymentMetadata
-
-	// Salt is used to make blob intentionally unique when everything else is the same
-	Salt uint32
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -125,7 +122,6 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
-		Salt:            proto.GetSalt(),
 	}, nil
 }
 
@@ -145,7 +141,6 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		QuorumNumbers: quorums,
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
-		Salt:          b.Salt,
 	}, nil
 }
 

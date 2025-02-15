@@ -425,7 +425,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "account 1",
-					ReservationPeriod: 0,
+					Timestamp:         0,
 					CumulativePayment: big.NewInt(532),
 				},
 			},
@@ -439,7 +439,7 @@ func TestDispatcherBuildMerkleTree(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "account 2",
-					ReservationPeriod: 0,
+					Timestamp:         0,
 					CumulativePayment: big.NewInt(532),
 				},
 			},

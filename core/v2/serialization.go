@@ -41,17 +41,12 @@ func ComputeBlobKey(
 	blobCommitments encoding.BlobCommitments,
 	quorumNumbers []core.QuorumID,
 	paymentMetadataHash [32]byte,
-	salt uint32,
 ) ([32]byte, error) {
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
 	quorumNumbersType, err := abi.NewType("bytes", "", nil)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	saltType, err := abi.NewType("uint32", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -117,9 +112,6 @@ func ComputeBlobKey(
 		{
 			Type: commitmentType,
 		},
-		{
-			Type: saltType,
-		},
 	}
 	// Sort the quorum numbers to ensure the hash is consistent
 	sortedQuorums := make([]core.QuorumID, len(quorumNumbers))
@@ -162,7 +154,6 @@ func ComputeBlobKey(
 			},
 			DataLength: uint32(blobCommitments.Length),
 		},
-		salt,
 	)
 	if err != nil {
 		return [32]byte{}, err
@@ -228,7 +219,7 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 		b.BlobCommitments,
 		b.QuorumNumbers,
 		paymentMetadataHash,
-		b.Salt)
+	)
 }
 
 func (c *BlobCertificate) Hash() ([32]byte, error) {
