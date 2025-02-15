@@ -76,7 +76,7 @@ func BuildValidatorPayloadRetriever(
 
 	codec, err := codecs.CreateCodec(
 		validatorPayloadRetrieverConfig.PayloadPolynomialForm,
-		validatorPayloadRetrieverConfig.BlobEncodingVersion)
+		validatorPayloadRetrieverConfig.PayloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("create codec: %w", err)
 	}
