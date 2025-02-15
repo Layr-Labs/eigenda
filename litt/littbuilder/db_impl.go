@@ -1,16 +1,17 @@
-package litt
+package littbuilder
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/litt"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-var _ DB = &db{}
+var _ litt.DB = &db{}
 
 // tableBuilder is a function that creates a new table.
-type tableBuilder func(timeSource func() time.Time, name string, ttl time.Duration) (ManagedTable, error)
+type tableBuilder func(timeSource func() time.Time, name string, ttl time.Duration) (litt.ManagedTable, error)
 
 // db is an implementation of DB.
 type db struct {
@@ -27,7 +28,7 @@ type db struct {
 	tableBuilder tableBuilder
 
 	// A map of all tables in the database.
-	tables map[string]ManagedTable
+	tables map[string]litt.ManagedTable
 
 	// A flag that indicates whether the database is alive (i.e. Stop() has not been called).
 	alive atomic.Bool
@@ -40,7 +41,7 @@ func newDB(
 	timeSource func() time.Time,
 	ttl time.Duration,
 	gcPeriod time.Duration,
-	tableBuilder tableBuilder) DB {
+	tableBuilder tableBuilder) litt.DB {
 
 	return &db{
 		timeSource:   timeSource,
@@ -50,7 +51,7 @@ func newDB(
 	}
 }
 
-func (d *db) GetTable(name string) (Table, error) {
+func (d *db) GetTable(name string) (litt.Table, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -104,7 +105,7 @@ func (d *db) Stop() {
 
 // doGarbageCollection performs garbage collection on all tables in the database.
 func (d *db) doGarbageCollection() {
-	tables := make([]ManagedTable, 0, len(d.tables))
+	tables := make([]litt.ManagedTable, 0, len(d.tables))
 	d.lock.Lock()
 	for _, table := range d.tables {
 		tables = append(tables, table)

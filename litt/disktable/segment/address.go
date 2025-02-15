@@ -1,4 +1,4 @@
-package litt
+package segment
 
 // address describes the location of data on disk.
 // The first 4 bytes are the file ID, and the second 4 bytes are the offset of the data within the file.

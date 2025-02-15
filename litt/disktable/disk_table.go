@@ -1,8 +1,11 @@
-package litt
+package disktable
 
-import "time"
+import (
+	"github.com/Layr-Labs/eigenda/litt"
+	"time"
+)
 
-var _ ManagedTable = &diskTable{}
+var _ litt.ManagedTable = &diskTable{}
 
 type diskTable struct {
 }

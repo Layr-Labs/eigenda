@@ -1,14 +1,15 @@
-package litt
+package memtable
 
 import (
 	"fmt"
+	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/emirpasic/gods/queues"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"sync"
 	"time"
 )
 
-var _ ManagedTable = &memTable{}
+var _ litt.ManagedTable = &memTable{}
 
 // expirationRecord is a record of when a key was inserted into the table, and for when it should be deleted.
 type expirationRecord struct {
@@ -44,7 +45,7 @@ type memTable struct {
 }
 
 // NewMemTable creates a new in-memory table.
-func NewMemTable(timeSource func() time.Time, name string, ttl time.Duration) ManagedTable {
+func NewMemTable(timeSource func() time.Time, name string, ttl time.Duration) litt.ManagedTable {
 	return &memTable{
 		timeSource:      timeSource,
 		name:            name,

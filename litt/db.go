@@ -1,10 +1,5 @@
 package litt
 
-import (
-	"fmt"
-	"time"
-)
-
 // DB is a highly specialized key-value store. It is intentionally very feature poor, sacrificing
 // unnecessary features for simplicity, high performance, and low memory usage.
 //
@@ -43,25 +38,4 @@ type DB interface {
 	// Stop ensures that all non-flushed data is crash durable on disk before returning. Calls to
 	// Put() concurrent with Stop() may not be crash durable after Stop() returns.¬
 	Stop()
-}
-
-// NewDB builds a new litt.DB.
-func NewDB(config *Config) (DB, error) {
-
-	var tb tableBuilder
-	switch config.Type {
-	case DiskDB:
-		tb = func(timeSource func() time.Time, name string, ttl time.Duration) (ManagedTable, error) {
-			return nil, nil // TODO
-		}
-	case MemDB:
-		tb = func(timeSource func() time.Time, name string, ttl time.Duration) (ManagedTable, error) {
-			return NewMemTable(timeSource, name, ttl), nil
-		}
-	default:
-		return nil, fmt.Errorf("unsupported DB type: %v", config.Type)
-	}
-
-	database := newDB(config.TimeSource, config.TTL, config.GCPeriod, tb)
-	return database, nil
 }
