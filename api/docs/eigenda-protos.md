@@ -121,6 +121,8 @@
     - [StoreChunksReply](#validator-StoreChunksReply)
     - [StoreChunksRequest](#validator-StoreChunksRequest)
   
+    - [ChunkEncodingFormat](#validator-ChunkEncodingFormat)
+  
     - [Dispersal](#validator-Dispersal)
     - [Retrieval](#validator-Retrieval)
   
@@ -1713,7 +1715,8 @@ The response to the GetChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
+| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per GetChunksRequest. |
+| chunk_encoding_format | [ChunkEncodingFormat](#validator-ChunkEncodingFormat) |  | The format how the above chunks are encoded. |
 
 
 
@@ -1773,7 +1776,7 @@ StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
+| signature | [bytes](#bytes) |  | The validator&#39;s BSL signature signed on the batch header hash. |
 
 
 
@@ -1803,6 +1806,27 @@ Note that this signature is not included in the hash for obvious reasons. |
 
 
  
+
+
+<a name="validator-ChunkEncodingFormat"></a>
+
+### ChunkEncodingFormat
+This describes how the chunks returned in GetChunksReply are encoded.
+Used to facilitate the decoding of chunks.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. |
+| GNARK | 1 | A chunk encoded in GNARK has the following format:
+
+[KZG proof: 32 bytes] [Coeff 1: 32 bytes] [Coeff 2: 32 bytes] ... [Coeff n: 32 bytes]
+
+The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes(). The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+
+References: - bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254 - fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+
+Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding |
+
 
  
 
