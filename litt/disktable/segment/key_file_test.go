@@ -9,17 +9,17 @@ import (
 	"testing"
 )
 
-func TestWriteThenRead(t *testing.T) {
+func TestReadWriteKeys(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	directory := t.TempDir()
 
 	index := rand.Uint32()
 
-	keyCount := rand.Intn(100) + 1
+	keyCount := rand.Int32Range(100, 200)
 	keys := make([][]byte, keyCount)
-	for i := 0; i < keyCount; i++ {
+	for i := 0; i < int(keyCount); i++ {
 		keys[i] = rand.VariableBytes(1, 100)
 	}
 
@@ -58,17 +58,17 @@ func TestWriteThenRead(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-func TestReadingTruncatedFile(t *testing.T) {
+func TestReadingTruncatedKeyFile(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	directory := t.TempDir()
 
 	index := rand.Uint32()
 
-	keyCount := rand.Intn(100) + 1
+	keyCount := rand.Int32Range(100, 200)
 	keys := make([][]byte, keyCount)
-	for i := 0; i < keyCount; i++ {
+	for i := 0; i < int(keyCount); i++ {
 		keys[i] = rand.VariableBytes(1, 100)
 	}
 
@@ -91,8 +91,8 @@ func TestReadingTruncatedFile(t *testing.T) {
 	originalBytes, err := os.ReadFile(filePath)
 	require.NoError(t, err)
 
-	bytesToRemove := rand.Intn(lastKeyLength-1) + 1
-	bytes := originalBytes[:len(originalBytes)-bytesToRemove]
+	bytesToRemove := rand.Int32Range(1, int32(lastKeyLength)+1)
+	bytes := originalBytes[:len(originalBytes)-int(bytesToRemove)]
 
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
@@ -107,8 +107,8 @@ func TestReadingTruncatedFile(t *testing.T) {
 	}
 
 	// Truncate the file. This time, chop off some of the length prefix of the last key.
-	prefixBytesToRemove := rand.Intn(2) + 1
-	bytes = originalBytes[:len(originalBytes)-prefixBytesToRemove]
+	prefixBytesToRemove := rand.Int32Range(1, 4)
+	bytes = originalBytes[:len(originalBytes)-int(prefixBytesToRemove)]
 
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)

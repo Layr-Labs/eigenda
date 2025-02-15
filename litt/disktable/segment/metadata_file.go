@@ -3,7 +3,6 @@ package segment
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"os"
 	"path"
 	"time"
@@ -61,7 +60,7 @@ func newMetadataFile(index uint32, parentDirectory string) (*metadataFile, error
 	}
 
 	filePath := file.path()
-	exists, err := verifyFilePermissions(filePath)
+	exists, _, err := verifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
@@ -197,28 +196,28 @@ func (m *metadataFile) delete() error {
 
 // TODO perhaps this doesn't belong here
 
-// purgeRogueSwapFiles deletes any swap files that are present in the targetDirectory.
-func purgeRogueSwapFiles(logger logging.Logger, targetDirectory string) error {
-	files, err := os.ReadDir(targetDirectory)
-	if err != nil {
-		return fmt.Errorf("failed to read directory %s: %v", targetDirectory, err)
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if path.Ext(file.Name()) == MetadataSwapExtension {
-			swapPath := path.Join(targetDirectory, file.Name())
-			err = os.Remove(swapPath)
-			if err != nil {
-				return fmt.Errorf("failed to remove swap file %s: %v", swapPath, err)
-			}
-
-			logger.Warnf("Removed rogue swap file %s", swapPath)
-		}
-	}
-
-	return nil
-}
+//// purgeRogueSwapFiles deletes any swap files that are present in the targetDirectory.
+//func purgeRogueSwapFiles(logger logging.Logger, targetDirectory string) error {
+//	files, err := os.ReadDir(targetDirectory)
+//	if err != nil {
+//		return fmt.Errorf("failed to read directory %s: %v", targetDirectory, err)
+//	}
+//
+//	for _, file := range files {
+//		if file.IsDir() {
+//			continue
+//		}
+//
+//		if path.Ext(file.Name()) == MetadataSwapExtension {
+//			swapPath := path.Join(targetDirectory, file.Name())
+//			err = os.Remove(swapPath)
+//			if err != nil {
+//				return fmt.Errorf("failed to remove swap file %s: %v", swapPath, err)
+//			}
+//
+//			logger.Warnf("Removed rogue swap file %s", swapPath)
+//		}
+//	}
+//
+//	return nil
+//}

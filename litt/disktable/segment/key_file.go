@@ -43,7 +43,7 @@ func newKeyFile(
 
 	filePath := keys.path()
 
-	exists, err := verifyFilePermissions(filePath)
+	exists, _, err := verifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file is not writeable: %v", err)
 	}
