@@ -96,7 +96,7 @@ func (t *testProvider) PublicIPAddress(ctx context.Context) (string, error) {
 }
 
 func TestMultiProvider(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 

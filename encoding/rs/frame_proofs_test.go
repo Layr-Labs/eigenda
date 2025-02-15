@@ -36,7 +36,7 @@ func TestSerializeFrameProof(t *testing.T) {
 }
 
 func TestSerializeFrameProofs(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	count := 10 + rand.Intn(10)
 	proofs := make([]*encoding.Proof, count)
@@ -59,7 +59,7 @@ func TestSerializeFrameProofs(t *testing.T) {
 }
 
 func TestSplitSerializedFrameProofs(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	count := 10 + rand.Intn(10)
 	proofs := make([]*encoding.Proof, count)

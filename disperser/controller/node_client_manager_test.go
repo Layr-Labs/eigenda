@@ -10,9 +10,10 @@ import (
 )
 
 func TestNodeClientManager(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
-	_, private := rand.ECDSA()
+	_, private, err := rand.ECDSA()
+	require.NoError(t, err)
 	requestSigner := mock.NewStaticRequestSigner(private)
 
 	m, err := controller.NewNodeClientManager(2, requestSigner, nil)

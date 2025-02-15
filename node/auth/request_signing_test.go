@@ -10,7 +10,7 @@ import (
 )
 
 func TestHashing(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	request := RandomStoreChunksRequest(rand)
 	originalRequestHash := hashing.HashStoreChunksRequest(request)
@@ -139,9 +139,10 @@ func TestHashing(t *testing.T) {
 }
 
 func TestRequestSigning(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
-	public, private := rand.ECDSA()
+	public, private, err := rand.ECDSA()
+	require.NoError(t, err)
 	publicAddress := crypto.PubkeyToAddress(*public)
 
 	request := RandomStoreChunksRequest(rand)
@@ -154,7 +155,8 @@ func TestRequestSigning(t *testing.T) {
 	require.NoError(t, err)
 
 	// Using a different public key should make the signature invalid
-	otherPublic, _ := rand.ECDSA()
+	otherPublic, _, err := rand.ECDSA()
+	require.NoError(t, err)
 	otherPublicAddress := crypto.PubkeyToAddress(*otherPublic)
 	err = VerifyStoreChunksRequest(otherPublicAddress, request)
 	require.Error(t, err)

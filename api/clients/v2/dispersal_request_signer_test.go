@@ -73,7 +73,7 @@ func teardown() {
 }
 
 func TestRequestSigning(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	setup(t)
 	defer teardown()
 

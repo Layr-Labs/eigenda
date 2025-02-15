@@ -63,7 +63,7 @@ func TestEmptyBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (no padding).
 func TestMicroscopicBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := []byte{1}
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestMicroscopicBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (with padding).
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := []byte{1}
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -79,7 +79,7 @@ func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
 
 // Disperse a small payload (between 1KB and 2KB).
 func TestSmallBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -87,7 +87,7 @@ func TestSmallBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 100KB and 200KB).
 func TestMediumBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 	t.Skip("TODO: validation is borked for single quorum dispersal")
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0})
 	require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 	maxBlobSize := int(config.MaxBlobSize)
 	dataLength := maxBlobSize
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.Bytes(dataLength)
 	err = testBasicDispersal(t, rand, payload, quorums)
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	// TODO refactor this to use exactly 1 byte more than max size after padding and header data
 
 	config, err := client.GetConfig(client.PreprodEnv)
@@ -152,7 +152,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 }
 
 func TestDoubleDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
@@ -171,7 +171,7 @@ func TestDoubleDispersal(t *testing.T) {
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
@@ -202,7 +202,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 func TestDispersalWithInvalidSignature(t *testing.T) {
 	quorums := []core.QuorumID{0, 1}
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	c := client.GetTestClient(t, client.PreprodEnv)
 

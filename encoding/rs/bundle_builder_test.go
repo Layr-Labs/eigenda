@@ -11,7 +11,7 @@ import (
 )
 
 func TestParsingBundle(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
