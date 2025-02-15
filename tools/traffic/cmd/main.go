@@ -34,7 +34,7 @@ func main() {
 func trafficGeneratorMain(ctx *cli.Context) error {
 	config, err := traffic.NewConfig(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create config: %w", err)
 	}
 
 	var signer core.BlobRequestSigner
@@ -45,7 +45,7 @@ func trafficGeneratorMain(ctx *cli.Context) error {
 
 	generator, err := traffic.NewTrafficGenerator(config, signer)
 	if err != nil {
-		panic("failed to create new traffic generator")
+		return fmt.Errorf("failed to create new traffic generator: %w", err)
 	}
 
 	return generator.Run()
