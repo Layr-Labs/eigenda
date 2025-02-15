@@ -56,38 +56,36 @@ type metadataFile struct {
 // be durably written to disk.
 func newMetadataFile(index uint32, parentDirectory string) (*metadataFile, error) {
 	file := &metadataFile{
-		index:                index,
-		serializationVersion: currentSerializationVersion,
-		parentDirectory:      parentDirectory,
-	}
-
-	err := file.write()
-	if err != nil {
-		return nil, fmt.Errorf("failed to write metadata file: %v", err)
-	}
-
-	return file, nil
-}
-
-// loadMetadataFile loads a metadata file from disk.
-func loadMetadataFile(index uint32, parentDirectory string) (*metadataFile, error) {
-	metadata := &metadataFile{
 		index:           index,
 		parentDirectory: parentDirectory,
 	}
 
-	filePath := metadata.path()
-	data, err := os.ReadFile(filePath)
+	filePath := file.path()
+	exists, err := verifyFilePermissions(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
+		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
 
-	err = metadata.deserialize(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
+	if exists {
+		// File exists. Load it.
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
+		}
+		err = file.deserialize(data)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
+		}
+	} else {
+		// File does not exist. Create it.
+		file.serializationVersion = currentSerializationVersion
+		err = file.write()
+		if err != nil {
+			return nil, fmt.Errorf("failed to write metadata file: %v", err)
+		}
 	}
 
-	return metadata, nil
+	return file, nil
 }
 
 // Name returns the file name for this metadata file.
@@ -196,6 +194,8 @@ func (m *metadataFile) delete() error {
 
 	return nil
 }
+
+// TODO perhaps this doesn't belong here
 
 // purgeRogueSwapFiles deletes any swap files that are present in the targetDirectory.
 func purgeRogueSwapFiles(logger logging.Logger, targetDirectory string) error {

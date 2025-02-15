@@ -3,6 +3,7 @@ package segment
 import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 )
 
@@ -22,12 +23,20 @@ func TestUnsealedSerialization(t *testing.T) {
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := loadMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
+	// delete the file
+	filePath := m.path()
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
 	err = m.delete()
 	require.NoError(t, err)
+
+	_, err = os.Stat(filePath)
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestSealedSerialization(t *testing.T) {
@@ -46,12 +55,20 @@ func TestSealedSerialization(t *testing.T) {
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := loadMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
+	// delete the file
+	filePath := m.path()
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
 	err = m.delete()
 	require.NoError(t, err)
+
+	_, err = os.Stat(filePath)
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestFreshFileSerialization(t *testing.T) {
@@ -68,9 +85,20 @@ func TestFreshFileSerialization(t *testing.T) {
 	require.Zero(t, m.timestamp)
 	require.Equal(t, directory, m.parentDirectory)
 
-	deserialized, err := loadMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
+
+	// delete the file
+	filePath := m.path()
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	err = m.delete()
+	require.NoError(t, err)
+
+	_, err = os.Stat(filePath)
+	require.True(t, os.IsNotExist(err))
 }
 
 func TestSealing(t *testing.T) {
@@ -93,7 +121,18 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
-	deserialized, err := loadMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
+
+	// delete the file
+	filePath := m.path()
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	err = m.delete()
+	require.NoError(t, err)
+
+	_, err = os.Stat(filePath)
+	require.True(t, os.IsNotExist(err))
 }
