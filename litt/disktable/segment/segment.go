@@ -3,6 +3,7 @@ package segment
 import (
 	"fmt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"sync"
 	"time"
 )
 
@@ -21,6 +22,9 @@ type Segment struct {
 
 	// This file contains the values for the data segment.
 	values *valueFile
+
+	// lock controls access to the segment.
+	lock sync.RWMutex
 }
 
 // NewSegment creates a new data segment.
@@ -57,10 +61,13 @@ func (s *Segment) Index() uint32 {
 	return s.index
 }
 
-// Put records a key-value pair in the data segment, returning the resulting address of the data.
+// Write records a key-value pair in the data segment, returning the resulting address of the data.
 // This method does not ensure that the key-value pair is actually written to disk, only that it is recorded
 // in the data segment. Flush must be called to ensure that all data previously passed to Put is written to disk.
-func (s *Segment) Put(key []byte, value []byte) (Address, error) {
+func (s *Segment) Write(key []byte, value []byte) (Address, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	err := s.keys.write(key)
 	if err != nil {
 		return 0, fmt.Errorf("failed to write key: %v", err)
@@ -74,8 +81,19 @@ func (s *Segment) Put(key []byte, value []byte) (Address, error) {
 	return address, nil
 }
 
-// Get fetches the data for a key from the data segment.
-func (s *Segment) Get(dataAddress Address) ([]byte, error) {
+// CurrentSize returns the current size of the data segment.
+func (s *Segment) CurrentSize() uint64 {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.values.currentSize
+}
+
+// Read fetches the data for a key from the data segment.
+func (s *Segment) Read(dataAddress Address) ([]byte, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	value, err := s.values.read(dataAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read value: %v", err)
@@ -85,6 +103,9 @@ func (s *Segment) Get(dataAddress Address) ([]byte, error) {
 
 // GetKeys returns all keys in the data segment. Only permitted to be called after the segment has been sealed.
 func (s *Segment) GetKeys() ([][]byte, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
 	keys, err := s.keys.readKeys()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read keys: %v", err)
@@ -94,6 +115,9 @@ func (s *Segment) GetKeys() ([][]byte, error) {
 
 // Flush writes the data segment to disk.
 func (s *Segment) Flush() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	err := s.keys.flush()
 	if err != nil {
 		return fmt.Errorf("failed to flush key file: %v", err)
@@ -109,6 +133,9 @@ func (s *Segment) Flush() error {
 
 // Delete deletes the data segment from disk.
 func (s *Segment) Delete() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	err := s.keys.delete()
 	if err != nil {
 		return fmt.Errorf("failed to delete key file: %v", err)
@@ -127,6 +154,9 @@ func (s *Segment) Delete() error {
 // Seal flushes all data to disk and finalizes the metadata. After this method is called, no more data can be written
 // to the data segment.
 func (s *Segment) Seal(now time.Time) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	err := s.keys.seal()
 	if err != nil {
 		return fmt.Errorf("failed to seal key file: %v", err)
@@ -143,4 +173,21 @@ func (s *Segment) Seal(now time.Time) error {
 	}
 
 	return nil
+}
+
+// IsSealed returns true if the segment is sealed, and false otherwise.
+func (s *Segment) IsSealed() bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return s.metadata.sealed
+}
+
+// GetSealTime returns the time at which the segment was sealed. If the file is not sealed, this method will return
+// the zero time.
+func (s *Segment) GetSealTime() time.Time {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	return time.Unix(0, int64(s.metadata.timestamp))
 }
