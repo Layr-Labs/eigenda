@@ -48,7 +48,7 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 
 ## System Architecture
 
-![image](../assets/architecture.png)
+![image](./assets/architecture.png)
 
 ### Core Components
 
@@ -94,9 +94,9 @@ The primary responsibility of the attestation layer is to enable consensus about
 ![image](../assets/attestation-layer-parts.png)
 
 
-The desired behavior of the attestation logic can be formally described as follows (Ignore this if you're happy with the high level ideas): Let $\alpha$ denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let $\beta$ represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let $O$ denote the set of EigenDA operators.
+The desired behavior of the attestation logic can be formally described as follows (Ignore this if you're happy with the high level ideas): Let \\(\alpha\\) denote the safety threshold, i.e. the maximum proportion of adversarial stake that the system is able to tolerate. Likewise, let \\(\beta\\) represent the amount of stake that we require to be held by the signing operators in order to accept an attestation, i.e. one minus the liveness threshold. Also, let \\(O\\) denote the set of EigenDA operators.
 
-We need to guarantee that any set of signing operators $U_q \subseteq O$ such that
+We need to guarantee that any set of signing operators \\(U_q \subseteq O\\) such that
 
 $$ \sum_{i \in U_q} S_i \ge \beta \sum_{i \in O}S_i$$
 
@@ -104,7 +104,7 @@ and any set of adversarial operators $U_a \subseteq U_q$ such
 
 $$ \sum_{i \in U_a} S_i \le \alpha \sum_{i \in O}S_i$$
 
-we can reconstruct the original data blob from the chunks held by $U_q \setminus U_a$.
+we can reconstruct the original data blob from the chunks held by \\( U_q \setminus U_a \\).
 
 ### Encoding Module
 
