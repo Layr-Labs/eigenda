@@ -135,11 +135,16 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	opSocket, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
 	}
+
+	dispersalPort := opSocket.GetV1DispersalSocket()
+	retrievalPort := opSocket.GetV1RetrievalSocket()
+	v2DispersalPort := opSocket.GetV2DispersalSocket()
+	v2RetrievalPort := opSocket.GetV2RetrievalSocket()
 
 	socket := config.Socket
 	if isLocalhost(socket) {
