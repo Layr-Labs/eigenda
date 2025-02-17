@@ -103,7 +103,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		RequestedAt: uint64(endTime.UnixNano()),
 	}
 
-	blobs, paginationToken, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(c.Request.Context(), startCursor, endCursor, limit)
+	blobs, paginationToken, err := s.blobMetadataStore.GetBlobMetadataByRequestedAtForward(c.Request.Context(), startCursor, endCursor, limit)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
