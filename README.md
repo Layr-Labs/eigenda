@@ -4,10 +4,9 @@ A basic REST server for Rollups with the following endpoints:
 - POST routes: used by sequencers to encode their payloads (batches of transactions or state transitions) into EigenDA blobs, submit them to the EigenDA disperser to make them available, and receive a DA certificate to be submitted to the rollup's batcher inbox.
 - GET routes: used by validators to retrieve the blob from the EigenDA network given a DA Certificate, decode the blob back into the original payload, and return it to the validator, to be used in its derivation pipeline.
 
-[![Compiles](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/build.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/build.yml)
-[![Unit Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/unit-tests.yml)
-[![Linter](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/lint.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/lint.yml)
-[![Integration Tests](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/holesky-test.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/holesky-test.yml)
+[![per-pr-ci](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/per-pr.yml)
+[![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
+
 
 [Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
 
@@ -53,9 +52,9 @@ In order to disperse to the EigenDA network in production, or at high throughput
       - [Standard Commitment Mode](#standard-commitment-mode)
   - [Testing](#testing)
     - [Unit](#unit)
-    - [Integration](#integration)
+    - [Integration / E2E against local deployment](#integration--e2e-against-local-deployment)
+    - [E2E against Holesky](#e2e-against-holesky)
     - [E2E Fuzz](#e2e-fuzz)
-    - [Holesky](#holesky)
   - [Metrics](#metrics)
   - [Flags and Env Vars](#flags-and-env-vars)
   - [Resources](#resources)
@@ -228,21 +227,22 @@ For standard clients (i.e, `client/client.go`) communicating with proxy (e.g, ar
 
 ### Unit
 
-Unit tests can be ran via invoking `make test`.
+Unit tests can be ran via invoking `make test-unit`.
 
-### Integration
+### Integration / E2E against local deployment
 
-End-to-end (E2E) tests can be ran via `make e2e-test`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
+Integration tests against op framework can be ran via `make test-e2e-local`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
 
 These tests also assert E2E client <-> server interactions using simple/op clients.
 
+### E2E against Holesky
+
+A holesky integration test can be ran using `make test-e2e-holesky` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
+
 ### E2E Fuzz
 
-This E2E test will fuzz the proxy client server integration and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA. Run with `make e2e-fuzz-test`.
+This E2E test will fuzz the proxy client server integration and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA. Run with `make test-e2e-fuzz`.
 
-### Holesky
-
-A holesky integration test can be ran using `make holesky-test` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
 
 ## Metrics
 

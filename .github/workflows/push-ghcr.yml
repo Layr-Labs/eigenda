@@ -1,4 +1,4 @@
-name: Build and push container
+name: Push Release Image to ghcr # This name is displayed in the badge
 
 on:
   push:
