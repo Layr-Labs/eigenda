@@ -3,13 +3,14 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"sync"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/stretchr/testify/require"
 )
 
 var (
