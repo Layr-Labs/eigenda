@@ -93,7 +93,8 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 		Os:       runtime.GOOS,
 		Arch:     runtime.GOARCH,
 		NumCpu:   uint32(runtime.GOMAXPROCS(0)),
-		MemBytes: memBytes}, nil
+		MemBytes: memBytes,
+	}, nil
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
@@ -101,19 +102,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
-
-	if s.authenticator != nil {
-		disperserPeer, ok := peer.FromContext(ctx)
-		if !ok {
-			return nil, errors.New("could not get peer information")
-		}
-		disperserAddress := disperserPeer.Addr.String()
-
-		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("failed to authenticate request: %w", err)
-		}
 	}
 
 	if s.node.StoreV2 == nil {
@@ -124,26 +112,41 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
 
+	// Validate the request parameters (which is cheap) before starting any further
+	// processing of the request.
 	batch, err := s.validateStoreChunksRequest(in)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate store chunk request: %v", err))
 	}
 
 	batchHeaderHash, err := batch.BatchHeader.Hash()
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("invalid batch header: %v", err))
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
+	}
+
+	if s.authenticator != nil {
+		disperserPeer, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, api.NewErrorInvalidArg("could not get peer information from request context")
+		}
+		disperserAddress := disperserPeer.Addr.String()
+
+		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+		}
 	}
 
 	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
 	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
 	if err != nil {
-		return nil, err
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
 	stageTimer := time.Now()
 	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to download batch: %v", err))
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
 
@@ -158,7 +161,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		if err != nil {
 			storeChan <- storeResult{
 				keys: nil,
-				err:  fmt.Errorf("failed to store batch: %v", err),
+				err:  err,
 			}
 			return
 		}
@@ -203,13 +206,20 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
 func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
-	if req.GetBatch() == nil {
-		return nil, api.NewErrorInvalidArg("missing batch in request")
+	// The signature is created by go-ethereum library, which contains 1 additional byte (for
+	// recovering the public key from signature), so it's 65 bytes.
+	if len(req.GetSignature()) != 65 {
+		return nil, fmt.Errorf("signature must be 65 bytes, found %d bytes", len(req.GetSignature()))
 	}
 
+	if req.GetBatch() == nil {
+		return nil, errors.New("missing batch in request")
+	}
+
+	// BatchFromProtobuf internally validates the Batch while deserializing
 	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
 	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to deserialize batch: %v", err))
+		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
 	}
 
 	return batch, nil
