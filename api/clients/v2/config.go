@@ -114,7 +114,7 @@ type PayloadDisperserConfig struct {
 // NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
-		PayloadEncodingVersion: codecs.PayloadEncodingVersion0,
+		PayloadEncodingVersion:  codecs.PayloadEncodingVersion0,
 		PayloadPolynomialForm:   codecs.PolynomialFormEval,
 		ContractCallTimeout:     5 * time.Second,
 		BlockNumberPollInterval: 1 * time.Second,
