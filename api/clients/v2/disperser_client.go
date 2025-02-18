@@ -8,8 +8,6 @@ import (
 
 	"github.com/docker/go-units"
 
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
