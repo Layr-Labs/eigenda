@@ -24,8 +24,8 @@ type Blob struct {
 	blobLengthSymbols uint32
 }
 
-// BlobFromBytes initializes a Blob from bytes
-func BlobFromBytes(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
+// DeserializeBlob initializes a Blob from bytes
+func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 	coeffPolynomial, err := rs.ToFrArray(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("bytes to field elements: %w", err)
@@ -42,9 +42,9 @@ func BlobFromPolynomial(coeffPolynomial []fr.Element, blobLengthSymbols uint32) 
 	}, nil
 }
 
-// GetBytes gets the raw bytes of the Blob
-func (b *Blob) GetBytes() []byte {
-	return rs.FieldElementsToBytes(b.coeffPolynomial)
+// Serialize gets the raw bytes of the Blob
+func (b *Blob) Serialize() []byte {
+	return rs.SerializeFieldElements(b.coeffPolynomial)
 }
 
 // ToPayload converts the Blob into a Payload

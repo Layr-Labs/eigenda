@@ -26,7 +26,7 @@ func newEncodedPayload(payload *Payload) (*encodedPayload, error) {
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
 	encodedPayloadHeader[1] = byte(PayloadEncodingVersion0) // encode version byte
 
-	payloadBytes := payload.GetBytes()
+	payloadBytes := payload.Serialize()
 
 	// encode payload length as uint32
 	binary.BigEndian.PutUint32(
@@ -88,7 +88,7 @@ func (ep *encodedPayload) toFieldElements() ([]fr.Element, error) {
 //
 // maxPayloadLength is the maximum length in bytes that the contained Payload is permitted to be
 func encodedPayloadFromElements(fieldElements []fr.Element, maxPayloadLength uint32) (*encodedPayload, error) {
-	polynomialBytes := rs.FieldElementsToBytes(fieldElements)
+	polynomialBytes := rs.SerializeFieldElements(fieldElements)
 	// this is the payload length in bytes, as claimed by the encoded payload header
 	payloadLength := binary.BigEndian.Uint32(polynomialBytes[2:6])
 

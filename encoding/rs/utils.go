@@ -12,6 +12,9 @@ import (
 )
 
 // ToFrArray accept a byte array as an input, and converts it to an array of field elements
+//
+// TODO (litt3): it would be nice to rename this to "DeserializeFieldElements", as the counterpart to "SerializeFieldElements",
+//  but doing so would be a very large diff. I'm leaving this comment as a potential future cleanup.
 func ToFrArray(inputData []byte) ([]fr.Element, error) {
 	bytes := padToBytesPerSymbol(inputData)
 
@@ -30,8 +33,8 @@ func ToFrArray(inputData []byte) ([]fr.Element, error) {
 	return outputElements, nil
 }
 
-// FieldElementsToBytes accepts an array of field elements, and converts it to an array of bytes
-func FieldElementsToBytes(fieldElements []fr.Element) []byte {
+// SerializeFieldElements accepts an array of field elements, and serializes it to an array of bytes
+func SerializeFieldElements(fieldElements []fr.Element) []byte {
 	outputBytes := make([]byte, len(fieldElements)*encoding.BYTES_PER_SYMBOL)
 
 	for i := 0; i < len(fieldElements); i++ {

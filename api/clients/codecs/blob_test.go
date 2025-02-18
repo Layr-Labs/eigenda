@@ -25,7 +25,7 @@ func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm Po
 	blob, err := NewPayload(payloadBytes).ToBlob(payloadForm)
 	require.NoError(t, err)
 
-	blobDeserialized, err := BlobFromBytes(blob.GetBytes(), blob.blobLengthSymbols)
+	blobDeserialized, err := DeserializeBlob(blob.Serialize(), blob.blobLengthSymbols)
 	require.NoError(t, err)
 
 	payloadFromBlob, err := blob.ToPayload(payloadForm)
@@ -34,6 +34,6 @@ func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm Po
 	payloadFromDeserializedBlob, err := blobDeserialized.ToPayload(payloadForm)
 	require.NoError(t, err)
 
-	require.Equal(t, payloadFromBlob.GetBytes(), payloadFromDeserializedBlob.GetBytes())
-	require.Equal(t, payloadBytes, payloadFromBlob.GetBytes())
+	require.Equal(t, payloadFromBlob.Serialize(), payloadFromDeserializedBlob.Serialize())
+	require.Equal(t, payloadBytes, payloadFromBlob.Serialize())
 }

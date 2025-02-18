@@ -56,8 +56,8 @@ func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 	return BlobFromPolynomial(coeffPolynomial, blobLengthSymbols)
 }
 
-// GetBytes returns the bytes that underlie the payload, i.e. the unprocessed user data
-func (p *Payload) GetBytes() []byte {
+// Serialize returns the bytes that underlie the payload, i.e. the unprocessed user data
+func (p *Payload) Serialize() []byte {
 	return p.bytes
 }
 
