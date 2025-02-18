@@ -35,7 +35,7 @@ func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 		return nil, fmt.Errorf("encoded payload to field elements: %w", err)
 	}
 
-	blobLength := uint32(encoding.NextPowerOf2(len(fieldElements)))
+	blobLengthSymbols := uint32(encoding.NextPowerOf2(len(fieldElements)))
 
 	var coeffPolynomial []fr.Element
 	switch payloadForm {
@@ -45,7 +45,7 @@ func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 		coeffPolynomial = fieldElements
 	case PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form, since blobs are in coefficient form
-		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLength)
+		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLengthSymbols)
 		if err != nil {
 			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
 		}
@@ -53,7 +53,7 @@ func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 		return nil, fmt.Errorf("unknown polynomial form: %v", payloadForm)
 	}
 
-	return BlobFromPolynomial(coeffPolynomial, blobLength)
+	return BlobFromPolynomial(coeffPolynomial, blobLengthSymbols)
 }
 
 // GetBytes returns the bytes that underlie the payload, i.e. the unprocessed user data
@@ -63,12 +63,12 @@ func (p *Payload) GetBytes() []byte {
 
 // evalToCoeffPoly converts an evalPoly to a coeffPoly, using the IFFT operation
 //
-// blobLength (in SYMBOLS) is required, to be able to choose the correct parameters when performing FFT
-func evalToCoeffPoly(evalPoly []fr.Element, blobLength uint32) ([]fr.Element, error) {
+// blobLengthSymbols is required, to be able to choose the correct parameters when performing FFT
+func evalToCoeffPoly(evalPoly []fr.Element, blobLengthSymbols uint32) ([]fr.Element, error) {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLength(blobLength)
+	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(blobLengthSymbols)
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	ifftedElements, err := fftSettings.FFT(evalPoly, true)

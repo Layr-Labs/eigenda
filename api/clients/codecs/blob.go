@@ -14,36 +14,31 @@ import (
 // A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form
 type Blob struct {
 	coeffPolynomial []fr.Element
-	// blobLength must be a power of 2, and should match the blobLength claimed in the BlobCommitment
-	// This is the blob length IN SYMBOLS, not in bytes
+	// blobLengthSymbols must be a power of 2, and should match the blobLength claimed in the BlobCommitment
 	//
 	// This value must be specified, rather than computed from the length of the coeffPolynomial, due to an edge case
 	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
 	// bytes are trailing zeros. When a different user fetches the blob from a relay, it's possible that the relay could
-	// truncate the trailing zeros. If we were to say that blobLength = nextPowerOf2(len(coeffPolynomial)), then the
+	// truncate the trailing zeros. If we were to say that blobLengthSymbols = nextPowerOf2(len(coeffPolynomial)), then the
 	// user fetching and reconstructing this blob would determine that the blob length is 1 symbol, when it's actually 2.
-	blobLength uint32
+	blobLengthSymbols uint32
 }
 
 // BlobFromBytes initializes a Blob from bytes
-//
-// blobLength is the length of the blob IN SYMBOLS
-func BlobFromBytes(bytes []byte, blobLength uint32) (*Blob, error) {
+func BlobFromBytes(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
 	coeffPolynomial, err := rs.ToFrArray(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("bytes to field elements: %w", err)
 	}
 
-	return BlobFromPolynomial(coeffPolynomial, blobLength)
+	return BlobFromPolynomial(coeffPolynomial, blobLengthSymbols)
 }
 
 // BlobFromPolynomial initializes a blob from a polynomial
-//
-// blobLength is the length of the blob IN SYMBOLS
-func BlobFromPolynomial(coeffPolynomial []fr.Element, blobLength uint32) (*Blob, error) {
+func BlobFromPolynomial(coeffPolynomial []fr.Element, blobLengthSymbols uint32) (*Blob, error) {
 	return &Blob{
-		coeffPolynomial: coeffPolynomial,
-		blobLength:      blobLength,
+		coeffPolynomial:   coeffPolynomial,
+		blobLengthSymbols: blobLengthSymbols,
 	}, nil
 }
 
@@ -75,7 +70,7 @@ func (b *Blob) ToPayload(payloadForm PolynomialForm) (*Payload, error) {
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
 func (b *Blob) toEncodedPayload(payloadForm PolynomialForm) (*encodedPayload, error) {
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLength)
+	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("get max permissible payload length: %w", err)
 	}
@@ -110,7 +105,7 @@ func (b *Blob) computeEvalPoly() ([]fr.Element, error) {
 	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
 	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
 	//  to present a computational burden, consider making this change.
-	fftSettings := fft.FFTSettingsFromBlobLength(b.blobLength)
+	fftSettings := fft.FFTSettingsFromBlobLengthSymbols(b.blobLengthSymbols)
 
 	// the FFT method pads to the next power of 2, so we don't need to do that manually
 	fftedElements, err := fftSettings.FFT(b.coeffPolynomial, false)

@@ -177,22 +177,22 @@ func GetUnpaddedDataLength(inputLen uint32) (uint32, error) {
 	return unpaddedLength, nil
 }
 
-// GetMaxPermissiblePayloadLength accepts a blob length IN SYMBOLS, and returns the size IN BYTES of the largest payload
+// GetMaxPermissiblePayloadLength accepts a blob length, and returns the size IN BYTES of the largest payload
 // that could fit inside the blob.
-func GetMaxPermissiblePayloadLength(blobLength uint32) (uint32, error) {
-	if blobLength == 0 {
-		return 0, fmt.Errorf("input blob length is zero")
+func GetMaxPermissiblePayloadLength(blobLengthSymbols uint32) (uint32, error) {
+	if blobLengthSymbols == 0 {
+		return 0, fmt.Errorf("input blobLengthSymbols is zero")
 	}
 
 	// TODO (litt3): it's awkward to use a method defined in fft for this, but it's not trivial to move to a better
 	//  location, due to the resulting cyclic imports, and I'd prefer not to reimplement. Ideally, a proper location
 	//  would be found for this important utility function
-	if !fft.IsPowerOfTwo(uint64(blobLength)) {
-		return 0, fmt.Errorf("blobLength %d is not a power of two", blobLength)
+	if !fft.IsPowerOfTwo(uint64(blobLengthSymbols)) {
+		return 0, fmt.Errorf("blobLengthSymbols %d is not a power of two", blobLengthSymbols)
 	}
 
 	// subtract 32 from the blob length before doing the unpad operation, to account for the encoded payload header
-	maxPayloadLength, err := GetUnpaddedDataLength(blobLength*encoding.BYTES_PER_SYMBOL - 32)
+	maxPayloadLength, err := GetUnpaddedDataLength(blobLengthSymbols*encoding.BYTES_PER_SYMBOL - 32)
 	if err != nil {
 		return 0, fmt.Errorf("get unpadded data length: %w", err)
 	}

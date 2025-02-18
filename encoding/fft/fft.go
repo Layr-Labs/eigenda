@@ -91,8 +91,8 @@ func NewFFTSettings(maxScale uint8) *FFTSettings {
 	}
 }
 
-// FFTSettingsFromBlobLength accepts a blob length in symbols, and returns a new instance of FFT settings
-func FFTSettingsFromBlobLength(blobLength uint32) *FFTSettings {
-	maxScale := uint8(math.Log2(float64(blobLength)))
+// FFTSettingsFromBlobLengthSymbols accepts a blob length, and returns a new instance of FFT settings
+func FFTSettingsFromBlobLengthSymbols(blobLengthSymbols uint32) *FFTSettings {
+	maxScale := uint8(math.Log2(float64(blobLengthSymbols)))
 	return NewFFTSettings(maxScale)
 }
