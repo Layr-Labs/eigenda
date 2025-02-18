@@ -77,7 +77,7 @@ func TestSignBlobRequest(t *testing.T) {
 		PaymentMetadata: corev1.PaymentMetadata{
 			AccountID:         accountID,
 			CumulativePayment: big.NewInt(100),
-			ReservationPeriod: 100,
+			Timestamp:         100,
 		},
 	}
 

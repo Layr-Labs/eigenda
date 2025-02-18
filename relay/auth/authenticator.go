@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api/hashing"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/hashing"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/core"
@@ -85,7 +86,7 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context) error {
-	blockNumber, err := a.ics.GetCurrentBlockNumber()
+	blockNumber, err := a.ics.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
@@ -148,7 +149,7 @@ func (a *requestAuthenticator) getOperatorKey(ctx context.Context, operatorID co
 		return key, nil
 	}
 
-	blockNumber, err := a.ics.GetCurrentBlockNumber()
+	blockNumber, err := a.ics.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}

@@ -13,27 +13,26 @@ import (
 
 func TestVerifyReceivedBlobKey(t *testing.T) {
 	blobCommitments := encoding.BlobCommitments{
-		Commitment: &encoding.G1Commitment{},
+		Commitment:       &encoding.G1Commitment{},
 		LengthCommitment: &encoding.G2Commitment{},
-		LengthProof: &encoding.LengthProof{},
-		Length: 4,
+		LengthProof:      &encoding.LengthProof{},
+		Length:           4,
 	}
 
 	quorumNumbers := make([]core.QuorumID, 1)
 	quorumNumbers[0] = 8
 
 	paymentMetadata := core.PaymentMetadata{
-		AccountID: "asdf",
-		ReservationPeriod: 5,
+		AccountID:         "asdf",
+		Timestamp:         5,
 		CumulativePayment: big.NewInt(6),
 	}
 
 	blobHeader := &corev2.BlobHeader{
-		BlobVersion: 0,
+		BlobVersion:     0,
 		BlobCommitments: blobCommitments,
-		QuorumNumbers: quorumNumbers,
+		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: paymentMetadata,
-		Salt: 9,
 	}
 
 	realKey, err := blobHeader.BlobKey()

@@ -24,6 +24,7 @@ type encodingManagerMetrics struct {
 	batchRetryCount         *prometheus.GaugeVec
 	failedSubmissionCount   *prometheus.CounterVec
 	completedBlobs          *prometheus.CounterVec
+	blobSetSize             *prometheus.GaugeVec
 }
 
 // NewEncodingManagerMetrics sets up metrics for the encoding manager.
@@ -133,6 +134,15 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		[]string{"state", "data"},
 	)
 
+	blobSetSize := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: encodingManagerNamespace,
+			Name:      "blob_queue_size",
+			Help:      "The number of blobs in the encoding queue.",
+		},
+		[]string{},
+	)
+
 	return &encodingManagerMetrics{
 		batchSubmissionLatency:  batchSubmissionLatency,
 		blobHandleLatency:       blobHandleLatency,
@@ -145,6 +155,7 @@ func newEncodingManagerMetrics(registry *prometheus.Registry) *encodingManagerMe
 		batchRetryCount:         batchRetryCount,
 		failedSubmissionCount:   failSubmissionCount,
 		completedBlobs:          completedBlobs,
+		blobSetSize:             blobSetSize,
 	}
 }
 
@@ -202,4 +213,8 @@ func (m *encodingManagerMetrics) reportCompletedBlob(size int, status dispv2.Blo
 
 	m.completedBlobs.WithLabelValues("total", "number").Inc()
 	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+}
+
+func (m *encodingManagerMetrics) reportBlobSetSize(size int) {
+	m.blobSetSize.WithLabelValues().Set(float64(size))
 }

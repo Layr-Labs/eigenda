@@ -17,8 +17,13 @@ on:
       - 'core/**'
       - 'common/**'
       - 'api/**'
+      - 'subgraphs/**'
+      - 'indexer/**'
+      - 'encoding/**'
+      - 'crypto/**'
+      - 'relay/**'
       - '.github/codeql/**'
-      - '.github/workflows/codeql-analysis.yml'
+      - '.github/workflows/codeql-scanning.yaml'
   schedule:
     - cron: '0 9 * * *'
 
@@ -46,10 +51,19 @@ jobs:
       with:
         go-version: '1.21.13'
 
-    - name: Custom build using make
+    - name: Build contract dependencies
       run: |
-        go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-        make compile-contracts
+        cd contracts && yarn
+
+    - name: Compile contracts
+      run: |
+        cd contracts && forge build
+
+    # Ref: https://github.com/Layr-Labs/eigenda/blob/master/.github/workflows/integration-tests.yml#L71C7-L71C67
+    # - name: Custom build using make
+    #   run: |
+    #     go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+    #     make compile-contracts
         
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

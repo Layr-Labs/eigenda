@@ -251,7 +251,7 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 }
 
 func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId string) (*OperatorsStakeResponse, error) {
-	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber()
+	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
 	}
@@ -259,7 +259,7 @@ func (oh *OperatorHandler) GetOperatorsStake(ctx context.Context, operatorId str
 }
 
 func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverReportResponse, error) {
-	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber()
+	currentBlock, err := s.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current block number: %w", err)
 	}

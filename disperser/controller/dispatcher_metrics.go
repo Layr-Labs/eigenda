@@ -37,6 +37,7 @@ type dispatcherMetrics struct {
 	blobE2EDispersalLatency     *prometheus.SummaryVec
 	completedBlobs              *prometheus.CounterVec
 	attestation                 *prometheus.GaugeVec
+	blobSetSize                 *prometheus.GaugeVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -260,6 +261,15 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{"state", "data"},
 	)
 
+	blobSetSize := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "blob_queue_size",
+			Help:      "The size of the blob queue used for deduplication.",
+		},
+		[]string{},
+	)
+
 	return &dispatcherMetrics{
 		handleBatchLatency:          handleBatchLatency,
 		newBatchLatency:             newBatchLatency,
@@ -283,6 +293,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		blobE2EDispersalLatency:     blobE2EDispersalLatency,
 		completedBlobs:              completedBlobs,
 		attestation:                 attestation,
+		blobSetSize:                 blobSetSize,
 	}
 }
 
@@ -380,6 +391,10 @@ func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 
 	m.completedBlobs.WithLabelValues("total", "number").Inc()
 	m.completedBlobs.WithLabelValues("total", "size").Add(float64(size))
+}
+
+func (m *dispatcherMetrics) reportBlobSetSize(size int) {
+	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
 func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {

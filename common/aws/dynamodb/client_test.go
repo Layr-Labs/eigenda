@@ -296,7 +296,7 @@ func TestBatchOperations(t *testing.T) {
 		}
 	}
 
-	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys)
+	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys, true)
 	assert.NoError(t, err)
 	assert.Len(t, fetchedItems, numItems)
 	blobKeys := make([]string, numItems)
