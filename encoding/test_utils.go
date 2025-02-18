@@ -1,8 +1,6 @@
 package encoding
 
 import (
-	"math"
-
 	"golang.org/x/exp/constraints"
 )
 
@@ -11,7 +9,7 @@ import (
 func GeneratePowersOfTwo[T constraints.Integer](powersToGenerate T) []T {
 	powers := make([]T, powersToGenerate)
 	for i := T(0); i < powersToGenerate; i++ {
-		powers[i] = T(math.Pow(2, float64(i)))
+		powers[i] = 1 << i
 	}
 
 	return powers
