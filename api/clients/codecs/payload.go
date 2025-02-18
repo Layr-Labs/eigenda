@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
 // Payload represents arbitrary user data, without any processing.
@@ -32,16 +34,15 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 
 	blobLength := uint32(encoding.NextPowerOf2(len(fieldElements)))
 
-	var coeffPolynomial *coeffPoly
+	var coeffPolynomial []fr.Element
 	switch form {
 	case PolynomialFormCoeff:
 		// the payload is already in coefficient form. no conversion needs to take place, since blobs are also in
 		// coefficient form
-		coeffPolynomial = coeffPolyFromElements(fieldElements)
+		coeffPolynomial = fieldElements
 	case PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form
-		evalPolynomial := evalPolyFromElements(fieldElements)
-		coeffPolynomial, err = evalPolynomial.toCoeffPoly(blobLength)
+		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
 		}
@@ -55,4 +56,22 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 // GetBytes returns the bytes that underlie the payload, i.e. the unprocessed user data
 func (p *Payload) GetBytes() []byte {
 	return p.bytes
+}
+
+// evalToCoeffPoly converts an evalPoly to a coeffPoly, using the IFFT operation
+//
+// blobLength (in SYMBOLS) is required, to be able to choose the correct parameters when performing FFT
+func evalToCoeffPoly(evalPoly []fr.Element, blobLength uint32) ([]fr.Element, error) {
+	// TODO (litt3): this could conceivably be optimized, so that multiple objects share an instance of FFTSettings,
+	//  which has enough roots of unity for general use. If the following construction of FFTSettings ever proves
+	//  to present a computational burden, consider making this change.
+	fftSettings := fft.FFTSettingsFromBlobLength(blobLength)
+
+	// the FFT method pads to the next power of 2, so we don't need to do that manually
+	ifftedElements, err := fftSettings.FFT(evalPoly, true)
+	if err != nil {
+		return nil, fmt.Errorf("perform IFFT: %w", err)
+	}
+
+	return ifftedElements, nil
 }

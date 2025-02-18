@@ -57,7 +57,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 		almostTooLongFieldElements, err := almostTooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
 		// there are almost too many field elements for the defined blob length, but not quite
-		_, err = encodedPayloadFromElements(almostTooLongFieldElements, blobLength)
+		_, err = encodedPayloadFromElements(almostTooLongFieldElements, maxPermissiblePayloadLength)
 		require.NoError(t, err)
 
 		tooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength) + 1)
@@ -66,7 +66,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 		tooLongFieldElements, err := tooLongEncodedPayload.toFieldElements()
 		require.NoError(t, err)
 		// there is one too many field elements for the defined blob length
-		_, err = encodedPayloadFromElements(tooLongFieldElements, blobLength)
+		_, err = encodedPayloadFromElements(tooLongFieldElements, maxPermissiblePayloadLength)
 		require.Error(t, err)
 	}
 }
@@ -75,27 +75,28 @@ func TestEncodeTooManyElements(t *testing.T) {
 // cause an error to be returned.
 func TestTrailingNonZeros(t *testing.T) {
 	testRandom := random.NewTestRandom(t)
-	// make original data 1025 bytes, so that there is plenty of wiggle room to tack on another couple bytes
-	// without having a payload that fails verification for being too long
-	originalData := testRandom.Bytes(1025)
+	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
 
-	blob, err := NewPayload(originalData).ToBlob(PolynomialFormCoeff)
+	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
 	require.NoError(t, err)
 
-	fieldElements1 := make([]fr.Element, len(blob.coeffPolynomial.fieldElements))
-	copy(fieldElements1, blob.coeffPolynomial.fieldElements)
+	originalElements, err := encodedPayload.toFieldElements()
+	require.NoError(t, err)
 
-	fieldElements2 := make([]fr.Element, len(blob.coeffPolynomial.fieldElements))
-	copy(fieldElements2, blob.coeffPolynomial.fieldElements)
+	fieldElements1 := make([]fr.Element, len(originalElements))
+	copy(fieldElements1, originalElements)
+
+	fieldElements2 := make([]fr.Element, len(originalElements))
+	copy(fieldElements2, originalElements)
 
 	// adding a 0 is fine
 	fieldElements1 = append(fieldElements1, fr.Element{})
-	_, err = encodedPayloadFromElements(fieldElements1, blob.blobLength)
+	_, err = encodedPayloadFromElements(fieldElements1, uint32(len(fieldElements1)*encoding.BYTES_PER_SYMBOL))
 	require.NoError(t, err)
 
 	// adding a non-0 is non-fine
 	fieldElements2 = append(fieldElements2, fr.Element{0,0,0,1})
-	_, err = encodedPayloadFromElements(fieldElements2, blob.blobLength)
+	_, err = encodedPayloadFromElements(fieldElements2, uint32(len(fieldElements2)*encoding.BYTES_PER_SYMBOL))
 	require.Error(t, err)
 }
 
@@ -114,11 +115,10 @@ func TestEncodeWithFewerElements(t *testing.T) {
 	// intentionally don't copy all the elements
 	copy(truncatedFieldElements, originalFieldElements[:len(originalFieldElements)-1])
 
-	// next power of 2 bytes, converted into symbol length
-	blobLength := encoding.NextPowerOf2(len(originalData)) / encoding.BYTES_PER_SYMBOL
-
 	// even though the actual length will be less than the claimed length, we shouldn't see any error
-	reconstructedEncodedPayload, err := encodedPayloadFromElements(originalFieldElements, uint32(blobLength))
+	reconstructedEncodedPayload, err := encodedPayloadFromElements(
+		originalFieldElements,
+		uint32(len(originalFieldElements))*encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
 	require.NotNil(t, reconstructedEncodedPayload)
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -14,7 +13,7 @@ import (
 //
 // Example encoding:
 //
-//              Encoded Payload header (32 bytes total)                   Encoded Payload Data (len is multiple of 32)
+//             Encoded Payload header (32 bytes total)                   Encoded Payload Data (len is multiple of 32)
 // [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
 type encodedPayload struct {
 	// the size of these bytes is guaranteed to be a multiple of 32
@@ -87,23 +86,16 @@ func (ep *encodedPayload) toFieldElements() ([]fr.Element, error) {
 
 // encodedPayloadFromElements accepts an array of field elements, and converts them into an encoded payload
 //
-// blobLength is the length of the blob IN SYMBOLS, as claimed by the blob commitment. This is needed to make sure
-// that the claimed length in the encoded payload header is valid relative to the total blob length
-func encodedPayloadFromElements(fieldElements []fr.Element, blobLength uint32) (*encodedPayload, error) {
+// maxPayloadLength is the maximum length in bytes that the contained Payload is permitted to be
+func encodedPayloadFromElements(fieldElements []fr.Element, maxPayloadLength uint32) (*encodedPayload, error) {
 	polynomialBytes := rs.FieldElementsToBytes(fieldElements)
 	// this is the payload length in bytes, as claimed by the encoded payload header
 	payloadLength := binary.BigEndian.Uint32(polynomialBytes[2:6])
 
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
-	if err != nil {
-		return nil, fmt.Errorf("get max permissible payload length: %w", err)
-	}
-
-	if payloadLength > maxPermissiblePayloadLength {
+	if payloadLength > maxPayloadLength {
 		return nil, fmt.Errorf(
-			`length claimed in encoded payload header (%d bytes) exceeds the max permissible length (%d bytes)
-					that could be contained in a blob of length %d symbols (%d bytes)`,
-			payloadLength, maxPermissiblePayloadLength, blobLength, blobLength*encoding.BYTES_PER_SYMBOL)
+			"payload length claimed in encoded payload header (%d bytes) is larger than the permitted maximum (%d bytes)",
+			payloadLength, maxPayloadLength)
 	}
 
 	// this is the length you would get if you padded a payload of the length claimed in the encoded payload header
