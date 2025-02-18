@@ -161,13 +161,14 @@ func RandomProofsTest(t *testing.T, client s3.Client) {
 		proofs := getProofs(t, rand.Intn(100)+100)
 		expectedValues[key] = proofs
 
-		err := writer.PutChunkProofs(context.Background(), key, proofs)
+		err := writer.PutFrameProofs(context.Background(), key, proofs)
 		require.NoError(t, err)
 	}
 
 	// Read data
 	for key, expectedProofs := range expectedValues {
-		proofs, err := reader.GetChunkProofs(context.Background(), key)
+		binaryProofs, err := reader.GetBinaryChunkProofs(context.Background(), key)
+		proofs := rs.DeserializeSplitFrameProofs(binaryProofs)
 		require.NoError(t, err)
 		require.Equal(t, expectedProofs, proofs)
 	}
@@ -188,16 +189,15 @@ func TestRandomProofs(t *testing.T) {
 	}
 }
 
-func generateRandomFrames(t *testing.T, encoder *rs.Encoder, size int, params encoding.EncodingParams) []*rs.Frame {
+func generateRandomFrameCoeffs(
+	t *testing.T,
+	encoder *rs.Encoder,
+	size int,
+	params encoding.EncodingParams) []rs.FrameCoeffs {
+
 	frames, _, err := encoder.EncodeBytes(codec.ConvertByPaddingEmptyByte(tu.RandomBytes(size)), params)
-	result := make([]*rs.Frame, len(frames))
 	require.NoError(t, err)
-
-	for i := 0; i < len(frames); i++ {
-		result[i] = &frames[i]
-	}
-
-	return result
+	return frames
 }
 
 func RandomCoefficientsTest(t *testing.T, client s3.Client) {
@@ -215,28 +215,31 @@ func RandomCoefficientsTest(t *testing.T, client s3.Client) {
 	writer := NewChunkWriter(logger, client, bucket, fragmentSize)
 	reader := NewChunkReader(logger, client, bucket)
 
-	expectedValues := make(map[corev2.BlobKey][]*rs.Frame)
+	expectedValues := make(map[corev2.BlobKey][]rs.FrameCoeffs)
 	metadataMap := make(map[corev2.BlobKey]*encoding.FragmentInfo)
 
 	// Write data
 	for i := 0; i < 100; i++ {
 		key := corev2.BlobKey(tu.RandomBytes(32))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
+		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
 		expectedValues[key] = coefficients
 
-		metadata, err := writer.PutChunkCoefficients(context.Background(), key, coefficients)
+		metadata, err := writer.PutFrameCoefficients(context.Background(), key, coefficients)
 		require.NoError(t, err)
 		metadataMap[key] = metadata
 	}
 
 	// Read data
 	for key, expectedCoefficients := range expectedValues {
-		coefficients, err := reader.GetChunkCoefficients(context.Background(), key, metadataMap[key])
+		elementCount, binaryCoefficients, err :=
+			reader.GetBinaryChunkCoefficients(context.Background(), key, metadataMap[key])
+		require.NoError(t, err)
+		coefficients := rs.DeserializeSplitFrameCoeffs(elementCount, binaryCoefficients)
 		require.NoError(t, err)
 		require.Equal(t, len(expectedCoefficients), len(coefficients))
 		for i := 0; i < len(expectedCoefficients); i++ {
-			require.Equal(t, *expectedCoefficients[i], *coefficients[i])
+			require.Equal(t, expectedCoefficients[i], coefficients[i])
 		}
 	}
 }
@@ -279,12 +282,12 @@ func TestCheckProofCoefficientsExist(t *testing.T) {
 		key := corev2.BlobKey(tu.RandomBytes(32))
 
 		proofs := getProofs(t, rand.Intn(100)+100)
-		err := writer.PutChunkProofs(ctx, key, proofs)
+		err := writer.PutFrameProofs(ctx, key, proofs)
 		require.NoError(t, err)
 		require.True(t, writer.ProofExists(ctx, key))
 
-		coefficients := generateRandomFrames(t, encoder, int(chunkSize), params)
-		metadata, err := writer.PutChunkCoefficients(ctx, key, coefficients)
+		coefficients := generateRandomFrameCoeffs(t, encoder, int(chunkSize), params)
+		metadata, err := writer.PutFrameCoefficients(ctx, key, coefficients)
 		require.NoError(t, err)
 		exist, fragmentInfo := writer.CoefficientsExists(ctx, key)
 		require.True(t, exist)

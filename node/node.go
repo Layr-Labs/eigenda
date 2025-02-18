@@ -352,7 +352,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	n.CurrentSocket = socket
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 {
+	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
 		go n.checkRegisteredNodeIpOnChain(ctx)
 		go n.checkCurrentNodeIp(ctx)
 	}

@@ -876,16 +876,20 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 			require.Equal(t, cursor.UpdatedAt, expectedCursors[i].UpdatedAt)
 		} else {
 			require.Len(t, metadata, numBlobs%pageSize)
-			require.Equal(t, cursor.BlobKey, &keys[numBlobs-1])
-			require.Equal(t, cursor.UpdatedAt, metadataList[numBlobs-1].UpdatedAt)
+			require.Nil(t, cursor)
 		}
 		i++
 	}
-	lastCursor := cursor
+
+	for i := 0; i < numBlobs; i++ {
+		err = blobMetadataStore.UpdateBlobStatus(ctx, keys[i], v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
 	metadata, cursor, err = blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, cursor, int32(pageSize))
 	require.NoError(t, err)
 	require.Len(t, metadata, 0)
-	require.Equal(t, cursor, lastCursor)
+	require.Nil(t, cursor)
 
 	deleteItems(t, dynamoKeys)
 }
@@ -929,7 +933,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "0x123",
-					ReservationPeriod: uint32(i),
+					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
 			},
@@ -947,14 +951,14 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, certs, numCerts)
 	assert.Len(t, fragmentInfos, numCerts)
-	reservationPeriodes := make(map[uint32]struct{})
+	timestamps := make(map[int64]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
-		reservationPeriodes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
+		timestamps[certs[i].BlobHeader.PaymentMetadata.Timestamp] = struct{}{}
 	}
-	assert.Len(t, reservationPeriodes, numCerts)
+	assert.Len(t, timestamps, numCerts)
 	for i := 0; i < numCerts; i++ {
-		assert.Contains(t, reservationPeriodes, uint32(i))
+		assert.Contains(t, timestamps, int64(i))
 	}
 
 	deleteItems(t, []commondynamodb.Key{
@@ -1310,15 +1314,44 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, attestation, fetchedAttestation)
 
-	// attempt to put attestation with the same key should fail
-	err = blobMetadataStore.PutAttestation(ctx, attestation)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
-
 	// attempt to retrieve batch header and attestation at the same time
 	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
 	assert.NoError(t, err)
 	assert.Equal(t, h, fetchedHeader)
 	assert.Equal(t, attestation, fetchedAttestation)
+
+	// overwrite existing attestation
+	updatedAttestation := &corev2.Attestation{
+		BatchHeader: h,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 90,
+		},
+	}
+
+	err = blobMetadataStore.PutAttestation(ctx, updatedAttestation)
+	assert.NoError(t, err)
+	fetchedAttestation, err = blobMetadataStore.GetAttestation(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
+
+	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
@@ -1343,8 +1376,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
-	require.NoError(t, err)
+	timestamp := time.Now().UnixNano()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -1356,7 +1388,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp,
 			CumulativePayment: cumulativePayment,
 		},
 	}

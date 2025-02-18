@@ -23,7 +23,7 @@ func TestBlobKey(t *testing.T) {
 func TestPaymentHash(t *testing.T) {
 	pm := core.PaymentMetadata{
 		AccountID:         "0x123",
-		ReservationPeriod: 5,
+		Timestamp:         5,
 		CumulativePayment: big.NewInt(100),
 	}
 	hash, err := pm.Hash()
@@ -45,15 +45,14 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
-		Salt: 42,
 	}
 	blobKey, err := bh.BlobKey()
 	assert.NoError(t, err)
-	// 0x2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a has verified in solidity  with chisel
-	assert.Equal(t, "2bac85c7fc4c21ad02538a7eb44b120efbc64d25b1691470273f84c8cf82187a", blobKey.Hex())
+	// 0xcadcc0498d2b61c069ef1000ce6d7b23370a918a6aa44f73de79973d3fa3120e has verified in solidity  with chisel
+	assert.Equal(t, "cadcc0498d2b61c069ef1000ce6d7b23370a918a6aa44f73de79973d3fa3120e", blobKey.Hex())
 
 	// same blob key should be generated for the blob header with shuffled quorum numbers
 	bh2 := v2.BlobHeader{
@@ -62,10 +61,9 @@ func TestBlobKeyFromHeader(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{1, 0},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
-		Salt: 42,
 	}
 
 	blobKey2, err := bh2.BlobKey()
@@ -116,10 +114,9 @@ func TestBlobCertHash(t *testing.T) {
 			QuorumNumbers:   []core.QuorumID{0, 1},
 			PaymentMetadata: core.PaymentMetadata{
 				AccountID:         "0x123",
-				ReservationPeriod: 5,
+				Timestamp:         5,
 				CumulativePayment: big.NewInt(100),
 			},
-			Salt: 42,
 		},
 		Signature: []byte{1, 2, 3},
 		RelayKeys: []v2.RelayKey{4, 5, 6},
@@ -128,8 +125,8 @@ func TestBlobCertHash(t *testing.T) {
 	hash, err := blobCert.Hash()
 	assert.NoError(t, err)
 
-	// afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec has verified in solidity with chisel
-	assert.Equal(t, "afa39b4c45197f0254f7e8e2127c797c74578357e9f077eab7a8aa62e1402bec", hex.EncodeToString(hash[:]))
+	// 36430a6fbf0b99cc86801b6f7254b5f5cb5e838c6b9d83889ad7705165ffa4dc has verified in solidity with chisel
+	assert.Equal(t, "36430a6fbf0b99cc86801b6f7254b5f5cb5e838c6b9d83889ad7705165ffa4dc", hex.EncodeToString(hash[:]))
 }
 
 func TestBlobCertSerialization(t *testing.T) {
@@ -146,10 +143,9 @@ func TestBlobCertSerialization(t *testing.T) {
 			QuorumNumbers:   []core.QuorumID{0, 1},
 			PaymentMetadata: core.PaymentMetadata{
 				AccountID:         "0x123",
-				ReservationPeriod: 5,
+				Timestamp:         5,
 				CumulativePayment: big.NewInt(100),
 			},
-			Salt: 42,
 		},
 		Signature: []byte{1, 2, 3},
 		RelayKeys: []v2.RelayKey{4, 5, 6},

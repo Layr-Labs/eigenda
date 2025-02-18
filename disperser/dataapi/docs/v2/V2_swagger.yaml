@@ -156,10 +156,6 @@ definitions:
         items:
           type: integer
         type: array
-      salt:
-        description: Salt is used to make blob intentionally unique when everything
-          else is the same
-        type: integer
     type: object
   github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo:
     properties:
@@ -227,6 +223,23 @@ definitions:
           type: number
         type: object
     type: object
+  v2.AttestationInfo:
+    properties:
+      attestation:
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      nonsigners:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/v2.OperatorIdentity'
+          type: array
+        type: object
+      signers:
+        additionalProperties:
+          items:
+            $ref: '#/definitions/v2.OperatorIdentity'
+          type: array
+        type: object
+    type: object
   v2.BatchFeedResponse:
     properties:
       batches:
@@ -266,8 +279,8 @@ definitions:
     type: object
   v2.BlobAttestationInfoResponse:
     properties:
-      attestation:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      attestation_info:
+        $ref: '#/definitions/v2.AttestationInfo'
       batch_header_hash:
         type: string
       blob_inclusion_info:
@@ -398,6 +411,13 @@ definitions:
         items:
           $ref: '#/definitions/v2.DispersalResponse'
         type: array
+    type: object
+  v2.OperatorIdentity:
+    properties:
+      operator_address:
+        type: string
+      operator_id:
+        type: string
     type: object
   v2.OperatorLivenessResponse:
     properties:

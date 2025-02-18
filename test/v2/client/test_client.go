@@ -386,10 +386,10 @@ func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
 	quorums []core.QuorumID,
 	payload []byte,
-	salt uint32) error {
+) error {
 
 	start := time.Now()
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload, salt)
+	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
@@ -450,7 +450,7 @@ func (c *TestClient) DispersePayload(
 	ctx context.Context,
 	quorums []core.QuorumID,
 	payload []byte,
-	salt uint32) (*verification.EigenDACert, error) {
+) (*verification.EigenDACert, error) {
 
 	c.logger.Debugf("Dispersing payload of length %d", len(payload))
 	start := time.Now()
@@ -459,7 +459,7 @@ func (c *TestClient) DispersePayload(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payload disperser: %w", err)
 	}
-	cert, err := payloadDisperser.SendPayload(ctx, payload, salt)
+	cert, err := payloadDisperser.SendPayload(ctx, payload)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload: %w", err)
@@ -509,7 +509,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	quorums []core.QuorumID,
 	expectedPayload []byte) error {
 
-	currentBlockNumber, err := c.chainState.GetCurrentBlockNumber()
+	currentBlockNumber, err := c.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}

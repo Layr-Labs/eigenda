@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -360,6 +361,13 @@ func (b Bundle) Size() uint64 {
 	return size
 }
 
+// BinaryBundleHeader returns the header of a bundle in binary format.
+func BinaryBundleHeader(elementCount uint64) uint64 {
+	header := uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)
+	header |= elementCount
+	return header
+}
+
 // Serialize returns the serialized bytes of the bundle.
 //
 // The bytes are packed in this format:
@@ -389,7 +397,7 @@ func (b Bundle) Serialize() ([]byte, error) {
 	}
 	result := make([]byte, size+8)
 	buf := result
-	metadata := (uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(len(b[0].Coeffs))
+	metadata := BinaryBundleHeader(uint64(len(b[0].Coeffs)))
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, f := range b {
@@ -490,8 +498,8 @@ type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
 	AccountID string `json:"account_id"`
 
-	// ReservationPeriod represents the range of time at which the dispersal is made
-	ReservationPeriod uint32 `json:"reservation_period"`
+	// Timestamp represents the nanosecond of the dispersal request creation
+	Timestamp int64 `json:"timestamp"`
 	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
 }
@@ -507,8 +515,8 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "reservationPeriod",
-			Type: "uint32",
+			Name: "timestamp",
+			Type: "int64",
 		},
 		{
 			Name: "cumulativePayment",
@@ -545,8 +553,8 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
-			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.ReservationPeriod)},
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
@@ -564,15 +572,15 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
 	}
 	pm.AccountID = accountID.Value
-	rp, ok := m.Value["ReservationPeriod"].(*types.AttributeValueMemberN)
+	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
 	if !ok {
-		return fmt.Errorf("expected *types.AttributeValueMemberN for ReservationPeriod, got %T", m.Value["ReservationPeriod"])
+		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
 	}
-	reservationPeriod, err := strconv.ParseUint(rp.Value, 10, 32)
+	timestamp, err := strconv.ParseInt(rp.Value, 10, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
+		return fmt.Errorf("failed to parse Timestamp: %w", err)
 	}
-	pm.ReservationPeriod = uint32(reservationPeriod)
+	pm.Timestamp = timestamp
 	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
@@ -587,7 +595,7 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 	}
 	return &commonpbv2.PaymentHeader{
 		AccountId:         pm.AccountID,
-		ReservationPeriod: pm.ReservationPeriod,
+		Timestamp:         pm.Timestamp,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
 	}
 }
@@ -600,7 +608,7 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
 
 	return &PaymentMetadata{
 		AccountID:         ph.AccountId,
-		ReservationPeriod: ph.ReservationPeriod,
+		Timestamp:         ph.Timestamp,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
 	}
 }
@@ -634,4 +642,10 @@ type BlobVersionParameters struct {
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
+}
+
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

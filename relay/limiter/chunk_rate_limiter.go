@@ -149,7 +149,7 @@ func (l *ChunkRateLimiter) FinishGetChunkOperation(requesterID string) {
 }
 
 // RequestGetChunkBandwidth should be called when a GetChunk is about to start downloading chunk data.
-func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID string, bytes int) error {
+func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID string, bytes uint32) error {
 	if l == nil {
 		// If the rate limiter is nil, do not enforce rate limits.
 		return nil
@@ -157,7 +157,7 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 
 	// no lock needed here, as the bandwidth limiters themselves are thread-safe
 
-	allowed := l.globalBandwidthLimiter.AllowN(now, bytes)
+	allowed := l.globalBandwidthLimiter.AllowN(now, int(bytes))
 	if !allowed {
 		if l.relayMetrics != nil {
 			l.relayMetrics.ReportChunkRateLimited("global bandwidth")
@@ -175,9 +175,9 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 	if !ok {
 		return fmt.Errorf("internal error, unable to find bandwidth limiter for client ID %s", requesterID)
 	}
-	allowed = limiter.AllowN(now, bytes)
+	allowed = limiter.AllowN(now, int(bytes))
 	if !allowed {
-		l.globalBandwidthLimiter.AllowN(now, -bytes)
+		l.globalBandwidthLimiter.AllowN(now, -int(bytes))
 		if l.relayMetrics != nil {
 			l.relayMetrics.ReportChunkRateLimited("client bandwidth")
 		}

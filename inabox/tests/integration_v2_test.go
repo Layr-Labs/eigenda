@@ -351,7 +351,6 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
-				Salt:              blobCertificate.BlobHeader.Salt,
 			},
 			Signature: blobCertificate.Signature,
 			RelayKeys: blobCertificate.RelayKeys,

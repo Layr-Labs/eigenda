@@ -35,7 +35,7 @@ func testBasicDispersal(
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, quorums, payload, rand.Uint32())
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -161,12 +161,11 @@ func TestDoubleDispersal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err = c.DisperseAndVerify(ctx, quorums, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -181,7 +180,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()

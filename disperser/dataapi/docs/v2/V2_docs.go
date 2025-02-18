@@ -979,6 +979,32 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.AttestationInfo": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "nonsigners": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/v2.OperatorIdentity"
+                        }
+                    }
+                },
+                "signers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/v2.OperatorIdentity"
+                        }
+                    }
+                }
+            }
+        },
         "v2.BatchFeedResponse": {
             "type": "object",
             "properties": {
@@ -1039,8 +1065,8 @@ const docTemplateV2 = `{
         "v2.BlobAttestationInfoResponse": {
             "type": "object",
             "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                "attestation_info": {
+                    "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header_hash": {
                     "type": "string"
@@ -1228,6 +1254,17 @@ const docTemplateV2 = `{
                     "items": {
                         "$ref": "#/definitions/v2.DispersalResponse"
                     }
+                }
+            }
+        },
+        "v2.OperatorIdentity": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
                 }
             }
         },
