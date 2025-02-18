@@ -22,19 +22,18 @@ func FuzzBlobConversion(f *testing.F) {
 }
 
 func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm PolynomialForm) {
-	payload := NewPayload(payloadBytes)
-
-	blob, err := payload.ToBlob(payloadForm)
+	blob, err := NewPayload(payloadBytes).ToBlob(payloadForm)
 	require.NoError(t, err)
 
-	blobBytes := blob.GetBytes()
-	blobFromBytes, err := BlobFromBytes(blobBytes, blob.blobLength)
+	blobDeserialized, err := BlobFromBytes(blob.GetBytes(), blob.blobLength)
 	require.NoError(t, err)
 
-	decodedPayload, err := blobFromBytes.ToPayload(payloadForm)
+	payloadFromBlob, err := blob.ToPayload(payloadForm)
 	require.NoError(t, err)
 
-	decodedPayloadBytes := decodedPayload.GetBytes()
+	payloadFromDeserializedBlob, err := blobDeserialized.ToPayload(payloadForm)
+	require.NoError(t, err)
 
-	require.Equal(t, payloadBytes, decodedPayloadBytes)
+	require.Equal(t, payloadFromBlob.GetBytes(), payloadFromDeserializedBlob.GetBytes())
+	require.Equal(t, payloadBytes, payloadFromBlob.GetBytes())
 }

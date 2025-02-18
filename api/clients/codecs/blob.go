@@ -11,7 +11,7 @@ import (
 
 // Blob is data that is dispersed on eigenDA.
 //
-// A Blob is represented under the hood by a coeff polynomial
+// A Blob is represented under the hood by an array of field elements, which represent a polynomial in coefficient form
 type Blob struct {
 	coeffPolynomial []fr.Element
 	// blobLength must be a power of 2, and should match the blobLength claimed in the BlobCommitment
