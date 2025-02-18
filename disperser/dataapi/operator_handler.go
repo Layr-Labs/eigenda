@@ -227,8 +227,7 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		return nil, fmt.Errorf("failed to fetch indexed operator state: %w", err)
 	}
 
-	tqs, quorumsStake := operators.GetRankedOperators(state)
-	oh.metrics.UpdateOperatorsStake(tqs, quorumsStake)
+	_, quorumsStake := operators.GetRankedOperators(state)
 
 	stakeRanked := make(map[string][]*OperatorStake)
 	for q, operators := range quorumsStake {
