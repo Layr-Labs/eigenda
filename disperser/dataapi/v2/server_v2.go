@@ -92,8 +92,8 @@ type (
 		BlobMetadata *disperserv2.BlobMetadata `json:"blob_metadata"`
 	}
 	BlobFeedResponse struct {
-		Blobs           []BlobInfo `json:"blobs"`
-		PaginationToken string     `json:"pagination_token"`
+		Blobs  []BlobInfo `json:"blobs"`
+		Cursor string     `json:"cursor"`
 	}
 
 	BatchResponse struct {
@@ -263,7 +263,8 @@ func (s *ServerV2) Start() error {
 	{
 		blobs := v2.Group("/blobs")
 		{
-			blobs.GET("/feed", s.FetchBlobFeed)
+			blobs.GET("/feed/forward", s.FetchBlobFeedForward)
+			blobs.GET("/feed/backward", s.FetchBlobFeedBackward)
 			blobs.GET("/:blob_key", s.FetchBlob)
 			blobs.GET("/:blob_key/certificate", s.FetchBlobCertificate)
 			blobs.GET("/:blob_key/attestation-info", s.FetchBlobAttestationInfo)
