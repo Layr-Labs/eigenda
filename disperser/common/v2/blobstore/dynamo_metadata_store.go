@@ -420,7 +420,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 	if !until.LessThan(&before) {
 		return nil, nil, errors.New("until cursor must be less than before cursor")
 	}
-	endBucket, startBucket := GetRequestedAtBucketIDRange(until.RequestedAt, before.RequestedAt)
+	startBucket, endBucket := GetRequestedAtBucketIDRange(until.RequestedAt, before.RequestedAt)
 	startKey := until.ToCursorKey()
 	endKey := before.ToCursorKey()
 	result := make([]*v2.BlobMetadata, 0)
@@ -590,7 +590,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
 		return nil, errors.New("until must be less than before")
 	}
 	// Note: we traverse buckets in reverse order for backward query
-	endBucket, startBucket := GetAttestedAtBucketIDRange(until, before)
+	startBucket, endBucket := GetAttestedAtBucketIDRange(until, before)
 	result := make([]*corev2.Attestation, 0)
 
 	// Traverse buckets in reverse order
@@ -614,6 +614,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
 			}
 		}
 	}
+
 	return result, nil
 }
 
