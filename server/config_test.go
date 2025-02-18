@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -42,9 +42,9 @@ func validCfg() *Config {
 			EthConfirmationDepth: 12,
 		},
 		MemstoreEnabled: true,
-		MemstoreConfig: memstore.Config{
+		MemstoreConfig: memconfig.NewSafeConfig(memconfig.Config{
 			BlobExpiration: 25 * time.Minute,
-		},
+		}),
 	}
 }
 

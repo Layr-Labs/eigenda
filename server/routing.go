@@ -14,7 +14,7 @@ const (
 	routingVarNameCommitTypeByteHex = "commit_type_byte_hex"
 )
 
-func (svr *Server) registerRoutes(r *mux.Router) {
+func (svr *Server) RegisterRoutes(r *mux.Router) {
 	subrouterGET := r.Methods("GET").PathPrefix("/get").Subrouter()
 	// std commitments (for nitro)
 	subrouterGET.HandleFunc("/"+

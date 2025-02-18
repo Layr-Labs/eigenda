@@ -9,13 +9,14 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 )
 
 type Config struct {
 	EdaClientConfig clients.EigenDAClientConfig
-	MemstoreConfig  memstore.Config
+	MemstoreConfig  *memconfig.SafeConfig
 	StorageConfig   store.Config
 	VerifierConfig  verify.Config
 	PutRetries      uint

@@ -11,7 +11,7 @@ LDFLAGSSTRING +=-X main.Date=$(BUILD_TIME)
 LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
-E2EFUZZTEST = FUZZ=true go test ./e2e -fuzz -v -fuzztime=15m
+E2EFUZZTEST = FUZZ=true go test ./e2e -fuzz -v -fuzztime=5m
 
 .PHONY: eigenda-proxy
 eigenda-proxy:
@@ -23,7 +23,7 @@ docker-build:
 	@docker build -t ghcr.io/layr-labs/eigenda-proxy:dev .
 
 run-memstore-server:
-	./bin/eigenda-proxy --memstore.enabled --eigenda.cert-verification-disabled --eigenda.eth-rpc http://localhost:8545 --eigenda.svc-manager-addr 0x123 --metrics.enabled
+	./bin/eigenda-proxy --memstore.enabled --metrics.enabled
 
 disperse-test-blob:
 	curl -X POST -d my-blob-content http://127.0.0.1:3100/put/

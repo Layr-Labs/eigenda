@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
 	"github.com/golang/mock/gomock"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +22,8 @@ func TestRouting(t *testing.T) {
 
 	m := metrics.NewMetrics("default")
 	server := NewServer("localhost", 8080, mockRouter, testLogger, m)
-	err := server.Start()
+	r := mux.NewRouter()
+	err := server.Start(r)
 	require.NoError(t, err)
 
 	tests := []struct {

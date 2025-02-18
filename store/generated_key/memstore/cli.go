@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/urfave/cli/v2"
 )
@@ -98,16 +99,17 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 	}
 }
 
-func ReadConfig(ctx *cli.Context) Config {
-	return Config{
-		// TODO: there has to be a better way to get MaxBlobLengthBytes
-		// right now we get it from the verifier cli, but there's probably a way to share flags more nicely?
-		// maybe use a duplicate but hidden flag in memstore category, and set it using the action by reading
-		// from the other flag?
-		MaxBlobSizeBytes:        verify.MaxBlobLengthBytes,
-		BlobExpiration:          ctx.Duration(ExpirationFlagName),
-		PutLatency:              ctx.Duration(PutLatencyFlagName),
-		GetLatency:              ctx.Duration(GetLatencyFlagName),
-		PutReturnsFailoverError: ctx.Bool(PutReturnsFailoverErrorFlagName),
-	}
+func ReadConfig(ctx *cli.Context) *memconfig.SafeConfig {
+	return memconfig.NewSafeConfig(
+		memconfig.Config{
+			// TODO: there has to be a better way to get MaxBlobLengthBytes
+			// right now we get it from the verifier cli, but there's probably a way to share flags more nicely?
+			// maybe use a duplicate but hidden flag in memstore category, and set it using the action by reading
+			// from the other flag?
+			MaxBlobSizeBytes:        verify.MaxBlobLengthBytes,
+			BlobExpiration:          ctx.Duration(ExpirationFlagName),
+			PutLatency:              ctx.Duration(PutLatencyFlagName),
+			GetLatency:              ctx.Duration(GetLatencyFlagName),
+			PutReturnsFailoverError: ctx.Bool(PutReturnsFailoverErrorFlagName),
+		})
 }

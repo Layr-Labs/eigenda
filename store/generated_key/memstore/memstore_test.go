@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -22,13 +23,13 @@ const (
 	testPreimage = "Four score and seven years ago"
 )
 
-func getDefaultMemStoreTestConfig() Config {
-	return Config{
+func getDefaultMemStoreTestConfig() *memconfig.SafeConfig {
+	return memconfig.NewSafeConfig(memconfig.Config{
 		MaxBlobSizeBytes: 1024 * 1024,
 		BlobExpiration:   0,
 		PutLatency:       0,
 		GetLatency:       0,
-	}
+	})
 }
 
 func getDefaultVerifierTestConfig() *verify.Config {
@@ -80,7 +81,7 @@ func TestExpiration(t *testing.T) {
 	require.NoError(t, err)
 
 	memstoreConfig := getDefaultMemStoreTestConfig()
-	memstoreConfig.BlobExpiration = 10 * time.Millisecond
+	memstoreConfig.SetBlobExpiration(10 * time.Millisecond)
 	ms, err := New(
 		ctx,
 		verifier,
@@ -115,8 +116,8 @@ func TestLatency(t *testing.T) {
 	require.NoError(t, err)
 
 	config := getDefaultMemStoreTestConfig()
-	config.PutLatency = putLatency
-	config.GetLatency = getLatency
+	config.SetLatencyPUTRoute(putLatency)
+	config.SetLatencyGETRoute(getLatency)
 	ms, err := New(ctx, verifier, testLogger, config)
 
 	require.NoError(t, err)
@@ -150,7 +151,7 @@ func TestPutRetursFailoverErrorConfig(t *testing.T) {
 	validKey, err := ms.Put(ctx, []byte("some-value"))
 	require.NoError(t, err)
 
-	ms.config.PutReturnsFailoverError = true
+	ms.config.SetPUTReturnsFailoverError(true)
 
 	// failover mode should only affect Put route
 	_, err = ms.Get(ctx, validKey)

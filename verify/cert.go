@@ -46,7 +46,6 @@ func NewCertVerifier(cfg *Config, log logging.Logger) (*CertVerifier, error) {
 		// We keep this low (<128) to avoid requiring an archive node.
 		return nil, fmt.Errorf("confirmation depth must be less than 64; consider using cfg.WaitForFinalization=true instead")
 	}
-	log.Info("Enabling certificate verification", "confirmation_depth", cfg.EthConfirmationDepth)
 
 	client, err := ethclient.Dial(cfg.RPCURL)
 	if err != nil {

@@ -85,12 +85,6 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log logging.Logger, m 
 		return nil, fmt.Errorf("failed to create verifier: %w", err)
 	}
 
-	if vCfg.VerifyCerts {
-		log.Info("Certificate verification with Ethereum enabled")
-	} else {
-		log.Warn("Verification disabled")
-	}
-
 	// create EigenDA backend store
 	var eigenDA common.GeneratedKeyStore
 	if cfg.EigenDAConfig.MemstoreEnabled {
@@ -109,7 +103,7 @@ func LoadStoreManager(ctx context.Context, cfg CLIConfig, log logging.Logger, m 
 			verifier,
 			log,
 			&eigenda.StoreConfig{
-				MaxBlobSizeBytes:     cfg.EigenDAConfig.MemstoreConfig.MaxBlobSizeBytes,
+				MaxBlobSizeBytes:     cfg.EigenDAConfig.MemstoreConfig.MaxBlobSizeBytes(),
 				EthConfirmationDepth: cfg.EigenDAConfig.VerifierConfig.EthConfirmationDepth,
 				StatusQueryTimeout:   cfg.EigenDAConfig.EdaClientConfig.StatusQueryTimeout,
 				PutRetries:           cfg.EigenDAConfig.PutRetries,

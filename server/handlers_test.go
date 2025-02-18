@@ -99,7 +99,7 @@ func TestHandlerGet(t *testing.T) {
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
 			server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
-			server.registerRoutes(r)
+			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
 			require.Equal(t, tt.expectedCode, rec.Code)
@@ -170,7 +170,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 			r := mux.NewRouter()
 			// enable this logger to help debug tests
 			server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
-			server.registerRoutes(r)
+			server.RegisterRoutes(r)
 			r.ServeHTTP(rec, req)
 
 			require.Equal(t, tt.expectedCode, rec.Code)
@@ -255,7 +255,7 @@ func TestHandlerPutErrors(t *testing.T) {
 				r := mux.NewRouter()
 				// enable this logger to help debug tests
 				server := NewServer("localhost", 0, mockStorageMgr, testLogger, metrics.NoopMetrics)
-				server.registerRoutes(r)
+				server.RegisterRoutes(r)
 				r.ServeHTTP(rec, req)
 
 				require.Equal(t, tt.expectedHTTPCode, rec.Code)

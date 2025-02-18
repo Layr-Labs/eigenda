@@ -53,9 +53,7 @@ func NewServer(host string, port int, sm store.IManager, log logging.Logger,
 	}
 }
 
-func (svr *Server) Start() error {
-	r := mux.NewRouter()
-	svr.registerRoutes(r)
+func (svr *Server) Start(r *mux.Router) error {
 	svr.httpServer.Handler = r
 
 	listener, err := net.Listen("tcp", svr.endpoint)
