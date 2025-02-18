@@ -21,9 +21,9 @@ import (
 //	@Summary	Fetch blob feed forward in time (oldest to newest)
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		after	query		string	false	"Fetch blobs after this time (ISO 8601 format) [default: until - 1h]"
-//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format) [default: now]"
-//	@Param		cursor	query		string	false	"Pagination cursor for fetching newer items; override after [default: empty]"
+//	@Param		after	query		string	false	"Fetch blobs after this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: until - 1h]"
+//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		cursor	query		string	false	"Pagination cursor for fetching newer items; override after param [default: empty]"
 //	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
 //	@Success	200		{object}	BlobFeedResponse
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
@@ -115,9 +115,9 @@ func (s *ServerV2) FetchBlobFeedForward(c *gin.Context) {
 //	@Summary	Fetch blob feed backward in time (newest to oldest)
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		before	query		string	false	"Fetch blobs before this time (ISO 8601 format) [default: now]"
-//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format) [default: now-1h]"
-//	@Param		cursor	query		string	false	"Pagination cursor for fetching older items; override before [default: empty]"
+//	@Param		before	query		string	false	"Fetch blobs before this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: before - 1h]"
+//	@Param		cursor	query		string	false	"Pagination cursor for fetching older items; override before param [default: empty]"
 //	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
 //	@Success	200		{object}	BlobFeedResponse
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
