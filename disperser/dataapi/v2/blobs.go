@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,140 +17,87 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// FetchBlobFeedForward godoc
+// FetchBlobFeed godoc
 //
-//	@Summary	Fetch blob feed forward in time (oldest to newest)
+//	@Summary	Fetch blob feed in specified direction
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		after	query		string	false	"Fetch blobs after this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: until - 1h]"
-//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		cursor	query		string	false	"Pagination cursor for fetching newer items; override after param [default: empty]"
-//	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
-//	@Success	200		{object}	BlobFeedResponse
-//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404		{object}	ErrorResponse	"error: Not found"
-//	@Failure	500		{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/feed/forward [get]
-func (s *ServerV2) FetchBlobFeedForward(c *gin.Context) {
+//	@Param		direction	query		string	true	"Direction to fetch: 'forward' or 'backward' [default: forward]"
+//	@Param		before		query		string	false	"Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		after		query		string	false	"Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than 'before' [default: before-1h]"
+//	@Param		cursor		query		string	false	"Pagination cursor; for 'forward', fetches blobs from 'cursor' to 'before', for 'backward', fetches from 'after' to 'cursor' (all are exclusive) [default: empty]"
+//	@Param		limit		query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
+//	@Success	200			{object}	BlobFeedResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/feed [get]
+func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
 
-	now := handlerStart
-	oldestTime := now.Add(-maxBlobAge)
-
-	untilTime := now
-	if c.Query("until") != "" {
-		untilTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("until"))
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedForward")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse until param: %w", err))
+	// Validate direction
+	direction := "forward"
+	if dirStr := c.Query("direction"); dirStr != "" {
+		if dirStr != "forward" && dirStr != "backward" {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+			invalidParamsErrorResponse(c, fmt.Errorf("direction must be either 'forward' or 'backward', found: %s", dirStr))
 			return
 		}
-		if untilTime.Before(oldestTime) {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedForward")
-			invalidParamsErrorResponse(c, fmt.Errorf("until time cannot be more than 14 days in the past, found: %s", c.Query("until")))
-			return
-		}
+		direction = dirStr
 	}
-
-	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedForward")
-		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
-		return
-	}
-	if limit <= 0 || limit > maxNumBlobsPerBlobFeedResponse {
-		limit = maxNumBlobsPerBlobFeedResponse
-	}
-
-	var afterCursor blobstore.BlobFeedCursor
-
-	// Handle cursor (overrides after)
-	if cursorStr := c.Query("cursor"); cursorStr != "" {
-		cursor, err := new(blobstore.BlobFeedCursor).FromCursorKey(cursorStr)
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedForward")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the cursor: %w", err))
-			return
-		}
-		afterCursor = *cursor
-	} else {
-		// Use after parameter if no cursor
-		afterTime := untilTime.Add(-time.Hour) // default to 1 hour ago
-		if c.Query("after") != "" {
-			afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
-			if err != nil {
-				s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedForward")
-				invalidParamsErrorResponse(c, fmt.Errorf("failed to parse after param: %w", err))
-				return
-			}
-			if afterTime.Before(oldestTime) {
-				afterTime = oldestTime
-			}
-		}
-		afterCursor = blobstore.BlobFeedCursor{
-			RequestedAt: uint64(afterTime.UnixNano()),
-		}
-	}
-
-	untilCursor := blobstore.BlobFeedCursor{
-		RequestedAt: uint64(untilTime.UnixNano()),
-	}
-
-	blobs, nextCursor, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(
-		c.Request.Context(),
-		afterCursor,
-		untilCursor,
-		limit,
-	)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobFeedForward")
-		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
-		return
-	}
-	s.sendBlobFeedResponse(c, blobs, nextCursor, handlerStart)
-}
-
-// FetchBlobFeedBackward godoc
-//
-//	@Summary	Fetch blob feed backward in time (newest to oldest)
-//	@Tags		Blobs
-//	@Produce	json
-//	@Param		before	query		string	false	"Fetch blobs before this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: before - 1h]"
-//	@Param		cursor	query		string	false	"Pagination cursor for fetching older items; override before param [default: empty]"
-//	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
-//	@Success	200		{object}	BlobFeedResponse
-//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404		{object}	ErrorResponse	"error: Not found"
-//	@Failure	500		{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/feed/backward [get]
-func (s *ServerV2) FetchBlobFeedBackward(c *gin.Context) {
-	handlerStart := time.Now()
-	var err error
 
 	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
 	// Handle before parameter
-	beforeTime := now // default to now
+	beforeTime := now
 	if c.Query("before") != "" {
 		beforeTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("before"))
 		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedBackward")
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse before param: %w", err))
 			return
 		}
 		if beforeTime.Before(oldestTime) {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedBackward")
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 			invalidParamsErrorResponse(c, fmt.Errorf("before time cannot be more than 14 days in the past, found: %s", c.Query("before")))
 			return
 		}
+		if now.Before(beforeTime) {
+			beforeTime = now
+		}
+	}
+
+	// Handle after parameter
+	afterTime := beforeTime.Add(-time.Hour)
+	if c.Query("after") != "" {
+		afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
+		if err != nil {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse after param: %w", err))
+			return
+		}
+		if now.Before(afterTime) {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+			invalidParamsErrorResponse(c, fmt.Errorf("'after' must be before current time, found: %s", c.Query("after")))
+			return
+		}
+		if afterTime.Before(oldestTime) {
+			afterTime = oldestTime
+		}
+	}
+
+	// Validate time range
+	if !afterTime.Before(beforeTime) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+		invalidParamsErrorResponse(c, fmt.Errorf("after time must be before before time"))
+		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedBackward")
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
 		return
 	}
@@ -157,53 +105,55 @@ func (s *ServerV2) FetchBlobFeedBackward(c *gin.Context) {
 		limit = maxNumBlobsPerBlobFeedResponse
 	}
 
-	var beforeCursor blobstore.BlobFeedCursor
+	// Convert times to cursors
+	afterCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(afterTime.UnixNano()),
+	}
+	beforeCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(beforeTime.UnixNano()),
+	}
 
-	// Handle cursor (overrides before)
+	current := blobstore.BlobFeedCursor{
+		RequestedAt: 0,
+	}
+	// Handle cursor if provided
 	if cursorStr := c.Query("cursor"); cursorStr != "" {
 		cursor, err := new(blobstore.BlobFeedCursor).FromCursorKey(cursorStr)
 		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedBackward")
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the cursor: %w", err))
 			return
 		}
-		beforeCursor = *cursor
+		current = *cursor
+	}
+
+	var blobs []*v2.BlobMetadata
+	var nextCursor *blobstore.BlobFeedCursor
+
+	if direction == "forward" {
+		startCursor := afterCursor
+		// The presence of `cusor` param will override the `after` param
+		if current.RequestedAt > 0 {
+			startCursor = current
+		}
+		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAt(
+			c.Request.Context(),
+			startCursor,
+			beforeCursor,
+			limit,
+		)
 	} else {
-		beforeCursor = blobstore.BlobFeedCursor{
-			RequestedAt: uint64(beforeTime.UnixNano()),
-		}
+		// TODO(jianxiao): To be implemented
+		errorResponse(c, errors.New("Not Implemented"))
+		return
 	}
 
-	// Handle until parameter
-	untilTime := now.Add(-time.Hour) // default to 1 hour ago
-	if c.Query("until") != "" {
-		untilTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("until"))
-		if err != nil {
-			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeedBackward")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse until param: %w", err))
-			return
-		}
-		if untilTime.Before(oldestTime) {
-			untilTime = oldestTime
-		}
-	}
-
-	untilCursor := blobstore.BlobFeedCursor{
-		RequestedAt: uint64(untilTime.UnixNano()),
-	}
-
-	// TODO(jianxiao): this is just a placeholder as GetBlobMetadataByRequested is doing forward retrieval
-	blobs, nextCursor, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(
-		c.Request.Context(),
-		untilCursor,
-		beforeCursor,
-		limit,
-	)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobFeedBackward")
+		s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
 		return
 	}
+
 	s.sendBlobFeedResponse(c, blobs, nextCursor, handlerStart)
 }
 

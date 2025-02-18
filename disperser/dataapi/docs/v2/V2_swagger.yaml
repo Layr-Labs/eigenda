@@ -672,62 +672,27 @@ paths:
       summary: Fetch blob certificate by blob key v2
       tags:
       - Blobs
-  /blobs/feed/backward:
+  /blobs/feed:
     get:
       parameters:
-      - description: 'Fetch blobs before this time (ISO 8601 format) [default: now]'
+      - description: 'Direction to fetch: ''forward'' or ''backward'' [default: forward]'
+        in: query
+        name: direction
+        required: true
+        type: string
+      - description: 'Fetch blobs before this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z) [default: now]'
         in: query
         name: before
         type: string
-      - description: 'Stop fetching at this time (ISO 8601 format) [default: now-1h]'
-        in: query
-        name: until
-        type: string
-      - description: 'Pagination cursor for fetching older items; override before
-          [default: empty]'
-        in: query
-        name: cursor
-        type: string
-      - description: 'Maximum number of blobs to fetch [default: 20; max: 1000]'
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.BlobFeedResponse'
-        "400":
-          description: 'error: Bad request'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "404":
-          description: 'error: Not found'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-        "500":
-          description: 'error: Server error'
-          schema:
-            $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob feed backward in time (newest to oldest)
-      tags:
-      - Blobs
-  /blobs/feed/forward:
-    get:
-      parameters:
-      - description: 'Fetch blobs after this time (ISO 8601 format) [default: until
-          - 1h]'
+      - description: 'Fetch blobs after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than ''before'' [default: before-1h]'
         in: query
         name: after
         type: string
-      - description: 'Stop fetching at this time (ISO 8601 format) [default: now]'
-        in: query
-        name: until
-        type: string
-      - description: 'Pagination cursor for fetching newer items; override after [default:
-          empty]'
+      - description: 'Pagination cursor; for ''forward'', fetches blobs from ''cursor''
+          to ''before'', for ''backward'', fetches from ''after'' to ''cursor'' (all
+          are exclusive) [default: empty]'
         in: query
         name: cursor
         type: string
@@ -754,7 +719,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob feed forward in time (oldest to newest)
+      summary: Fetch blob feed in specified direction
       tags:
       - Blobs
   /metrics/summary:

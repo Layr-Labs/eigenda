@@ -115,7 +115,7 @@
                 }
             }
         },
-        "/blobs/feed/backward": {
+        "/blobs/feed": {
             "get": {
                 "produces": [
                     "application/json"
@@ -123,86 +123,30 @@
                 "tags": [
                     "Blobs"
                 ],
-                "summary": "Fetch blob feed backward in time (newest to oldest)",
+                "summary": "Fetch blob feed in specified direction",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Fetch blobs before this time (ISO 8601 format) [default: now]",
+                        "description": "Direction to fetch: 'forward' or 'backward' [default: forward]",
+                        "name": "direction",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
                         "name": "before",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Stop fetching at this time (ISO 8601 format) [default: now-1h]",
-                        "name": "until",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Pagination cursor for fetching older items; override before [default: empty]",
-                        "name": "cursor",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum number of blobs to fetch [default: 20; max: 1000]",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.BlobFeedResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/blobs/feed/forward": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Blobs"
-                ],
-                "summary": "Fetch blob feed forward in time (oldest to newest)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Fetch blobs after this time (ISO 8601 format) [default: until - 1h]",
+                        "description": "Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than 'before' [default: before-1h]",
                         "name": "after",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Stop fetching at this time (ISO 8601 format) [default: now]",
-                        "name": "until",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Pagination cursor for fetching newer items; override after [default: empty]",
+                        "description": "Pagination cursor; for 'forward', fetches blobs from 'cursor' to 'before', for 'backward', fetches from 'after' to 'cursor' (all are exclusive) [default: empty]",
                         "name": "cursor",
                         "in": "query"
                     },

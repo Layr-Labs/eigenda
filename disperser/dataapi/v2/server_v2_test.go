@@ -444,15 +444,16 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	defer deleteItems(t, dynamoKeys)
 
-	r.GET("/v2/blobs/feed/forward", testDataApiServerV2.FetchBlobFeedForward)
+	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
 		reqUrls := []string{
-			"/v2/blobs/feed/forward?cursor=abc",
-			"/v2/blobs/feed/forward?limit=abc",
-			"/v2/blobs/feed/forward?after=abc",
-			"/v2/blobs/feed/forward?until=2006-01-02T15:04:05",
-			"/v2/blobs/feed/forward?until=2006-01-02T15:04:05Z",
+			"/v2/blobs/feed?direction=abc",
+			"/v2/blobs/feed?cursor=abc",
+			"/v2/blobs/feed?limit=abc",
+			"/v2/blobs/feed?after=abc",
+			"/v2/blobs/feed?before=2006-01-02T15:04:05",
+			"/v2/blobs/feed?before=2006-01-02T15:04:05Z",
 		}
 		for _, url := range reqUrls {
 			w := httptest.NewRecorder()
@@ -467,7 +468,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - Most recent 1 hour of blobs (60 blobs total available, keys[43], ..., keys[102])
 		// - Limited to 20 results (the default "limit")
 		// - Starting from blob[43] through blob[62]
-		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed/forward")
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed")
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
 		for i := 0; i < 20; i++ {
@@ -481,7 +482,7 @@ func TestFetchBlobFeed(t *testing.T) {
 	t.Run("various query ranges and limits", func(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// Returns keys[43] through keys[102] (60 blobs)
-		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed/forward?limit=0")
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
 		for i := 0; i < 60; i++ {
@@ -494,7 +495,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
 		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
-		reqUrl := fmt.Sprintf("/v2/blobs/feed/forward?after=%s&limit=-1", afterTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, numBlobs, len(response.Blobs))
@@ -513,7 +514,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
-		reqUrl = fmt.Sprintf("/v2/blobs/feed/forward?until=%s&limit=-1", endTime)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
@@ -534,7 +535,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - Proper token handling
 		tm := time.Unix(0, time.Now().UnixNano()).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
-		reqUrl := fmt.Sprintf("/v2/blobs/feed/forward?until=%s&limit=20", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -546,7 +547,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 
 		// Request next page using pagination cursor
-		reqUrl = fmt.Sprintf("/v2/blobs/feed/forward?until=%s&limit=20&cursor=%s", endTime, response.Cursor)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -567,7 +568,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
-		reqUrl := fmt.Sprintf("/v2/blobs/feed/forward?until=%s&limit=2", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 2, len(response.Blobs))
@@ -579,7 +580,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkCursor(t, response.Cursor, requestedAt[1], firstBlobKeys[1])
 
 		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
-		reqUrl = fmt.Sprintf("/v2/blobs/feed/forward?until=%s&limit=0&cursor=%s", endTime, response.Cursor)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=0&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		// Verify second page contains:
