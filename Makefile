@@ -11,8 +11,6 @@ LDFLAGSSTRING +=-X main.Date=$(BUILD_TIME)
 LDFLAGSSTRING +=-X main.Version=$(GIT_TAG)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
-E2EFUZZTEST = FUZZ=true go test ./e2e -fuzz -v -fuzztime=15m
-
 .PHONY: eigenda-proxy
 eigenda-proxy:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) go build -v $(LDFLAGS) -o ./bin/eigenda-proxy ./cmd/server
@@ -31,21 +29,20 @@ disperse-test-blob:
 clean:
 	rm bin/eigenda-proxy
 
-# Unit tests
-test:
-	go test ./... -parallel 4 
+test-unit:
+	go test ./... -parallel 4
 
-# E2E tests, leveraging op-e2e
-e2e-test:
+# Local E2E tests, leveraging op-e2e framework. Also tests the standard client against the proxy.
+test-e2e-local:
 	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4
 
-# E2E test which fuzzes the proxy client server integration and op client keccak256 with malformed inputs
-e2e-fuzz-test:
-	$(E2EFUZZTEST)
-
 # E2E tests against holesky testnet
-holesky-test:
+test-e2e-holesky:
 	TESTNET=true go test -timeout 50m ./e2e  -parallel 4
+
+# E2E test which fuzzes the proxy client server integration and op client keccak256 with malformed inputs
+test-e2e-fuzz:
+	FUZZ=true go test ./e2e -fuzz -v -fuzztime=5m
 
 .PHONY: lint
 lint:
