@@ -22,11 +22,11 @@ import (
 //	@Summary	Fetch blob feed in specified direction
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		direction	query		string	true	"Direction to fetch: 'forward' or 'backward' [default: forward]"
+//	@Param		direction	query		string	true	"Direction to fetch: 'forward' (oldest to newest) or 'backward' (newest to oldest) [default: forward]"
 //	@Param		before		query		string	false	"Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		after		query		string	false	"Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than 'before' [default: before-1h]"
-//	@Param		cursor		query		string	false	"Pagination cursor; for 'forward', fetches blobs from 'cursor' to 'before', for 'backward', fetches from 'after' to 'cursor' (all are exclusive) [default: empty]"
-//	@Param		limit		query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
+//	@Param		after		query		string	false	"Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]"
+//	@Param		cursor		query		string	false	"Pagination cursor; for 'forward' direction, overides `after` and fetches blobs from `cursor` to `before`; for 'backward' direction, overrides `before` and fetches blobs from `cursor` to `before` (all are exclusive) [default: empty]"
+//	@Param		limit		query		int		false	"Maximum number of blobs to return; if limit <=0 or > 1000, it's set to 1000 [default: 20; max: 1000]"
 //	@Success	200			{object}	BlobFeedResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
