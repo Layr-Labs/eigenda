@@ -18,18 +18,18 @@ import (
 
 // FetchBlobFeedForward godoc
 //
-// @Summary    Fetch blob feed forward in time (oldest to newest)
-// @Tags       Blobs
-// @Produce    json
-// @Param      after      query    string    false    "Fetch blobs after this time (ISO 8601 format) [default: until - 1h]"
-// @Param      until      query    string    false    "Stop fetching at this time (ISO 8601 format) [default: now]"
-// @Param      cursor     query    string    false    "Pagination cursor for fetching newer items; override after [default: empty]"
-// @Param      limit      query    int       false    "Maximum number of blobs to fetch [default: 20; max: 1000]"
-// @Success    200        {object} BlobFeedResponse
-// @Failure    400        {object} ErrorResponse    "error: Bad request"
-// @Failure    404        {object} ErrorResponse    "error: Not found"
-// @Failure    500        {object} ErrorResponse    "error: Server error"
-// @Router     /blobs/feed/forward [get]
+//	@Summary	Fetch blob feed forward in time (oldest to newest)
+//	@Tags		Blobs
+//	@Produce	json
+//	@Param		after	query		string	false	"Fetch blobs after this time (ISO 8601 format) [default: until - 1h]"
+//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format) [default: now]"
+//	@Param		cursor	query		string	false	"Pagination cursor for fetching newer items; override after [default: empty]"
+//	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
+//	@Success	200		{object}	BlobFeedResponse
+//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404		{object}	ErrorResponse	"error: Not found"
+//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/feed/forward [get]
 func (s *ServerV2) FetchBlobFeedForward(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
@@ -112,18 +112,18 @@ func (s *ServerV2) FetchBlobFeedForward(c *gin.Context) {
 
 // FetchBlobFeedBackward godoc
 //
-// @Summary    Fetch blob feed backward in time (newest to oldest)
-// @Tags       Blobs
-// @Produce    json
-// @Param      before     query    string    false    "Fetch blobs before this time (ISO 8601 format) [default: now]"
-// @Param      until      query    string    false    "Stop fetching at this time (ISO 8601 format) [default: now-1h]"
-// @Param      cursor     query    string    false    "Pagination cursor for fetching older items; override before [default: empty]"
-// @Param      limit      query    int       false    "Maximum number of blobs to fetch [default: 20; max: 1000]"
-// @Success    200        {object} BlobFeedResponse
-// @Failure    400        {object} ErrorResponse    "error: Bad request"
-// @Failure    404        {object} ErrorResponse    "error: Not found"
-// @Failure    500        {object} ErrorResponse    "error: Server error"
-// @Router     /blobs/feed/backward [get]
+//	@Summary	Fetch blob feed backward in time (newest to oldest)
+//	@Tags		Blobs
+//	@Produce	json
+//	@Param		before	query		string	false	"Fetch blobs before this time (ISO 8601 format) [default: now]"
+//	@Param		until	query		string	false	"Stop fetching at this time (ISO 8601 format) [default: now-1h]"
+//	@Param		cursor	query		string	false	"Pagination cursor for fetching older items; override before [default: empty]"
+//	@Param		limit	query		int		false	"Maximum number of blobs to fetch [default: 20; max: 1000]"
+//	@Success	200		{object}	BlobFeedResponse
+//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404		{object}	ErrorResponse	"error: Not found"
+//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Router		/blobs/feed/backward [get]
 func (s *ServerV2) FetchBlobFeedBackward(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error

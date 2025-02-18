@@ -118,7 +118,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/blobs/feed": {
+        "/blobs/feed/backward": {
             "get": {
                 "produces": [
                     "application/json"
@@ -126,29 +126,92 @@ const docTemplateV2 = `{
                 "tags": [
                     "Blobs"
                 ],
-                "summary": "Fetch blob feed",
+                "summary": "Fetch blob feed backward in time (newest to oldest)",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
-                        "name": "end",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]",
-                        "name": "interval",
+                        "description": "Fetch blobs before this time (ISO 8601 format) [default: now]",
+                        "name": "before",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]",
-                        "name": "pagination_token",
+                        "description": "Stop fetching at this time (ISO 8601 format) [default: now-1h]",
+                        "name": "until",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor for fetching older items; override before [default: empty]",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "The maximum number of blobs to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "description": "Maximum number of blobs to fetch [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BlobFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/blobs/feed/forward": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blobs"
+                ],
+                "summary": "Fetch blob feed forward in time (oldest to newest)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs after this time (ISO 8601 format) [default: until - 1h]",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stop fetching at this time (ISO 8601 format) [default: now]",
+                        "name": "until",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor for fetching newer items; override after [default: empty]",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of blobs to fetch [default: 20; max: 1000]",
                         "name": "limit",
                         "in": "query"
                     }
@@ -693,8 +756,8 @@ const docTemplateV2 = `{
                         }
                     ]
                 },
-                "reservation_period": {
-                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                "timestamp": {
+                    "description": "Timestamp represents the nanosecond of the dispersal request creation",
                     "type": "integer"
                 }
             }
@@ -879,10 +942,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "salt": {
-                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
-                    "type": "integer"
                 }
             }
         },
@@ -1096,7 +1155,7 @@ const docTemplateV2 = `{
                         "$ref": "#/definitions/v2.BlobInfo"
                     }
                 },
-                "pagination_token": {
+                "cursor": {
                     "type": "string"
                 }
             }

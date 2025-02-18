@@ -24,9 +24,9 @@ definitions:
         - $ref: '#/definitions/big.Int'
         description: CumulativePayment represents the total amount of payment (in
           wei) made by the user up to this point
-      reservation_period:
-        description: ReservationPeriod represents the range of time at which the dispersal
-          is made
+      timestamp:
+        description: Timestamp represents the nanosecond of the dispersal request
+          creation
         type: integer
     type: object
   core.Signature:
@@ -299,7 +299,7 @@ definitions:
         items:
           $ref: '#/definitions/v2.BlobInfo'
         type: array
-      pagination_token:
+      cursor:
         type: string
     type: object
   v2.BlobInfo:
@@ -672,26 +672,23 @@ paths:
       summary: Fetch blob certificate by blob key v2
       tags:
       - Blobs
-  /blobs/feed:
+  /blobs/feed/backward:
     get:
       parameters:
-      - description: 'Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
-          [default: now]'
+      - description: 'Fetch blobs before this time (ISO 8601 format) [default: now]'
         in: query
-        name: end
+        name: before
         type: string
-      - description: 'Fetch blobs starting from an interval (in seconds) before the
-          end time [default: 3600]'
+      - description: 'Stop fetching at this time (ISO 8601 format) [default: now-1h]'
         in: query
-        name: interval
-        type: integer
-      - description: 'Fetch blobs starting from the pagination token (exclusively).
-          Overrides the interval param if specified [default: empty]'
-        in: query
-        name: pagination_token
+        name: until
         type: string
-      - description: 'The maximum number of blobs to fetch. System max (1000) if limit
-          <= 0 [default: 20; max: 1000]'
+      - description: 'Pagination cursor for fetching older items; override before
+          [default: empty]'
+        in: query
+        name: cursor
+        type: string
+      - description: 'Maximum number of blobs to fetch [default: 20; max: 1000]'
         in: query
         name: limit
         type: integer
@@ -714,7 +711,50 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob feed
+      summary: Fetch blob feed backward in time (newest to oldest)
+      tags:
+      - Blobs
+  /blobs/feed/forward:
+    get:
+      parameters:
+      - description: 'Fetch blobs after this time (ISO 8601 format) [default: until
+          - 1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Stop fetching at this time (ISO 8601 format) [default: now]'
+        in: query
+        name: until
+        type: string
+      - description: 'Pagination cursor for fetching newer items; override after [default:
+          empty]'
+        in: query
+        name: cursor
+        type: string
+      - description: 'Maximum number of blobs to fetch [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BlobFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blob feed forward in time (oldest to newest)
       tags:
       - Blobs
   /metrics/summary:
