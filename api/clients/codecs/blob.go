@@ -16,6 +16,12 @@ type Blob struct {
 	coeffPolynomial []fr.Element
 	// blobLength must be a power of 2, and should match the blobLength claimed in the BlobCommitment
 	// This is the blob length IN SYMBOLS, not in bytes
+	//
+	// This value must be specified, rather than computed from the length of the coeffPolynomial, due to an edge case
+	// illustrated by the following example: imagine a user disperses a very small blob, only 64 bytes, and the last 40
+	// bytes are trailing zeros. When a different user fetches the blob from a relay, it's possible that the relay could
+	// truncate the trailing zeros. If we were to say that blobLength = nextPowerOf2(len(coeffPolynomial)), then the
+	// user fetching and reconstructing this blob would determine that the blob length is 1 symbol, when it's actually 2.
 	blobLength uint32
 }
 
@@ -48,10 +54,10 @@ func (b *Blob) GetBytes() []byte {
 
 // ToPayload converts the Blob into a Payload
 //
-// The payloadStartingForm indicates how payloads are constructed by the dispersing client. Based on the starting form
-// of the payload, we can determine what operations must be done to the blob in order to reconstruct the original payload
-func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
-	encodedPayload, err := b.toEncodedPayload(payloadStartingForm)
+// The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
+// conversion, if any, must be performed when creating a payload from the blob.
+func (b *Blob) ToPayload(payloadForm PolynomialForm) (*Payload, error) {
+	encodedPayload, err := b.toEncodedPayload(payloadForm)
 	if err != nil {
 		return nil, fmt.Errorf("to encoded payload: %w", err)
 	}
@@ -65,22 +71,27 @@ func (b *Blob) ToPayload(payloadStartingForm PolynomialForm) (*Payload, error) {
 }
 
 // toEncodedPayload creates an encodedPayload from the blob
-func (b *Blob) toEncodedPayload(payloadStartingForm PolynomialForm) (*encodedPayload, error) {
+//
+// The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
+// conversion, if any, must be performed when creating an encoded payload from the blob.
+func (b *Blob) toEncodedPayload(payloadForm PolynomialForm) (*encodedPayload, error) {
 	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLength)
 	if err != nil {
 		return nil, fmt.Errorf("get max permissible payload length: %w", err)
 	}
 
 	var payloadElements []fr.Element
-	switch payloadStartingForm {
+	switch payloadForm {
 	case PolynomialFormCoeff:
-		// the payload started off in coefficient form, so no conversion needs to be done
+		// the payload is interpreted as coefficients of the polynomial, so no conversion needs to be done, given that
+		// eigenda also interprets blobs as coefficients
 		payloadElements = b.coeffPolynomial
 	case PolynomialFormEval:
-		// the payload started off in evaluation form, so we first need to convert the blob's coeff poly into an eval poly
+		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
+		// in the blob must be converted to the evaluation form
 		payloadElements, err = b.computeEvalPoly()
 		if err != nil {
-			return nil, fmt.Errorf("coeff poly to eval poly: %w", err)
+			return nil, fmt.Errorf("compute eval poly: %w", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid polynomial form")

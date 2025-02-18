@@ -21,7 +21,10 @@ func NewPayload(payloadBytes []byte) *Payload {
 }
 
 // ToBlob converts the Payload bytes into a Blob
-func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
+//
+// The payloadForm indicates how payloads are interpreted. The form of a payload dictates what conversion, if any, must
+// be performed when creating a blob from the payload.
+func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 	encodedPayload, err := newEncodedPayload(p)
 	if err != nil {
 		return nil, fmt.Errorf("encoding payload: %w", err)
@@ -35,19 +38,19 @@ func (p *Payload) ToBlob(form PolynomialForm) (*Blob, error) {
 	blobLength := uint32(encoding.NextPowerOf2(len(fieldElements)))
 
 	var coeffPolynomial []fr.Element
-	switch form {
+	switch payloadForm {
 	case PolynomialFormCoeff:
 		// the payload is already in coefficient form. no conversion needs to take place, since blobs are also in
 		// coefficient form
 		coeffPolynomial = fieldElements
 	case PolynomialFormEval:
-		// the payload is in evaluation form, so we need to convert it to coeff form
+		// the payload is in evaluation form, so we need to convert it to coeff form, since blobs are in coefficient form
 		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLength)
 		if err != nil {
 			return nil, fmt.Errorf("eval poly to coeff poly: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("unknown polynomial form: %v", form)
+		return nil, fmt.Errorf("unknown polynomial form: %v", payloadForm)
 	}
 
 	return BlobFromPolynomial(coeffPolynomial, blobLength)
