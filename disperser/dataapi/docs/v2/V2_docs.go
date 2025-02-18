@@ -693,8 +693,8 @@ const docTemplateV2 = `{
                         }
                     ]
                 },
-                "reservation_period": {
-                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                "timestamp": {
+                    "description": "Timestamp represents the nanosecond of the dispersal request creation",
                     "type": "integer"
                 }
             }
@@ -879,10 +879,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "salt": {
-                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
-                    "type": "integer"
                 }
             }
         },
@@ -1326,6 +1322,9 @@ const docTemplateV2 = `{
         "v2.OperatorStake": {
             "type": "object",
             "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
