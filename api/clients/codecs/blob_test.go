@@ -25,7 +25,7 @@ func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm Po
 	blob, err := NewPayload(payloadBytes).ToBlob(payloadForm)
 	require.NoError(t, err)
 
-	blobDeserialized, err := BlobFromBytes(blob.GetBytes(), blob.blobLength)
+	blobDeserialized, err := BlobFromBytes(blob.GetBytes(), blob.blobLengthSymbols)
 	require.NoError(t, err)
 
 	payloadFromBlob, err := blob.ToPayload(payloadForm)
