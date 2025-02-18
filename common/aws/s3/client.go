@@ -182,7 +182,7 @@ func (s *client) DeleteObject(ctx context.Context, bucket string, key string) er
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // ListObjects lists all items metadata in a bucket with the given prefix up to 1000 items.
