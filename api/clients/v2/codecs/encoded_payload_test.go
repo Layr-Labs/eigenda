@@ -12,7 +12,7 @@ import (
 
 // TestDecodeShortBytes checks that an encoded payload with a length less than claimed length fails at decode time
 func TestDecodeShortBytes(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
 
 	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
@@ -28,7 +28,7 @@ func TestDecodeShortBytes(t *testing.T) {
 
 // TestDecodeLongBytes checks that an encoded payload with length too much greater than claimed fails at decode
 func TestDecodeLongBytes(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
 
 	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
@@ -43,7 +43,7 @@ func TestDecodeLongBytes(t *testing.T) {
 // TestEncodeTooManyElements checks that encodedPayloadFromElements fails at the expect limit, relative to payload
 // length and blob length
 func TestEncodeTooManyElements(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	powersOf2 := encoding.GeneratePowersOfTwo(uint32(12))
 
 	for i := 0; i < len(powersOf2); i++ {
@@ -74,7 +74,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 // TestTrailingNonZeros checks that any non-zero values that come after the end of the claimed payload length
 // cause an error to be returned.
 func TestTrailingNonZeros(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 1)
 
 	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
@@ -102,7 +102,7 @@ func TestTrailingNonZeros(t *testing.T) {
 
 // TestEncodeWithFewerElements tests that having fewer bytes than expected doesn't throw an error
 func TestEncodeWithFewerElements(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	originalData := testRandom.Bytes(testRandom.Intn(1024) + 33)
 
 	encodedPayload, err := newEncodedPayload(NewPayload(originalData))

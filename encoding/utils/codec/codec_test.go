@@ -80,7 +80,7 @@ func TestGetUnpaddedDataLengthAgainstKnowns(t *testing.T) {
 
 // TestPadUnpad makes sure that padding and unpadding doesn't corrupt underlying data
 func TestPadUnpad(t *testing.T) {
-	testRandom := random.NewTestRandom(t)
+	testRandom := random.NewTestRandom()
 	testIterations := 1000
 
 	for i := 0; i < testIterations; i++ {
