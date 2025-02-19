@@ -201,7 +201,7 @@ func NewTestClient(
 
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 	payloadClientConfig.EigenDACertVerifierAddr = config.EigenDACertVerifierAddress
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.DefaultBlobEncoding)
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob codec: %w", err)
 	}
@@ -347,7 +347,7 @@ func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.Payl
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.BlobEncodingVersion)
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.PayloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob codec: %w", err)
 	}
