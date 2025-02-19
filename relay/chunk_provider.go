@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/core"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
 
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -63,7 +64,8 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, *core.ChunksData](
+	var err error
+	server.frameCache, err = cache.NewCacheAccessor[blobKeyWithMetadata, *core.ChunksData](
 		cache.NewFIFOCache[blobKeyWithMetadata, *core.ChunksData](cacheSize, server.computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
@@ -71,7 +73,6 @@ func newChunkProvider(
 	if err != nil {
 		return nil, err
 	}
-	server.frameCache = cacheAccessor
 
 	return server, nil
 }
