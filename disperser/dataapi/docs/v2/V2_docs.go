@@ -130,10 +130,9 @@ const docTemplateV2 = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Direction to fetch: 'forward' (oldest to newest) or 'backward' (newest to oldest) [default: forward]",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
                         "name": "direction",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -149,13 +148,13 @@ const docTemplateV2 = `{
                     },
                     {
                         "type": "string",
-                        "description": "Pagination cursor; for 'forward' direction, overides ` + "`" + `after` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `before` + "`" + `; for 'backward' direction, overrides ` + "`" + `before` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `before` + "`" + ` (all are exclusive) [default: empty]",
+                        "description": "Pagination cursor (opaque string from previous response); for 'forward' direction, overrides ` + "`" + `after` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `before` + "`" + `; for 'backward' direction, overrides ` + "`" + `before` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `after` + "`" + ` (all bounds exclusive) [default: empty]",
                         "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Maximum number of blobs to return; if limit \u003c=0 or \u003e 1000, it's set to 1000 [default: 20; max: 1000]",
+                        "description": "Maximum number of blobs to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
                         "name": "limit",
                         "in": "query"
                     }
