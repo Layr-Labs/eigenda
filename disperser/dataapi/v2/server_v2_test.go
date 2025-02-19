@@ -1648,26 +1648,57 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
+	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
+	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				if id == opId0 {
+					result[i] = addr0
+				} else if id == opId1 {
+					result[i] = addr1
+				} else {
+					result[i] = gethcommon.Address{}
+				}
+			}
+			return result
+		},
+		nil,
+	)
+
 	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/operators/stake")
 	response := decodeResponseBody[dataapi.OperatorsStakeResponse](t, w)
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
-	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
+	// There are 2 quorums (0, 1)
 	require.Equal(t, 2, len(response.StakeRankedOperators))
+	checkAddress := func(op *dataapi.OperatorStake) {
+		if op.OperatorId == opId0.Hex() {
+			assert.Equal(t, addr0.Hex(), op.OperatorAddress)
+		}
+		if op.OperatorId == opId1.Hex() {
+			assert.Equal(t, addr1.Hex(), op.OperatorAddress)
+		}
+	}
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 }
 
 func TestFetchMetricsSummary(t *testing.T) {

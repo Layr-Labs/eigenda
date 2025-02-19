@@ -690,8 +690,8 @@
                         }
                     ]
                 },
-                "reservation_period": {
-                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                "timestamp": {
+                    "description": "Timestamp represents the nanosecond of the dispersal request creation",
                     "type": "integer"
                 }
             }
@@ -1319,6 +1319,9 @@
         "v2.OperatorStake": {
             "type": "object",
             "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
