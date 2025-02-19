@@ -24,7 +24,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@openzeppelin/contracts": "4.7.0",
+    "@openzeppelin/contracts": "4.9.6",
     "@openzeppelin/contracts-upgradeable": "4.7.0"
   }
 }
