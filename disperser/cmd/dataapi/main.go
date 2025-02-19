@@ -91,7 +91,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	cs, err := coreeth.NewChainState(tx, client)
+	cs, err := coreeth.NewChainState(tx, client, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create chain state: %w", err)
 	}

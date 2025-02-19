@@ -177,7 +177,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	cs, err := eth.NewChainState(tx, ethClient)
+	cs, err := eth.NewChainState(tx, ethClient, logger)
 	if err != nil {
 		log.Fatalln("could not create chain state:", err)
 		return fmt.Errorf("could not create chain state: %w", err)

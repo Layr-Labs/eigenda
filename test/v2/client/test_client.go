@@ -232,7 +232,7 @@ func NewTestClient(
 
 	// Construct the retrieval client
 
-	chainState, err := eth.NewChainState(ethReader, ethClient)
+	chainState, err := eth.NewChainState(ethReader, ethClient, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain state: %w", err)
 	}

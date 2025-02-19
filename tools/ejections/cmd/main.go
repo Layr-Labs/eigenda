@@ -73,7 +73,7 @@ func RunScan(ctx *cli.Context) error {
 		return err
 	}
 
-	chainState, err := eth.NewChainState(tx, client)
+	chainState, err := eth.NewChainState(tx, client, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create chain state: %w", err)
 	}

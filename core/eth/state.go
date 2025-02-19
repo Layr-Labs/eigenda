@@ -32,7 +32,7 @@ type ChainState struct {
 	socketPrevBlockNumber atomic.Uint32
 }
 
-func NewChainState(reader core.Reader, client common.EthClient) (*ChainState, error) {
+func NewChainState(reader core.Reader, client common.EthClient, logger logging.Logger) (*ChainState, error) {
 	currentBlockNumber, err := client.BlockByNumber(context.Background(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -40,6 +40,7 @@ func NewChainState(reader core.Reader, client common.EthClient) (*ChainState, er
 	cs := &ChainState{
 		Client:    client,
 		Reader:    reader,
+		logger:    logger,
 		SocketMap: make(map[core.OperatorID]*string),
 	}
 	// Set initial block number to current block number

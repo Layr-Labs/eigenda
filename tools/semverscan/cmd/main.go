@@ -59,7 +59,7 @@ func RunScan(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-	chainState, err := eth.NewChainState(tx, gethClient)
+	chainState, err := eth.NewChainState(tx, gethClient, logger)
 	if err != nil {
 		logger.Error("failed to create chain state", "error", err)
 		return fmt.Errorf("failed to create chain state: %w", err)

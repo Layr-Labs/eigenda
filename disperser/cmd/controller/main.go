@@ -125,7 +125,7 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create signature aggregator: %v", err)
 	}
 	dispatcherPool := workerpool.New(config.NumConcurrentDispersalRequests)
-	chainState, err := eth.NewChainState(chainReader, gethClient)
+	chainState, err := eth.NewChainState(chainReader, gethClient, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create chain state: %w", err)
 	}

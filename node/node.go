@@ -124,7 +124,7 @@ func NewNode(
 	}
 
 	// Create ChainState Client
-	cst, err := eth.NewChainState(tx, client)
+	cst, err := eth.NewChainState(tx, client, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chain state: %w", err)
 	}

@@ -126,7 +126,7 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 
 	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
-	chainState, err := eth.NewChainState(tx, client)
+	chainState, err := eth.NewChainState(tx, client, logger)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (

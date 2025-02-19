@@ -101,7 +101,7 @@ func TestIndexerIntegration(t *testing.T) {
 	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
 
-	chainState, err := eth.NewChainState(tx, client)
+	chainState, err := eth.NewChainState(tx, client, logger)
 	assert.NoError(t, err)
 	cs := thegraph.NewIndexedChainState(chainState, graphql.NewClient(graphUrl, nil), logger)
 	time.Sleep(5 * time.Second)

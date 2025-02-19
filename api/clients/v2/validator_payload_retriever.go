@@ -57,7 +57,7 @@ func BuildValidatorPayloadRetriever(
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
-	chainState, err := eth.NewChainState(reader, ethClient)
+	chainState, err := eth.NewChainState(reader, ethClient, logger)
 	if err != nil {
 		return nil, fmt.Errorf("new chain state: %w", err)
 	}

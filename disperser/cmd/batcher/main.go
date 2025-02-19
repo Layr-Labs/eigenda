@@ -195,7 +195,7 @@ func RunBatcher(ctx *cli.Context) error {
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
 	queue := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
 
-	cs, err := coreeth.NewChainState(tx, client)
+	cs, err := coreeth.NewChainState(tx, client, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create chain state: %w", err)
 	}

@@ -78,7 +78,7 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create eth writer: %w", err)
 	}
 
-	cs, err := coreeth.NewChainState(tx, client)
+	cs, err := coreeth.NewChainState(tx, client, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create chain state: %w", err)
 	}
