@@ -235,17 +235,13 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
-	// next reservation duration
-	time.Sleep(1000 * time.Millisecond)
-
 	// Second call
-	now = time.Now().UnixNano()
+	now += int64(reservationWindow) * time.Second.Nanoseconds()
 	_, err = accountant.AccountBlob(ctx, now, 300, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 300, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
 	// Third call
-	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{800, 800, 0}, mapRecordUsage(accountant.periodRecords)), true)
