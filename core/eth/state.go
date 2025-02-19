@@ -286,8 +286,3 @@ func (cs *ChainState) getOperatorState(creader context.Context, operatorsByQuoru
 
 	return state, nil
 }
-
-type socketUpdateParams struct {
-	OperatorID core.OperatorID
-	Socket     string
-}
