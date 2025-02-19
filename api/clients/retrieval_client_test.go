@@ -52,15 +52,14 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 }
 
 var (
-	indexedChainState core.IndexedChainState
-	chainState        core.ChainState
-	indexer           *indexermock.MockIndexer
-	operatorState     *core.OperatorState
-	nodeClient        *clientsmock.MockNodeClient
-	coordinator       *core.StdAssignmentCoordinator
-	retrievalClient   clients.RetrievalClient
-	blobHeader        *core.BlobHeader
-	encodedBlob       core.EncodedBlob = core.EncodedBlob{
+	chainState      core.ChainState
+	indexer         *indexermock.MockIndexer
+	operatorState   *core.OperatorState
+	nodeClient      *clientsmock.MockNodeClient
+	coordinator     *core.StdAssignmentCoordinator
+	retrievalClient clients.RetrievalClient
+	blobHeader      *core.BlobHeader
+	encodedBlob     core.EncodedBlob = core.EncodedBlob{
 		BlobHeader:               nil,
 		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 	}
@@ -79,15 +78,6 @@ func setup(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("failed to create new mocked chain data: %s", err)
-	}
-
-	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
-		0: numOperators,
-		1: numOperators,
-		2: numOperators,
-	})
-	if err != nil {
-		t.Fatalf("failed to create new mocked indexed chain data: %s", err)
 	}
 
 	nodeClient = clientsmock.NewNodeClient()
