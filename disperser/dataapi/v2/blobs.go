@@ -19,19 +19,19 @@ import (
 
 // FetchBlobFeed godoc
 //
-//	@Summary	Fetch blob feed in specified direction
-//	@Tags		Blobs
-//	@Produce	json
-//	@Param		direction	query		string	true	"Direction to fetch: 'forward' (oldest to newest) or 'backward' (newest to oldest) [default: forward]"
-//	@Param		before		query		string	false	"Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		after		query		string	false	"Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]"
-//	@Param		cursor		query		string	false	"Pagination cursor; for 'forward' direction, overides `after` and fetches blobs from `cursor` to `before`; for 'backward' direction, overrides `before` and fetches blobs from `cursor` to `before` (all are exclusive) [default: empty]"
-//	@Param		limit		query		int		false	"Maximum number of blobs to return; if limit <=0 or > 1000, it's set to 1000 [default: 20; max: 1000]"
-//	@Success	200			{object}	BlobFeedResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/blobs/feed [get]
+// @Summary    Fetch blob feed in specified direction
+// @Tags       Blobs
+// @Produce    json
+// @Param      direction   query    string  false   "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
+// @Param      before      query    string  false   "Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
+// @Param      after       query    string  false   "Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]"
+// @Param      cursor      query    string  false   "Pagination cursor (opaque string from previous response); for 'forward' direction, overrides `after` and fetches blobs from `cursor` to `before`; for 'backward' direction, overrides `before` and fetches blobs from `cursor` to `after` (all bounds exclusive) [default: empty]"
+// @Param      limit       query    int     false   "Maximum number of blobs to return; if limit <= 0 or >1000, it's treated as 1000 [default: 20; max: 1000]"
+// @Success    200         {object} BlobFeedResponse
+// @Failure    400         {object} ErrorResponse   "error: Bad request"
+// @Failure    404         {object} ErrorResponse   "error: Not found"
+// @Failure    500         {object} ErrorResponse   "error: Server error"
+// @Router     /blobs/feed [get]
 func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
