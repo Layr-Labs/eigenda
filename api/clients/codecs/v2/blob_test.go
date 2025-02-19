@@ -1,9 +1,10 @@
-package codecs
+package v2
 
 import (
 	"bytes"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,13 +16,13 @@ func FuzzBlobConversion(f *testing.F) {
 
 	f.Fuzz(
 		func(t *testing.T, originalData []byte) {
-			testBlobConversionForForm(t, originalData, PolynomialFormEval)
-			testBlobConversionForForm(t, originalData, PolynomialFormCoeff)
+			testBlobConversionForForm(t, originalData, codecs.PolynomialFormEval)
+			testBlobConversionForForm(t, originalData, codecs.PolynomialFormCoeff)
 		})
 
 }
 
-func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm PolynomialForm) {
+func testBlobConversionForForm(t *testing.T, payloadBytes []byte, payloadForm codecs.PolynomialForm) {
 	blob, err := NewPayload(payloadBytes).ToBlob(payloadForm)
 	require.NoError(t, err)
 

@@ -1,9 +1,10 @@
-package codecs
+package v2
 
 import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -24,7 +25,7 @@ type encodedPayload struct {
 func newEncodedPayload(payload *Payload) (*encodedPayload, error) {
 	encodedPayloadHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the payloadHeader is a valid bn254 element
-	encodedPayloadHeader[1] = byte(PayloadEncodingVersion0) // encode version byte
+	encodedPayloadHeader[1] = byte(codecs.PayloadEncodingVersion0) // encode version byte
 
 	payloadBytes := payload.Serialize()
 

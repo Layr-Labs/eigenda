@@ -1,8 +1,9 @@
-package codecs
+package v2
 
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -51,7 +52,7 @@ func (b *Blob) Serialize() []byte {
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating a payload from the blob.
-func (b *Blob) ToPayload(payloadForm PolynomialForm) (*Payload, error) {
+func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
 	encodedPayload, err := b.toEncodedPayload(payloadForm)
 	if err != nil {
 		return nil, fmt.Errorf("to encoded payload: %w", err)
@@ -69,7 +70,7 @@ func (b *Blob) ToPayload(payloadForm PolynomialForm) (*Payload, error) {
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
-func (b *Blob) toEncodedPayload(payloadForm PolynomialForm) (*encodedPayload, error) {
+func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayload, error) {
 	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("get max permissible payload length: %w", err)
@@ -77,11 +78,11 @@ func (b *Blob) toEncodedPayload(payloadForm PolynomialForm) (*encodedPayload, er
 
 	var payloadElements []fr.Element
 	switch payloadForm {
-	case PolynomialFormCoeff:
+	case codecs.PolynomialFormCoeff:
 		// the payload is interpreted as coefficients of the polynomial, so no conversion needs to be done, given that
 		// eigenda also interprets blobs as coefficients
 		payloadElements = b.coeffPolynomial
-	case PolynomialFormEval:
+	case codecs.PolynomialFormEval:
 		// the payload is interpreted as evaluations of the polynomial, so the coefficient representation contained
 		// in the blob must be converted to the evaluation form
 		payloadElements, err = b.computeEvalPoly()

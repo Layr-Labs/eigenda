@@ -1,8 +1,9 @@
-package codecs
+package v2
 
 import (
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
@@ -24,7 +25,7 @@ func NewPayload(payloadBytes []byte) *Payload {
 //
 // The payloadForm indicates how payloads are interpreted. The form of a payload dictates what conversion, if any, must
 // be performed when creating a blob from the payload.
-func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
+func (p *Payload) ToBlob(payloadForm codecs.PolynomialForm) (*Blob, error) {
 	encodedPayload, err := newEncodedPayload(p)
 	if err != nil {
 		return nil, fmt.Errorf("encoding payload: %w", err)
@@ -39,11 +40,11 @@ func (p *Payload) ToBlob(payloadForm PolynomialForm) (*Blob, error) {
 
 	var coeffPolynomial []fr.Element
 	switch payloadForm {
-	case PolynomialFormCoeff:
+	case codecs.PolynomialFormCoeff:
 		// the payload is already in coefficient form. no conversion needs to take place, since blobs are also in
 		// coefficient form
 		coeffPolynomial = fieldElements
-	case PolynomialFormEval:
+	case codecs.PolynomialFormEval:
 		// the payload is in evaluation form, so we need to convert it to coeff form, since blobs are in coefficient form
 		coeffPolynomial, err = evalToCoeffPoly(fieldElements, blobLengthSymbols)
 		if err != nil {

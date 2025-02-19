@@ -1,4 +1,4 @@
-package codecs
+package v2
 
 import (
 	"testing"
