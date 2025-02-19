@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"sort"
 	"testing"
@@ -447,19 +448,95 @@ func TestFetchBlobFeed(t *testing.T) {
 	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
-		reqUrls := []string{
-			"/v2/blobs/feed?direction=abc",
-			"/v2/blobs/feed?cursor=abc",
-			"/v2/blobs/feed?limit=abc",
-			"/v2/blobs/feed?after=abc",
-			"/v2/blobs/feed?before=2006-01-02T15:04:05",
-			"/v2/blobs/feed?before=2006-01-02T15:04:05Z",
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "direction must be either 'forward' or 'backward', found: abc",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "'after' must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+				},
+				wantError: "after time must be before before time",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "before time cannot be more than 14 days in the past",
+			},
+
+			// Invalid cursor
+			{
+				name:        "invalid cursor format",
+				queryParams: map[string]string{"cursor": "not-a-valid-cursor"},
+				wantError:   "failed to parse the cursor",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse limit param",
+			},
 		}
-		for _, url := range reqUrls {
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+			url := fmt.Sprintf("/v2/blobs/feed?%s", params.Encode())
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
+
 			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
 		}
 	})
 
