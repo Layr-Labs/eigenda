@@ -79,7 +79,6 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	certVerifier, err := verification.NewCertVerifier(
 		log,
 		ethClient,
-		payloadDispCfg.EigenDACertVerifierAddr,
 		payloadDispCfg.BlockNumberPollInterval,
 	)
 
@@ -136,6 +135,7 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
+	certVerifierAddress string,
 	// payload is the raw data to be stored on eigenDA
 	payload []byte,
 ) (*verification.EigenDACert, error) {
@@ -167,7 +167,7 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
 
-	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
+	eigenDACert, err := pd.buildEigenDACert(ctx, certVerifierAddress, blobKey, blobStatusReply)
 	if err != nil {
 		// error returned from method is sufficiently descriptive
 		return nil, err
@@ -175,7 +175,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
+	err = pd.certVerifier.VerifyCertV2(timeoutCtx, certVerifierAddress, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
@@ -261,6 +261,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 // contract, and then assembles an EigenDACert
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
+	certVerifierAddress string,
 	blobKey core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 ) (*verification.EigenDACert, error) {
@@ -268,7 +269,7 @@ func (pd *PayloadDisperser) buildEigenDACert(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
-		timeoutCtx, blobStatusReply.GetSignedBatch())
+		timeoutCtx, certVerifierAddress, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}

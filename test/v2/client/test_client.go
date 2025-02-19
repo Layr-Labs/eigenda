@@ -161,7 +161,6 @@ func NewTestClient(
 	certVerifier, err := verification.NewCertVerifier(
 		logger,
 		ethClient,
-		config.EigenDACertVerifierAddress,
 		time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
@@ -393,12 +392,13 @@ func (c *TestClient) Stop() {
 // it back from the relays and the validators.
 func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
+	certVerifierAddress string,
 	quorums []core.QuorumID,
 	payload []byte,
 ) error {
 
 	start := time.Now()
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
+	eigenDACert, err := c.DispersePayload(ctx, certVerifierAddress, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
@@ -457,6 +457,7 @@ func (c *TestClient) DisperseAndVerify(
 // DispersePayload sends a payload to the disperser. Returns the blob key.
 func (c *TestClient) DispersePayload(
 	ctx context.Context,
+	certVerifierAddress string,
 	quorums []core.QuorumID,
 	payload []byte,
 ) (*verification.EigenDACert, error) {
@@ -468,7 +469,7 @@ func (c *TestClient) DispersePayload(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get payload disperser: %w", err)
 	}
-	cert, err := payloadDisperser.SendPayload(ctx, payload)
+	cert, err := payloadDisperser.SendPayload(ctx, certVerifierAddress, payload)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload: %w", err)

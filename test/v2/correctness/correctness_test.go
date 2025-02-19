@@ -31,11 +31,13 @@ func testBasicDispersal(
 	quorums []core.QuorumID) error {
 
 	c := client.GetTestClient(t, client.PreprodEnv)
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, quorums, payload)
+	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -161,11 +163,14 @@ func TestDoubleDispersal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, quorums, payload)
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, quorums, payload)
+	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -173,6 +178,8 @@ func TestDoubleDispersal(t *testing.T) {
 func TestUnauthorizedGetChunks(t *testing.T) {
 	rand := random.NewTestRandom(t)
 	c := client.GetTestClient(t, client.PreprodEnv)
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
 
 	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
@@ -180,7 +187,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
+	eigenDACert, err := c.DispersePayload(ctx, config.EigenDACertVerifierAddress, quorums, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
