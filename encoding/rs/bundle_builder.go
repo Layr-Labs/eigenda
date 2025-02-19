@@ -2,7 +2,6 @@ package rs
 
 import (
 	"fmt"
-
 	"github.com/Layr-Labs/eigenda/core"
 )
 
