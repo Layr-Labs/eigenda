@@ -126,61 +126,78 @@ func (cs *ChainState) indexSocketMap(creader context.Context) error {
 		return nil
 	}
 
-	var socketUpdates []*socketUpdateParams
-
 	// logs are in order of block number, so we can just iterate through them
 	for _, log := range logs {
-		socketUpdate, err := cs.parseSocketUpdateEvent(creader, &log)
+		reader, isPending, err := cs.Client.TransactionByHash(creader, log.TxHash)
+		// Don't continue filtering through logs if we fail to get the transaction or the transaction is pending
 		if err != nil {
-			cs.logger.Warn("failed to parse socket update event; skipping",
-				"error", err,
-				"txHash", log.TxHash.Hex(),
-				"operatorId", log.Topics[1].Hex(),
-				"socket", log.Data)
+			cs.logger.Warn("failed to get transaction %s: %w", "txHash", log.TxHash.Hex(), "error", err)
+			break
+		}
+		if isPending {
+			cs.logger.Warn("transaction %s is still pending for operator socket update event", "txHash", log.TxHash.Hex())
+			break
+		}
+
+		operatorID, err := cs.parseOperatorIDFromLog(&log)
+		if err != nil {
+			cs.logger.Warn("failed to parse operator ID from log. skipping malformed log",
+				"error", err)
 			continue
 		}
-		socketUpdates = append(socketUpdates, socketUpdate)
+
+		calldata := reader.Data()
+		socket, err := cs.parseSocketFromCallData(calldata)
+		if err != nil {
+			cs.logger.Warn("failed to parse socket update event. skipping malformed log",
+				"error", err,
+				"txHash", log.TxHash.Hex(),
+				"operatorId", operatorID)
+			continue
+		}
+
+		cs.socketMu.Lock()
+		cs.SocketMap[operatorID] = &socket
+		cs.socketMu.Unlock()
+		prevBlockNum = uint32(log.BlockNumber)
 	}
 
-	cs.socketMu.Lock()
-	for _, socketUpdate := range socketUpdates {
-		cs.SocketMap[socketUpdate.OperatorID] = &socketUpdate.Socket
-	}
-	cs.socketPrevBlockNumber.Store(currentBlockNumber)
-	cs.socketMu.Unlock()
-
+	cs.socketPrevBlockNumber.Store(prevBlockNum)
 	return nil
 }
 
-// parseSocketUpdateEvent parses the socket update event from a log and returns the operator ID and socket address.
-func (cs *ChainState) parseSocketUpdateEvent(creader context.Context, log *types.Log) (*socketUpdateParams, error) {
-	reader, isPending, err := cs.Client.TransactionByHash(creader, log.TxHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction %s: %w", log.TxHash.Hex(), err)
+// parseOperatorIDFromLog parses the operator ID from a log and returns the operator ID.
+func (cs *ChainState) parseOperatorIDFromLog(log *types.Log) (core.OperatorID, error) {
+	if len(log.Topics) < 2 {
+		return core.OperatorID{}, fmt.Errorf("log topics too short: expected at least 2 topics, got %d", len(log.Topics))
 	}
-	if isPending {
-		return nil, fmt.Errorf("transaction %s is still pending for operator socket update event", log.TxHash.Hex())
+	if len(log.Topics[1].Bytes()) != 32 {
+		return core.OperatorID{}, fmt.Errorf("operatorID is expecting 32 bytes, got %d", len(log.Topics[1].Bytes()))
 	}
+	operatorID := core.OperatorID(log.Topics[1].Bytes())
+	return operatorID, nil
+}
 
-	calldata := reader.Data()
+// parseSocketFromCallData parses the socket update event from a log and returns the operator ID and socket address.
+func (cs *ChainState) parseSocketFromCallData(calldata []byte) (string, error) {
 	// Add length check for method name and input data
 	if len(calldata) <= 4 {
-		return nil, fmt.Errorf("calldata too short: expected more than 4 bytes for method name and input data, got %d bytes", len(calldata))
+		return "", fmt.Errorf("calldata too short: expected more than 4 bytes for method name and input data, got %d bytes", len(calldata))
 	}
 
 	rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	methodSig := calldata[:4]
 	method, err := rcAbi.MethodById(methodSig)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	inputs, err := method.Inputs.Unpack(calldata[4:])
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var socket string
@@ -189,20 +206,11 @@ func (cs *ChainState) parseSocketUpdateEvent(creader context.Context, log *types
 	} else if method.Name == "updateSocket" && len(inputs) >= 1 {
 		socket = inputs[0].(string)
 	} else {
-		// this should never happen; we are going to return nil, so it will be skipped
-		return nil, fmt.Errorf("method and input length mismatch for socket update event: %s", method.Name)
+		// this should never happen; we are going to return empty string
+		cs.logger.Warn("method and input length mismatch for socket update event: %s", "method", method.Name)
+		return "", fmt.Errorf("method and input length mismatch for socket update event: %s", method.Name)
 	}
-	if len(log.Topics) < 2 {
-		return nil, fmt.Errorf("log topics too short: expected at least 2 topics, got %d", len(log.Topics))
-	}
-	if len(log.Topics[1].Bytes()) != 32 {
-		return nil, fmt.Errorf("operatorID is expecting 32 bytes, got %d", len(log.Topics[1].Bytes()))
-	}
-	operatorID := core.OperatorID(log.Topics[1].Bytes())
-	return &socketUpdateParams{
-		Socket:     socket,
-		OperatorID: operatorID,
-	}, nil
+	return socket, nil
 }
 
 // refreshSocketMap refresh the socket map for the given operators by quorums at the current block.
