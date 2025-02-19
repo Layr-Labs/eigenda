@@ -3,8 +3,6 @@ package flags
 import (
 	"time"
 
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
