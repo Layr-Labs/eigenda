@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/docker/go-units"
 	"github.com/urfave/cli"
 )
 
@@ -291,6 +292,25 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
 		Value:    9101,
 	}
+	EnableMetricsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
+		Usage:    "Enable prometheus metrics collection",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	EnablePprofFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "Enable pprof profiling",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
+	}
+	PprofHttpPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-port"),
+		Usage:    "Port to listen on for pprof",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_PORT"),
+		Value:    6060,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -300,6 +320,7 @@ var requiredFlags = []cli.Flag{
 	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	EnableMetricsFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -337,6 +358,8 @@ var optionalFlags = []cli.Flag{
 	InternalGetCoefficientsTimeoutFlag,
 	OnchainStateRefreshIntervalFlag,
 	MetricsPortFlag,
+	EnablePprofFlag,
+	PprofHttpPortFlag,
 }
 
 var Flags []cli.Flag

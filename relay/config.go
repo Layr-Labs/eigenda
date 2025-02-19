@@ -1,9 +1,10 @@
 package relay
 
 import (
+	"time"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
-	"time"
 )
 
 // Config is the configuration for the relay Server.
@@ -64,4 +65,13 @@ type Config struct {
 
 	// MetricsPort is the port that the relay metrics server listens on.
 	MetricsPort int
+
+	// EnableMetrics enables the metrics HTTP server for prometheus metrics collection
+	EnableMetrics bool
+
+	// EnablePprof enables the pprof HTTP server for profiling
+	EnablePprof bool
+
+	// PprofHttpPort is the port that the pprof HTTP server listens on
+	PprofHttpPort int
 }
