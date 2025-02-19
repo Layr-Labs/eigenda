@@ -12,7 +12,7 @@ import (
 )
 
 func TestFrameCoeffsSliceSerialization(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 
@@ -40,7 +40,7 @@ func TestFrameCoeffsSliceSerialization(t *testing.T) {
 }
 
 func TestSplitSerializedFrameCoeffs(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	teardownSuite := setupSuite(t)
 	defer teardownSuite(t)
 

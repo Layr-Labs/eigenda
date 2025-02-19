@@ -246,6 +246,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			case dispgrpc.BlobStatus_COMPLETE:
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
+				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
+				//  out of this loop early if we have enough signatures
 				continue
 			default:
 				return nil, fmt.Errorf(
