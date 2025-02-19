@@ -70,9 +70,6 @@ type BlobHeader struct {
 
 	// PaymentMetadata contains the payment information for the blob
 	PaymentMetadata core.PaymentMetadata
-
-	// Salt is used to make blob intentionally unique when everything else is the same
-	Salt uint32
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -125,7 +122,6 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
-		Salt:            proto.GetSalt(),
 	}, nil
 }
 
@@ -145,7 +141,6 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		QuorumNumbers: quorums,
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
-		Salt:          b.Salt,
 	}, nil
 }
 
@@ -350,14 +345,22 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 		quorumResults[i] = a.QuorumResults[q]
 	}
 
-	apkG2Bytes := a.APKG2.Bytes()
-	sigmaBytes := a.Sigma.Bytes()
+	var apkG2Bytes []byte
+	var sigmaBytes []byte
+	if a.APKG2 != nil {
+		b := a.APKG2.Bytes()
+		apkG2Bytes = b[:]
+	}
+	if a.Sigma != nil {
+		b := a.Sigma.Bytes()
+		sigmaBytes = b[:]
+	}
 
 	return &disperserpb.Attestation{
 		NonSignerPubkeys:        nonSignerPubKeys,
-		ApkG2:                   apkG2Bytes[:],
+		ApkG2:                   apkG2Bytes,
 		QuorumApks:              quorumAPKs,
-		Sigma:                   sigmaBytes[:],
+		Sigma:                   sigmaBytes,
 		QuorumNumbers:           quorumNumbers,
 		QuorumSignedPercentages: quorumResults,
 	}, nil

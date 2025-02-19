@@ -169,6 +169,7 @@ func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.L
 }
 
 func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
+	s.logger.Debug("store put blob metadata", "blobMetadata", blobMetadata)
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {
 		return err
@@ -219,7 +220,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 			return fmt.Errorf("%w: blob already in status %s", common.ErrAlreadyExists, status.String())
 		}
 
-		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
+		return fmt.Errorf("%w: invalid status transition from %s to %s", ErrInvalidStateTransition, blob.BlobStatus.String(), status.String())
 	}
 
 	return err
@@ -594,23 +595,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 
 	lastEvaludatedKey := res.LastEvaluatedKey
 	if lastEvaludatedKey == nil {
-		lastItem := res.Items[len(res.Items)-1]
-		u, ok := lastItem["UpdatedAt"].(*types.AttributeValueMemberN)
-		if !ok {
-			return nil, nil, fmt.Errorf("expected *types.AttributeValueMemberN for UpdatedAt, got %T", u)
-		}
-		updatedAt, err := strconv.ParseUint(u.Value, 10, 64)
-		if err != nil {
-			return nil, nil, err
-		}
-		bk, err := UnmarshalBlobKey(lastItem)
-		if err != nil {
-			return nil, nil, err
-		}
-		return metadata, &StatusIndexCursor{
-			BlobKey:   &bk,
-			UpdatedAt: updatedAt,
-		}, nil
+		return metadata, nil, nil
 	}
 
 	newCursor := StatusIndexCursor{}
@@ -710,7 +695,7 @@ func (s *BlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []
 		}
 	}
 
-	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -897,11 +882,8 @@ func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *cor
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
-	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
-	}
-
+	// Allow overwrite of existing attestation
+	err = s.dynamoDBClient.PutItem(ctx, s.tableName, item)
 	return err
 }
 

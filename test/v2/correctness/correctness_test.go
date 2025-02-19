@@ -35,7 +35,7 @@ func testBasicDispersal(
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, quorums, payload, rand.Uint32())
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -46,7 +46,6 @@ func testBasicDispersal(
 // Disperse a 0 byte blob.
 // Empty blobs are not allowed by the disperser
 func TestEmptyBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
 	blobBytes := []byte{}
 	quorums := []core.QuorumID{0, 1}
 
@@ -57,14 +56,14 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
 	// attempt dispersal of an empty blob
 	// This should fail with "data is empty" error
-	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums, rand.Uint32())
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "blob size must be greater than 0")
 }
 
 // Disperse a 1 byte payload (no padding).
 func TestMicroscopicBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := []byte{1}
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -72,7 +71,7 @@ func TestMicroscopicBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (with padding).
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := []byte{1}
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -80,7 +79,7 @@ func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
 
 // Disperse a small payload (between 1KB and 2KB).
 func TestSmallBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -88,7 +87,7 @@ func TestSmallBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 100KB and 200KB).
 func TestMediumBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
 	require.NoError(t, err)
@@ -96,7 +95,7 @@ func TestMediumBlobDispersal(t *testing.T) {
 
 // Disperse a medium payload (between 1MB and 2MB).
 func TestLargeBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
@@ -112,7 +111,7 @@ func TestLargeBlobDispersal(t *testing.T) {
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
 	t.Skip("TODO: validation is borked for single quorum dispersal")
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0})
 	require.NoError(t, err)
@@ -129,7 +128,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 	maxBlobSize := int(config.MaxBlobSize)
 	dataLength := maxBlobSize
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	payload := rand.Bytes(dataLength)
 	err = testBasicDispersal(t, rand, payload, quorums)
 	require.NoError(t, err)
@@ -137,7 +136,7 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	// TODO refactor this to use exactly 1 byte more than max size after padding and header data
 
 	config, err := client.GetConfig(client.PreprodEnv)
@@ -153,7 +152,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 }
 
 func TestDoubleDispersal(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
@@ -162,18 +161,17 @@ func TestDoubleDispersal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	salt := rand.Uint32()
-	err := c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err := c.DisperseAndVerify(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, quorums, payload, salt)
+	err = c.DisperseAndVerify(ctx, quorums, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
 
 func TestUnauthorizedGetChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	c := client.GetTestClient(t, client.PreprodEnv)
 
 	quorums := []core.QuorumID{0, 1}
@@ -182,7 +180,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, quorums, payload, rand.Uint32())
+	eigenDACert, err := c.DispersePayload(ctx, quorums, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
@@ -204,7 +202,7 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 func TestDispersalWithInvalidSignature(t *testing.T) {
 	quorums := []core.QuorumID{0, 1}
 
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	c := client.GetTestClient(t, client.PreprodEnv)
 
@@ -231,7 +229,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums, rand.Uint32())
+	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

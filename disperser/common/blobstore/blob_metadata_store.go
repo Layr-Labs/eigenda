@@ -91,7 +91,7 @@ func (s *BlobMetadataStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []
 			"MetadataHash": &types.AttributeValueMemberS{Value: blobKeys[i].MetadataHash},
 		}
 	}
-	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, false)
 	if err != nil {
 		return nil, err
 	}

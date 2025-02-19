@@ -133,10 +133,10 @@ func TestGetChunksBandwidthLimit(t *testing.T) {
 	// Without advancing time, we should be able to utilize a number of bytes equal to the burstiness limit.
 	bytesRemaining := config.GetChunkBytesBurstiness
 	for bytesRemaining > 0 {
-		bytesToRequest := 1 + rand.Intn(bytesRemaining)
+		bytesToRequest := uint32(1 + rand.Intn(bytesRemaining))
 		err = limiter.RequestGetChunkBandwidth(now, userID, bytesToRequest)
 		require.NoError(t, err)
-		bytesRemaining -= bytesToRequest
+		bytesRemaining -= int(bytesToRequest)
 	}
 
 	// Requesting one more byte should fail due to the bandwidth limit
@@ -148,7 +148,7 @@ func TestGetChunksBandwidthLimit(t *testing.T) {
 	bytesRemaining = int(config.MaxGetChunkBytesPerSecond)
 	for bytesRemaining > 0 {
 		bytesToRequest := 1 + rand.Intn(bytesRemaining)
-		err = limiter.RequestGetChunkBandwidth(now, userID, bytesToRequest)
+		err = limiter.RequestGetChunkBandwidth(now, userID, uint32(bytesToRequest))
 		require.NoError(t, err)
 		bytesRemaining -= bytesToRequest
 	}
@@ -293,7 +293,7 @@ func TestBandwidthLimitPerClient(t *testing.T) {
 	bytesRemaining := config.GetChunkBytesBurstinessClient
 	for bytesRemaining > 0 {
 		bytesToRequest := 1 + rand.Intn(bytesRemaining)
-		err = limiter.RequestGetChunkBandwidth(now, userID1, bytesToRequest)
+		err = limiter.RequestGetChunkBandwidth(now, userID1, uint32(bytesToRequest))
 		require.NoError(t, err)
 		bytesRemaining -= bytesToRequest
 	}
@@ -306,7 +306,7 @@ func TestBandwidthLimitPerClient(t *testing.T) {
 	bytesRemaining = config.GetChunkBytesBurstinessClient
 	for bytesRemaining > 0 {
 		bytesToRequest := 1 + rand.Intn(bytesRemaining)
-		err = limiter.RequestGetChunkBandwidth(now, userID2, bytesToRequest)
+		err = limiter.RequestGetChunkBandwidth(now, userID2, uint32(bytesToRequest))
 		require.NoError(t, err)
 		bytesRemaining -= bytesToRequest
 	}
@@ -320,9 +320,9 @@ func TestBandwidthLimitPerClient(t *testing.T) {
 	bytesRemaining = int(config.MaxGetChunkBytesPerSecondClient)
 	for bytesRemaining > 0 {
 		bytesToRequest := 1 + rand.Intn(bytesRemaining)
-		err = limiter.RequestGetChunkBandwidth(now, userID1, bytesToRequest)
+		err = limiter.RequestGetChunkBandwidth(now, userID1, uint32(bytesToRequest))
 		require.NoError(t, err)
-		err = limiter.RequestGetChunkBandwidth(now, userID2, bytesToRequest)
+		err = limiter.RequestGetChunkBandwidth(now, userID2, uint32(bytesToRequest))
 		require.NoError(t, err)
 		bytesRemaining -= bytesToRequest
 	}

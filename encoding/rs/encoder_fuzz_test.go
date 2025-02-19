@@ -26,7 +26,7 @@ func FuzzOnlySystematic(f *testing.F) {
 			t.Errorf("Error Encoding:\n Data:\n %q \n Err: %q", input, err)
 		}
 
-		//sample the correct systematic frames
+		//sample the correct systematic Frames
 		samples, indices := sampleFrames(frames, uint64(len(frames)))
 
 		data, err := enc.Decode(samples, indices, uint64(len(input)), params)

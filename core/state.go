@@ -171,7 +171,7 @@ type IndexedOperatorState struct {
 
 // ChainState is an interface for getting information about the current chain state.
 type ChainState interface {
-	GetCurrentBlockNumber() (uint, error)
+	GetCurrentBlockNumber(ctx context.Context) (uint, error)
 	GetOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
 	GetOperatorSocket(ctx context.Context, blockNumber uint, operator OperatorID) (string, error)

@@ -71,11 +71,20 @@ type (
 		Certificate *corev2.BlobCertificate `json:"blob_certificate"`
 	}
 
+	OperatorIdentity struct {
+		OperatorId      string `json:"operator_id"`
+		OperatorAddress string `json:"operator_address"`
+	}
+	AttestationInfo struct {
+		Attestation *corev2.Attestation          `json:"attestation"`
+		Nonsigners  map[uint8][]OperatorIdentity `json:"nonsigners"`
+		Signers     map[uint8][]OperatorIdentity `json:"signers"`
+	}
 	BlobAttestationInfoResponse struct {
 		BlobKey         string                    `json:"blob_key"`
 		BatchHeaderHash string                    `json:"batch_header_hash"`
 		InclusionInfo   *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
-		Attestation     *corev2.Attestation       `json:"attestation"`
+		AttestationInfo *AttestationInfo          `json:"attestation_info"`
 	}
 
 	BlobInfo struct {
@@ -130,6 +139,7 @@ type (
 	OperatorStake struct {
 		QuorumId        string  `json:"quorum_id"`
 		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
 	}

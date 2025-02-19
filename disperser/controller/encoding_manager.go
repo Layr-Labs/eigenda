@@ -60,6 +60,10 @@ type EncodingManager struct {
 	// state
 	cursor                *blobstore.StatusIndexCursor
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
+	// blobSet keeps track of blobs that are currently being encoded
+	// This is used to deduplicate blobs to prevent the same blob from being encoded multiple times
+	// blobSet is shared with Dispatcher which removes blobs from this queue as they are packaged for dispersal
+	blobSet BlobSet
 
 	metrics *encodingManagerMetrics
 }
@@ -72,6 +76,7 @@ func NewEncodingManager(
 	chainReader core.Reader,
 	logger logging.Logger,
 	registry *prometheus.Registry,
+	blobSet BlobSet,
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
 		len(config.AvailableRelays) == 0 ||
@@ -90,6 +95,7 @@ func NewEncodingManager(
 		logger:                logger.With("component", "EncodingManager"),
 		cursor:                nil,
 		metrics:               newEncodingManagerMetrics(registry),
+		blobSet:               blobSet,
 	}, nil
 }
 
@@ -141,6 +147,22 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	return nil
 }
 
+func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
+	dedupedBlobs := make([]*v2.BlobMetadata, 0)
+	for _, blob := range blobMetadatas {
+		key, err := blob.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			continue
+		}
+		if !e.blobSet.Contains(key) {
+			dedupedBlobs = append(dedupedBlobs, blob)
+			e.blobSet.AddBlob(key)
+		}
+	}
+	return dedupedBlobs
+}
+
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
@@ -148,6 +170,8 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 		return err
 	}
 
+	blobMetadatas = e.dedupBlobs(blobMetadatas)
+	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
 	}
@@ -267,9 +291,7 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 	e.metrics.reportBatchSubmissionLatency(time.Since(submissionStart))
 
-	if cursor != nil {
-		e.cursor = cursor
-	}
+	e.cursor = cursor
 
 	e.logger.Debug("successfully submitted encoding requests", "numBlobs", len(blobMetadatas))
 	return nil

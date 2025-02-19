@@ -112,7 +112,7 @@ func getChunks(
 }
 
 func TestReadWriteBlobs(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestReadWriteBlobs(t *testing.T) {
 }
 
 func TestReadNonExistentBlob(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -254,7 +254,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 }
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -390,7 +390,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 }
 
 func TestReadWriteChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -406,7 +406,8 @@ func TestReadWriteChunks(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -461,9 +462,9 @@ func TestReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -615,7 +616,7 @@ func TestReadWriteChunks(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -631,7 +632,8 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -682,9 +684,9 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -750,7 +752,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 }
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -777,7 +779,8 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -839,9 +842,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		shardMap[blobKey] = shards
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -1050,7 +1053,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -1077,7 +1080,8 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -1133,9 +1137,9 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 

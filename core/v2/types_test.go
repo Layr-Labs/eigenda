@@ -3,6 +3,7 @@ package v2_test
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -22,7 +23,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -32,7 +33,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x456",
-			ReservationPeriod: 6,
+			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
 	}
@@ -76,7 +77,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -101,7 +102,7 @@ func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -119,4 +120,28 @@ func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, blobCert, newBlobCert)
+}
+
+func TestAttestationToProtobuf(t *testing.T) {
+	zeroAttestation := &v2.Attestation{
+		BatchHeader: &v2.BatchHeader{
+			BatchRoot:            [32]byte{1, 1, 1},
+			ReferenceBlockNumber: 100,
+		},
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nil,
+		APKG2:            nil,
+		QuorumAPKs:       nil,
+		Sigma:            nil,
+		QuorumNumbers:    nil,
+		QuorumResults:    nil,
+	}
+	attestationProto, err := zeroAttestation.ToProtobuf()
+	assert.NoError(t, err)
+	assert.Empty(t, attestationProto.NonSignerPubkeys)
+	assert.Empty(t, attestationProto.ApkG2)
+	assert.Empty(t, attestationProto.QuorumApks)
+	assert.Empty(t, attestationProto.Sigma)
+	assert.Empty(t, attestationProto.QuorumNumbers)
+	assert.Empty(t, attestationProto.QuorumSignedPercentages)
 }

@@ -46,7 +46,7 @@ func TestWaitForBlockNumber(t *testing.T) {
 	waitGroup := sync.WaitGroup{}
 
 	// start these goroutines in random order, so that it isn't always the same sequence of polling handoffs that gets exercised
-	indices := testrandom.NewTestRandom(t).Perm(callCount)
+	indices := testrandom.NewTestRandom().Perm(callCount)
 	for _, index := range indices {
 		waitGroup.Add(1)
 

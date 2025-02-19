@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"slices"
 	"sync"
-	"time"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
@@ -61,14 +60,15 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 
 // BlobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
-// then on-demand if the reservation is not available. The returned values are
-// reservation period for reservation payments and cumulative payment for on-demand payments,
-// and both fields are used to create the payment header and signature.
+// then on-demand if the reservation is not available. It takes in a timestamp at
+// the current UNIX time in nanoseconds, and returns a cumulative payment for on-
+// demand payments in units of wei. Both timestamp and cumulative payment are used
+// to create the payment header and signature, with non-zero cumulative payment
+// indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8) (uint32, *big.Int, error) {
-	now := time.Now().Unix()
-	currentReservationPeriod := meterer.GetReservationPeriod(uint64(now), a.reservationWindow)
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
+	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
 	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
 
 	a.usageLock.Lock()
@@ -80,9 +80,9 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return currentReservationPeriod, big.NewInt(0), nil
+		return big.NewInt(0), nil
 	}
 
 	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
@@ -90,9 +90,9 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return currentReservationPeriod, big.NewInt(0), nil
+		return big.NewInt(0), nil
 	}
 
 	// reservation not available, rollback reservation records, attempt on-demand
@@ -102,24 +102,24 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 	if a.cumulativePayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			return 0, big.NewInt(0), err
+			return big.NewInt(0), err
 		}
-		return 0, a.cumulativePayment, nil
+		return a.cumulativePayment, nil
 	}
 
-	return 0, big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
+	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
-	reservationPeriod, cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums)
+func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
+	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, err
 	}
 
 	pm := &core.PaymentMetadata{
 		AccountID:         a.accountID,
-		ReservationPeriod: reservationPeriod,
+		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
 
