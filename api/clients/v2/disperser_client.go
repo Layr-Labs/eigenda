@@ -175,6 +175,18 @@ func (c *disperserClient) DisperseBlob(
 			return nil, [32]byte{}, fmt.Errorf("error deserializing blob commitments: %w", err)
 		}
 		blobCommitments = *deserialized
+
+		// We need to check that the disperser used the correct length. Even once checking the commitment from the
+		// disperser has been implemented, there is still an edge case where the disperser could truncate trailing 0s,
+		// yielding the wrong blob length, but not causing commitment verification to fail. It is important that the
+		// commitment doesn't report a blob length smaller than expected, since this could cause payload parsing to
+		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
+		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
+		if lengthFromCommitment != uint32(symbolLength) {
+			return nil, [32]byte{}, fmt.Errorf(
+				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
+				lengthFromCommitment, symbolLength, err)
+		}
 	} else {
 		// if prover is configured, get commitments from prover
 
