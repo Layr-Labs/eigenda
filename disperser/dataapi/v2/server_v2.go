@@ -263,7 +263,7 @@ func (s *ServerV2) Start() error {
 	{
 		blobs := v2.Group("/blobs")
 		{
-			blobs.GET("/feed/forward", s.FetchBlobFeed)
+			blobs.GET("/feed", s.FetchBlobFeed)
 			blobs.GET("/:blob_key", s.FetchBlob)
 			blobs.GET("/:blob_key/certificate", s.FetchBlobCertificate)
 			blobs.GET("/:blob_key/attestation-info", s.FetchBlobAttestationInfo)
