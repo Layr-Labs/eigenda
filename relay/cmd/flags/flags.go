@@ -1,8 +1,9 @@
 package flags
 
 import (
-	"github.com/docker/go-units"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -81,7 +82,7 @@ var (
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
-		Value:    8 * units.GiB,
+		Value:    units.GiB,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
