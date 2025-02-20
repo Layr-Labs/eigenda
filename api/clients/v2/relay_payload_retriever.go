@@ -50,7 +50,7 @@ func BuildRelayPayloadRetriever(
 
 	codec, err := codecs.CreateCodec(
 		relayPayloadRetrieverConfig.PayloadPolynomialForm,
-		relayPayloadRetrieverConfig.BlobEncodingVersion)
+		relayPayloadRetrieverConfig.PayloadEncodingVersion)
 	if err != nil {
 		return nil, err
 	}

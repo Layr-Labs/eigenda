@@ -259,6 +259,7 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	s.metrics.ReportGetChunksLatency(time.Since(start))
 
 	return &pb.GetChunksReply{
-		Chunks: chunks,
+		Chunks:              chunks,
+		ChunkEncodingFormat: pb.ChunkEncodingFormat_GNARK,
 	}, nil
 }
