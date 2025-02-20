@@ -12,7 +12,7 @@ const docTemplateV2 = `{
         "contact": {},
         "version": "{{.Version}}"
     },
-    "host": "{{.Host}}",
+    "host": "{{.host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
         "/batches/feed": {

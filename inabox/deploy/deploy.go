@@ -365,7 +365,7 @@ func (env *Config) StopAnvil() {
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 
-	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT))
+	socket := core.NewOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT)
 
 	envVars := []string{
 		"NODE_OPERATION=" + operation,
@@ -373,7 +373,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_BLS_KEY_FILE=" + operator.NODE_BLS_KEY_FILE,
 		"NODE_ECDSA_KEY_PASSWORD=" + operator.NODE_ECDSA_KEY_PASSWORD,
 		"NODE_BLS_KEY_PASSWORD=" + operator.NODE_BLS_KEY_PASSWORD,
-		"NODE_SOCKET=" + socket,
+		"NODE_SOCKET=" + socket.String(),
 		"NODE_QUORUM_ID_LIST=" + operator.NODE_QUORUM_ID_LIST,
 		"NODE_CHAIN_RPC=" + operator.NODE_CHAIN_RPC,
 		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,

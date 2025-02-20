@@ -40,8 +40,12 @@ func (c client) GetBlobHeader(
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 ) (*core.BlobHeader, *merkletree.Proof, error) {
+	operatorSocket, err := core.ParseOperatorSocket(socket)
+	if err != nil {
+		return nil, nil, err
+	}
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(socket).GetV1RetrievalSocket(),
+		operatorSocket.GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -85,8 +89,18 @@ func (c client) GetChunks(
 	quorumID core.QuorumID,
 	chunksChan chan RetrievedChunks,
 ) {
+	operatorSocket, err := core.ParseOperatorSocket(opInfo.Socket)
+	if err != nil {
+		chunksChan <- RetrievedChunks{
+			OperatorID: opID,
+			Err:        err,
+			Chunks:     nil,
+		}
+		return
+	}
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetV1RetrievalSocket(),
+		//core.OperatorSocket(opInfo.Socket).GetV1RetrievalSocket(),
+		operatorSocket.GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
