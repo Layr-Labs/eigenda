@@ -307,7 +307,7 @@ library EigenDACertVerificationUtils {
         for (uint i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {
             nonSignerOperatorIds[i] = BN254.hashG1Point(signedBatch.attestation.nonSignerPubkeys[i]);
         }
-
+      
         for (uint i = 0; i < signedBatch.attestation.quorumNumbers.length; ++i) {
             signedQuorumNumbers = abi.encodePacked(signedQuorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }

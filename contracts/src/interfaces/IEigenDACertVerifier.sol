@@ -70,10 +70,11 @@ interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
+     * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
-    ) external view returns (NonSignerStakesAndSignature memory, bytes memory);
+    ) external view returns (NonSignerStakesAndSignature memory);
 
     /**
      * @notice Verifies the security parameters for a blob cert

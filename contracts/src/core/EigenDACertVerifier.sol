@@ -18,12 +18,24 @@ import "../interfaces/IEigenDAStructs.sol";
  */
 contract EigenDACertVerifier is IEigenDACertVerifier {
 
+    /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+
+    /// @notice The EigenDABatchMetadataStorage contract address
+    /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorage;
+
+    /// @notice The EigenDASignatureVerifier contract address
+    /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDASignatureVerifier public immutable eigenDASignatureVerifier;
+
+    /// @notice The EigenDARelayRegistry contract address
     IEigenDARelayRegistry public immutable eigenDARelayRegistry;
 
+    /// @notice The EigenDA middleware OperatorStateRetriever contract address
     OperatorStateRetriever public immutable operatorStateRetriever;
+
+    /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinator;
 
     SecurityThresholds public securityThresholdsV2;
@@ -179,16 +191,16 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
-     * @return signedQuorumNumbers The signed quorum numbers for the given signed batch attestation
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
-    ) external view returns (NonSignerStakesAndSignature memory, bytes memory) {
-        return EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
-            operatorStateRetriever, 
-            registryCoordinator, 
+    ) external view returns (NonSignerStakesAndSignature memory) {
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) = EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
             signedBatch
         );
+        return nonSignerStakesAndSignature;
     }
 
     /**
