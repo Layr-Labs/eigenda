@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -140,9 +141,13 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 
-		err = verification.CheckBlobLength(blob, blobCommitments.Length)
-		if err != nil {
-			pr.log.Warn("check blob length", "blobKey", blobKey.Hex(), "relayKey", relayKey, "error", err)
+		if uint(len(blob)) > blobCommitments.Length*encoding.BYTES_PER_SYMBOL {
+			pr.log.Warn(
+				"received length is greater than claimed blob length",
+				"blobKey", blobKey.Hex(),
+				"relayKey", relayKey,
+				"receivedLengthBytes", len(blob),
+				"claimedLengthBytes", blobCommitments.Length*encoding.BYTES_PER_SYMBOL)
 			continue
 		}
 

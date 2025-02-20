@@ -152,9 +152,13 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			continue
 		}
 
-		err = verification.CheckBlobLength(blobBytes, commitment.Length)
-		if err != nil {
-			pr.logger.Warn("check blob length", "blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
+		if uint(len(blobBytes)) > commitment.Length*encoding.BYTES_PER_SYMBOL {
+			pr.logger.Warn(
+				"received length is greater than claimed blob length",
+				"blobKey", blobKey.Hex(),
+				"quorumID", quorumID,
+				"receivedLengthBytes", len(blobBytes),
+				"claimedLengthBytes", commitment.Length*encoding.BYTES_PER_SYMBOL)
 			continue
 		}
 
