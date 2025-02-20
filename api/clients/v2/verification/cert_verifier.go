@@ -29,6 +29,11 @@ type ICertVerifier interface {
 		certVerifierAddress string,
 		signedBatch *disperser.SignedBatch,
 	) (*verifierBindings.NonSignerStakesAndSignature, error)
+
+	GetQuorumNumbersRequired(
+		ctx context.Context,
+		certVerifierAddress string,
+	) ([]uint8, error)
 }
 
 // CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
@@ -209,6 +214,24 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	}
 
 	return &nonSignerStakesAndSignature, nil
+}
+
+// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
+// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
+func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, certVerifierAddress string) ([]uint8, error) {
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress),
+		cv.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequiredV2(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("get quorum numbers required: %w", err)
+	}
+
+	return quorumNumbersRequired, nil
 }
 
 // MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless
