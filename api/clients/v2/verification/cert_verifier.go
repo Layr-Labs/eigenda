@@ -109,8 +109,6 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("wait for block number: %w", err)
 	}
 
-	// don't try to bind to the address until AFTER waiting for the block number. if you try to bind too early, the
-	// contract might not exist yet
 	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
 		gethcommon.HexToAddress(certVerifierAddress),
 		cv.ethClient)
@@ -195,8 +193,6 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	// don't try to bind to the address until AFTER waiting for the block number. if you try to bind too early, the
-	// contract might not exist yet
 	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
 		gethcommon.HexToAddress(certVerifierAddress),
 		cv.ethClient)
