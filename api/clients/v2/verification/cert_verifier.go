@@ -20,11 +20,13 @@ import (
 type ICertVerifier interface {
 	VerifyCertV2(
 		ctx context.Context,
+		certVerifierAddress string,
 		eigenDACert *EigenDACert,
 	) error
 
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
+		certVerifierAddress string,
 		signedBatch *disperser.SignedBatch,
 	) (*verifierBindings.NonSignerStakesAndSignature, error)
 }
@@ -34,11 +36,9 @@ type ICertVerifier interface {
 //
 // The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol
 type CertVerifier struct {
-	logger logging.Logger
-	// go binding around the EigenDACertVerifier ethereum contract
-	certVerifierCaller *verifierBindings.ContractEigenDACertVerifierCaller
-	ethClient          common.EthClient
-	pollInterval       time.Duration
+	logger       logging.Logger
+	ethClient    common.EthClient
+	pollInterval time.Duration
 	// storage shared between goroutines, containing the most recent block number observed by calling ethClient.BlockNumber()
 	latestBlockNumber atomic.Uint64
 	// atomic bool, so that only a single goroutine is polling the internal client with BlockNumber() calls at any given time
@@ -52,8 +52,6 @@ func NewCertVerifier(
 	logger logging.Logger,
 	// the eth client, which should already be set up
 	ethClient common.EthClient,
-	// the hex address of the EigenDACertVerifier contract
-	certVerifierAddress string,
 	// pollInterval is how frequently to check latest block number when waiting for the internal eth client to advance
 	// to a certain block. This is needed because the RBN in a cert might be further in the future than the internal
 	// eth client. In such a case, we must wait for the internal client to catch up to the block number
@@ -63,14 +61,6 @@ func NewCertVerifier(
 	// rely on the client having reached a certain block number will fail if the internal client is behind.
 	pollInterval time.Duration,
 ) (*CertVerifier, error) {
-	verifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress),
-		ethClient)
-
-	if err != nil {
-		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
-	}
-
 	if pollInterval <= time.Duration(0) {
 		logger.Warn(
 			`CertVerifier poll interval is <= 0. Therefore, any method calls made with this object that 
@@ -80,10 +70,9 @@ func NewCertVerifier(
 	}
 
 	return &CertVerifier{
-		logger:             logger,
-		certVerifierCaller: verifierCaller,
-		ethClient:          ethClient,
-		pollInterval:       pollInterval,
+		logger:       logger,
+		ethClient:    ethClient,
+		pollInterval: pollInterval,
 	}, nil
 }
 
@@ -97,6 +86,8 @@ func NewCertVerifier(
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 	ctx context.Context,
+	// the hex address of the EigenDACertVerifier contract
+	certVerifierAddress string,
 	// The signed batch that contains the blob whose cert is being verified. This is obtained from the disperser, and
 	// is used to verify that the described blob actually exists in a valid batch.
 	signedBatch *disperser.SignedBatch,
@@ -118,7 +109,14 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("wait for block number: %w", err)
 	}
 
-	err = cv.certVerifierCaller.VerifyDACertV2FromSignedBatch(
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress),
+		cv.ethClient)
+	if err != nil {
+		return fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	err = certVerifierCaller.VerifyDACertV2FromSignedBatch(
 		&bind.CallOpts{Context: ctx},
 		*convertedSignedBatch,
 		*convertedBlobInclusionInfo)
@@ -140,6 +138,8 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2(
 	ctx context.Context,
+	// the hex address of the EigenDACertVerifier contract
+	certVerifierAddress string,
 	eigenDACert *EigenDACert,
 ) error {
 	err := cv.MaybeWaitForBlockNumber(ctx, uint64(eigenDACert.BatchHeader.ReferenceBlockNumber))
@@ -147,7 +147,16 @@ func (cv *CertVerifier) VerifyCertV2(
 		return fmt.Errorf("wait for block number: %w", err)
 	}
 
-	err = cv.certVerifierCaller.VerifyDACertV2(
+	// don't try to bind to the address until AFTER waiting for the block number. if you try to bind too early, the
+	// contract might not exist yet
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress),
+		cv.ethClient)
+	if err != nil {
+		return fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	err = certVerifierCaller.VerifyDACertV2(
 		&bind.CallOpts{Context: ctx},
 		eigenDACert.BatchHeader,
 		eigenDACert.BlobInclusionInfo,
@@ -170,9 +179,10 @@ func (cv *CertVerifier) VerifyCertV2(
 // behind.
 func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
+	// the hex address of the EigenDACertVerifier contract
+	certVerifierAddress string,
 	signedBatch *disperser.SignedBatch,
 ) (*verifierBindings.NonSignerStakesAndSignature, error) {
-
 	signedBatchBinding, err := SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
@@ -183,7 +193,14 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	nonSignerStakesAndSignature, err := cv.certVerifierCaller.GetNonSignerStakesAndSignature(
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress),
+		cv.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	nonSignerStakesAndSignature, err := certVerifierCaller.GetNonSignerStakesAndSignature(
 		&bind.CallOpts{Context: ctx},
 		*signedBatchBinding)
 

@@ -18,9 +18,9 @@ type MockCertVerifier struct {
 	mock.Mock
 }
 
-// GetNonSignerStakesAndSignature provides a mock function with given fields: ctx, signedBatch
-func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, signedBatch *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error) {
-	ret := _m.Called(ctx, signedBatch)
+// GetNonSignerStakesAndSignature provides a mock function with given fields: ctx, certVerifierAddress, signedBatch
+func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, certVerifierAddress string, signedBatch *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error) {
+	ret := _m.Called(ctx, certVerifierAddress, signedBatch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNonSignerStakesAndSignature")
@@ -28,19 +28,19 @@ func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, 
 
 	var r0 *contractEigenDACertVerifier.NonSignerStakesAndSignature
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error)); ok {
-		return rf(ctx, signedBatch)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error)); ok {
+		return rf(ctx, certVerifierAddress, signedBatch)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *v2.SignedBatch) *contractEigenDACertVerifier.NonSignerStakesAndSignature); ok {
-		r0 = rf(ctx, signedBatch)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *v2.SignedBatch) *contractEigenDACertVerifier.NonSignerStakesAndSignature); ok {
+		r0 = rf(ctx, certVerifierAddress, signedBatch)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*contractEigenDACertVerifier.NonSignerStakesAndSignature)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *v2.SignedBatch) error); ok {
-		r1 = rf(ctx, signedBatch)
+	if rf, ok := ret.Get(1).(func(context.Context, string, *v2.SignedBatch) error); ok {
+		r1 = rf(ctx, certVerifierAddress, signedBatch)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -48,17 +48,17 @@ func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, 
 	return r0, r1
 }
 
-// VerifyCertV2 provides a mock function with given fields: ctx, eigenDACert
-func (_m *MockCertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *verification.EigenDACert) error {
-	ret := _m.Called(ctx, eigenDACert)
+// VerifyCertV2 provides a mock function with given fields: ctx, certVerifierAddress, eigenDACert
+func (_m *MockCertVerifier) VerifyCertV2(ctx context.Context, certVerifierAddress string, eigenDACert *verification.EigenDACert) error {
+	ret := _m.Called(ctx, certVerifierAddress, eigenDACert)
 
 	if len(ret) == 0 {
 		panic("no return value specified for VerifyCertV2")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *verification.EigenDACert) error); ok {
-		r0 = rf(ctx, eigenDACert)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *verification.EigenDACert) error); ok {
+		r0 = rf(ctx, certVerifierAddress, eigenDACert)
 	} else {
 		r0 = ret.Error(0)
 	}
