@@ -114,7 +114,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		startTime = oldestTime
 	}
 
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAtForward(
+	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(
 		c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1,
 	)
 	if err != nil {
