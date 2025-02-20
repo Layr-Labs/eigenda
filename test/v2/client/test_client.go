@@ -31,15 +31,10 @@ import (
 )
 
 const (
-	SRSPath           = "srs"
-	SRSPathG1         = SRSPath + "/g1.point"
-	SRSPathG2         = SRSPath + "/g2.point"
-	SRSPathG2PowerOf2 = SRSPath + "/g2.point.powerOf2"
-	SRSPathSRSTables  = SRSPath + "/SRSTables"
-
-	G1URL         = "https://eigenda.s3.amazonaws.com/srs/g1.point"
-	G2URL         = "https://eigenda.s3.amazonaws.com/srs/g2.point"
-	G2PowerOf2URL = "https://eigenda.s3.amazonaws.com/srs/g2.point.powerOf2"
+	SRSPathG1         = "/g1.point"
+	SRSPathG2         = "/g2.point"
+	SRSPathG2PowerOf2 = "/g2.point.powerOf2"
+	SRSPathSRSTables  = "/SRSTables"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -75,20 +70,12 @@ func NewTestClient(
 
 	// Construct the disperser client
 
-	privateKeyFile, err := ResolveTildeInPath(config.KeyPath)
+	privateKey, err := loadPrivateKey(config.KeyPath, config.KeyVar)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve tilde in path: %w", err)
-	}
-	privateKey, err := os.ReadFile(privateKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file: %w", err)
+		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
-	privateKeyString := string(privateKey)
-	privateKeyString = strings.Trim(privateKeyString, "\n \t")
-	privateKeyString, _ = strings.CutPrefix(privateKeyString, "0x")
-
-	signer, err := auth.NewLocalBlobRequestSigner(privateKeyString)
+	signer, err := auth.NewLocalBlobRequestSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
@@ -99,19 +86,19 @@ func NewTestClient(
 	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Infof("Account ID: %s", accountId.String())
 
-	g1Path, err := config.Path(SRSPathG1)
+	g1Path, err := config.ResolveSRSPath(SRSPathG1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G1 file: %w", err)
 	}
-	g2Path, err := config.Path(SRSPathG2)
+	g2Path, err := config.ResolveSRSPath(SRSPathG2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 file: %w", err)
 	}
-	g2PowerOf2Path, err := config.Path(SRSPathG2PowerOf2)
+	g2PowerOf2Path, err := config.ResolveSRSPath(SRSPathG2PowerOf2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to G2 power of 2 file: %w", err)
 	}
-	srsTablesPath, err := config.Path(SRSPathSRSTables)
+	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get path to SRS tables: %w", err)
 	}
@@ -149,7 +136,7 @@ func NewTestClient(
 
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          config.EthRPCURLs,
-		PrivateKeyString: privateKeyString,
+		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -185,8 +172,12 @@ func NewTestClient(
 
 	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
 	// This is expected to be rejected by the relays, since this client is not authorized to call GetChunks().
-	rand := random.NewTestRandom(nil)
-	keypair := rand.BLS()
+	rand := random.NewTestRandom()
+	keypair, err := rand.BLS()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate BLS keypair: %w", err)
+	}
+
 	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
 	}
@@ -210,7 +201,7 @@ func NewTestClient(
 
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 	payloadClientConfig.EigenDACertVerifierAddr = config.EigenDACertVerifierAddress
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.DefaultBlobEncoding)
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob codec: %w", err)
 	}
@@ -277,11 +268,43 @@ func NewTestClient(
 		retrievalClient:           retrievalClient,
 		validatorPayloadRetriever: validatorPayloadRetriever,
 		certVerifier:              certVerifier,
-		privateKey:                privateKeyString,
+		privateKey:                privateKey,
 		metricsRegistry:           metrics.registry,
 		metrics:                   metrics,
 		blobCodec:                 blobCodec,
 	}, nil
+}
+
+// loadPrivateKey loads the private key from the file/env var specified in the config.
+func loadPrivateKey(keyPath string, keyVar string) (string, error) {
+	if keyPath != "" {
+		privateKeyFile, err := ResolveTildeInPath(keyPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		}
+		privateKey, err := os.ReadFile(privateKeyFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to read private key file: %w", err)
+		}
+
+		return formatPrivateKey(string(privateKey)), nil
+	}
+
+	if keyVar == "" {
+		return "", fmt.Errorf("either KeyPath or KeyVar must be set")
+	}
+	privateKey := os.Getenv(keyVar)
+	if privateKey == "" {
+		return "", fmt.Errorf("key not found in environment variable %s", keyVar)
+	}
+	return formatPrivateKey(privateKey), nil
+}
+
+// formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
+func formatPrivateKey(privateKey string) string {
+	privateKey = strings.Trim(privateKey, "\n \t")
+	privateKey, _ = strings.CutPrefix(privateKey, "0x")
+	return privateKey
 }
 
 // GetConfig returns the test client's configuration.
@@ -324,7 +347,7 @@ func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.Payl
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.BlobEncodingVersion)
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.PayloadEncodingVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob codec: %w", err)
 	}

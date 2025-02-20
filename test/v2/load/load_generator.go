@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"sync/atomic"
-	"time"
-
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
+	"github.com/docker/go-units"
+	"os"
+	"sync/atomic"
+	"time"
 )
 
+// LoadGenerator is a utility for generating read and write load for the target network.
 type LoadGenerator struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -23,8 +22,6 @@ type LoadGenerator struct {
 	config *LoadGeneratorConfig
 	// The test client to use for the load test.
 	client *client.TestClient
-	// The random number generator to use for the load test.
-	rand *random.TestRandom
 	// The time between starting each blob submission.
 	submissionPeriod time.Duration
 	// The channel to limit the number of parallel blob submissions.
@@ -60,8 +57,7 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 // NewLoadGenerator creates a new LoadGenerator.
 func NewLoadGenerator(
 	config *LoadGeneratorConfig,
-	client *client.TestClient,
-	rand *random.TestRandom) *LoadGenerator {
+	client *client.TestClient) *LoadGenerator {
 
 	bytesPerSecond := config.MBPerSecond * units.MiB
 	averageBlobSize := config.AverageBlobSizeMB * units.MiB
@@ -82,7 +78,6 @@ func NewLoadGenerator(
 		cancel:             cancel,
 		config:             config,
 		client:             client,
-		rand:               rand,
 		submissionPeriod:   submissionPeriodAsDuration,
 		parallelismLimiter: parallelismLimiter,
 		alive:              atomic.Bool{},
@@ -132,22 +127,24 @@ func (l *LoadGenerator) submitBlob() {
 
 	// TODO: failure metrics
 
-	payloadSize := int(l.rand.BoundedGaussian(
+	rand := random.NewTestRandomNoPrint()
+
+	payloadSize := int(rand.BoundedGaussian(
 		l.config.AverageBlobSizeMB*units.MiB,
 		l.config.BlobSizeStdDev*units.MiB,
 		1.0,
 		float64(l.client.GetConfig().MaxBlobSize+1)))
-	payload := l.rand.Bytes(payloadSize)
+	payload := rand.Bytes(payloadSize)
 
 	eigenDACert, err := l.client.DispersePayload(ctx, l.config.Quorums, payload)
 	if err != nil {
-		fmt.Printf("failed to disperse blob: %v\n", err)
+		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return
 	}
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
-		fmt.Printf("failed to compute blob key: %v\n", err)
+		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
 		return
 	}
 
@@ -159,14 +156,15 @@ func (l *LoadGenerator) submitBlob() {
 			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
 			payload)
 		if err != nil {
-			fmt.Printf("failed to read blob from relays: %v\n", err)
+			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
 	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
-		fmt.Printf("failed to compute blob commitment: %v\n", err)
+		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		return
 	}
 
 	for i := uint64(0); i < l.config.ValidatorReadAmplification; i++ {
@@ -178,7 +176,7 @@ func (l *LoadGenerator) submitBlob() {
 			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 			payload)
 		if err != nil {
-			fmt.Printf("failed to read blob from validators: %v\n", err)
+			l.client.GetLogger().Errorf("failed to read blob from validators: %v", err)
 		}
 	}
 }

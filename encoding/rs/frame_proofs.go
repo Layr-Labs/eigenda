@@ -2,6 +2,7 @@ package rs
 
 import (
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -74,9 +75,7 @@ func SplitSerializedFrameProofs(bytes []byte) ([][]byte, error) {
 	proofs := make([][]byte, proofCount)
 
 	for i := 0; i < proofCount; i++ {
-		proof := make([]byte, SerializedProofLength)
-		copy(proof, bytes[i*SerializedProofLength:(i+1)*SerializedProofLength])
-		proofs[i] = proof
+		proofs[i] = bytes[i*SerializedProofLength : (i+1)*SerializedProofLength]
 	}
 
 	return proofs, nil

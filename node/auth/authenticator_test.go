@@ -15,11 +15,12 @@ import (
 )
 
 func TestValidRequest(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -46,11 +47,12 @@ func TestValidRequest(t *testing.T) {
 }
 
 func TestInvalidRequestWrongHash(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -80,11 +82,12 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 }
 
 func TestInvalidRequestWrongKey(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, _ := rand.ECDSA()
+	publicKey, _, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -103,7 +106,8 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
 
-	_, differentPrivateKey := rand.ECDSA()
+	_, differentPrivateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	signature, err := SignStoreChunksRequest(differentPrivateKey, request)
 	require.NoError(t, err)
 	request.Signature = signature
@@ -113,15 +117,17 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 }
 
 func TestInvalidRequestInvalidDisperserID(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey0, privateKey0 := rand.ECDSA()
+	publicKey0, privateKey0, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
 
 	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
-	publicKey1, privateKey1 := rand.ECDSA()
+	publicKey1, privateKey1, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
 
 	chainReader := wmock.MockWriter{}
@@ -173,11 +179,12 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 }
 
 func TestAuthCaching(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -239,11 +246,12 @@ func TestAuthCaching(t *testing.T) {
 }
 
 func TestAuthCachingDisabled(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -283,11 +291,12 @@ func TestAuthCachingDisabled(t *testing.T) {
 }
 
 func TestKeyExpiry(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -336,11 +345,12 @@ func TestKeyExpiry(t *testing.T) {
 }
 
 func TestAuthCacheSize(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
-	publicKey, privateKey := rand.ECDSA()
+	publicKey, privateKey, err := rand.ECDSA()
+	require.NoError(t, err)
 	disperserAddress := crypto.PubkeyToAddress(*publicKey)
 
 	chainReader := wmock.MockWriter{}
@@ -423,7 +433,7 @@ func TestAuthCacheSize(t *testing.T) {
 }
 
 func TestKeyCacheSize(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	start := rand.Time()
 
@@ -432,7 +442,8 @@ func TestKeyCacheSize(t *testing.T) {
 	chainReader := wmock.MockWriter{}
 	keyMap := make(map[uint32]*ecdsa.PrivateKey, cacheSize+1)
 	for i := 0; i < cacheSize+1; i++ {
-		publicKey, privateKey := rand.ECDSA()
+		publicKey, privateKey, err := rand.ECDSA()
+		require.NoError(t, err)
 		disperserAddress := crypto.PubkeyToAddress(*publicKey)
 		keyMap[uint32(i)] = privateKey
 

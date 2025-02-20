@@ -3,6 +3,7 @@ package rs
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
@@ -83,8 +84,7 @@ func SplitSerializedFrameCoeffs(serializedData []byte) (elementCount uint32, bin
 	binaryFrameCoeffs = make([][]byte, frameCoeffCount)
 
 	for i := uint32(0); i < frameCoeffCount; i++ {
-		binaryFrameCoeffs[i] = make([]byte, bytesPerFrameCoeffs)
-		copy(binaryFrameCoeffs[i], serializedData[index:index+bytesPerFrameCoeffs])
+		binaryFrameCoeffs[i] = serializedData[index : index+bytesPerFrameCoeffs]
 		index += bytesPerFrameCoeffs
 	}
 
