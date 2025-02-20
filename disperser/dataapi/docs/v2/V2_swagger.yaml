@@ -24,9 +24,9 @@ definitions:
         - $ref: '#/definitions/big.Int'
         description: CumulativePayment represents the total amount of payment (in
           wei) made by the user up to this point
-      reservation_period:
-        description: ReservationPeriod represents the range of time at which the dispersal
-          is made
+      timestamp:
+        description: Timestamp represents the nanosecond of the dispersal request
+          creation
         type: integer
     type: object
   core.Signature:
@@ -299,7 +299,7 @@ definitions:
         items:
           $ref: '#/definitions/v2.BlobInfo'
         type: array
-      pagination_token:
+      cursor:
         type: string
     type: object
   v2.BlobInfo:
@@ -457,6 +457,8 @@ definitions:
     type: object
   v2.OperatorStake:
     properties:
+      operator_address:
+        type: string
       operator_id:
         type: string
       quorum_id:
@@ -675,23 +677,30 @@ paths:
   /blobs/feed:
     get:
       parameters:
-      - description: 'Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z)
-          [default: now]'
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
         in: query
-        name: end
+        name: direction
         type: string
-      - description: 'Fetch blobs starting from an interval (in seconds) before the
-          end time [default: 3600]'
+      - description: 'Fetch blobs before this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z) [default: now]'
         in: query
-        name: interval
-        type: integer
-      - description: 'Fetch blobs starting from the pagination token (exclusively).
-          Overrides the interval param if specified [default: empty]'
-        in: query
-        name: pagination_token
+        name: before
         type: string
-      - description: 'The maximum number of blobs to fetch. System max (1000) if limit
-          <= 0 [default: 20; max: 1000]'
+      - description: 'Fetch blobs after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Pagination cursor (opaque string from previous response); for
+          ''forward'' direction, overrides `after` and fetches blobs from `cursor`
+          to `before`; for ''backward'' direction, overrides `before` and fetches
+          blobs from `cursor` to `after` (all bounds exclusive) [default: empty]'
+        in: query
+        name: cursor
+        type: string
+      - description: 'Maximum number of blobs to return; if limit <= 0 or >1000, it''s
+          treated as 1000 [default: 20; max: 1000]'
         in: query
         name: limit
         type: integer
@@ -714,7 +723,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob feed
+      summary: Fetch blob feed in specified direction
       tags:
       - Blobs
   /metrics/summary:

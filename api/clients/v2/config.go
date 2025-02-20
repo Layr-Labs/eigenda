@@ -11,8 +11,10 @@ import (
 
 // PayloadClientConfig contains configuration values that are needed by both PayloadRetriever and PayloadDisperser
 type PayloadClientConfig struct {
-	// The blob encoding version to use when writing and reading blobs
-	BlobEncodingVersion codecs.BlobEncodingVersion
+	// The payload encoding version to use when encoding payload bytes
+	//
+	// This is the version that is put into the header of the EncodedPayload.
+	PayloadEncodingVersion codecs.PayloadEncodingVersion
 
 	// The address of the EigenDACertVerifier contract
 	EigenDACertVerifierAddr string
@@ -112,7 +114,7 @@ type PayloadDisperserConfig struct {
 // NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
-		BlobEncodingVersion:     codecs.DefaultBlobEncoding,
+		PayloadEncodingVersion:  codecs.PayloadEncodingVersion0,
 		PayloadPolynomialForm:   codecs.PolynomialFormEval,
 		ContractCallTimeout:     5 * time.Second,
 		BlockNumberPollInterval: 1 * time.Second,

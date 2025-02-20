@@ -156,6 +156,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 //	@Router		/operators/stake [get]
 func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 	handlerStart := time.Now()
+	ctx := c.Request.Context()
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
@@ -166,13 +167,48 @@ func (s *ServerV2) FetchOperatorsStake(c *gin.Context) {
 		errorResponse(c, fmt.Errorf("failed to get current block number: %w", err))
 		return
 	}
-	operatorsStakeResponse, err := s.operatorHandler.GetOperatorsStake(c.Request.Context(), operatorId)
+	operatorsStakeResponse, err := s.operatorHandler.GetOperatorsStakeAtBlock(ctx, operatorId, uint32(currentBlock))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
 		errorResponse(c, fmt.Errorf("failed to get operator stake: %w", err))
 		return
 	}
 	operatorsStakeResponse.CurrentBlock = uint32(currentBlock)
+
+	// Get operators' addresses in batch
+	operatorsSeen := make(map[string]struct{}, 0)
+	for _, ops := range operatorsStakeResponse.StakeRankedOperators {
+		for _, op := range ops {
+			operatorsSeen[op.OperatorId] = struct{}{}
+		}
+	}
+	operatorIDs := make([]core.OperatorID, 0)
+	for id := range operatorsSeen {
+		opId, err := core.OperatorIDFromHex(id)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
+			errorResponse(c, fmt.Errorf("malformed operator ID: %w", err))
+			return
+		}
+		operatorIDs = append(operatorIDs, opId)
+	}
+	// Get the address for the operators.
+	// operatorAddresses[i] is the address for operatorIDs[i].
+	operatorAddresses, err := s.chainReader.BatchOperatorIDToAddress(ctx, operatorIDs)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchOperatorsStake")
+		errorResponse(c, fmt.Errorf("failed to get operator addresses from IDs: %w", err))
+		return
+	}
+	idToAddress := make(map[string]string, 0)
+	for i := range operatorIDs {
+		idToAddress[operatorIDs[i].Hex()] = operatorAddresses[i].Hex()
+	}
+	for _, ops := range operatorsStakeResponse.StakeRankedOperators {
+		for _, op := range ops {
+			op.OperatorAddress = idToAddress[op.OperatorId]
+		}
+	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorsStake")
 	s.metrics.ObserveLatency("FetchOperatorsStake", time.Since(handlerStart))

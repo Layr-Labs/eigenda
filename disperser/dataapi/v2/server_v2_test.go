@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"sort"
 	"testing"
@@ -317,7 +318,7 @@ func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.Oper
 	assert.Equal(t, expected.TotalBatches, actual.TotalBatches)
 }
 
-func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
 	require.NoError(t, err)
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
@@ -447,19 +448,95 @@ func TestFetchBlobFeed(t *testing.T) {
 	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
-		reqUrls := []string{
-			"/v2/blobs/feed?pagination_token=abc",
-			"/v2/blobs/feed?limit=abc",
-			"/v2/blobs/feed?interval=abc",
-			"/v2/blobs/feed?interval=-1",
-			"/v2/blobs/feed?end=2006-01-02T15:04:05",
-			"/v2/blobs/feed?end=2006-01-02T15:04:05Z",
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "direction must be either 'forward' or 'backward', found: abc",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "'after' must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+				},
+				wantError: "after time must be before before time",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "before time cannot be more than 14 days in the past",
+			},
+
+			// Invalid cursor
+			{
+				name:        "invalid cursor format",
+				queryParams: map[string]string{"cursor": "not-a-valid-cursor"},
+				wantError:   "failed to parse the cursor",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse limit param",
+			},
 		}
-		for _, url := range reqUrls {
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+			url := fmt.Sprintf("/v2/blobs/feed?%s", params.Encode())
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
+
 			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
 		}
 	})
 
@@ -475,8 +552,8 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 	})
 
 	t.Run("various query ranges and limits", func(t *testing.T) {
@@ -489,12 +566,14 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, numBlobs, len(response.Blobs))
 		// First 3 blobs ordered by key due to same timestamp
@@ -505,14 +584,14 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
@@ -520,8 +599,8 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[41+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[100], keys[100])
 	})
 
 	t.Run("pagination", func(t *testing.T) {
@@ -533,7 +612,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - Proper token handling
 		tm := time.Unix(0, time.Now().UnixNano()).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -541,11 +620,11 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 
-		// Request next page using pagination token
-		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
+		// Request next page using pagination cursor
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -553,8 +632,8 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[63+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[82], keys[82])
 	})
 
 	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
@@ -566,7 +645,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=2", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 2, len(response.Blobs))
@@ -574,11 +653,11 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobMetadata.BlobHeader)
 		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
 		assert.Equal(t, firstBlobTime, response.Blobs[1].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[1], firstBlobKeys[1])
 
 		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
-		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=0&pagination_token=%s", endTime, response.PaginationToken)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=0&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		// Verify second page contains:
@@ -591,8 +670,8 @@ func TestFetchBlobFeed(t *testing.T) {
 		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
 		assert.Equal(t, requestedAt[3], response.Blobs[1].BlobMetadata.RequestedAt)
 		assert.Equal(t, requestedAt[4], response.Blobs[2].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[4], keys[4])
 	})
 }
 
@@ -1648,26 +1727,57 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
+	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
+	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				if id == opId0 {
+					result[i] = addr0
+				} else if id == opId1 {
+					result[i] = addr1
+				} else {
+					result[i] = gethcommon.Address{}
+				}
+			}
+			return result
+		},
+		nil,
+	)
+
 	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/operators/stake")
 	response := decodeResponseBody[dataapi.OperatorsStakeResponse](t, w)
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
-	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
+	// There are 2 quorums (0, 1)
 	require.Equal(t, 2, len(response.StakeRankedOperators))
+	checkAddress := func(op *dataapi.OperatorStake) {
+		if op.OperatorId == opId0.Hex() {
+			assert.Equal(t, addr0.Hex(), op.OperatorAddress)
+		}
+		if op.OperatorId == opId1.Hex() {
+			assert.Equal(t, addr1.Hex(), op.OperatorAddress)
+		}
+	}
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 }
 
 func TestFetchMetricsSummary(t *testing.T) {
