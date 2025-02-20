@@ -6,7 +6,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 )
 
@@ -26,11 +26,11 @@ func FuzzProxyClientServerIntegration(f *testing.F) {
 		}
 	}
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
 
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	// seed and data are expected. `seed` value is seed: {rune} and data is the one with the random byte(s)
 	f.Fuzz(func(t *testing.T, data []byte) {

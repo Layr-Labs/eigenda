@@ -5,6 +5,6 @@
 // 1. [omitted]
 // 2. if you have a repository with a complex set of dependencies, but you have a client API with a smaller set of dependencies.
 //    In some cases, it might make sense to have an api or clientapi or similar directory with its own go.mod, or to separate out that clientapi into its own repository.
-module github.com/Layr-Labs/eigenda-proxy/client
+module github.com/Layr-Labs/eigenda-proxy/clients
 
 go 1.21.0

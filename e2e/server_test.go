@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/memconfig_client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
@@ -68,10 +69,10 @@ func TestProxyClientServerIntegration(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	t.Cleanup(kill)
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	t.Run("single byte preimage set data case", func(t *testing.T) {
 		t.Parallel()
@@ -136,10 +137,10 @@ func TestProxyClient(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	defer kill()
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	testPreimage := e2e.RandBytes(100)
 
@@ -248,10 +249,10 @@ func TestProxyReadFallback(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	defer kill()
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 	expectedBlob := e2e.RandBytes(1_000_000)
 	t.Log("Setting input data on proxy server...")
 	blobInfo, err := daClient.SetData(ts.Ctx, expectedBlob)
@@ -266,4 +267,39 @@ func TestProxyReadFallback(t *testing.T) {
 	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+}
+
+func TestProxyMemConfigClientCanGetAndPatch(t *testing.T) {
+	// test can't be ran against holesky since its specific to memstore
+	if !runIntegrationTests || runTestnetIntegrationTests {
+		t.Skip("Skipping test as INTEGRATION env var not set")
+	}
+	t.Parallel()
+
+	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
+	ts, kill := e2e.CreateTestSuite(tsConfig)
+	defer kill()
+
+	memClient := memconfig_client.New(&memconfig_client.Config{
+		URL: "http://" + ts.Server.Endpoint(),
+	})
+
+	// 1 - ensure cfg can be read from memconfig handlers
+	cfg, err := memClient.GetConfig(ts.Ctx)
+	require.NoError(t, err)
+
+	// 2 - update PutLatency field && ensure that newly fetched config reflects change
+	expectedChange := time.Second * 420
+	cfg.PutLatency = expectedChange
+
+	cfg, err = memClient.UpdateConfig(ts.Ctx, cfg)
+	require.NoError(t, err)
+
+	require.Equal(t, cfg.PutLatency, expectedChange)
+
+	// 3 - get cfg again to verify that memconfig state update is now reflected on server
+	cfg, err = memClient.GetConfig(ts.Ctx)
+
+	require.NoError(t, err)
+	require.Equal(t, cfg.PutLatency, expectedChange)
 }

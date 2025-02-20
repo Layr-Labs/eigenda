@@ -47,3 +47,7 @@ $ curl http://localhost:3100/memstore/config | \
   jq '.PutLatency = "5s" | .GetLatency = "2s"' | \
   curl -X PATCH http://localhost:3100/memstore/config -d @-
 ```
+
+
+### Golang client
+A simple HTTP client implementation lives in `/clients/memconfig_client/` and can be imported for manipulating the config using more structured types.

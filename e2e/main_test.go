@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
@@ -67,10 +67,10 @@ func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.Bac
 
 // requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
 func requireStandardClientSetGet(t *testing.T, ts e2e.TestSuite, blob []byte) {
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	t.Log("Setting input data on proxy server...")
 	blobInfo, err := daClient.SetData(ts.Ctx, blob)

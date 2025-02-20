@@ -1,4 +1,4 @@
-package client
+package standard_client
 
 import (
 	"bytes"
@@ -42,16 +42,16 @@ type Client struct {
 
 // New ... constructor
 func New(cfg *Config, opts ...ClientOption) *Client {
-	scc := &Client{
+	client := &Client{
 		cfg,
 		http.DefaultClient,
 	}
 
 	for _, opt := range opts {
-		opt(scc)
+		opt(client)
 	}
 
-	return scc
+	return client
 }
 
 // Health indicates if the server is operational; useful for event based awaits

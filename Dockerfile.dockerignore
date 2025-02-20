@@ -3,7 +3,7 @@
 
 # Re-include necessary files only
 !go.mod
-!client/go.mod
+!clients/go.mod
 !go.sum
 !*/**/*.go
 !Makefile

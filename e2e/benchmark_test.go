@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 )
 
 // BenchmarkPutsWithSecondary  ... Takes in an async worker count and profiles blob insertions using
@@ -26,10 +26,10 @@ func BenchmarkPutsWithSecondary(b *testing.B) {
 	ts, kill := CreateTestSuite(tsConfig)
 	defer kill()
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	for i := 0; i < b.N; i++ {
 		_, err := daClient.SetData(context.Background(), []byte("I am a blob and I only live for 14 days on EigenDA"))

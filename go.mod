@@ -6,7 +6,7 @@ toolchain go1.22.7
 
 require (
 	github.com/Layr-Labs/eigenda v0.8.6-rc.0.0.20250130173836-0d293cc03198
-	github.com/Layr-Labs/eigenda-proxy/client v0.0.0-00010101000000-000000000000
+	github.com/Layr-Labs/eigenda-proxy/clients v0.0.0-00010101000000-000000000000
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/consensys/gnark-crypto v0.12.1
@@ -27,8 +27,8 @@ require (
 	google.golang.org/grpc v1.64.1
 )
 
-// TODO: Remove this after we have published v0.1.0 of the new client module.
-replace github.com/Layr-Labs/eigenda-proxy/client => ./client/
+// TODO: Remove this after we have published v0.1.0 of the new clients module.
+replace github.com/Layr-Labs/eigenda-proxy/clients => ./clients/
 
 require (
 	dario.cat/mergo v1.0.0 // indirect

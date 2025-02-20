@@ -8,7 +8,7 @@ import (
 
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 
-	"github.com/Layr-Labs/eigenda-proxy/client"
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/e2e"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,10 +79,10 @@ func TestProxyClientMalformedInputCases(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	defer kill()
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 
 	t.Run("single byte preimage set data case", func(t *testing.T) {
 		testPreimage := []byte{1} // single byte preimage
@@ -169,10 +169,10 @@ func TestOversizedBlobRequestErrors(t *testing.T) {
 	ts, kill := e2e.CreateTestSuite(tsConfig)
 	defer kill()
 
-	cfg := &client.Config{
+	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
-	daClient := client.New(cfg)
+	daClient := standard_client.New(cfg)
 	//  17MB blob
 	testPreimage := e2e.RandBytes(17_000_0000)
 

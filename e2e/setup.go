@@ -281,6 +281,10 @@ func CreateTestSuite(testSuiteCfg server.CLIConfig) (TestSuite, func()) {
 		panic(err)
 	}
 
+	if testSuiteCfg.EigenDAConfig.MemstoreEnabled {
+		memconfig.NewHandlerHTTP(log, testSuiteCfg.EigenDAConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(r)
+	}
+
 	kill := func() {
 		if err := proxySvr.Stop(); err != nil {
 			log.Error("failed to stop proxy server", "err", err)
