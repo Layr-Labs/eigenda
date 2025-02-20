@@ -160,7 +160,8 @@ func (cv *CertVerifier) VerifyCertV2(
 		&bind.CallOpts{Context: ctx},
 		eigenDACert.BatchHeader,
 		eigenDACert.BlobInclusionInfo,
-		eigenDACert.NonSignerStakesAndSignature)
+		eigenDACert.NonSignerStakesAndSignature,
+		eigenDACert.SignedQuorumNumbers)
 
 	if err != nil {
 		return fmt.Errorf("verify cert v2: %w", err)
