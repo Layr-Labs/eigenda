@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -489,7 +490,18 @@ func buildInsufficientGetChunksBandwidthError(
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start(ctx context.Context) error {
-	s.metrics.Start()
+	// Start metrics server if enabled
+	if s.config.EnableMetrics {
+		s.metrics.Start()
+		s.logger.Info("Enabled metrics for relay server", "port", s.config.MetricsPort)
+	}
+
+	// Start pprof server if enabled
+	if s.config.EnablePprof {
+		pprofProfiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", s.config.PprofHttpPort), s.logger)
+		go pprofProfiler.Start()
+		s.logger.Info("Enabled pprof for relay server", "port", s.config.PprofHttpPort)
+	}
 
 	if s.chainReader != nil && s.metadataProvider != nil {
 		go func() {
@@ -548,9 +560,11 @@ func (s *Server) Stop() error {
 		s.grpcServer.GracefulStop()
 	}
 
-	err := s.metrics.Stop()
-	if err != nil {
-		return fmt.Errorf("error stopping metrics server: %w", err)
+	if s.config.EnableMetrics {
+		err := s.metrics.Stop()
+		if err != nil {
+			return fmt.Errorf("error stopping metrics server: %w", err)
+		}
 	}
 
 	return nil

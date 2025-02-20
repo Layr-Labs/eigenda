@@ -7,11 +7,9 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/require"
 	"io"
 	"math/big"
 	"math/rand"
-	"testing"
 	"time"
 )
 
@@ -23,18 +21,23 @@ type TestRandom struct {
 	// The source of randomness
 	*rand.Rand
 
-	// The testing object
-	t *testing.T
-
 	// The seed used to initialize the random number generator
 	seed int64
 }
 
 // NewTestRandom creates a new instance of TestRandom
 // This method may either be seeded, or not seeded. If no seed is provided, then current unix nano time is used.
-//
-// The testing.T object is optional, but if it is nil then this utility will panic if an internal error occurs.
-func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
+func NewTestRandom(fixedSeed ...int64) *TestRandom {
+	return newTestRandom(true, fixedSeed...)
+}
+
+// NewTestRandomNoPrint is similar to NewTestRandom, but does not print the seed to stdout.
+func NewTestRandomNoPrint(fixedSeed ...int64) *TestRandom {
+	return newTestRandom(false, fixedSeed...)
+}
+
+// NewTestRandomNoSeed creates a new instance of TestRandom.
+func newTestRandom(print bool, fixedSeed ...int64) *TestRandom {
 	var seed int64
 	if len(fixedSeed) == 0 {
 		seed = time.Now().UnixNano()
@@ -44,10 +47,11 @@ func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
 		panic("too many arguments, expected exactly one seed")
 	}
 
-	fmt.Printf("Random seed: %d\n", seed)
+	if print {
+		fmt.Printf("Random seed: %d\n", seed)
+	}
 	return &TestRandom{
 		Rand: rand.New(rand.NewSource(seed)),
-		t:    t,
 		seed: seed,
 	}
 }
@@ -144,32 +148,28 @@ func (r *TestRandom) IOReader() io.Reader {
 // **intentionally** imposed by the Go standard libraries. (╯°□°)╯︵ ┻━┻
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
-	r.requireNoError(err)
-	return &key.PublicKey, key
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate key: %w", err)
+	}
+	return &key.PublicKey, key, nil
 }
 
 // BLS generates a random BLS key pair.
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) BLS() *core.KeyPair {
+func (r *TestRandom) BLS() (*core.KeyPair, error) {
 	//Max random value is order of the curve
 	maxValue := new(big.Int)
 	maxValue.SetString(fr.Modulus().String(), 10)
 
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := crand.Int(r.IOReader(), maxValue)
-	r.requireNoError(err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random number: %w", err)
+	}
 
 	sk := new(core.PrivateKey).SetBigInt(n)
-	return core.MakeKeyPair(sk)
-}
-
-func (r *TestRandom) requireNoError(err error) {
-	if r.t != nil {
-		require.NoError(r.t, err)
-	} else if err != nil {
-		panic(err)
-	}
+	return core.MakeKeyPair(sk), nil
 }

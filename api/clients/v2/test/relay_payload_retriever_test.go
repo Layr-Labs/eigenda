@@ -56,7 +56,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	mockRelayClient := clientsmock.MockRelayClient{}
 	codec := codecs.NewDefaultBlobCodec()
 
-	random := testrandom.NewTestRandom(t)
+	random := testrandom.NewTestRandom()
 
 	g1Srs, err := kzg.ReadG1Points(g1Path, 5, uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
