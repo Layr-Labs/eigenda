@@ -35,7 +35,7 @@ type ChainState struct {
 func NewChainState(reader core.Reader, client common.EthClient, logger logging.Logger) (*ChainState, error) {
 	currentBlockNumber, err := client.BlockByNumber(context.Background(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current block number: %w", err)
+		return nil, fmt.Errorf("failed to get current block number: %v", err)
 	}
 	cs := &ChainState{
 		Client:    client,
@@ -54,28 +54,28 @@ var _ core.ChainState = (*ChainState)(nil)
 func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
 	operatorsByQuorum, _, err := cs.Reader.GetOperatorStakes(ctx, operator, uint32(blockNumber))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator stakes for operator %x at block %d: %w", operator, blockNumber, err)
+		return nil, fmt.Errorf("failed to get operator stakes for operator %x at block %d: %v", operator, blockNumber, err)
 	}
 
 	return cs.getOperatorState(ctx, operatorsByQuorum, uint32(blockNumber))
 }
 
 // GetOperatorState returns the operator state for a given quorum at a specific block number.
-func (cs *ChainState) GetOperatorState(creader context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
-	operatorsByQuorum, err := cs.Reader.GetOperatorStakesForQuorums(creader, quorums, uint32(blockNumber))
+func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
+	operatorsByQuorum, err := cs.Reader.GetOperatorStakesForQuorums(ctx, quorums, uint32(blockNumber))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator stakes for quorums %v at block %d: %w", quorums, blockNumber, err)
+		return nil, fmt.Errorf("failed to get operator stakes for quorums %v at block %d: %v", quorums, blockNumber, err)
 	}
 
-	return cs.getOperatorState(creader, operatorsByQuorum, uint32(blockNumber))
+	return cs.getOperatorState(ctx, operatorsByQuorum, uint32(blockNumber))
 }
 
 // GetCurrentBlockNumber returns the current block number.
-func (cs *ChainState) GetCurrentBlockNumber(creader context.Context) (uint, error) {
-	number, err := cs.Client.BlockNumber(creader)
+func (cs *ChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
+	number, err := cs.Client.BlockNumber(ctx)
 	if err != nil {
-		cs.logger.Warn("failed to get current block number: %w", "error", err)
-		return 0, fmt.Errorf("failed to get current block number: %w", err)
+		cs.logger.Warn("failed to get current block number", "error", err)
+		return 0, fmt.Errorf("failed to get current block number: %v", err)
 	}
 
 	return uint(number), nil
@@ -83,11 +83,11 @@ func (cs *ChainState) GetCurrentBlockNumber(creader context.Context) (uint, erro
 
 // GetOperatorSocket returns the socket address for a given operator at the current block number,
 // and it takes blockNumber due to the core.ChainState interface.
-func (cs *ChainState) GetOperatorSocket(creader context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
-	socket, err := cs.Reader.GetOperatorSocket(creader, operator)
+func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
+	socket, err := cs.Reader.GetOperatorSocket(ctx, operator)
 	if err != nil {
-		cs.logger.Warn("failed to get socket for operator %x at block %d: %w", "operator", operator, "blockNumber", blockNumber, "error", err)
-		return "", fmt.Errorf("failed to get socket for operator %x at block %d: %w", operator, blockNumber, err)
+		cs.logger.Warn("failed to get socket for operator %x at block %d: %v", "operator", operator, "blockNumber", blockNumber, "error", err)
+		return "", fmt.Errorf("failed to get socket for operator %x at block %d: %v", operator, blockNumber, err)
 	}
 	return socket, nil
 }
@@ -97,7 +97,7 @@ func (cs *ChainState) GetOperatorSocket(creader context.Context, blockNumber uin
 func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	logs, err := cs.getSocketUpdateEventLogs(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get logs: %w", err)
+		return fmt.Errorf("failed to get logs: %v", err)
 	}
 
 	// logs are in order of block number, so we can just iterate through them
@@ -106,13 +106,13 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 		cs.socketPrevBlockNumber.Store(uint32(log.BlockNumber - 1))
 		transaction, err := cs.getTransaction(ctx, log.TxHash)
 		if err != nil {
-			cs.logger.Warn("failed to check transaction %s: %w", "txHash", log.TxHash.Hex(), "error", err)
+			cs.logger.Warn("failed to check transaction %s: %v", "txHash", log.TxHash.Hex(), "error", err)
 			prematureBreak = true
 			break
 		}
 		operatorID, socket, err := cs.parseOperatorSocketUpdate(transaction.Data(), &log)
 		if err != nil {
-			cs.logger.Warn("failed to get transaction data for operator %x: %w", "operatorID", operatorID, "error", err)
+			cs.logger.Warn("failed to get transaction data for operator %x: %v", "operatorID", operatorID, "error", err)
 			continue
 		}
 
@@ -123,8 +123,7 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 
 	// If above loop completed without a premature break, increment prevBlockNum by 1 to ensure we don't handle the same block twice
 	if !prematureBreak {
-		socketPrevBlockNumber := cs.socketPrevBlockNumber.Load()
-		cs.socketPrevBlockNumber.Store(uint32(socketPrevBlockNumber + 1))
+		cs.socketPrevBlockNumber.Add(1)
 	}
 
 	return nil
@@ -133,12 +132,12 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log, error) {
 	currentBlockNumber, err := cs.Reader.GetCurrentBlockNumber(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current block number: %w", err)
+		return nil, fmt.Errorf("failed to get current block number: %v", err)
 	}
 
 	registryCoordinator, err := cs.Reader.RegistryCoordinator(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get registry coordinator address: %w", err)
+		return nil, fmt.Errorf("failed to get registry coordinator address: %v", err)
 	}
 	prevBlockNum := cs.socketPrevBlockNumber.Load()
 	// The chain hasn't progressed since the last filter, so no logs
@@ -155,8 +154,8 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 		},
 	})
 	if err != nil {
-		cs.logger.Warn("failed to filter logs from block %d to %d: %w", prevBlockNum+1, currentBlockNumber, err)
-		return nil, fmt.Errorf("failed to filter logs from block %d to %d: %w", prevBlockNum+1, currentBlockNumber, err)
+		cs.logger.Warn("failed to filter logs from block %d to %d: %v", prevBlockNum+1, currentBlockNumber, err)
+		return nil, fmt.Errorf("failed to filter logs from block %d to %d: %v", prevBlockNum+1, currentBlockNumber, err)
 	}
 	if len(logs) == 0 {
 		return []types.Log{}, nil
@@ -168,8 +167,8 @@ func (cs *ChainState) getTransaction(ctx context.Context, txHash gcommon.Hash) (
 	transaction, isPending, err := cs.Client.TransactionByHash(ctx, txHash)
 	// Don't continue filtering through logs if we fail to get the transaction or the transaction is pending
 	if err != nil {
-		cs.logger.Warn("failed to get transaction %s: %w", "txHash", txHash.Hex(), "error", err)
-		return nil, fmt.Errorf("failed to get transaction %s: %w", txHash.Hex(), err)
+		cs.logger.Warn("failed to get transaction %s: %v", "txHash", txHash.Hex(), "error", err)
+		return nil, fmt.Errorf("failed to get transaction %s: %v", txHash.Hex(), err)
 	}
 	if isPending {
 		cs.logger.Warn("transaction %s is still pending for operator socket update event", "txHash", txHash.Hex())
@@ -243,7 +242,7 @@ func (cs *ChainState) parseSocketFromCallData(calldata []byte) (string, error) {
 }
 
 // refreshSocketMap refresh the socket map for the given operators by quorums at the current block.
-func (cs *ChainState) refreshSocketMap(creader context.Context, operatorsByQuorum core.OperatorStakes) error {
+func (cs *ChainState) refreshSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) error {
 	for _, quorum := range operatorsByQuorum {
 		for _, operator := range quorum {
 			cs.socketMu.Lock()
@@ -251,9 +250,9 @@ func (cs *ChainState) refreshSocketMap(creader context.Context, operatorsByQuoru
 			cs.socketMu.Unlock()
 
 			if !ok {
-				socket, err := cs.Reader.GetOperatorSocket(creader, operator.OperatorID)
+				socket, err := cs.Reader.GetOperatorSocket(ctx, operator.OperatorID)
 				if err != nil {
-					return fmt.Errorf("failed to get socket for operator %x: %w", operator.OperatorID, err)
+					return fmt.Errorf("failed to get socket for operator %x: %v", operator.OperatorID, err)
 				}
 				cs.socketMu.Lock()
 				cs.SocketMap[operator.OperatorID] = &socket
@@ -263,7 +262,7 @@ func (cs *ChainState) refreshSocketMap(creader context.Context, operatorsByQuoru
 	}
 
 	// Index for recent socket updates
-	if err := cs.indexSocketMap(creader); err != nil {
+	if err := cs.indexSocketMap(ctx); err != nil {
 		return err
 	}
 	return nil
@@ -271,10 +270,10 @@ func (cs *ChainState) refreshSocketMap(creader context.Context, operatorsByQuoru
 
 // getOperatorState returns the current operator state for a given operatorsByQuorum.
 // It ensures the socket map is refreshed before returning the state.
-func (cs *ChainState) getOperatorState(creader context.Context, operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
+func (cs *ChainState) getOperatorState(ctx context.Context, operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
 	// Ensure socket map is refreshed before getting operator state
-	if err := cs.refreshSocketMap(creader, operatorsByQuorum); err != nil {
-		return nil, fmt.Errorf("failed to refresh socket map: %w", err)
+	if err := cs.refreshSocketMap(ctx, operatorsByQuorum); err != nil {
+		return nil, fmt.Errorf("failed to refresh socket map: %v", err)
 	}
 
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
