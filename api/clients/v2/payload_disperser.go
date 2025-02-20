@@ -79,7 +79,6 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	certVerifier, err := verification.NewCertVerifier(
 		log,
 		ethClient,
-		payloadDispCfg.EigenDACertVerifierAddr,
 		payloadDispCfg.BlockNumberPollInterval,
 	)
 
@@ -88,7 +87,7 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	}
 
 	// 5 - create codec
-	codec, err := codecs.CreateCodec(payloadDispCfg.PayloadPolynomialForm, payloadDispCfg.BlobEncodingVersion)
+	codec, err := codecs.CreateCodec(payloadDispCfg.PayloadPolynomialForm, payloadDispCfg.PayloadEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +135,7 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
+	certVerifierAddress string,
 	// payload is the raw data to be stored on eigenDA
 	payload []byte,
 ) (*verification.EigenDACert, error) {
@@ -167,7 +167,7 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
 
-	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
+	eigenDACert, err := pd.buildEigenDACert(ctx, certVerifierAddress, blobKey, blobStatusReply)
 	if err != nil {
 		// error returned from method is sufficiently descriptive
 		return nil, err
@@ -175,7 +175,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
+	err = pd.certVerifier.VerifyCertV2(timeoutCtx, certVerifierAddress, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
@@ -263,18 +263,15 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 // contract, and then assembles an EigenDACert
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
+	certVerifierAddress string,
 	blobKey core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 ) (*verification.EigenDACert, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-
-	// TODO (litt3): @reviewers I think this method (buildEigenDACert) is the main end user of GetNonSignerStakesAndSignature,
-	//  and we are just discarding the signedQuorumNumbers returned from GetNonSignerStakesAndSignature. IMO this points
-	//  to returning signedQuorumNumbers being the wrong API choice
-	nonSignerStakesAndSignature, _, err := pd.certVerifier.GetNonSignerStakesAndSignature(
-		timeoutCtx, blobStatusReply.GetSignedBatch())
+	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
+		timeoutCtx, certVerifierAddress, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}

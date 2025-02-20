@@ -55,13 +55,14 @@ func NewChunkReader(
 func (r *chunkReader) GetBinaryChunkProofs(ctx context.Context, blobKey corev2.BlobKey) ([][]byte, error) {
 	bytes, err := r.client.DownloadObject(ctx, r.bucket, s3.ScopedProofKey(blobKey))
 	if err != nil {
-		r.logger.Error("Failed to download chunks from S3: %v", err)
-		return nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+		r.logger.Error("failed to download proofs from S3", "blob", blobKey.Hex(), "error", err)
+		return nil, fmt.Errorf("failed to download proofs from S3 for blob %s: %w", blobKey.Hex(), err)
 	}
 
 	proofs, err := rs.SplitSerializedFrameProofs(bytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to split proofs: %w", err)
+		r.logger.Error("failed to split proofs", "blob", blobKey.Hex(), "error", err)
+		return nil, fmt.Errorf("failed to split proofs for blob %s: %w", blobKey.Hex(), err)
 	}
 
 	return proofs, nil
@@ -80,14 +81,19 @@ func (r *chunkReader) GetBinaryChunkCoefficients(
 		int(fragmentInfo.FragmentSizeBytes))
 
 	if err != nil {
-		r.logger.Error("Failed to download chunks from S3: %v", err)
-		return 0, nil, fmt.Errorf("failed to download chunks from S3: %w", err)
+		r.logger.Error("failed to download coefficients from S3",
+			"blob", blobKey.Hex(),
+			"totalSize", fragmentInfo.TotalChunkSizeBytes,
+			"fragmentSize", fragmentInfo.FragmentSizeBytes,
+			"error", err)
+		return 0, nil, fmt.Errorf("failed to download coefficients from S3 for blob %s (total size: %d, fragment size: %d): %w",
+			blobKey.Hex(), fragmentInfo.TotalChunkSizeBytes, fragmentInfo.FragmentSizeBytes, err)
 	}
 
 	elementCount, frames, err := rs.SplitSerializedFrameCoeffs(bytes)
 	if err != nil {
-		r.logger.Error("Failed to split frames: %v", err)
-		return 0, nil, fmt.Errorf("failed to split frames: %w", err)
+		r.logger.Error("failed to split coefficient frames", "blob", blobKey.Hex(), "error", err)
+		return 0, nil, fmt.Errorf("failed to split coefficient frames for blob %s: %w", blobKey.Hex(), err)
 	}
 
 	return elementCount, frames, nil
