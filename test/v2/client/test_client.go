@@ -130,8 +130,13 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
+	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
+	}
+
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          config.EthRPCURLs,
+		RPCURLs:          ethRPCUrls,
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
@@ -307,6 +312,24 @@ func loadPrivateKey(keyPath string, keyVar string) (string, error) {
 		return "", fmt.Errorf("key not found in environment variable %s", keyVar)
 	}
 	return formatPrivateKey(privateKey), nil
+}
+
+// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
+func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
+	if len(urls) > 0 {
+		return urls, nil
+	}
+
+	if urlsVar == "" {
+		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
+	}
+
+	ethRPCURLs := os.Getenv(urlsVar)
+	if ethRPCURLs == "" {
+		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
+	}
+
+	return strings.Split(ethRPCURLs, ","), nil
 }
 
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
