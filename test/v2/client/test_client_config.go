@@ -23,7 +23,13 @@ type TestClientConfig struct {
 	// The disperser's port
 	DisperserPort int
 	// The URL(s) to point the eth client to
+	//
+	// Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.
 	EthRPCURLs []string
+	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
+	//
+	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLsVar is used.
+	EthRPCUrlsVar string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
