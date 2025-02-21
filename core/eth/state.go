@@ -128,7 +128,8 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
 
-	registryCoordinator := cs.Reader.RegistryCoordinator(ctx)
+	registryCoordinator := cs.Reader.ContractBindings.
+
 	prevBlockNum := cs.socketPrevBlockNumber.Load()
 	// The chain hasn't progressed since the last filter, so no logs
 	if prevBlockNum >= currentBlockNumber {

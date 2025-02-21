@@ -122,10 +122,10 @@ func (t *MockWriter) SocketRegistry(ctx context.Context) (gethcommon.Address, er
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) RegistryCoordinator(ctx context.Context) (gethcommon.Address, error) {
+func (t *MockWriter) RegistryCoordinator(ctx context.Context) gethcommon.Address {
 	args := t.Called()
 	result := args.Get(0)
-	return result.(gethcommon.Address), args.Error(1)
+	return result.(gethcommon.Address)
 }
 
 func (t *MockWriter) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
