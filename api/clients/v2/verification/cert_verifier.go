@@ -18,18 +18,25 @@ import (
 //
 // This interface exists in order to allow verification mocking in unit tests.
 type ICertVerifier interface {
+	// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
+	//
+	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 	VerifyCertV2(
 		ctx context.Context,
 		certVerifierAddress string,
 		eigenDACert *EigenDACert,
 	) error
 
+	// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
+	// contract, and returns the resulting NonSignerStakesAndSignature object.
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		certVerifierAddress string,
 		signedBatch *disperser.SignedBatch,
 	) (*verifierBindings.NonSignerStakesAndSignature, error)
 
+	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
+	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
 	GetQuorumNumbersRequired(
 		ctx context.Context,
 		certVerifierAddress string,
