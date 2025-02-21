@@ -111,9 +111,7 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 			continue
 		}
 
-		cs.socketMu.Lock()
 		cs.SocketMap[operatorID] = &socket
-		cs.socketMu.Unlock()
 	}
 
 	// If above loop completed without a premature break, increment prevBlockNum by 1 to ensure we don't handle the same block twice
@@ -233,18 +231,14 @@ func (cs *ChainState) parseSocketFromEventLog(logData []byte) (string, error) {
 func (cs *ChainState) refreshSocketMap(ctx context.Context, operatorsByQuorum core.OperatorStakes) error {
 	for _, quorum := range operatorsByQuorum {
 		for _, operator := range quorum {
-			cs.socketMu.Lock()
 			_, ok := cs.SocketMap[operator.OperatorID]
-			cs.socketMu.Unlock()
 
 			if !ok {
 				socket, err := cs.Reader.GetOperatorSocket(ctx, operator.OperatorID)
 				if err != nil {
-					return fmt.Errorf("failed to get socket for operator %x: %v", operator.OperatorID, err)
+					return fmt.Errorf("failed to get socket for operator %x: %w", operator.OperatorID, err)
 				}
-				cs.socketMu.Lock()
 				cs.SocketMap[operator.OperatorID] = &socket
-				cs.socketMu.Unlock()
 			}
 		}
 	}
@@ -258,10 +252,14 @@ func (cs *ChainState) refreshSocketMap(ctx context.Context, operatorsByQuorum co
 
 // getOperatorState returns the current operator state for a given operatorsByQuorum.
 // It ensures the socket map is refreshed before returning the state.
+// This fucntion locks the socket map upon entry, refreshes the cache, reads
+// required values, and then returns the lock.
 func (cs *ChainState) getOperatorState(ctx context.Context, operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
+	cs.socketMu.Lock()
+	defer cs.socketMu.Unlock()
 	// Ensure socket map is refreshed before getting operator state
 	if err := cs.refreshSocketMap(ctx, operatorsByQuorum); err != nil {
-		return nil, fmt.Errorf("failed to refresh socket map: %v", err)
+		return nil, fmt.Errorf("failed to refresh socket map: %w", err)
 	}
 
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
@@ -271,9 +269,7 @@ func (cs *ChainState) getOperatorState(ctx context.Context, operatorsByQuorum co
 		totalStake := big.NewInt(0)
 		operators[quorumID] = make(map[core.OperatorID]*core.OperatorInfo)
 		for ind, op := range quorum {
-			cs.socketMu.Lock()
 			socket, ok := cs.SocketMap[op.OperatorID]
-			cs.socketMu.Unlock()
 			if !ok || socket == nil {
 				return nil, fmt.Errorf("socket not found for operator %x", op.OperatorID)
 			}
