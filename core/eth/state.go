@@ -54,7 +54,7 @@ var _ core.ChainState = (*ChainState)(nil)
 func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
 	operatorsByQuorum, _, err := cs.Reader.GetOperatorStakes(ctx, operator, uint32(blockNumber))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator stakes for operator %x at block %d: %v", operator, blockNumber, err)
+		return nil, fmt.Errorf("failed to get operator stakes for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 
 	return cs.getOperatorState(ctx, operatorsByQuorum, uint32(blockNumber))
@@ -75,7 +75,7 @@ func (cs *ChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	number, err := cs.Client.BlockNumber(ctx)
 	if err != nil {
 		cs.logger.Warn("failed to get current block number", "error", err)
-		return 0, fmt.Errorf("failed to get current block number: %v", err)
+		return 0, fmt.Errorf("failed to get current block number: %w", err)
 	}
 
 	return uint(number), nil
@@ -86,8 +86,8 @@ func (cs *ChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
 	socket, err := cs.Reader.GetOperatorSocket(ctx, operator)
 	if err != nil {
-		cs.logger.Warn("failed to get socket for operator %x at block %d: %v", "operator", operator, "blockNumber", blockNumber, "error", err)
-		return "", fmt.Errorf("failed to get socket for operator %x at block %d: %v", operator, blockNumber, err)
+		cs.logger.Warn("failed to get operator socket from Eth Client reader", "operator", operator, "blockNumber", blockNumber, "error", err)
+		return "", fmt.Errorf("failed to get socket for operator %x at block %d: %w", operator, blockNumber, err)
 	}
 	return socket, nil
 }
@@ -106,13 +106,13 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 		cs.socketPrevBlockNumber.Store(uint32(log.BlockNumber - 1))
 		transaction, err := cs.getTransaction(ctx, log.TxHash)
 		if err != nil {
-			cs.logger.Warn("failed to check transaction %s: %v", "txHash", log.TxHash.Hex(), "error", err)
+			cs.logger.Warn("failed to check transaction", "txHash", log.TxHash.Hex(), "error", err)
 			prematureBreak = true
 			break
 		}
 		operatorID, socket, err := cs.parseOperatorSocketUpdate(transaction.Data(), &log)
 		if err != nil {
-			cs.logger.Warn("failed to get transaction data for operator %x: %v", "operatorID", operatorID, "error", err)
+			cs.logger.Warn("failed to get transaction data for operator", "operatorID", operatorID, "error", err)
 			continue
 		}
 
@@ -154,7 +154,7 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 		},
 	})
 	if err != nil {
-		cs.logger.Warn("failed to filter logs from block %d to %d: %v", prevBlockNum+1, currentBlockNumber, err)
+		cs.logger.Warn("failed to filter logs from block", "FromBlock", prevBlockNum+1, "ToBlock", currentBlockNumber, "error", err)
 		return nil, fmt.Errorf("failed to filter logs from block %d to %d: %v", prevBlockNum+1, currentBlockNumber, err)
 	}
 	if len(logs) == 0 {
@@ -167,11 +167,11 @@ func (cs *ChainState) getTransaction(ctx context.Context, txHash gcommon.Hash) (
 	transaction, isPending, err := cs.Client.TransactionByHash(ctx, txHash)
 	// Don't continue filtering through logs if we fail to get the transaction or the transaction is pending
 	if err != nil {
-		cs.logger.Warn("failed to get transaction %s: %v", "txHash", txHash.Hex(), "error", err)
+		cs.logger.Warn("failed to get transaction", "txHash", txHash.Hex(), "error", err)
 		return nil, fmt.Errorf("failed to get transaction %s: %v", txHash.Hex(), err)
 	}
 	if isPending {
-		cs.logger.Warn("transaction %s is still pending for operator socket update event", "txHash", txHash.Hex())
+		cs.logger.Warn("transaction is still pending for operator socket update event", "txHash", txHash.Hex())
 		return nil, fmt.Errorf("transaction %s is still pending for operator socket update event", txHash.Hex())
 	}
 	return transaction, nil
@@ -181,15 +181,17 @@ func (cs *ChainState) parseOperatorSocketUpdate(callData []byte, log *types.Log)
 	operatorID, err := cs.parseOperatorIDFromLog(log)
 	if err != nil {
 		cs.logger.Warn("failed to parse operator ID from log. skipping malformed log",
+			"txHash", log.TxHash.Hex(),
+			"operatorId", operatorID,
 			"error", err)
 	}
 
 	socket, err := cs.parseSocketFromCallData(callData)
 	if err != nil {
 		cs.logger.Warn("failed to parse socket update event. skipping malformed log",
-			"error", err,
 			"txHash", log.TxHash.Hex(),
-			"operatorId", operatorID)
+			"operatorId", operatorID,
+			"error", err)
 	}
 	return operatorID, socket, nil
 }
@@ -235,7 +237,7 @@ func (cs *ChainState) parseSocketFromCallData(calldata []byte) (string, error) {
 		socket = inputs[0].(string)
 	} else {
 		// this should never happen; we are going to return empty string
-		cs.logger.Warn("method and input length mismatch for socket update event: %s", "method", method.Name)
+		cs.logger.Warn("method and input length mismatch for socket update eventS", "method", method.Name)
 		return "", fmt.Errorf("method and input length mismatch for socket update event: %s", method.Name)
 	}
 	return socket, nil
