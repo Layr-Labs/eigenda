@@ -1,63 +1,15 @@
+# System Architecture
 
+![image](../../../assets/architecture.png)
 
-## Introduction
-
-
-EigenDA is a Data Availability (DA) service, implemented as an actively validated service (AVS) on EigenLayer, that provides secure and scalable DA for L2s on Ethereum. 
-
-### What is DA?
-
-In informal terms, DA is a guarantee that a given piece of data will be available to anyone who wishes to retrieve it. 
-
-A DA system accepts blobs of data (via some interface) and then makes them available to retrievers (through another interface). 
-
-Two important aspects of a DA system are 
-1. Security: The security of a DA system constitutes the set of conditions which are sufficient to ensure that all data blobs certified by the system as available are indeed available for honest retrievers to download. 
-2. Throughput: The throughput of a DA system is the rate at which the system is able to accept blobs of data, typically measured in bytes/second. 
-
-### An EigenLayer AVS for DA
-
-EigenDA is implemented as an actively validated service on EigenLayer, which is a restaking protocol for Ethereum. 
-
-Because of this, EigenDA makes use of the EigenLayer state, which is stored on Ethereum, for consensus about the state of operators and as a callback for consensus about the availability of data. This means that EigenDA can be simpler in implementation than many existing DA solutions: EigenDA doesn't need to build it's own chain or consensus protocol; it rides on the back of Ethereum. 
-
-### A first of its kind, horizontally scalable DA solution
-
-Among extant DA solutions, EigenDA takes an approach to scalability which is unique in that it yields true horizontal scalability: Every additional unit of capacity contributed by an operator can increase the total system capacity. 
-
-This property is achieved by using a Reed Solomon erasure encoding scheme to shard the blob data across the DA nodes. While other systems such as Celestia and Danksharding (planned) also make use of Reed Solomon encoding, they do so only for the purpose of supporting certain observability properties of Data Availability Sampling (DAS) by light nodes. On the other hand, all incentivized/full nodes of the system download, store, and serve the full system bandwidth. 
-
-Horizontal scalability provides the promise for the technological bottlenecks of DA capacity to continually track demand, which has enormous implications for Layer 2 ecosystems. 
-
-### Security Model
-
-EigenDA produces a DA attestation which asserts that a given blob or collection of blobs is available. Attestations are anchored to one or more "Quorums," each of which defines a set of EigenLayer stakers which underwrite the security of the attestation. Quorums should be considered as redundant: Each quorum linked to an attestation provides an independent guarantee of availability as if the other quorums did not exist. 
-
-
-Each attestation is characterized by safety and liveness tolerances:
-- Liveness tolerance: Conditions under which the system will produce an availability attestation. 
-- Safety tolerance: Conditions under which an availability attestation implies that data is indeed available. 
-
-EigenDA defines two properties of each blob attestation which relate to its liveness and safety tolerance: 
-- Liveness threshold: The liveness threshold defines the minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system. 
-- Safety threshold: The safety threshold defines the total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system. 
-
-The term "first-order attack" alludes to the fact that exceeding the safety threshold may represent only a contingency rather than an actual safety failure due to the presence of recovery mechanisms that would apply during such a contingency. Discussion of such mechanisms is outside of the scope of the current documentation. 
-
-Safety thresholds can translate directly into cryptoeconomic safety properties for quorums consisting of tokens which experience toxicity in the event of publicly observable attacks by a large coalition of token holders. This and other discussions of cryptoeconomic security are also beyond the scope of this technical documentation. We restrict the discussion to illustrating how the protocol preserves the given safety and liveness thresholds. 
-
-## System Architecture
-
-![image](./assets/architecture.png)
-
-### Core Components
+## Core Components
 
 
 - **DA nodes** are the service providers of EigenDA, storing chunks of blob data for a predefined time period and serving these chunks upon request. 
 - The **disperser** is responsible for encoding blobs, distributing them to the DA nodes, and aggregating their digital signatures into a DA attestation. As the disperser is currently centralized, it is trusted for system liveness; the disperser will be decentralized over time.
 - The disperser and the DA nodes both depend on the **Ethereum L1** for shared state about the DA node registration and stake delegation. The L1 is also currently used to bridge DA attestations to L2 end-user applications such as rollup chains. 
 
-### Essential flows
+## Essential flows
 
 **Dispersal**. The is the flow by which data is made available and consists of the following steps:
 1. The Disperser receives a collection of blobs, [encodes them], constructs a batch of encoded blobs and headers, and sends the sharded batch to the DA nodes.
@@ -69,7 +21,7 @@ Safety thresholds can translate directly into cryptoeconomic safety properties f
 **Retrieval**. Interested parties such as rollup challengers that want to obtain rollup blob data can retrieve a blob by downloading the encoded chunks from the DA nodes and decoding them. The blob lookup information contained in the request is obtained from the bridged attestation to the DA nodes.
 
 
-## Protocol Overview
+# Protocol Overview
 
 For expositional purposes, we will divide the protocol into two conceptual layers: 
 - Attestation Layer: Modules to ensure that whenever a DA attestation is accepted by an end-user (e.g. a rollup), then the data is indeed available. More specifically, the attestation layer ensures that the system observes the safety and liveness tolerances defined in the [Security Model](#Security-Model) section.
@@ -108,19 +60,15 @@ we can reconstruct the original data blob from the chunks held by \\( U_q \setmi
 
 ### Encoding Module
 
-The encoding module defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
-
-[Read more](./attestation/encoding.md)
+The [encoding module](./architecture/encoding.md) defines a procedure for blobs to be encoded in such a way that their successful reconstruction can be guaranteed given a large enough collection of unique encoded chunks. The procedure also allows for the chunks to be trustlessly verified against a blob commitment so that the disperser cannot violate the protocol.
 
 ### Assignment Module
 
-The assignment module is nothing more than a rule which takes in the Ethereum chain state and outputs an allocation of chunks to DA operators. 
-
-[Read more](./attestation/assignment.md)
+The [assignment module](./architecture/assignment.md) is nothing more than a rule which takes in the Ethereum chain state and outputs an allocation of chunks to DA operators. 
 
 ### Signature verification and bridging
 
-[Read more](./attestation/bridging.md)
+[Bridging module](./architecture/bridging.md)
 
 ## Network Layer
 
