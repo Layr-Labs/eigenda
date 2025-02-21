@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -40,6 +39,7 @@ const (
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	config                    *TestClientConfig
+	payloadClientConfig       *clients.PayloadClientConfig
 	logger                    logging.Logger
 	disperserClient           clients.DisperserClient
 	payloadDisperser          *clients.PayloadDisperser
@@ -149,6 +149,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
 
+	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
+	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
+	//  options.
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 
 	payloadDisperserConfig := clients.PayloadDisperserConfig{
@@ -260,6 +263,7 @@ func NewTestClient(
 
 	return &TestClient{
 		config:                    config,
+		payloadClientConfig:       payloadClientConfig,
 		logger:                    logger,
 		disperserClient:           disperserClient,
 		payloadDisperser:          payloadDisperser,
@@ -491,8 +495,7 @@ func (c *TestClient) ReadBlobFromRelays(
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
 
-		// TODO (litt3): instead of hard coding PolynomialFormCoeff, this needs to be configurable
-		payload, err := blob.ToPayload(codecs.PolynomialFormCoeff)
+		payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to decode blob: %w", err)
 		}
@@ -545,11 +548,7 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
 
-		// TODO (litt3): this should be configurable, instead of hardcoded to PolynomialFormCoeff
-		//  @cody-littley Do you have any ideas for how this should be done? I don't think it makes
-		//  send to put into the config file, since we probably should do all of our tests for both
-		//  methods of payload encoding.
-		retrievedPayload, err := blob.ToPayload(codecs.PolynomialFormCoeff)
+		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to convert blob to payload: %w", err)
 		}
