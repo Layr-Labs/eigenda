@@ -36,10 +36,12 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
-        eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, nonSignerStakesAndSignature);
-
-        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
-        eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) = EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
+            signedBatch
+        );
+        eigenDACertVerifier.verifyDACertV2(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers);
     }
 
     function test_verifyDACertV2ZK_True(uint256 pseudoRandomNumber) public {
@@ -61,8 +63,12 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
         _registerRelayKeys();
 
-        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) = EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
+            signedBatch
+        );
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers);
         assert(zk);
     }
 
@@ -83,8 +89,12 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        NonSignerStakesAndSignature memory _nonSignerStakesAndSignature = eigenDACertVerifier.getNonSignerStakesAndSignature(signedBatch);
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature);
+        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) = EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
+            signedBatch
+        );
+        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers);
         assert(!zk);
     }
 
