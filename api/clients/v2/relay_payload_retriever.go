@@ -155,7 +155,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.log.Error(
-				`Cert verification was successful, but decode blob failed!
+				`Cert verification was successful, but conversion from blob to payload failed!
 					This is likely a problem with the local blob codec configuration,
 					but could potentially indicate a maliciously generated blob certificate.
 					It should not be possible for an honestly generated certificate to verify
