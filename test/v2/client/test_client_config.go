@@ -28,14 +28,18 @@ type TestClientConfig struct {
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
 	EigenDAServiceManagerAddr string
-	// The contract address for the EigenDA cert verifier, which specifies required quorum 0
-	//
-	// If this value is not set, that tests utilizing it will be skipped
-	EigenDACertVerifierAddressQuorums0 string
 	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
 	//
 	// If this value is not set, that tests utilizing it will be skipped
 	EigenDACertVerifierAddressQuorums0_1 string
+	// The contract address for the EigenDA cert verifier, which specifies required quorums 0, 1, and 2
+	//
+	// If this value is not set, that tests utilizing it will be skipped
+	EigenDACertVerifierAddressQuorums0_1_2 string
+	// The contract address for the EigenDA cert verifier, which specifies required quorum 2
+	//
+	// If this value is not set, that tests utilizing it will be skipped
+	EigenDACertVerifierAddressQuorums2 string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test
