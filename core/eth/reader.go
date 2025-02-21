@@ -500,6 +500,10 @@ func (t *Reader) SocketRegistry(ctx context.Context) (gethcommon.Address, error)
 	})
 }
 
+func (t *Reader) RegistryCoordinator(ctx context.Context) gethcommon.Address {
+	return t.bindings.RegCoordinatorAddr
+}
+
 func (t *Reader) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	return t.bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 		Context: ctx,
