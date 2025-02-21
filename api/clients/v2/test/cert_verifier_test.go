@@ -24,7 +24,6 @@ func TestWaitForBlockNumber(t *testing.T) {
 	certVerifier, err := verification.NewCertVerifier(
 		logger,
 		&mockEthClient,
-		"",
 		pollRate)
 	require.NoError(t, err)
 	require.NotNil(t, certVerifier)

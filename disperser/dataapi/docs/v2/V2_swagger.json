@@ -123,29 +123,35 @@
                 "tags": [
                     "Blobs"
                 ],
-                "summary": "Fetch blob feed",
+                "summary": "Fetch blob feed in specified direction",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
-                        "name": "end",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]",
-                        "name": "interval",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]",
-                        "name": "pagination_token",
+                        "description": "Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor (opaque string from previous response); for 'forward' direction, overrides `after` and fetches blobs from `cursor` to `before`; for 'backward' direction, overrides `before` and fetches blobs from `cursor` to `after` (all bounds exclusive) [default: empty]",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "The maximum number of blobs to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "description": "Maximum number of blobs to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
                         "name": "limit",
                         "in": "query"
                     }
@@ -1089,7 +1095,7 @@
                         "$ref": "#/definitions/v2.BlobInfo"
                     }
                 },
-                "pagination_token": {
+                "cursor": {
                     "type": "string"
                 }
             }
