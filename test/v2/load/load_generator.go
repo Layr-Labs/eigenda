@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync/atomic"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
-	"os"
-	"sync/atomic"
-	"time"
 )
 
 // LoadGenerator is a utility for generating read and write load for the target network.
@@ -48,7 +49,7 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 	config := &LoadGeneratorConfig{}
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal config file: %w\n%s", err, string(configFileBytes))
 	}
 
 	return config, nil
