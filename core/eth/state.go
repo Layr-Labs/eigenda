@@ -35,7 +35,7 @@ type ChainState struct {
 func NewChainState(reader core.Reader, client common.EthClient, logger logging.Logger) (*ChainState, error) {
 	currentBlockNumber, err := client.BlockByNumber(context.Background(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current block number: %v", err)
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
 	cs := &ChainState{
 		Client:    client,
@@ -64,7 +64,7 @@ func (cs *ChainState) GetOperatorStateByOperator(ctx context.Context, blockNumbe
 func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.OperatorState, error) {
 	operatorsByQuorum, err := cs.Reader.GetOperatorStakesForQuorums(ctx, quorums, uint32(blockNumber))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get operator stakes for quorums %v at block %d: %v", quorums, blockNumber, err)
+		return nil, fmt.Errorf("failed to get operator stakes for quorums %v at block %d: %w", quorums, blockNumber, err)
 	}
 
 	return cs.getOperatorState(ctx, operatorsByQuorum, uint32(blockNumber))
@@ -97,7 +97,7 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	logs, err := cs.getSocketUpdateEventLogs(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get logs: %v", err)
+		return fmt.Errorf("failed to get logs: %w", err)
 	}
 
 	// logs are in order of block number, so we can just iterate through them
@@ -125,7 +125,7 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log, error) {
 	currentBlockNumber, err := cs.Reader.GetCurrentBlockNumber(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current block number: %v", err)
+		return nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
 
 	registryCoordinator := cs.Reader.RegistryCoordinator(ctx)
@@ -145,7 +145,7 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 	})
 	if err != nil {
 		cs.logger.Warn("failed to filter logs from block", "FromBlock", prevBlockNum+1, "ToBlock", currentBlockNumber, "error", err)
-		return nil, fmt.Errorf("failed to filter logs from block %d to %d: %v", prevBlockNum+1, currentBlockNumber, err)
+		return nil, fmt.Errorf("failed to filter logs from block %d to %d: %w", prevBlockNum+1, currentBlockNumber, err)
 	}
 	if len(logs) == 0 {
 		return []types.Log{}, nil
