@@ -104,13 +104,8 @@ func (cs *ChainState) indexSocketMap(ctx context.Context) error {
 	prematureBreak := false
 	for _, log := range logs {
 		cs.socketPrevBlockNumber.Store(uint32(log.BlockNumber - 1))
-		transaction, err := cs.getTransaction(ctx, log.TxHash)
-		if err != nil {
-			cs.logger.Warn("failed to check transaction", "txHash", log.TxHash.Hex(), "error", err)
-			prematureBreak = true
-			break
-		}
-		operatorID, socket, err := cs.parseOperatorSocketUpdate(transaction.Data(), &log)
+
+		operatorID, socket, err := cs.parseOperatorSocketUpdate(&log)
 		if err != nil {
 			cs.logger.Warn("failed to get transaction data for operator", "operatorID", operatorID, "error", err)
 			continue
@@ -177,8 +172,8 @@ func (cs *ChainState) getTransaction(ctx context.Context, txHash gcommon.Hash) (
 	return transaction, nil
 }
 
-func (cs *ChainState) parseOperatorSocketUpdate(callData []byte, log *types.Log) (core.OperatorID, string, error) {
-	operatorID, err := cs.parseOperatorIDFromLog(log)
+func (cs *ChainState) parseOperatorSocketUpdate(log *types.Log) (core.OperatorID, string, error) {
+	operatorID, err := cs.parseOperatorIDFromEventLog(log)
 	if err != nil {
 		cs.logger.Warn("failed to parse operator ID from log. skipping malformed log",
 			"txHash", log.TxHash.Hex(),
@@ -186,7 +181,7 @@ func (cs *ChainState) parseOperatorSocketUpdate(callData []byte, log *types.Log)
 			"error", err)
 	}
 
-	socket, err := cs.parseSocketFromCallData(callData)
+	socket, err := cs.parseSocketFromEventLog(log.Data)
 	if err != nil {
 		cs.logger.Warn("failed to parse socket update event. skipping malformed log",
 			"txHash", log.TxHash.Hex(),
@@ -196,8 +191,8 @@ func (cs *ChainState) parseOperatorSocketUpdate(callData []byte, log *types.Log)
 	return operatorID, socket, nil
 }
 
-// parseOperatorIDFromLog parses the operator ID from a log and returns the operator ID.
-func (cs *ChainState) parseOperatorIDFromLog(log *types.Log) (core.OperatorID, error) {
+// parseOperatorIDFromEventLog parses the operator ID from a log and returns the operator ID.
+func (cs *ChainState) parseOperatorIDFromEventLog(log *types.Log) (core.OperatorID, error) {
 	if len(log.Topics) < 2 {
 		return core.OperatorID{}, fmt.Errorf("log topics too short: expected at least 2 topics, got %d", len(log.Topics))
 	}
@@ -208,38 +203,29 @@ func (cs *ChainState) parseOperatorIDFromLog(log *types.Log) (core.OperatorID, e
 	return operatorID, nil
 }
 
-// parseSocketFromCallData parses the socket update event from a log and returns the operator ID and socket address.
-func (cs *ChainState) parseSocketFromCallData(calldata []byte) (string, error) {
-	// Add length check for method name and input data
-	if len(calldata) <= 4 {
-		return "", fmt.Errorf("calldata too short: expected more than 4 bytes for method name and input data, got %d bytes", len(calldata))
-	}
-
+// parseSocketFromEventLog parses the socket string directly from the event log data
+func (cs *ChainState) parseSocketFromEventLog(logData []byte) (string, error) {
 	rcAbi, err := abi.JSON(bytes.NewReader(common.RegistryCoordinatorAbi))
 	if err != nil {
 		return "", err
 	}
-	methodSig := calldata[:4]
-	method, err := rcAbi.MethodById(methodSig)
+
+	event := rcAbi.Events["OperatorSocketUpdate"]
+	// Used NonIndexed() to specifically get the non-indexed parameters
+	values, err := event.Inputs.NonIndexed().Unpack(logData)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to unpack event data: %w", err)
+	}
+	// Expect exactly one value since there's only one non-indexed parameter (the socket)
+	if len(values) != 1 {
+		return "", fmt.Errorf("unexpected number of values in event data")
 	}
 
-	inputs, err := method.Inputs.Unpack(calldata[4:])
-	if err != nil {
-		return "", err
+	socket, ok := values[0].(string)
+	if !ok {
+		return "", fmt.Errorf("failed to convert socket to string")
 	}
 
-	var socket string
-	if (method.Name == "registerOperator" || method.Name == "registerOperatorWithChurn") && len(inputs) >= 2 {
-		socket = inputs[1].(string)
-	} else if method.Name == "updateSocket" && len(inputs) >= 1 {
-		socket = inputs[0].(string)
-	} else {
-		// this should never happen; we are going to return empty string
-		cs.logger.Warn("method and input length mismatch for socket update eventS", "method", method.Name)
-		return "", fmt.Errorf("method and input length mismatch for socket update event: %s", method.Name)
-	}
 	return socket, nil
 }
 
