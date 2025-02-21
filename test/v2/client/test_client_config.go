@@ -28,7 +28,7 @@ type TestClientConfig struct {
 	EthRPCURLs []string
 	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
 	//
-	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLsVar is used.
+	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
 	EthRPCUrlsVar string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
