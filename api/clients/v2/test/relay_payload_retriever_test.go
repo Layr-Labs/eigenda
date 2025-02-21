@@ -43,13 +43,8 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
-	// the constructor checks that these values aren't empty. we don't need them, though, since we're using mocks
-	payloadClientConfig := clients.PayloadClientConfig{
-		EigenDACertVerifierAddr: "x",
-	}
-
 	clientConfig := clients.RelayPayloadRetrieverConfig{
-		PayloadClientConfig: payloadClientConfig,
+		PayloadClientConfig: clients.PayloadClientConfig{},
 		RelayTimeout:        50 * time.Millisecond,
 	}
 

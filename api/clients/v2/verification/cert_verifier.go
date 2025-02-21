@@ -18,17 +18,29 @@ import (
 //
 // This interface exists in order to allow verification mocking in unit tests.
 type ICertVerifier interface {
+	// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
+	//
+	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 	VerifyCertV2(
 		ctx context.Context,
 		certVerifierAddress string,
 		eigenDACert *EigenDACert,
 	) error
 
+	// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
+	// contract, and returns the resulting NonSignerStakesAndSignature object.
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		certVerifierAddress string,
 		signedBatch *disperser.SignedBatch,
 	) (*verifierBindings.NonSignerStakesAndSignature, error)
+
+	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
+	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
+	GetQuorumNumbersRequired(
+		ctx context.Context,
+		certVerifierAddress string,
+	) ([]uint8, error)
 }
 
 // CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
@@ -210,6 +222,24 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	}
 
 	return &nonSignerStakesAndSignature, nil
+}
+
+// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
+// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
+func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, certVerifierAddress string) ([]uint8, error) {
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress),
+		cv.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequiredV2(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("get quorum numbers required: %w", err)
+	}
+
+	return quorumNumbersRequired, nil
 }
 
 // MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless

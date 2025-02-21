@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
@@ -15,9 +14,6 @@ type PayloadClientConfig struct {
 	//
 	// This is the version that is put into the header of the EncodedPayload.
 	PayloadEncodingVersion codecs.PayloadEncodingVersion
-
-	// The address of the EigenDACertVerifier contract
-	EigenDACertVerifierAddr string
 
 	// PayloadPolynomialForm is the initial form of a Payload after being encoded. The configured form does not imply
 	// any restrictions on the contents of a payload: it merely dictates how payload data is treated after being
@@ -98,15 +94,6 @@ type PayloadDisperserConfig struct {
 	// BlobStatusPollInterval is the tick rate for the PayloadDisperser to use, while polling the disperser with
 	// GetBlobStatus.
 	BlobStatusPollInterval time.Duration
-
-	// Quorums is the set of quorums that need to have a threshold of signatures for an EigenDA cert to successfully
-	// verify.
-	//
-	// TODO: Clients are currently charged for QuorumIDs 0 and 1 regardless of whether or not they are included in this
-	//  array. Therefore, if 0 and 1 aren't included in this array, you are missing out on security that your are paying
-	//  for. The strategy for how to handle this field in the context of rollups is still in flux: this comment should
-	//  be revisited and revised as necessary.
-	Quorums []core.QuorumID
 }
 
 // GetDefaultPayloadClientConfig creates a PayloadClientConfig with default values
@@ -129,10 +116,6 @@ func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 // 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (cc *PayloadClientConfig) checkAndSetDefaults() error {
 	// BlobEncodingVersion may be 0, so don't do anything
-
-	if cc.EigenDACertVerifierAddr == "" {
-		return errors.New("EigenDACertVerifierAddr is required")
-	}
 
 	// Nothing to do for PayloadPolynomialForm
 
@@ -231,7 +214,6 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 		DisperseBlobTimeout:    2 * time.Minute,
 		BlobCertifiedTimeout:   2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
-		Quorums:                []core.QuorumID{0, 1},
 	}
 }
 
@@ -259,8 +241,6 @@ func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 	if dc.BlobStatusPollInterval == 0 {
 		dc.BlobStatusPollInterval = defaultConfig.BlobStatusPollInterval
 	}
-
-	// Quorums may be empty, so don't do anything
 
 	return nil
 }

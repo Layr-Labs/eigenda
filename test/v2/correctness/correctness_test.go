@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
 )
@@ -26,18 +26,19 @@ import (
 // - read the blob from the validators
 func testBasicDispersal(
 	t *testing.T,
-	rand *random.TestRandom,
 	payload []byte,
-	quorums []core.QuorumID) error {
+	certVerifierAddress string,
+) error {
+	if certVerifierAddress == "" {
+		t.Skip("Requested cert verifier address is not configured")
+	}
 
 	c := client.GetTestClient(t, client.PreprodEnv)
-	config, err := client.GetConfig(client.PreprodEnv)
-	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
+	err := c.DisperseAndVerify(ctx, certVerifierAddress, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -65,17 +66,23 @@ func TestEmptyBlobDispersal(t *testing.T) {
 
 // Disperse a 1 byte payload (no padding).
 func TestMicroscopicBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom()
 	payload := []byte{1}
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
 // Disperse a 1 byte payload (with padding).
 func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
-	rand := random.NewTestRandom()
 	payload := []byte{1}
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
@@ -83,7 +90,11 @@ func TestMicroscopicBlobDispersalWithPadding(t *testing.T) {
 func TestSmallBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
@@ -91,7 +102,11 @@ func TestSmallBlobDispersal(t *testing.T) {
 func TestMediumBlobDispersal(t *testing.T) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(100*units.KiB, 200*units.KiB)
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
@@ -105,25 +120,25 @@ func TestLargeBlobDispersal(t *testing.T) {
 
 	payload := rand.VariableBytes(maxBlobSize/2, maxBlobSize*3/4)
 
-	err = testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
 // Disperse a small payload (between 1KB and 2KB) with a single quorum
 func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
-	t.Skip("TODO: validation is borked for single quorum dispersal")
-
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	err := testBasicDispersal(t, rand, payload, []core.QuorumID{0})
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0)
 	require.NoError(t, err)
 }
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
 	t.Skip("it's really hard to figure out what the maximum payload size is, re-enable when that is resolved")
-
-	quorums := []core.QuorumID{0, 1}
 
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
@@ -132,7 +147,8 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 	rand := random.NewTestRandom()
 	payload := rand.Bytes(dataLength)
-	err = testBasicDispersal(t, rand, payload, quorums)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
 }
 
@@ -148,7 +164,7 @@ func TestTooLargeBlobDispersal(t *testing.T) {
 	dataLength := maxBlobSize + 1
 	payload := rand.Bytes(dataLength)
 
-	err = testBasicDispersal(t, rand, payload, []core.QuorumID{0, 1})
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.Error(t, err)
 	fmt.Println(err)
 }
@@ -157,7 +173,6 @@ func TestDoubleDispersal(t *testing.T) {
 	rand := random.NewTestRandom()
 	c := client.GetTestClient(t, client.PreprodEnv)
 
-	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -166,11 +181,11 @@ func TestDoubleDispersal(t *testing.T) {
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 
-	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
+	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddress, quorums, payload)
+	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -181,13 +196,12 @@ func TestUnauthorizedGetChunks(t *testing.T) {
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 
-	quorums := []core.QuorumID{0, 1}
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, config.EigenDACertVerifierAddress, quorums, payload)
+	eigenDACert, err := c.DispersePayload(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
