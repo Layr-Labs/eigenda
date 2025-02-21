@@ -12,6 +12,7 @@ import (
 	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -125,29 +126,32 @@ func TestLargeBlobDispersal(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// Disperse a small payload (between 1KB and 2KB) with a single quorum
-func TestSmallBlobDispersalSingleQuorum(t *testing.T) {
+// Disperse a small payload (between 1KB and 2KB) with each of the defined quorum sets available
+func TestSmallBlobDispersalAllQuorumsSets(t *testing.T) {
 	rand := random.NewTestRandom()
 	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
 
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
 
-	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0)
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	require.NoError(t, err)
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1_2)
+	require.NoError(t, err)
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums2)
 	require.NoError(t, err)
 }
 
 // Disperse a blob that is exactly at the maximum size after padding (16MB)
 func TestMaximumSizedBlobDispersal(t *testing.T) {
-	t.Skip("it's really hard to figure out what the maximum payload size is, re-enable when that is resolved")
-
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
-	maxBlobSize := int(config.MaxBlobSize)
-	dataLength := maxBlobSize
+
+	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
+	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
-	payload := rand.Bytes(dataLength)
+	payload := rand.Bytes(int(maxPermissibleDataLength))
 
 	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.NoError(t, err)
@@ -155,19 +159,17 @@ func TestMaximumSizedBlobDispersal(t *testing.T) {
 
 // Disperse a blob that is too large (>16MB after padding)
 func TestTooLargeBlobDispersal(t *testing.T) {
-	rand := random.NewTestRandom()
-	// TODO refactor this to use exactly 1 byte more than max size after padding and header data
-
 	config, err := client.GetConfig(client.PreprodEnv)
 	require.NoError(t, err)
-	maxBlobSize := int(config.MaxBlobSize)
 
-	dataLength := maxBlobSize + 1
-	payload := rand.Bytes(dataLength)
+	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
+	require.NoError(t, err)
+
+	rand := random.NewTestRandom()
+	payload := rand.Bytes(int(maxPermissibleDataLength) + 1)
 
 	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
 	require.Error(t, err)
-	fmt.Println(err)
 }
 
 func TestDoubleDispersal(t *testing.T) {
