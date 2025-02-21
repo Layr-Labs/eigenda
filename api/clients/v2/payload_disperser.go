@@ -146,13 +146,20 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Payload encoded to blob")
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
+	if err != nil {
+		return nil, fmt.Errorf("get quorum numbers required: %w", err)
+	}
+
+	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
 		timeoutCtx,
 		blobBytes,
 		pd.config.BlobVersion,
-		pd.config.Quorums,
+		requiredQuorums,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)

@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync/atomic"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
-	"os"
-	"sync/atomic"
-	"time"
 )
 
 // LoadGenerator is a utility for generating read and write load for the target network.
@@ -138,8 +139,7 @@ func (l *LoadGenerator) submitBlob() {
 
 	eigenDACert, err := l.client.DispersePayload(
 		ctx,
-		l.client.GetConfig().EigenDACertVerifierAddress,
-		l.config.Quorums,
+		l.client.GetConfig().EigenDACertVerifierAddressQuorums0_1,
 		payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)

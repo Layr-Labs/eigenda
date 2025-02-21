@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -39,13 +38,10 @@ const (
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	config          *TestClientConfig
-	logger          logging.Logger
-	disperserClient clients.DisperserClient
-	// Each payload disperser serves a specific subset of quorums. The key in this map is a string representation
-	// of the quorum IDs served by the payload disperser.
-	payloadDispersers         map[string]*clients.PayloadDisperser
-	payloadDisperserLock      sync.Mutex
+	config                    *TestClientConfig
+	logger                    logging.Logger
+	disperserClient           clients.DisperserClient
+	payloadDisperser          *clients.PayloadDisperser
 	relayClient               clients.RelayClient
 	relayPayloadRetriever     *clients.RelayPayloadRetriever
 	indexedChainState         core.IndexedChainState
@@ -153,6 +149,27 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
 
+	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blob codec: %w", err)
+	}
+
+	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
+
+	payloadDisperserConfig := clients.PayloadDisperserConfig{
+		PayloadClientConfig: *payloadClientConfig,
+		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+	}
+	payloadDisperser, err := clients.NewPayloadDisperser(
+		logger,
+		payloadDisperserConfig,
+		blobCodec,
+		disperserClient,
+		certVerifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
+	}
+
 	// Construct the relay client
 
 	ethReader, err := eth.NewReader(
@@ -196,13 +213,6 @@ func NewTestClient(
 	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
-	}
-
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.EigenDACertVerifierAddr = config.EigenDACertVerifierAddress
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob codec: %w", err)
 	}
 
 	relayPayloadRetrieverConfig := &clients.RelayPayloadRetrieverConfig{
@@ -260,7 +270,7 @@ func NewTestClient(
 		config:                    config,
 		logger:                    logger,
 		disperserClient:           disperserClient,
-		payloadDispersers:         make(map[string]*clients.PayloadDisperser),
+		payloadDisperser:          payloadDisperser,
 		relayClient:               relayClient,
 		relayPayloadRetriever:     relayPayloadRetriever,
 		indexedChainState:         indexedChainState,
@@ -321,49 +331,9 @@ func (c *TestClient) GetDisperserClient() clients.DisperserClient {
 	return c.disperserClient
 }
 
-// GetPayloadDisperser returns the test client's payload disperser for a specific set of quorums.
-func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.PayloadDisperser, error) {
-	quorumsString := ""
-	for _, quorum := range quorums {
-		quorumsString += fmt.Sprintf("%d,", quorum)
-	}
-
-	c.payloadDisperserLock.Lock()
-	defer c.payloadDisperserLock.Unlock()
-
-	if payloadDisperser, ok := c.payloadDispersers[quorumsString]; ok {
-		return payloadDisperser, nil
-	}
-
-	c.logger.Debugf("Creating payload disperser for quorums %v", quorums)
-
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.EigenDACertVerifierAddr = c.config.EigenDACertVerifierAddress
-
-	payloadDisperserConfig := &clients.PayloadDisperserConfig{
-		PayloadClientConfig: *payloadClientConfig,
-		Quorums:             quorums,
-		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
-	}
-
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.PayloadEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob codec: %w", err)
-	}
-
-	payloadDisperser, err := clients.NewPayloadDisperser(
-		logger,
-		*payloadDisperserConfig,
-		blobCodec,
-		c.disperserClient,
-		c.certVerifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
-	}
-
-	c.payloadDispersers[quorumsString] = payloadDisperser
-
-	return payloadDisperser, nil
+// GetPayloadDisperser returns the test client's payload disperser.
+func (c *TestClient) GetPayloadDisperser() *clients.PayloadDisperser {
+	return c.payloadDisperser
 }
 
 // GetRelayClient returns the test client's relay client.
@@ -416,12 +386,11 @@ func (c *TestClient) Stop() {
 func (c *TestClient) DisperseAndVerify(
 	ctx context.Context,
 	certVerifierAddress string,
-	quorums []core.QuorumID,
 	payload []byte,
 ) error {
 
 	start := time.Now()
-	eigenDACert, err := c.DispersePayload(ctx, certVerifierAddress, quorums, payload)
+	eigenDACert, err := c.DispersePayload(ctx, certVerifierAddress, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
@@ -481,18 +450,12 @@ func (c *TestClient) DisperseAndVerify(
 func (c *TestClient) DispersePayload(
 	ctx context.Context,
 	certVerifierAddress string,
-	quorums []core.QuorumID,
 	payload []byte,
 ) (*verification.EigenDACert, error) {
-
 	c.logger.Debugf("Dispersing payload of length %d", len(payload))
 	start := time.Now()
 
-	payloadDisperser, err := c.GetPayloadDisperser(quorums)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payload disperser: %w", err)
-	}
-	cert, err := payloadDisperser.SendPayload(ctx, certVerifierAddress, payload)
+	cert, err := c.GetPayloadDisperser().SendPayload(ctx, certVerifierAddress, payload)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload: %w", err)
