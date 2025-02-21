@@ -51,7 +51,7 @@ func GetConfig(configPath string) (*TestClientConfig, error) {
 	config := &TestClientConfig{}
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal config file: %w\n%s", err, string(configFileBytes))
 	}
 
 	configMap[configPath] = config
