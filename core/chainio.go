@@ -57,7 +57,7 @@ type Reader interface {
 	SocketRegistry(ctx context.Context) (gethcommon.Address, error)
 
 	// RegistryCoordinator returns the address of the  registry coordinator contract.
-	RegistryCoordinator(ctx context.Context) (gethcommon.Address, error)
+	RegistryCoordinator(ctx context.Context) gethcommon.Address
 
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)

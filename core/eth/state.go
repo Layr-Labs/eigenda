@@ -128,10 +128,7 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 		return nil, fmt.Errorf("failed to get current block number: %v", err)
 	}
 
-	registryCoordinator, err := cs.Reader.RegistryCoordinator(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get registry coordinator address: %v", err)
-	}
+	registryCoordinator := cs.Reader.RegistryCoordinator(ctx)
 	prevBlockNum := cs.socketPrevBlockNumber.Load()
 	// The chain hasn't progressed since the last filter, so no logs
 	if prevBlockNum >= currentBlockNumber {
@@ -154,20 +151,6 @@ func (cs *ChainState) getSocketUpdateEventLogs(ctx context.Context) ([]types.Log
 		return []types.Log{}, nil
 	}
 	return logs, nil
-}
-
-func (cs *ChainState) getTransaction(ctx context.Context, txHash gcommon.Hash) (*types.Transaction, error) {
-	transaction, isPending, err := cs.Client.TransactionByHash(ctx, txHash)
-	// Don't continue filtering through logs if we fail to get the transaction or the transaction is pending
-	if err != nil {
-		cs.logger.Warn("failed to get transaction", "txHash", txHash.Hex(), "error", err)
-		return nil, fmt.Errorf("failed to get transaction %s: %v", txHash.Hex(), err)
-	}
-	if isPending {
-		cs.logger.Warn("transaction is still pending for operator socket update event", "txHash", txHash.Hex())
-		return nil, fmt.Errorf("transaction %s is still pending for operator socket update event", txHash.Hex())
-	}
-	return transaction, nil
 }
 
 func (cs *ChainState) parseOperatorSocketUpdate(log *types.Log) (core.OperatorID, string, error) {
