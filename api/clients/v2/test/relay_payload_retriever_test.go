@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -20,22 +20,24 @@ import (
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	prover2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 const g1Path = "../../../../inabox/resources/kzg/g1.point"
-const payloadLength = 100
+const maxPayloadBytes = 1025
 
 type RelayPayloadRetrieverTester struct {
 	Random                *testrandom.TestRandom
 	RelayPayloadRetriever *clients.RelayPayloadRetriever
 	MockRelayClient       *clientsmock.MockRelayClient
-	Codec                 *codecs.DefaultBlobCodec
 	G1Srs                 []bn254.G1Affine
+	Config                clients.RelayPayloadRetrieverConfig
 }
 
 // buildRelayPayloadRetrieverTester sets up a client with mocks necessary for testing
@@ -49,11 +51,11 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	}
 
 	mockRelayClient := clientsmock.MockRelayClient{}
-	codec := codecs.NewDefaultBlobCodec()
-
 	random := testrandom.NewTestRandom()
 
-	g1Srs, err := kzg.ReadG1Points(g1Path, 5, uint64(runtime.GOMAXPROCS(0)))
+	srsPointsToLoad := encoding.NextPowerOf2(codec.GetPaddedDataLength(maxPayloadBytes)) / encoding.BYTES_PER_SYMBOL
+
+	g1Srs, err := kzg.ReadG1Points(g1Path, uint64(srsPointsToLoad), uint64(runtime.GOMAXPROCS(0)))
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
@@ -62,7 +64,6 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		random.Rand,
 		clientConfig,
 		&mockRelayClient,
-		&codec,
 		g1Srs)
 
 	require.NotNil(t, client)
@@ -72,8 +73,8 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		Random:                random,
 		RelayPayloadRetriever: client,
 		MockRelayClient:       &mockRelayClient,
-		Codec:                 &codec,
 		G1Srs:                 g1Srs,
+		Config:                clientConfig,
 	}
 }
 
@@ -84,9 +85,11 @@ func buildBlobAndCert(
 	relayKeys []core.RelayKey,
 ) (core.BlobKey, []byte, *verification.EigenDACert) {
 
-	payloadBytes := tester.Random.Bytes(payloadLength)
-	blobBytes, err := tester.Codec.EncodeBlob(payloadBytes)
+	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
+	blob, err := codecsv2.NewPayload(payloadBytes).ToBlob(tester.Config.PayloadPolynomialForm)
 	require.NoError(t, err)
+
+	blobBytes := blob.Serialize()
 	require.NotNil(t, blobBytes)
 
 	kzgConfig := &kzg.KzgConfig{
