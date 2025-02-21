@@ -161,7 +161,8 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	for opID, op := range state.IndexedOperators {
 		opID := opID
 		op := op
-		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
+
+		operatorSocket, err := core.ParseOperatorSocket(op.Socket)
 		if err != nil {
 			d.logger.Warn("failed to parse operator socket, check if the socket format is correct", "operator", opID.Hex(), "socket", op.Socket, "err", err)
 			sigChan <- core.SigningMessage{
@@ -173,6 +174,9 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 			}
 			continue
 		}
+
+		host := operatorSocket.GetHost()
+		v2DispersalPort := operatorSocket.GetV2DispersalSocket()
 
 		client, err := d.nodeClientManager.GetClient(host, v2DispersalPort)
 		if err != nil {
