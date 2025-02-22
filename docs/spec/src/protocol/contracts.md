@@ -1,10 +1,10 @@
-# Contracts
+# EigenDA Managed Contracts
 
-## EigenDA Managed Contracts
+This page describe EigenDA contracts that are manage by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/contracts.md) page.
 
-### Middlewares Contracts
+## Middlewares Contracts
 
-### EigenDA Specific Contracts
+## EigenDA Specific Contracts
 
 <!-- Section copied over from https://www.notion.so/eigen-labs/EigenDA-V2-Integration-Spec-12d13c11c3e0800e8968f31ef2c6a2b3?pvs=4#18513c11c3e08058a034ddc9523a3197 -->
 <!-- TODO: arch to review and update -->
@@ -17,7 +17,7 @@ The smart contracts can be found [here](https://github.com/Layr-Labs/eigenda/tre
 
 Contains a single function verifyDACertV2 which is used to verify `certs`. This function’s logic is described in the [Cert Validation](https://www.notion.so/EigenDA-V2-Integration-Spec-12d13c11c3e0800e8968f31ef2c6a2b3?pvs=21) section.
 
-#### EigenDAThreshold Registry
+### EigenDAThreshold Registry
 
 The [EigenDAThresholdRegistry](https://github.com/Layr-Labs/eigenda/blob/c4567f90e835678fae4749f184857dea10ff330c/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L22) contains two sets of fundamental parameters:
 
@@ -70,23 +70,19 @@ $$
 
 where $\gamma$ = confirmationThreshold - adversaryThreshold
 
-#### EigenDARelayRegistry
+### EigenDARelayRegistry
 
 Contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address. `BlobCertificate`s contain `relayKey`(s), which can be transformed into that relay’s URL by calling [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/core/EigenDARelayRegistry.sol#L35).
 
-#### EigenDADisperserRegistry
+### EigenDADisperserRegistry
 
 Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA Network currently only supports a single Disperser, hosted by EigenLabs. The Disperser’s URL is currently static and unchanging, and can be found on our docs site in the [Networks](https://docs.eigenda.xyz/networks/mainnet) section.
 
-### Deployments
+## Deployments
 
 <!-- TODO: add deployed contract addresses table -->
 
-### Governance Roles
+## Governance Roles
 
 <!-- TODO: import from https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
 <!-- Do we want to make public everything in that doc?? -->
-
-## Rollup Managed Contracts
-
-DACertVerifier
