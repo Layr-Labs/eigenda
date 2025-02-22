@@ -354,7 +354,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 }
 
 // GetBlobMetadataByRequestedAtForward returns blobs (as BlobMetadata) in cursor range
-// (after, until] (after exclusive, until inclusive). Blobs are ordered by <RequestedAt, BlobKey>
+// (after, until) (both exclusive). Blobs are ordered by <RequestedAt, BlobKey>
 // in ascending order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
@@ -388,8 +388,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
 			}
-			// Skip the after cursor's blob
-			if after.Equal(bm.RequestedAt, &blobKey) {
+			// Skip blobs at the endpoints
+			if after.Equal(bm.RequestedAt, &blobKey) || until.Equal(bm.RequestedAt, &blobKey) {
 				continue
 			}
 			result = append(result, bm)
@@ -406,7 +406,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 }
 
 // GetBlobMetadataByRequestedAtBackward returns blobs (as BlobMetadata) in cursor range
-// [until, before) (until inclusive, before exclusive). Blobs are ordered by <RequestedAt, BlobKey>
+// (until, before) (both exclusive). Blobs are ordered by <RequestedAt, BlobKey>
 // in descending order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
@@ -441,8 +441,8 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
 			}
-			// Skip the before cursor's blob
-			if before.Equal(bm.RequestedAt, &blobKey) {
+			// Skip blobs at the endpoints
+			if before.Equal(bm.RequestedAt, &blobKey) || until.Equal(bm.RequestedAt, &blobKey) {
 				continue
 			}
 			result = append(result, bm)
@@ -528,8 +528,8 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 	return attestations, nil
 }
 
-// GetAttestationByAttestedAtForward returns attestations within time range (after, until]
-// (after exclusive, until inclusive), ordered by AttestedAt timestamp in ascending order.
+// GetAttestationByAttestedAtForward returns attestations within time range (after, until)
+// (both exclusive), ordered by AttestedAt timestamp in ascending order.
 //
 // The function splits the time range into buckets and queries each bucket sequentially from earliest to latest.
 // Results from all buckets are combined while maintaining the ordering.
@@ -542,8 +542,8 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 	until uint64,
 	limit int,
 ) ([]*corev2.Attestation, error) {
-	if after >= until {
-		return nil, errors.New("after must be less than until")
+	if after+1 > until-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", after, until)
 	}
 	startBucket, endBucket := GetAttestedAtBucketIDRange(after, until)
 	result := make([]*corev2.Attestation, 0)
@@ -558,7 +558,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 			remaining = limit - len(result)
 		}
 		// Query bucket in ascending order
-		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, after+1, until, remaining, true)
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, after+1, until-1, remaining, true)
 		if err != nil {
 			return nil, err
 		}
@@ -572,8 +572,8 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 	return result, nil
 }
 
-// GetAttestationByAttestedAtBackward returns attestations within time range [until, before)
-// (until inclusive, before exclusive), ordered by AttestedAt timestamp in descending order.
+// GetAttestationByAttestedAtBackward returns attestations within time range (until, before)
+// (both exclusive), ordered by AttestedAt timestamp in descending order.
 //
 // The function splits the time range into buckets and queries each bucket sequentially from latest to earliest.
 // Results from all buckets are combined while maintaining the ordering.
@@ -586,8 +586,8 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
 	until uint64,
 	limit int,
 ) ([]*corev2.Attestation, error) {
-	if until >= before {
-		return nil, errors.New("until must be less than before")
+	if until+1 > before-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", until, before)
 	}
 	// Note: we traverse buckets in reverse order for backward query
 	startBucket, endBucket := GetAttestedAtBucketIDRange(until, before)
@@ -603,7 +603,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
 			remaining = limit - len(result)
 		}
 		// Query bucket in descending order
-		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, until, before-1, remaining, false)
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, until+1, before-1, remaining, false)
 		if err != nil {
 			return nil, err
 		}
