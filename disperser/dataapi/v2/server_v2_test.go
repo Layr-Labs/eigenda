@@ -1139,14 +1139,14 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[66] (60 batches)
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `end` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
-		require.Equal(t, 60, len(response.Batches))
-		for i := 0; i < 60; i++ {
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
