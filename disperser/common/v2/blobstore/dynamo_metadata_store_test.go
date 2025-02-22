@@ -542,7 +542,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(metadata))
-		assert.Equal(t, nil, lastProcessedCursor)
+		assert.Nil(t, lastProcessedCursor)
 
 		endCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob + 1 // pass the time of second blob
 		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
@@ -718,7 +718,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, 0, len(metadata))
-		assert.Equal(t, nil, lastProcessedCursor)
+		assert.Nil(t, lastProcessedCursor)
 
 		// Test the effects of blob key in before cursor
 		beforeCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob*2 // time of blob[2]
