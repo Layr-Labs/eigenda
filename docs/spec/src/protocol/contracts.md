@@ -82,7 +82,7 @@ Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA 
 
 <!-- TODO: add deployed contract addresses table -->
 
-### Governance / Upgradability
+### Governance Roles
 
 <!-- TODO: import from https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
 <!-- Do we want to make public everything in that doc?? -->
