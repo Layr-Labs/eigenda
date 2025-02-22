@@ -278,15 +278,6 @@ func newLevelDBMetrics(reg *prometheus.Registry) error {
 		levelWriteBytes = levelWriteBytesMetric
 	}
 
-	// Operation latency metrics
-	operationLatencyMetric := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:      "operation_duration_seconds",
-		Namespace: "eigenda",
-		Subsystem: "leveldb",
-		Help:      "Duration of database operations (get, put, delete, batch)",
-		Buckets:   prometheus.ExponentialBuckets(0.0001, 2, 15),
-	}, []string{"operation", "name"})
-
 	return nil
 }
 
