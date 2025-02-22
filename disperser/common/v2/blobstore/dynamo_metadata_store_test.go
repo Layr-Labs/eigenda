@@ -340,7 +340,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 		BlobKey:     &keys[1],
 	}
 	endCursor = blobstore.BlobFeedCursor{
-		RequestedAt: requestedAts[3],
+		RequestedAt: requestedAts[4],
 		BlobKey:     nil,
 	}
 
@@ -351,8 +351,8 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimest
 		expectLast int
 	}{
 		{nil, 1, 2},
-		{&keys[3], 2, 3},
-		{&keys[4], 3, 4},
+		{&keys[3], 1, 2}, // keys[2] will be retrieved
+		{&keys[4], 2, 3}, // keys[2], keys[3] will be retrieved
 	}
 
 	for _, tc := range testCases {
@@ -537,11 +537,17 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 		assert.Equal(t, 0, len(metadata))
 		assert.Nil(t, lastProcessedCursor)
 
-		// Test inclusive end
+		// Test exclusive end
 		endCursor.BlobKey = &keys[1]
 		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
-		assert.Equal(t, 1, len(metadata))
+		require.Equal(t, 0, len(metadata))
+		assert.Equal(t, nil, lastProcessedCursor)
+
+		endCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob + 1 // pass the time of second blob
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(metadata))
 		assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt)
 		checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
 		require.NotNil(t, lastProcessedCursor)
@@ -700,22 +706,19 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 		}
 		untilCursor := blobstore.BlobFeedCursor{
 			RequestedAt: firstBlobTime, // time of blob[0]
-			BlobKey:     &keys[0],      // inclusive
+			BlobKey:     &keys[0],      // exclusive
 		}
 
-		// Test exclusive before, inclusive until
+		// Test exclusive before, exclusive until
 		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
 			ctx,
 			beforeCursor, // blob[1] excluded
-			untilCursor,  // blob[0] included
+			untilCursor,  // blob[0] excluded
 			0,
 		)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(metadata))
-		assert.Equal(t, firstBlobTime, metadata[0].RequestedAt) // blob[0]
-		checkBlobKeyEqual(t, keys[0], metadata[0].BlobHeader)
-		require.NotNil(t, lastProcessedCursor)
-		assert.Equal(t, keys[0], *lastProcessedCursor.BlobKey)
+		require.Equal(t, 0, len(metadata))
+		assert.Equal(t, nil, lastProcessedCursor)
 
 		// Test the effects of blob key in before cursor
 		beforeCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob*2 // time of blob[2]
@@ -723,17 +726,15 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
 			ctx,
 			beforeCursor, // excludes blob[2]
-			untilCursor,  // includes blob[0]
+			untilCursor,  // excludes blob[0]
 			0,
 		)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(metadata))
+		require.Equal(t, 1, len(metadata))
 		assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt) // blob[1]
-		assert.Equal(t, firstBlobTime, metadata[1].RequestedAt)                 // blob[0]
 		checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
-		checkBlobKeyEqual(t, keys[0], metadata[1].BlobHeader)
 		require.NotNil(t, lastProcessedCursor)
-		assert.Equal(t, keys[0], *lastProcessedCursor.BlobKey)
+		assert.Equal(t, keys[1], *lastProcessedCursor.BlobKey)
 
 		// Test when removing blob key from until cursor
 		untilCursor.BlobKey = nil // makes until cursor point to before blob[0]
@@ -859,7 +860,11 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		// Test invalid time range
 		_, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 1, 1, 0)
 		require.Error(t, err)
-		assert.Equal(t, "after must be less than until", err.Error())
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 1, 2, 0)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
 
 		// Test empty range
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, now, now+uint64(240*time.Hour.Nanoseconds()), 0)
@@ -895,7 +900,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 	// Test range boundaries
 	t.Run("range boundaries", func(t *testing.T) {
 		// Test exclusive start
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now, 0)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now+1, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches-1, len(attestations))
 		checkAttestationsOrdered(t, attestations)
@@ -904,21 +909,21 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
 		assert.Equal(t, batchHeaders[numBatches-1].BatchRoot, attestations[numBatches-2].BatchRoot)
 
-		// Test inclusive end
+		// Test exclusive end
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, attestedAt[4], 0)
 		require.NoError(t, err)
-		require.Equal(t, 5, len(attestations))
+		require.Equal(t, 4, len(attestations))
 		checkAttestationsOrdered(t, attestations)
 		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
-		assert.Equal(t, attestedAt[4], attestations[4].AttestedAt)
-		assert.Equal(t, batchHeaders[4].BatchRoot, attestations[4].BatchRoot)
+		assert.Equal(t, attestedAt[3], attestations[3].AttestedAt)
+		assert.Equal(t, batchHeaders[3].BatchRoot, attestations[3].BatchRoot)
 	})
 
 	// Test pagination
 	t.Run("pagination", func(t *testing.T) {
 		for i := 1; i < numBatches; i++ {
-			attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, attestedAt[i-1], attestedAt[i], 1)
+			attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, attestedAt[i-1], attestedAt[i]+1, 1)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(attestations))
 			assert.Equal(t, attestedAt[i], attestations[0].AttestedAt)
@@ -983,7 +988,11 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		// Test invalid time range
 		_, err := blobMetadataStore.GetAttestationByAttestedAtBackward(ctx, 1, 1, 0)
 		require.Error(t, err)
-		assert.Equal(t, "until must be less than before", err.Error())
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetAttestationByAttestedAtBackward(ctx, 2, 1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
 
 		// Test empty range
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
@@ -1025,28 +1034,28 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
 			ctx,
 			attestedAt[numBatches-1], // before (exclusive)
-			firstBatchTs,             // until (inclusive)
+			firstBatchTs,             // until (exclusive)
 			0,
 		)
 		require.NoError(t, err)
-		require.Equal(t, numBatches-1, len(attestations))
+		require.Equal(t, numBatches-2, len(attestations))
 		// The first one returned is not "before" (as "before" is exclusive)
 		assert.Equal(t, attestedAt[numBatches-2], attestations[0].AttestedAt)
-		// The last one returned is the first batch (as "until" is inclusive)
-		assert.Equal(t, attestedAt[0], attestations[numBatches-2].AttestedAt)
+		// The last one returned is the second batch (as "until" is exclusive)
+		assert.Equal(t, attestedAt[1], attestations[numBatches-3].AttestedAt)
 		checkAttestationsOrderedDesc(t, attestations)
 
-		// Test inclusive until - should include the oldest item
+		// Test exclusive until - should not include the oldest item
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
 			ctx,
 			attestedAt[4]+1, // before: just after 4th item (so this batch should be included)
-			attestedAt[0],   // until: oldest item (should be included)
+			attestedAt[0],   // until: oldest item (should not be included)
 			0,
 		)
 		require.NoError(t, err)
+		require.Equal(t, 4, len(attestations))
 		assert.Equal(t, attestedAt[4], attestations[0].AttestedAt)
-		assert.Equal(t, attestedAt[0], attestations[4].AttestedAt)
-		require.Equal(t, 5, len(attestations))
+		assert.Equal(t, attestedAt[1], attestations[3].AttestedAt)
 		checkAttestationsOrderedDesc(t, attestations)
 	})
 

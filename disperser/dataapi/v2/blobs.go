@@ -3,7 +3,6 @@ package v2
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -132,7 +131,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 
 	if direction == "forward" {
 		startCursor := afterCursor
-		// The presence of `cusor` param will override the `after` param
+		// The presence of `cursor` param will override the `after` param
 		if current.RequestedAt > 0 {
 			startCursor = current
 		}
@@ -143,9 +142,17 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 			limit,
 		)
 	} else {
-		// TODO(jianxiao): To be implemented
-		errorResponse(c, errors.New("Not Implemented"))
-		return
+		endCursor := beforeCursor
+		// The presence of `cursor` param will override the `before` param
+		if current.RequestedAt > 0 {
+			endCursor = current
+		}
+		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
+			c.Request.Context(),
+			endCursor,
+			afterCursor,
+			limit,
+		)
 	}
 
 	if err != nil {
@@ -393,7 +400,7 @@ func (s *ServerV2) sendBlobFeedResponse(
 	for i := 0; i < len(blobs); i++ {
 		bk, err := blobs[i].BlobHeader.BlobKey()
 		if err != nil {
-			s.metrics.IncrementFailedRequestNum("FetchBlobFeedForward")
+			s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
 			errorResponse(c, fmt.Errorf("failed to serialize blob key: %w", err))
 			return
 		}
@@ -405,7 +412,7 @@ func (s *ServerV2) sendBlobFeedResponse(
 		Cursor: cursorStr,
 	}
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeedForward")
-	s.metrics.ObserveLatency("FetchBlobFeedForward", time.Since(handlerStart))
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeed")
+	s.metrics.ObserveLatency("FetchBlobFeed", time.Since(handlerStart))
 	c.JSON(http.StatusOK, response)
 }
