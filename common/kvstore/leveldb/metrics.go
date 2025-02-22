@@ -298,6 +298,16 @@ func newLevelDBMetrics(reg *prometheus.Registry) error {
 		levelWriteBytes = levelWriteBytesMetric
 	}
 
+	if err := reg.Register(levelWriteBytesMetric); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			levelWriteBytes = are.ExistingCollector.(*prometheus.GaugeVec)
+		} else {
+			return fmt.Errorf("failed to register level write bytes metric: %w", err)
+		}
+	} else {
+		levelWriteBytes = levelWriteBytesMetric
+	}
+
 	return nil
 }
 
