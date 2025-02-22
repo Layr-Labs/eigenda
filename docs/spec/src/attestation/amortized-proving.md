@@ -1,1 +1,0 @@
-# Amortized Proving
