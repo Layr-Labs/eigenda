@@ -1,13 +1,14 @@
 package tablestore
 
 import (
-	"github.com/Layr-Labs/eigenda/common"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExpiryKeyParsing(t *testing.T) {
