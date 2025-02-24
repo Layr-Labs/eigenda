@@ -354,7 +354,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 }
 
 // GetBlobMetadataByRequestedAtForward returns blobs (as BlobMetadata) in cursor range
-// (after, before) (both exclusive). Blobs are ordered by <RequestedAt, BlobKey>
+// (after, before) (both exclusive). Blobs are retrieved and ordered by <RequestedAt, BlobKey>
 // in ascending order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
@@ -406,7 +406,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 }
 
 // GetBlobMetadataByRequestedAtBackward returns blobs (as BlobMetadata) in cursor range
-// (after, before) (both exclusive). Blobs are ordered by <RequestedAt, BlobKey>
+// (after, before) (both exclusive). Blobs are retrieved and ordered by <RequestedAt, BlobKey>
 // in descending order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
@@ -529,7 +529,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 }
 
 // GetAttestationByAttestedAtForward returns attestations within time range (after, before)
-// (both exclusive), ordered by AttestedAt timestamp in ascending order.
+// (both exclusive), retrieved and ordered by AttestedAt timestamp in ascending order.
 //
 // The function splits the time range into buckets and queries each bucket sequentially from earliest to latest.
 // Results from all buckets are combined while maintaining the ordering.
@@ -573,7 +573,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 }
 
 // GetAttestationByAttestedAtBackward returns attestations within time range (after, before)
-// (both exclusive), ordered by AttestedAt timestamp in descending order.
+// (both exclusive), retrieved and ordered by AttestedAt timestamp in descending order.
 //
 // The function splits the time range into buckets and queries each bucket sequentially from latest to earliest.
 // Results from all buckets are combined while maintaining the ordering.
