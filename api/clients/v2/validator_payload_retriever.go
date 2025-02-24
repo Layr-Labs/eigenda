@@ -188,6 +188,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
 
+	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
 	blobBytes, err := pr.retrievalClient.GetBlob(
 		timeoutCtx,
 		blobKey,

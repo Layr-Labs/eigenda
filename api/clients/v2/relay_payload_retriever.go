@@ -181,6 +181,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
+	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
 	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
 	if err != nil {
 		return nil, fmt.Errorf("get blob from relay: %w", err)
