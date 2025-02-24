@@ -76,8 +76,8 @@ func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
 	return payload, nil
 }
 
-// GetBlobLengthSymbols returns the length of the blob, in symbols
-func (b *Blob) GetBlobLengthSymbols() uint32 {
+// BlobLengthSymbols returns the length of the blob, in symbols
+func (b *Blob) BlobLengthSymbols() uint32 {
 	return b.blobLengthSymbols
 }
 
