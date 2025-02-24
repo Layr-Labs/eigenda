@@ -28,6 +28,8 @@ type Blob struct {
 
 // DeserializeBlob initializes a Blob from bytes
 func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
+	// we check that length of bytes is <= blob length, rather than checking for equality, because it's possible
+	// that the bytes being deserialized have had trailing 0s truncated.
 	if uint32(len(bytes)) > blobLengthSymbols*encoding.BYTES_PER_SYMBOL {
 		return nil, fmt.Errorf(
 			"length (%d bytes) is greater than claimed blob length (%d bytes)",
