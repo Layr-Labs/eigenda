@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -88,7 +88,7 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *verification.EigenDACert) (*codecs.Payload, error) {
+	eigenDACert *verification.EigenDACert) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
@@ -176,7 +176,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	blobKey *core.BlobKey,
 	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
 	blobLengthSymbols uint32,
-) (*codecs.Blob, error) {
+) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
@@ -187,7 +187,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 		return nil, fmt.Errorf("get blob from relay: %w", err)
 	}
 
-	blob, err := codecs.DeserializeBlob(blobBytes, blobLengthSymbols)
+	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}

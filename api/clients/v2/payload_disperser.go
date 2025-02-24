@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -128,7 +128,7 @@ func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	certVerifierAddress string,
 	// payload is the raw data to be stored on eigenDA
-	payload *codecs.Payload,
+	payload *coretypes.Payload,
 ) (*verification.EigenDACert, error) {
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {

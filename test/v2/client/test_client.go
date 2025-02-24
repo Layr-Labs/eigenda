@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
@@ -482,7 +482,7 @@ func (c *TestClient) DispersePayload(
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 
-	payload := codecsv2.NewPayload(payloadBytes)
+	payload := coretypes.NewPayload(payloadBytes)
 
 	cert, err := c.GetPayloadDisperser().SendPayload(ctx, certVerifierAddress, payload)
 
@@ -513,7 +513,7 @@ func (c *TestClient) ReadBlobFromRelays(
 
 		c.metrics.reportRelayReadTime(time.Since(start), relayID)
 
-		blob, err := codecsv2.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
+		blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
@@ -566,7 +566,7 @@ func (c *TestClient) ReadBlobFromValidators(
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
 		blobLengthSymbols := uint32(blobCommitments.Length)
-		blob, err := codecsv2.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}

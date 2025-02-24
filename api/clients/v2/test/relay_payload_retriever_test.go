@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -86,7 +86,7 @@ func buildBlobAndCert(
 ) (core.BlobKey, []byte, *verification.EigenDACert) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := codecsv2.NewPayload(payloadBytes).ToBlob(tester.Config.PayloadPolynomialForm)
+	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.Config.PayloadPolynomialForm)
 	require.NoError(t, err)
 
 	blobBytes := blob.Serialize()

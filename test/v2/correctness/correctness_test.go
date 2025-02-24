@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	codecsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -250,7 +250,7 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 
 	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
 
-	payload := codecsv2.NewPayload(payloadBytes)
+	payload := coretypes.NewPayload(payloadBytes)
 
 	// TODO (litt3): make the blob form configurable. Using PolynomialFormCoeff means that the data isn't being FFTed/IFFTed,
 	//  and it is important for both modes of operation to be tested.

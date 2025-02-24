@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -109,7 +109,7 @@ func NewValidatorPayloadRetriever(
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
-) (*codecs.Payload, error) {
+) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
@@ -183,7 +183,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	referenceBlockNumber uint32,
-	quorumID core.QuorumID) (*codecs.Blob, error) {
+	quorumID core.QuorumID) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
@@ -201,7 +201,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 		return nil, fmt.Errorf("get blob: %w", err)
 	}
 
-	blob, err := codecs.DeserializeBlob(blobBytes, uint32(blobCommitments.Length))
+	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(blobCommitments.Length))
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}
