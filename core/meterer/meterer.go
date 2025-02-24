@@ -150,7 +150,7 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
-	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod <= endPeriod
+	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
 	if !isCurrentOrPreviousPeriod || !isWithinReservationWindow {
 		return false
 	}
