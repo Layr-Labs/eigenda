@@ -23,4 +23,8 @@ type LoadGeneratorConfig struct {
 	MaxParallelism uint64
 	// The timeout for each blob dispersal.
 	DispersalTimeout time.Duration
+	// EnablePprof enables the pprof HTTP server for profiling
+	EnablePprof bool
+	// PprofHttpPort is the port that the pprof HTTP server listens on
+	PprofHttpPort int
 }
