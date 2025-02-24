@@ -42,7 +42,7 @@ func (tf *testFetcher) getFetchCount() int64 {
 	return tf.fetchCount.Load()
 }
 
-func setupTestCache(maxItems int) (*v2.FeedCache[*testItem], *testFetcher, time.Time) {
+func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.Time) {
 	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	fetcher := newTestFetcher(baseTime)
 

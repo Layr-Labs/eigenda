@@ -14,21 +14,21 @@ type TimeRange struct {
 
 type CacheEntry[T any] struct {
 	TimeRange
-	Data []T // maintained in time order
+	Data []*T // maintained in time order
 }
 
 type FeedCache[T any] struct {
 	mu           sync.RWMutex
 	segment      *CacheEntry[T]
 	maxItems     int
-	fetchFromDB  func(start, end time.Time) ([]T, error)
-	getTimestamp func(T) time.Time
+	fetchFromDB  func(start, end time.Time) ([]*T, error)
+	getTimestamp func(*T) time.Time
 }
 
 func NewFeedCache[T any](
 	maxItems int,
-	fetchFn func(start, end time.Time) ([]T, error),
-	timestampFn func(T) time.Time,
+	fetchFn func(start, end time.Time) ([]*T, error),
+	timestampFn func(*T) time.Time,
 ) *FeedCache[T] {
 	return &FeedCache[T]{
 		maxItems:     maxItems,
@@ -41,7 +41,7 @@ func (tr TimeRange) Overlaps(other TimeRange) bool {
 	return tr.Start.Before(other.End) && other.Start.Before(tr.End)
 }
 
-func (c *FeedCache[T]) Get(start, end time.Time) ([]T, error) {
+func (c *FeedCache[T]) Get(start, end time.Time) ([]*T, error) {
 	queryRange := TimeRange{Start: start, End: end}
 
 	c.mu.RLock()
@@ -80,7 +80,7 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]T, error) {
 	}
 
 	// Handle overlapping case
-	var beforeData, afterData []T
+	var beforeData, afterData []*T
 	var err error
 
 	// Check if we need data before cached segment
@@ -107,8 +107,8 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]T, error) {
 	// Calculate total size for result
 	totalSize := len(beforeData) + len(afterData)
 	cachedInRange := c.countDataInRange(segment.Data, start, end)
-	result := make([]T, 0, totalSize+cachedInRange)
-	newCache := make([]T, 0, totalSize+len(c.segment.Data))
+	result := make([]*T, 0, totalSize+cachedInRange)
+	newCache := make([]*T, 0, totalSize+len(c.segment.Data))
 
 	// Combine all data in order
 	if beforeData != nil {
@@ -140,8 +140,8 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]T, error) {
 	return result, nil
 }
 
-func (c *FeedCache[T]) filterDataInRange(data []T, start, end time.Time) []T {
-	result := make([]T, 0)
+func (c *FeedCache[T]) filterDataInRange(data []*T, start, end time.Time) []*T {
+	result := make([]*T, 0)
 
 	for _, item := range data {
 		timestamp := c.getTimestamp(item)
@@ -160,7 +160,7 @@ func (c *FeedCache[T]) filterDataInRange(data []T, start, end time.Time) []T {
 	return result
 }
 
-func (c *FeedCache[T]) countDataInRange(data []T, start, end time.Time) int {
+func (c *FeedCache[T]) countDataInRange(data []*T, start, end time.Time) int {
 	count := 0
 	for _, item := range data {
 		timestamp := c.getTimestamp(item)
