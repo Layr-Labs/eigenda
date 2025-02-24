@@ -23,6 +23,4 @@ type LoadGeneratorConfig struct {
 	MaxParallelism uint64
 	// The timeout for each blob dispersal.
 	DispersalTimeout time.Duration
-	// The contract address to use for the EigenDA cert verifier.
-	VerificationContractAddress string
 }
