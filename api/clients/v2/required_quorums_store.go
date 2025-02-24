@@ -29,6 +29,8 @@ func NewRequiredQuorumsStore(certVerifier verification.ICertVerifier) (*Required
 // the required quorums are unknown, this method will attempt to fetch the required quorums from the contract. If the
 // fetch is successful, the internal cache is updated with the result, and the result is returned. If the fetch
 // is not successful, an error is returned.
+//
+// NOTE: it is UNSAFE to modify the returned list of quorums
 func (rqs *RequiredQuorumsStore) GetQuorumNumbersRequired(
 	ctx context.Context,
 	certVerifierAddress string,
