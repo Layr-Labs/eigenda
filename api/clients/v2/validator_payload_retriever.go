@@ -124,7 +124,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
-		blob, err := pr.getBlobWithTimeout(
+		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			*blobKey,
 			blobHeader.Version,
@@ -177,8 +177,8 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", blobHeader.QuorumNumbers)
 }
 
-// getBlobWithTimeout attempts to get a blob from a given quorum, and times out based on config.RetrievalTimeout
-func (pr *ValidatorPayloadRetriever) getBlobWithTimeout(
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
+func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,

@@ -120,7 +120,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 
 		blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
 
-		blob, err := pr.getBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
+		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
 			pr.log.Warn(
@@ -170,8 +170,8 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
-// getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.FetchTimeout
-func (pr *RelayPayloadRetriever) getBlobWithTimeout(
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given relay, and times out based on config.FetchTimeout
+func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
 	blobKey *core.BlobKey,
