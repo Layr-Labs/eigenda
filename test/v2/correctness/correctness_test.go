@@ -67,6 +67,44 @@ func TestEmptyBlobDispersal(t *testing.T) {
 	require.ErrorContains(t, err, "blob size must be greater than 0")
 }
 
+// Disperse an empty payload. Blob will not be empty, since payload encoding entails adding bytes
+func TestEmptyPayloadDispersal(t *testing.T) {
+	payload := []byte{}
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	require.NoError(t, err)
+}
+
+// Disperse a payload that consists only of 0 bytes
+func TestZeroPayloadDispersal(t *testing.T) {
+	payload := make([]byte, 1000)
+
+	config, err := client.GetConfig(client.PreprodEnv)
+	require.NoError(t, err)
+
+	err = testBasicDispersal(t, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	require.NoError(t, err)
+}
+
+// Disperse a blob that consists only of 0 bytes. This should be permitted by eigenDA, even
+// though it's not permitted by the default payload -> blob encoding scheme
+func TestZeroBlobDispersal(t *testing.T) {
+	blobBytes := make([]byte, 1000)
+	quorums := []core.QuorumID{0, 1}
+
+	c := client.GetTestClient(t, client.PreprodEnv)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// We have to use the disperser client directly, since it's not possible for the PayloadDisperser to
+	// attempt dispersal of a blob containing all 0s
+	_, _, err := c.GetDisperserClient().DisperseBlob(ctx, blobBytes, 0, quorums)
+	require.NoError(t, err)
+}
+
 // Disperse a 1 byte payload (no padding).
 func TestMicroscopicBlobDispersal(t *testing.T) {
 	payload := []byte{1}
