@@ -1,7 +1,6 @@
 package load
 
 import (
-	"github.com/Layr-Labs/eigenda/core"
 	"time"
 )
 
@@ -24,6 +23,4 @@ type LoadGeneratorConfig struct {
 	MaxParallelism uint64
 	// The timeout for each blob dispersal.
 	DispersalTimeout time.Duration
-	// The quorums to use for the load test.
-	Quorums []core.QuorumID
 }
