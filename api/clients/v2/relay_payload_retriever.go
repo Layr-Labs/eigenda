@@ -155,11 +155,10 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.log.Error(
-				`Cert verification was successful, but conversion from blob to payload failed!
-					This is likely a problem with the local blob codec configuration,
-					but could potentially indicate a maliciously generated blob certificate.
-					It should not be possible for an honestly generated certificate to verify
-					for an invalid blob!`,
+				`Commitment verification was successful, but conversion from blob to payload failed!
+					This is likely a problem with the local configuration, but could potentially indicate
+					malicious dispersed data. It should not be possible for a commitment to verify for an
+					invalid blob!`,
 				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
