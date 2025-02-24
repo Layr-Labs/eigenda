@@ -4,7 +4,7 @@ This script can be used to deploy an EigenDACertVerifier contract with specified
 
 ### Config
 
-To set up the deployment, a config json should be placed in the 'config/' folder with the following structure:
+To set up the deployment, a config json should be placed in the `config/` folder with the following structure:
 
 ```json
 {
@@ -23,7 +23,7 @@ To set up the deployment, a config json should be placed in the 'config/' folder
 }
 ```
 
-Two sample configs are provided in the 'config/' folder for preprod and testnet environments.
+Two sample configs are provided in the `config/` folder for preprod and testnet environments.
 
 ### Deployment
 
@@ -33,7 +33,7 @@ To deploy the contract, run the following command passing in the path to the con
 forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string)" <config.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 ```
 
-The deployment will output the address of the deployed contract to a json file in the 'output/' folder named 'certverifier_deployment_data.json'
+The deployment will output the address of the deployed contract to a json file in the `output/` folder named `certverifier_deployment_data.json`
 
 ```json
 {
