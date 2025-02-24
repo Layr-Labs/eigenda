@@ -22,10 +22,11 @@ import (
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
-	logger          logging.Logger
-	config          PayloadDisperserConfig
-	disperserClient DisperserClient
-	certVerifier    verification.ICertVerifier
+	logger               logging.Logger
+	config               PayloadDisperserConfig
+	disperserClient      DisperserClient
+	certVerifier         verification.ICertVerifier
+	requiredQuorumsStore *RequiredQuorumsStore
 }
 
 // BuildPayloadDisperser builds a PayloadDisperser from config structs.
@@ -108,11 +109,17 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
+	requiredQuorumsStore, err := NewRequiredQuorumsStore(certVerifier)
+	if err != nil {
+		return nil, fmt.Errorf("new required quorums store: %w", err)
+	}
+
 	return &PayloadDisperser{
-		logger:          logger,
-		config:          payloadDisperserConfig,
-		disperserClient: disperserClient,
-		certVerifier:    certVerifier,
+		logger:               logger,
+		config:               payloadDisperserConfig,
+		disperserClient:      disperserClient,
+		certVerifier:         certVerifier,
+		requiredQuorumsStore: requiredQuorumsStore,
 	}, nil
 }
 
@@ -137,7 +144,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
+	requiredQuorums, err := pd.requiredQuorumsStore.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
