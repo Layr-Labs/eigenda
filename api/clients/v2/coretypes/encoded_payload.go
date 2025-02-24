@@ -1,4 +1,4 @@
-package codecs
+package coretypes
 
 import (
 	"encoding/binary"

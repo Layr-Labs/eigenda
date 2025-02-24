@@ -7,16 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -246,13 +248,19 @@ func TestDispersalWithInvalidSignature(t *testing.T) {
 	disperserClient, err := clients.NewDisperserClient(disperserConfig, signer, nil, nil)
 	require.NoError(t, err)
 
-	payload := rand.VariableBytes(units.KiB, 2*units.KiB)
-	paddedPayload := codec.ConvertByPaddingEmptyByte(payload)
+	payloadBytes := rand.VariableBytes(units.KiB, 2*units.KiB)
+
+	payload := coretypes.NewPayload(payloadBytes)
+
+	// TODO (litt3): make the blob form configurable. Using PolynomialFormCoeff means that the data isn't being FFTed/IFFTed,
+	//  and it is important for both modes of operation to be tested.
+	blob, err := payload.ToBlob(codecs.PolynomialFormCoeff)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	_, _, err = disperserClient.DisperseBlob(ctx, paddedPayload, 0, quorums)
+	_, _, err = disperserClient.DisperseBlob(ctx, blob.Serialize(), 0, quorums)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "error accounting blob")
 }

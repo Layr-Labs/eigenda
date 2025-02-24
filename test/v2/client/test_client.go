@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,6 +39,7 @@ const (
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
 	config                    *TestClientConfig
+	payloadClientConfig       *clients.PayloadClientConfig
 	logger                    logging.Logger
 	disperserClient           clients.DisperserClient
 	payloadDisperser          *clients.PayloadDisperser
@@ -51,7 +52,6 @@ type TestClient struct {
 	privateKey                string
 	metricsRegistry           *prometheus.Registry
 	metrics                   *testClientMetrics
-	blobCodec                 codecs.BlobCodec
 }
 
 // NewTestClient creates a new TestClient instance.
@@ -154,11 +154,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
 
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob codec: %w", err)
-	}
-
+	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
+	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
+	//  options.
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 
 	payloadDisperserConfig := clients.PayloadDisperserConfig{
@@ -168,7 +166,6 @@ func NewTestClient(
 	payloadDisperser, err := clients.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		blobCodec,
 		disperserClient,
 		certVerifier)
 	if err != nil {
@@ -230,7 +227,6 @@ func NewTestClient(
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobCodec,
 		blobVerifier.Srs.G1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
@@ -264,7 +260,6 @@ func NewTestClient(
 	validatorPayloadRetriever, err := clients.NewValidatorPayloadRetriever(
 		logger,
 		*validatorPayloadRetrieverConfig,
-		blobCodec,
 		retrievalClient,
 		blobVerifier.Srs.G1)
 	if err != nil {
@@ -273,6 +268,7 @@ func NewTestClient(
 
 	return &TestClient{
 		config:                    config,
+		payloadClientConfig:       payloadClientConfig,
 		logger:                    logger,
 		disperserClient:           disperserClient,
 		payloadDisperser:          payloadDisperser,
@@ -285,7 +281,6 @@ func NewTestClient(
 		privateKey:                privateKey,
 		metricsRegistry:           metrics.registry,
 		metrics:                   metrics,
-		blobCodec:                 blobCodec,
 	}, nil
 }
 
@@ -425,25 +420,34 @@ func (c *TestClient) DisperseAndVerify(
 	}
 
 	// read blob from a single relay (assuming success, otherwise will retry)
-	payloadBytesFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
 	if err != nil {
-		return fmt.Errorf("failed to read blob from relay: %w", err)
+		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
+	payloadBytesFromRelayRetriever := payloadFromRelayRetriever.Serialize()
 	if !bytes.Equal(payload, payloadBytesFromRelayRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
 	// read blob from a single quorum (assuming success, otherwise will retry)
-	payloadBytesFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
 	if err != nil {
-		return fmt.Errorf("failed to read blob from validators: %w", err)
+		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
+	payloadBytesFromValidatorRetriever := payloadFromValidatorRetriever.Serialize()
 	if !bytes.Equal(payload, payloadBytesFromValidatorRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
+	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
 	// read blob from ALL relays
-	err = c.ReadBlobFromRelays(ctx, *blobKey, eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys, payload)
+	err = c.ReadBlobFromRelays(
+		ctx,
+		*blobKey,
+		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+		payload,
+		blobLengthSymbols)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
@@ -473,10 +477,12 @@ func (c *TestClient) DisperseAndVerify(
 func (c *TestClient) DispersePayload(
 	ctx context.Context,
 	certVerifierAddress string,
-	payload []byte,
+	payloadBytes []byte,
 ) (*verification.EigenDACert, error) {
-	c.logger.Debugf("Dispersing payload of length %d", len(payload))
+	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
+
+	payload := coretypes.NewPayload(payloadBytes)
 
 	cert, err := c.GetPayloadDisperser().SendPayload(ctx, certVerifierAddress, payload)
 
@@ -493,23 +499,31 @@ func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
 	relayKeys []corev2.RelayKey,
-	expectedPayload []byte) error {
+	expectedPayload []byte,
+	blobLengthSymbols uint32) error {
 
 	for _, relayID := range relayKeys {
 		start := time.Now()
 
 		c.logger.Debugf("Reading blob from relay %d", relayID)
-		blobFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
+		blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay: %w", err)
 		}
 
 		c.metrics.reportRelayReadTime(time.Since(start), relayID)
 
-		payloadBytesFromRelay, err := c.blobCodec.DecodeBlob(blobFromRelay)
+		blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize blob: %w", err)
+		}
+
+		payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to decode blob: %w", err)
 		}
+
+		payloadBytesFromRelay := payload.Serialize()
 
 		if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
 			return fmt.Errorf("payloads do not match")
@@ -526,7 +540,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
-	expectedPayload []byte) error {
+	expectedPayloadBytes []byte) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
@@ -538,7 +552,7 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		start := time.Now()
 
-		retrievedBlob, err := c.retrievalClient.GetBlob(
+		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
 			ctx,
 			blobKey,
 			blobVersion,
@@ -551,11 +565,19 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-		retrievedPayload, err := c.blobCodec.DecodeBlob(retrievedBlob)
+		blobLengthSymbols := uint32(blobCommitments.Length)
+		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
-			return fmt.Errorf("failed to decode blob: %w", err)
+			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
-		if !bytes.Equal(retrievedPayload, expectedPayload) {
+
+		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+		if err != nil {
+			return fmt.Errorf("failed to convert blob to payload: %w", err)
+		}
+
+		payloadBytes := retrievedPayload.Serialize()
+		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
 			return fmt.Errorf("payloads do not match")
 		}
 	}

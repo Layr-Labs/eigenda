@@ -152,13 +152,16 @@ func (l *LoadGenerator) submitBlob() {
 		return
 	}
 
+	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
 		err = l.client.ReadBlobFromRelays(
 			ctx,
 			*blobKey,
 			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
-			payload)
+			payload,
+			blobLengthSymbols)
 		if err != nil {
 			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
