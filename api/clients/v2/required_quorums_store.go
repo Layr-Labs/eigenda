@@ -8,28 +8,31 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 )
 
-// requiredQuorumsStore provides a mapping from cert verifier address to the quorums required by the eigenDACertVerifier
+// RequiredQuorumsStore provides a mapping from cert verifier address to the quorums required by the eigenDACertVerifier
 // contract located at that address.
-type requiredQuorumsStore struct {
+type RequiredQuorumsStore struct {
 	requiredQuorumsCache sync.Map
 	certVerifier         verification.ICertVerifier
 }
 
-// newRequiredQuorumsStore creates a new requiredQuorumsStore utility
-func newRequiredQuorumsStore(certVerifier verification.ICertVerifier) (*requiredQuorumsStore, error) {
-	return &requiredQuorumsStore{
+// NewRequiredQuorumsStore creates a new RequiredQuorumsStore utility
+func NewRequiredQuorumsStore(certVerifier verification.ICertVerifier) (*RequiredQuorumsStore, error) {
+	return &RequiredQuorumsStore{
 		requiredQuorumsCache: sync.Map{},
 		certVerifier:         certVerifier,
 	}, nil
 }
 
-// getQuorumNumbersRequired returns the required quorums for a given cert verifier contract
+// GetQuorumNumbersRequired returns the required quorums for a given cert verifier contract
 //
 // If the required quorums for the input certVerifierAddress are already known, they are returned immediately. If
 // the required quorums are unknown, this method will attempt to fetch the required quorums from the contract. If the
 // fetch is successful, the internal cache is updated with the result, and the result is returned. If the fetch
 // is not successful, an error is returned.
-func (rqs *requiredQuorumsStore) getQuorumNumbersRequired(ctx context.Context, certVerifierAddress string) ([]uint8, error) {
+func (rqs *RequiredQuorumsStore) GetQuorumNumbersRequired(
+	ctx context.Context,
+	certVerifierAddress string,
+) ([]uint8, error) {
 	requiredQuorums, keyAlreadyExists := rqs.requiredQuorumsCache.Load(certVerifierAddress)
 	if keyAlreadyExists {
 		return requiredQuorums.([]uint8), nil
