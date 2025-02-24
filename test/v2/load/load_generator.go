@@ -137,10 +137,7 @@ func (l *LoadGenerator) submitBlob() {
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload := rand.Bytes(payloadSize)
 
-	eigenDACert, err := l.client.DispersePayload(
-		ctx,
-		l.client.GetConfig().EigenDACertVerifierAddressQuorums0_1,
-		payload)
+	eigenDACert, err := l.client.DispersePayload(ctx, l.config.VerificationContractAddress, payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return

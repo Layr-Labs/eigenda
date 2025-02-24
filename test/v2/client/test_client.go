@@ -160,10 +160,12 @@ func NewTestClient(
 	}
 
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
+	payloadClientConfig.ContractCallTimeout = 1337 * time.Hour // this suite enforces its own timeouts
 
 	payloadDisperserConfig := clients.PayloadDisperserConfig{
-		PayloadClientConfig: *payloadClientConfig,
-		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+		PayloadClientConfig:  *payloadClientConfig,
+		DisperseBlobTimeout:  1337 * time.Hour, // this suite enforces its own timeouts
+		BlobCertifiedTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 	payloadDisperser, err := clients.NewPayloadDisperser(
 		logger,

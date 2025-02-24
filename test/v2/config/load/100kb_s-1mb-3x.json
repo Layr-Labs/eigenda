@@ -6,8 +6,5 @@
   "ValidatorReadAmplification": 3,
   "MaxParallelism": 100,
   "DispersalTimeout": 300,
-  "Quorums": [
-    0,
-    1
-  ]
+  "VerificationContractAddress": "0xd973fA62E22BC2779F8489258F040C0344B03C21"
 }
