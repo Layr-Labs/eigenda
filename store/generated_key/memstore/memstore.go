@@ -111,22 +111,10 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	var cert verify.Certificate
-	err := rlp.DecodeBytes(commit, &cert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode DA cert to RLP format: %w", err)
-	}
-
 	var encodedBlob []byte
 	var exists bool
-	if encodedBlob, exists = e.store[string(cert.BlobVerificationProof.InclusionProof)]; !exists {
+	if encodedBlob, exists = e.store[crypto.Keccak256Hash(commit).String()]; !exists {
 		return nil, fmt.Errorf("commitment key not found")
-	}
-
-	// Don't need to do this really since it's a mock store
-	err = e.verifier.VerifyCommitment(cert.BlobHeader.Commitment, encodedBlob)
-	if err != nil {
-		return nil, err
 	}
 
 	return e.codec.DecodeBlob(encodedBlob)
@@ -206,18 +194,17 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	certKey := crypto.Keccak256Hash(certBytes).String()
+
 	// construct key
-	bytesKeys := cert.BlobVerificationProof.InclusionProof
-
-	certStr := string(bytesKeys)
-
-	if _, exists := e.store[certStr]; exists {
+	if _, exists := e.store[certKey]; exists {
 		return nil, fmt.Errorf("commitment key already exists")
 	}
 
-	e.store[certStr] = encodedVal
+	e.store[certKey] = encodedVal
 	// add expiration
-	e.keyStarts[certStr] = time.Now()
+	e.keyStarts[certKey] = time.Now()
 
 	return certBytes, nil
 }
