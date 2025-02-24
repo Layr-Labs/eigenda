@@ -136,7 +136,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		if current.RequestedAt > 0 {
 			startCursor = current
 		}
-		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAt(
+		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAtForward(
 			c.Request.Context(),
 			startCursor,
 			beforeCursor,

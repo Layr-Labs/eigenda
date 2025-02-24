@@ -61,7 +61,7 @@ type Client interface {
 	Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error)
 	QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) (int32, error)
-	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error)
+	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error)
 	DeleteItem(ctx context.Context, tableName string, key Key) error
 	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
 	TableExists(ctx context.Context, name string) error
@@ -342,7 +342,7 @@ func (c *client) QueryIndexCount(ctx context.Context, tableName string, indexNam
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
 // When limit is 0, all items are returned
-func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
+func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error) {
 	var queryInput *dynamodb.QueryInput
 
 	// Fetch all items if limit is 0
@@ -353,6 +353,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
 			Limit:                     &limit,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	} else {
 		queryInput = &dynamodb.QueryInput{
@@ -360,6 +361,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			IndexName:                 aws.String(indexName),
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	}
 
