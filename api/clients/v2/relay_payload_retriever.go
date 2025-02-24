@@ -174,6 +174,7 @@ func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
 	blobKey *core.BlobKey,
+	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
 	blobLengthSymbols uint32,
 ) (*codecs.Blob, error) {
 
