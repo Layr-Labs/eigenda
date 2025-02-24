@@ -30,7 +30,7 @@ import (
 )
 
 const g1Path = "../../../../inabox/resources/kzg/g1.point"
-const maxPayloadBytes = 1025
+const maxPayloadBytes = 1025 // arbitrary value
 
 type RelayPayloadRetrieverTester struct {
 	Random                *testrandom.TestRandom
