@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
 	"github.com/stretchr/testify/require"
-	"os"
 )
 
 func main() {

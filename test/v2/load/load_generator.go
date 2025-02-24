@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
@@ -73,6 +74,12 @@ func NewLoadGenerator(
 	ctx, cancel := context.WithCancel(ctx)
 
 	metrics := newLoadGeneratorMetrics(client.GetMetricsRegistry())
+
+	if config.EnablePprof {
+		pprofProfiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", config.PprofHttpPort), client.GetLogger())
+		go pprofProfiler.Start()
+		client.GetLogger().Info("Enabled pprof", "port", config.PprofHttpPort)
+	}
 
 	return &LoadGenerator{
 		ctx:                ctx,
