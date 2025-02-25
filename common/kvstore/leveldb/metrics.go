@@ -2,6 +2,7 @@ package leveldb
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -366,8 +367,16 @@ func (mc *MetricsCollector) collectMetrics() {
 
 func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, timeDelta float64) {
 	// Calculate compaction latencies
-	for level, duration := range stats.LevelDurations {
-		compactionLatency.WithLabelValues(getLevelName(level), mc.config.Name).Observe(duration.Seconds())
+	if !mc.lastCollection.IsZero() && len(mc.lastStats.LevelDurations) > 0 {
+		for level, duration := range stats.LevelDurations {
+			if level < len(mc.lastStats.LevelDurations) {
+				prevDuration := mc.lastStats.LevelDurations[level]
+				deltaDuration := duration - prevDuration
+				if deltaDuration > 0 {
+					compactionLatency.WithLabelValues(getLevelName(level), mc.config.Name).Observe(deltaDuration.Seconds())
+				}
+			}
+		}
 	}
 
 	// Calculate throughput metrics
@@ -395,9 +404,9 @@ func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, tim
 
 func (mc *MetricsCollector) processIOMetrics(stats *leveldb.DBStats, timeDelta float64) {
 	// Calculate IO rates
-	if prevStats := mc.lastStats; true {
-		readDelta := float64(stats.IORead - prevStats.IORead)
-		writeDelta := float64(stats.IOWrite - prevStats.IOWrite)
+	if !mc.lastCollection.IsZero() {
+		readDelta := float64(stats.IORead - mc.lastStats.IORead)
+		writeDelta := float64(stats.IOWrite - mc.lastStats.IOWrite)
 
 		readThroughput.WithLabelValues(mc.config.Name).Set(readDelta / timeDelta)
 		writeThroughput.WithLabelValues(mc.config.Name).Set(writeDelta / timeDelta)
@@ -445,5 +454,5 @@ func getLevelName(level int) string {
 	if level == 0 {
 		return "memory"
 	}
-	return "level_" + string(rune('0'+level))
+	return "level_" + strconv.Itoa(level)
 }
