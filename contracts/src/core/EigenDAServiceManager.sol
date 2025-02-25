@@ -73,7 +73,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
     /**
      * @notice This function is used for
-     * - submitting data availability certificates,
+     * - submitting data availabilty certificates,
      * - check that the aggregate signature is valid,
      * - and check whether quorum has been achieved or not.
      */
