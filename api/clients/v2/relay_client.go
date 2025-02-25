@@ -57,10 +57,11 @@ type RelayClient interface {
 type relayClient struct {
 	logger logging.Logger
 	config *RelayClientConfig
-	// initOnce is used to ensure that the connection to each relay is initialized only once
-	initOnce map[corev2.RelayKey]*sync.Once
-	// initOnceMutex protects access to the initOnce map
-	initOnceMutex sync.Mutex
+	// relayLockProvider provides locks that correspond to individual relay keys
+	relayLockProvider relay.KeyLock[corev2.RelayKey]
+	// relayInitializationStatus maps relay key to a bool `map[corev2.RelayKey]bool`
+	// the boolean value indicates whether the connection to that relay has been initialized
+	relayInitializationStatus sync.Map
 	// clientConnections maps relay key to the gRPC connection: `map[corev2.RelayKey]*grpc.ClientConn`
 	// this map is maintained so that connections can be closed in Close
 	clientConnections sync.Map
@@ -73,8 +74,8 @@ type relayClient struct {
 
 var _ RelayClient = (*relayClient)(nil)
 
-// NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
-// It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
+// NewRelayClient creates a new RelayClient. It keeps a connection to each relay and reuses it for subsequent requests,
+// and the connection is lazily instantiated.
 func NewRelayClient(
 	config *RelayClientConfig,
 	logger logging.Logger,
@@ -243,39 +244,44 @@ func (c *relayClient) getClient(ctx context.Context, key corev2.RelayKey) (relay
 // initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only do perform
 // the initialization once per relay.
 func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.RelayKey) error {
-	// we must use a mutex here instead of a sync.Map, because this method could be called concurrently, and if
-	// two concurrent calls tried to `LoadOrStore` from a sync.Map at the same time, it's possible they would
-	// each create a unique sync.Once object, and perform duplicate initialization
-	c.initOnceMutex.Lock()
-	once, ok := c.initOnce[key]
-	if !ok {
-		once = &sync.Once{}
-		c.initOnce[key] = once
+	_, alreadyInitialized := c.relayInitializationStatus.Load(key)
+	if alreadyInitialized {
+		// this is the standard case, where the grpc connection has already been initialized
+		return nil
 	}
-	c.initOnceMutex.Unlock()
 
-	// TODO (litt3): should we implement a way to rebuild connections that break, or fail to initialize? as it currently
-	//  stands, if this initialization fails, or a connection breaks, the relay client will never speak to that relay again
-	var initErr error
-	once.Do(
-		func() {
-			relayUrl, err := c.relayUrlProvider.GetRelayUrl(ctx, key)
-			if err != nil {
-				initErr = fmt.Errorf("get relay url for key %d: %w", key, err)
-				return
-			}
+	// In cases were the value hasn't already been initialized, we must acquire a conceptual lock on the relay in
+	// question. This allows us to guarantee that a connection with a given relay is only initialized a single time
+	releaseMemberLock := c.relayLockProvider.AcquireKeyLock(key)
+	defer releaseMemberLock()
 
-			dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
-			conn, err := grpc.NewClient(relayUrl, dialOptions...)
-			if err != nil {
-				initErr = fmt.Errorf("create grpc client for key %d: %w", key, err)
-				return
-			}
-			c.clientConnections.Store(key, conn)
-			c.grpcRelayClients.Store(key, relaygrpc.NewRelayClient(conn))
-		})
+	_, alreadyInitialized = c.relayInitializationStatus.Load(key)
+	if alreadyInitialized {
+		// If we find that the connection was initialized in the time it took to acquire a conceptual lock on the relay,
+		// that means that a different caller did the necessary work already
+		return nil
+	}
 
-	return initErr
+	// TODO (litt3): storing `true` for key immediately mirrors the previous implementation, where a failed init
+	//  is NOT retried, and the connection to that relay will just be broken forever. Consider implementing
+	//  logic to retry initialization after a period of time in case of failure
+	c.relayInitializationStatus.Store(key, true)
+
+	relayUrl, err := c.relayUrlProvider.GetRelayUrl(ctx, key)
+	if err != nil {
+		return fmt.Errorf("get relay url for key %d: %w", key, err)
+	}
+
+	dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
+	conn, err := grpc.NewClient(relayUrl, dialOptions...)
+	if err != nil {
+		return fmt.Errorf("create grpc client for key %d: %w", key, err)
+
+	}
+	c.clientConnections.Store(key, conn)
+	c.grpcRelayClients.Store(key, relaygrpc.NewRelayClient(conn))
+
+	return nil
 }
 
 func (c *relayClient) Close() error {
