@@ -211,11 +211,11 @@ message PaymentGlobalParams {
   // Global ratelimit for on-demand dispersals
   uint64 global_symbols_per_second = 1;
   // Minimum number of symbols accounted for all dispersals
-  uint32 min_num_symbols = 2;
+  uint64 min_num_symbols = 2;
   // Price charged per symbol for on-demand dispersals
-  uint32 price_per_symbol = 3;
+  uint64 price_per_symbol = 3;
   // Reservation window for all reservations
-  uint32 reservation_window = 4;
+  uint64 reservation_window = 4;
   // quorums allowed to make on-demand dispersals
   repeated uint32 on_demand_quorum_numbers = 5;
 }

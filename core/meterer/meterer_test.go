@@ -237,7 +237,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
 	// test bin usage metering
-	symbolLength := uint(20)
+	symbolLength := uint64(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
 		now = time.Now().UnixNano()
@@ -322,7 +322,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 0, len(result))
 
 	// test duplicated cumulative payments
-	symbolLength := uint(100)
+	symbolLength := uint64(100)
 	priceCharged := mt.PaymentCharged(symbolLength)
 	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(now, priceCharged, accountID2)
@@ -349,7 +349,7 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
-	symbolLength = uint(2)
+	symbolLength = uint64(2)
 	priceCharged = mt.PaymentCharged(symbolLength)
 	header = createPaymentHeader(now, big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
@@ -383,7 +383,7 @@ func TestMetererOnDemand(t *testing.T) {
 func TestMeterer_paymentCharged(t *testing.T) {
 	tests := []struct {
 		name           string
-		symbolLength   uint
+		symbolLength   uint64
 		pricePerSymbol uint32
 		minNumSymbols  uint32
 		expected       *big.Int
@@ -442,7 +442,7 @@ func TestMeterer_paymentCharged(t *testing.T) {
 func TestMeterer_symbolsCharged(t *testing.T) {
 	tests := []struct {
 		name          string
-		symbolLength  uint
+		symbolLength  uint64
 		minNumSymbols uint32
 		expected      uint32
 	}{
