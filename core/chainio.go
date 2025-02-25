@@ -9,6 +9,8 @@ import (
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 )
 
 type OperatorStake struct {
@@ -55,9 +57,6 @@ type Reader interface {
 
 	// SocketRegistry returns the address of the socket registry contract.
 	SocketRegistry(ctx context.Context) (gethcommon.Address, error)
-
-	// RegistryCoordinator returns the address of the  registry coordinator contract.
-	RegistryCoordinator(ctx context.Context) gethcommon.Address
 
 	// OperatorIDToAddress returns the address of the operator from the operator id.
 	OperatorIDToAddress(ctx context.Context, operatorId OperatorID) (gethcommon.Address, error)
@@ -145,6 +144,9 @@ type Reader interface {
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
+
+	// GetSocketUpdates returns all socket updates in a given block range.
+	GetSocketUpdates(ctx context.Context, startBlock, endBlock uint64) ([]*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate, error)
 }
 
 type Writer interface {

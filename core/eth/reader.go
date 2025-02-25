@@ -500,10 +500,6 @@ func (t *Reader) SocketRegistry(ctx context.Context) (gethcommon.Address, error)
 	})
 }
 
-func (t *Reader) RegistryCoordinator(ctx context.Context) gethcommon.Address {
-	return t.bindings.RegCoordinatorAddr
-}
-
 func (t *Reader) OperatorIDToAddress(ctx context.Context, operatorId core.OperatorID) (gethcommon.Address, error) {
 	return t.bindings.BLSApkRegistry.PubkeyHashToOperator(&bind.CallOpts{
 		Context: ctx,
@@ -1010,4 +1006,40 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 	}
 
 	return address, nil
+}
+
+// / Utilize the binding generated filter function to get all socket updates in a given block range
+func (t *Reader) GetSocketUpdates(ctx context.Context, startBlock, endBlock uint64) ([]*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate, error) {
+	// Create filter options for the block range
+	filterOpts := &bind.FilterOpts{
+		Start:   startBlock,
+		End:     &endBlock,
+		Context: ctx,
+	}
+
+	// Get iterator for OperatorSocketUpdate events
+	// The nil parameter means we're not filtering by any specific operatorId
+	iterator, err := t.bindings.RegistryCoordinator.FilterOperatorSocketUpdate(filterOpts, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create filter: %w", err)
+	}
+	defer iterator.Close()
+
+	// Collect all events
+	var updates []*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate
+	for iterator.Next() {
+		// iterator.Event contains the current event
+		// It includes:
+		// - OperatorId ([32]byte)
+		// - Socket (string)
+		// - Raw (types.Log with blockchain specific info)
+		updates = append(updates, iterator.Event)
+	}
+
+	// Check if iteration ended with an error
+	if err := iterator.Error(); err != nil {
+		return nil, fmt.Errorf("error iterating through events: %w", err)
+	}
+
+	return updates, nil
 }
