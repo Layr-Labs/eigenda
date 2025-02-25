@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// SortOrder defines the ordering of data returned by fetchFromDB
+type SortOrder int
+
+const (
+	Ascending SortOrder = iota
+	Descending
+)
+
 // TimeRange represents a time interval [start, end) where
 // start is inclusive and end is exclusive
 type TimeRange struct {
@@ -14,7 +22,7 @@ type TimeRange struct {
 
 type CacheEntry[T any] struct {
 	TimeRange
-	Data []*T // maintained in time order
+	Data []*T
 }
 
 type FeedCache[T any] struct {
@@ -23,22 +31,34 @@ type FeedCache[T any] struct {
 	maxItems     int
 	fetchFromDB  func(start, end time.Time) ([]*T, error)
 	getTimestamp func(*T) time.Time
+	order        SortOrder
 }
 
 func NewFeedCache[T any](
 	maxItems int,
 	fetchFn func(start, end time.Time) ([]*T, error),
 	timestampFn func(*T) time.Time,
+	order SortOrder,
 ) *FeedCache[T] {
 	return &FeedCache[T]{
 		maxItems:     maxItems,
 		fetchFromDB:  fetchFn,
 		getTimestamp: timestampFn,
+		order:        order,
 	}
 }
 
 func (tr TimeRange) Overlaps(other TimeRange) bool {
 	return tr.Start.Before(other.End) && other.Start.Before(tr.End)
+}
+
+// reverseOrder reverses the order of elements in a slice
+func (c *FeedCache[T]) reverseOrder(data []*T) []*T {
+	result := make([]*T, len(data))
+	for i, item := range data {
+		result[len(data)-1-i] = item
+	}
+	return result
 }
 
 func (c *FeedCache[T]) Get(start, end time.Time) ([]*T, error) {
@@ -57,11 +77,15 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]*T, error) {
 
 		// Only cache if this is newer than existing cache
 		if segment == nil || queryRange.Start.After(segment.TimeRange.Start) {
+			// Normalize data to ascending order before caching
 			dataToCache := data
+			if c.order == Descending {
+				dataToCache = c.reverseOrder(data)
+			}
+
 			// If data exceeds maxItems, keep only the most recent ones
-			if len(data) > c.maxItems {
-				dataToCache = data[len(data)-c.maxItems:]
-				// Adjust start time based on first item in trimmed data
+			if len(dataToCache) > c.maxItems {
+				dataToCache = dataToCache[len(dataToCache)-c.maxItems:] // Keep newest
 				start = c.getTimestamp(dataToCache[0])
 			}
 
@@ -89,6 +113,10 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]*T, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Normalize to ascending order for caching
+		if c.order == Descending {
+			beforeData = c.reverseOrder(beforeData)
+		}
 	}
 
 	// Check if we need data after cached segment
@@ -97,46 +125,66 @@ func (c *FeedCache[T]) Get(start, end time.Time) ([]*T, error) {
 		if err != nil {
 			return nil, err
 		}
+		// Normalize to ascending order for caching
+		if c.order == Descending {
+			afterData = c.reverseOrder(afterData)
+		}
 	}
 
-	// If no gaps, just return filtered cached data
-	if beforeData == nil && afterData == nil {
-		return c.filterDataInRange(segment.Data, start, end), nil
+	// If no gaps, just return filtered cached data in the requested order
+	if len(beforeData) == 0 && len(afterData) == 0 {
+		cachedResult := c.filterDataInRange(segment.Data, start, end)
+		if c.order == Descending {
+			return c.reverseOrder(cachedResult), nil
+		}
+		return cachedResult, nil
 	}
 
 	// Calculate total size for result
 	totalSize := len(beforeData) + len(afterData)
 	cachedInRange := c.countDataInRange(segment.Data, start, end)
-	result := make([]*T, 0, totalSize+cachedInRange)
-	newCache := make([]*T, 0, totalSize+len(c.segment.Data))
 
-	// Combine all data in order
+	// Process data for cache (always in ascending order)
+	newCache := make([]*T, 0, totalSize+len(c.segment.Data))
 	if beforeData != nil {
-		result = append(result, beforeData...)
 		newCache = append(newCache, beforeData...)
 	}
-	result = append(result, c.filterDataInRange(segment.Data, start, end)...)
 	newCache = append(newCache, segment.Data...)
 	if afterData != nil {
-		result = append(result, afterData...)
 		newCache = append(newCache, afterData...)
+	}
+
+	// Result for the user includes only data in the requested range
+	// Result = beforeData + filterDataInrange(cached data) + afterData
+	result := make([]*T, 0, totalSize+cachedInRange)
+	if beforeData != nil {
+		result = append(result, beforeData...)
+	}
+	result = append(result, c.filterDataInRange(segment.Data, start, end)...)
+	if afterData != nil {
+		result = append(result, afterData...)
 	}
 
 	// Update cache with extended range
 	c.mu.Lock()
-	// If result would exceed maxItems, trim oldest data
+	// If newCache would exceed maxItems, trim oldest data
 	if len(newCache) > c.maxItems {
-		newCache = result[len(newCache)-c.maxItems:]
+		newCache = newCache[len(newCache)-c.maxItems:] // Keep newest
 	}
+
 	c.segment = &CacheEntry[T]{
 		TimeRange: TimeRange{
 			Start: c.getTimestamp(newCache[0]),
-			End:   maxTime(c.segment.End, end),
+			End:   maxTime(segment.End, end),
 		},
 		Data: newCache,
 	}
 	c.mu.Unlock()
 
+	// Return the result in the requested order
+	if c.order == Descending {
+		return c.reverseOrder(result), nil
+	}
 	return result, nil
 }
 
@@ -148,7 +196,7 @@ func (c *FeedCache[T]) filterDataInRange(data []*T, start, end time.Time) []*T {
 
 		// Since end is exclusive, we break on >=
 		if !timestamp.Before(end) {
-			break // since data is ordered
+			break // since data is in ascending order
 		}
 
 		// Since start is inclusive, we include >=
@@ -162,17 +210,20 @@ func (c *FeedCache[T]) filterDataInRange(data []*T, start, end time.Time) []*T {
 
 func (c *FeedCache[T]) countDataInRange(data []*T, start, end time.Time) int {
 	count := 0
+
 	for _, item := range data {
 		timestamp := c.getTimestamp(item)
 
 		if !timestamp.Before(end) {
-			break
+			break // since data is in ascending order
+
 		}
 
 		if !timestamp.Before(start) {
 			count++
 		}
 	}
+
 	return count
 }
 

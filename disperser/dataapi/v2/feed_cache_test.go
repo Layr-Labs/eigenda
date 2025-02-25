@@ -50,7 +50,7 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 		return item.ts
 	}
 
-	cache := v2.NewFeedCache(maxItems, fetcher.fetch, timestampFn)
+	cache := v2.NewFeedCache(maxItems, fetcher.fetch, timestampFn, v2.Ascending)
 	return cache, fetcher, baseTime
 }
 
