@@ -15,6 +15,12 @@ type TestRelayUrlProvider struct {
 
 var _ RelayUrlProvider = &TestRelayUrlProvider{}
 
+func NewTestRelayUrlProvider() *TestRelayUrlProvider {
+	return &TestRelayUrlProvider{
+		urlMap: make(map[v2.RelayKey]string),
+	}
+}
+
 func (rup *TestRelayUrlProvider) GetRelayUrl(_ context.Context, relayKey v2.RelayKey) (string, error) {
 	return rup.urlMap[relayKey], nil
 }

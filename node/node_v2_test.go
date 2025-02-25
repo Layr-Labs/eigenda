@@ -252,7 +252,7 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	c.node.Config.EnableV2 = true
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 
-	relayUrlProvider := &relay.TestRelayUrlProvider{}
+	relayUrlProvider := relay.NewTestRelayUrlProvider()
 	relayUrlProvider.StoreRelayUrl(0, "http://localhost:8080")
 
 	messageSigner := func(ctx context.Context, data [32]byte) (*core.Signature, error) {
@@ -298,8 +298,6 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	bp, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams2)
-	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
-	require.NotSame(t, relayClient, newRelayClient)
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {

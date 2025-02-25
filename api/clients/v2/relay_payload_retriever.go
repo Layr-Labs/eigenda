@@ -42,9 +42,9 @@ func BuildRelayPayloadRetriever(
 		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
 	}
 
-	testRelayUrlProvider := relay.TestRelayUrlProvider{}
+	testRelayUrlProvider := relay.NewTestRelayUrlProvider()
 
-	relayClient, err := NewRelayClient(relayClientConfig, log, &testRelayUrlProvider)
+	relayClient, err := NewRelayClient(relayClientConfig, log, testRelayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
