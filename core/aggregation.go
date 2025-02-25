@@ -317,7 +317,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	sort.Slice(nonSignerKeys, func(i, j int) bool {
 		hash1 := nonSignerKeys[i].Hash()
 		hash2 := nonSignerKeys[j].Hash()
-		// sort in accending order
+		// sort in ascending order
 		return bytes.Compare(hash1[:], hash2[:]) == -1
 	})
 

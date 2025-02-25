@@ -315,7 +315,7 @@ RetrieveBlobRequest contains parameters to retrieve the blob.
 BlobStatus represents the status of a blob.
 The status of a blob is updated as the blob is processed by the disperser.
 The status of a blob can be queried by the client using the GetBlobStatus API.
-Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 - PROCESSING
 - DISPERSING
 - CONFIRMED
@@ -329,7 +329,7 @@ Terminal states are states that will not be updated to a different state:
 | UNKNOWN | 0 |  |
 | PROCESSING | 1 | PROCESSING means that the blob is currently being processed by the disperser |
 | CONFIRMED | 2 | CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed batch containing the blob has been confirmed onchain |
-| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containg (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. |
+| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containing (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. |
 | FINALIZED | 4 | FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum |
 | INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
 | DISPERSING | 6 | The DISPERSING state is comprised of two separate phases: - Dispersing to DA nodes and collecting signature - Submitting the transaction on chain and waiting for tx receipt |
