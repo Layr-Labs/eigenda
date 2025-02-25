@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -131,6 +132,14 @@ func (r *retrievalClient) GetBlob(
 		assignmentIndices := make([]uint, len(assignment.GetIndices()))
 		for i, index := range assignment.GetIndices() {
 			assignmentIndices[i] = uint(index)
+		}
+
+		if len(assignmentIndices) != len(reply.Chunks) {
+			r.logger.Warn("invalid number of chunks from operator",
+				"operator", reply.OperatorID.Hex(),
+				"expected", len(assignmentIndices),
+				"actual", len(reply.Chunks))
+			continue
 		}
 
 		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
