@@ -58,7 +58,7 @@ type relayClient struct {
 	logger logging.Logger
 	config *RelayClientConfig
 	// relayLockProvider provides locks that correspond to individual relay keys
-	relayLockProvider relay.KeyLock[corev2.RelayKey]
+	relayLockProvider *relay.KeyLock[corev2.RelayKey]
 	// relayInitializationStatus maps relay key to a bool `map[corev2.RelayKey]bool`
 	// the boolean value indicates whether the connection to that relay has been initialized
 	relayInitializationStatus sync.Map
@@ -95,6 +95,7 @@ func NewRelayClient(
 	return &relayClient{
 		config:           config,
 		logger:           logger.With("component", "RelayClient"),
+		relayLockProvider: relay.NewKeyLock[corev2.RelayKey](),
 		relayUrlProvider: relayUrlProvider,
 	}, nil
 }
