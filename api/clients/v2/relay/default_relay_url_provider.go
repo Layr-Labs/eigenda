@@ -24,8 +24,7 @@ func NewDefaultRelayUrlProvider(
 	relayRegistryAddress gethcommon.Address,
 ) (*DefaultRelayUrlProvider, error) {
 	relayRegistryContractCaller, err := relayRegistryBindings.NewContractEigenDARelayRegistryCaller(
-		relayRegistryAddress,
-		ethClient)
+		relayRegistryAddress, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("NewContractEigenDARelayRegistryCaller: %w", err)
 	}
@@ -47,6 +46,8 @@ func (rup *DefaultRelayUrlProvider) GetRelayUrl(ctx context.Context, relayKey v2
 
 // GetRelayCount gets the number of relays that exist in the registry
 func (rup *DefaultRelayUrlProvider) GetRelayCount(ctx context.Context) (uint32, error) {
+	// NextRelayKey initializes to 0, and is incremented each time a relay is added
+	// current logic doesn't support removing relays, so NextRelayKey therefore corresponds directly to relay count
 	relayCount, err := rup.relayRegistryCaller.NextRelayKey(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, fmt.Errorf("get next relay key from EigenDARelayRegistry contract: %w", err)

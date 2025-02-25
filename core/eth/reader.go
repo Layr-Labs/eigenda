@@ -37,7 +37,7 @@ import (
 type ContractBindings struct {
 	RegCoordinatorAddr    gethcommon.Address
 	ServiceManagerAddr    gethcommon.Address
-	RelayRegistryAddress gethcommon.Address
+	RelayRegistryAddress  gethcommon.Address
 	DelegationManager     *delegationmgr.ContractDelegationManager
 	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
 	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
@@ -243,7 +243,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
-		RelayRegistryAddress: relayRegistryAddress,
+		RelayRegistryAddress:  relayRegistryAddress,
 		AVSDirectory:          contractAVSDirectory,
 		SocketRegistry:        contractSocketRegistry,
 		OpStateRetriever:      contractBLSOpStateRetr,

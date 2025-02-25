@@ -67,7 +67,7 @@ type relayClient struct {
 	// grpcRelayClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
 	// these grpc relay clients are used to communicate with individual relays
 	grpcRelayClients sync.Map
-	// relayUrlProvider knows how to retrieve the relay URLs, and maintains an internal URL cache
+	// relayUrlProvider knows how to retrieve the relay URLs
 	relayUrlProvider relay.RelayUrlProvider
 }
 
@@ -254,6 +254,8 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 	}
 	c.initOnceMutex.Unlock()
 
+	// TODO (litt3): should we implement a way to rebuild connections that break, or fail to initialize? as it currently
+	//  stands, if this initialization fails, or a connection breaks, the relay client will never speak to that relay again
 	var initErr error
 	once.Do(
 		func() {

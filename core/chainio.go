@@ -131,6 +131,7 @@ type Reader interface {
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
 
+	// GetRelayRegistryAddress returns the Address of the EigenDARelayRegistry contract
 	GetRelayRegistryAddress() gethcommon.Address
 }
 

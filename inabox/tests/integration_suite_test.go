@@ -52,7 +52,7 @@ var (
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
 	numRetries              = 0
-	chainReader core.Reader
+	chainReader         core.Reader
 
 	cancel context.CancelFunc
 )
