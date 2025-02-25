@@ -35,6 +35,7 @@ func BuildRelayPayloadRetriever(
 	log logging.Logger,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	relayClientConfig *RelayClientConfig,
+	relayUrlProvider relay.RelayUrlProvider,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
@@ -42,9 +43,7 @@ func BuildRelayPayloadRetriever(
 		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
 	}
 
-	testRelayUrlProvider := relay.NewTestRelayUrlProvider()
-
-	relayClient, err := NewRelayClient(relayClientConfig, log, testRelayUrlProvider)
+	relayClient, err := NewRelayClient(relayClientConfig, log, relayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
