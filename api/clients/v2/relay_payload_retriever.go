@@ -7,6 +7,7 @@ import (
 	"math/rand"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -41,7 +42,9 @@ func BuildRelayPayloadRetriever(
 		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
 	}
 
-	relayClient, err := NewRelayClient(relayClientConfig, log)
+	testRelayUrlProvider := relay.TestRelayUrlProvider{}
+
+	relayClient, err := NewRelayClient(relayClientConfig, log, &testRelayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}

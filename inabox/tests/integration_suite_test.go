@@ -19,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -53,7 +52,7 @@ var (
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
 	numRetries              = 0
-	relays                  = map[corev2.RelayKey]string{}
+	chainReader core.Reader
 
 	cancel context.CancelFunc
 )
@@ -133,7 +132,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
-		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
+		testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 		fmt.Println("Registering disperser keypair")
 		err = testConfig.RegisterDisperserKeypair(ethClient)

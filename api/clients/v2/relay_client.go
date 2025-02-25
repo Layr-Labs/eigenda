@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/core"
@@ -19,7 +20,6 @@ import (
 type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, error)
 
 type RelayClientConfig struct {
-	Sockets            map[corev2.RelayKey]string
 	UseSecureGrpcFlag  bool
 	MaxGRPCMessageSize uint
 	OperatorID         *core.OperatorID
@@ -48,56 +48,60 @@ type RelayClient interface {
 	// The returned slice has the same length and ordering as the input slice, and the i-th element is the bundle for the i-th request.
 	// Each bundle is a sequence of frames in raw form (i.e., serialized core.Bundle bytearray).
 	GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error)
-	// GetSockets returns the relay sockets
-	GetSockets() map[corev2.RelayKey]string
 	Close() error
 }
 
+// relayClient is a client for the entire relay subsystem.
+//
+// It is a wrapper around a collection of grpc relay clients, which are used to interact with individual relays.
 type relayClient struct {
-	config *RelayClientConfig
-
-	// initOnce is used to ensure that the connection to each relay is initialized only once.
-	// It maps relay key to a sync.Once instance: `map[corev2.RelayKey]*sync.Once`
-	initOnce *sync.Map
-	// conns maps relay key to the gRPC connection: `map[corev2.RelayKey]*grpc.ClientConn`
-	conns  sync.Map
 	logger logging.Logger
-
-	// grpcClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
-	grpcClients sync.Map
+	config *RelayClientConfig
+	// initOnce is used to ensure that the connection to each relay is initialized only once
+	initOnce map[corev2.RelayKey]*sync.Once
+	// initOnceMutex protects access to the initOnce map
+	initOnceMutex sync.Mutex
+	// clientConnections maps relay key to the gRPC connection: `map[corev2.RelayKey]*grpc.ClientConn`
+	// this map is maintained so that connections can be closed in Close
+	clientConnections sync.Map
+	// grpcRelayClients maps relay key to the gRPC client: `map[corev2.RelayKey]relaygrpc.RelayClient`
+	// these grpc relay clients are used to communicate with individual relays
+	grpcRelayClients sync.Map
+	// relayUrlProvider knows how to retrieve the relay URLs, and maintains an internal URL cache
+	relayUrlProvider relay.RelayUrlProvider
 }
 
 var _ RelayClient = (*relayClient)(nil)
 
 // NewRelayClient creates a new RelayClient that connects to the relays specified in the config.
 // It keeps a connection to each relay and reuses it for subsequent requests, and the connection is lazily instantiated.
-func NewRelayClient(config *RelayClientConfig, logger logging.Logger) (RelayClient, error) {
+func NewRelayClient(
+	config *RelayClientConfig,
+	logger logging.Logger,
+	relayUrlProvider relay.RelayUrlProvider,
+) (RelayClient, error) {
+
 	if config == nil {
 		return nil, errors.New("nil config")
-	} else if len(config.Sockets) <= 0 {
-		return nil, errors.New("no relay sockets provided")
-	} else if config.MaxGRPCMessageSize == 0 {
+	}
+
+	if config.MaxGRPCMessageSize == 0 {
 		return nil, errors.New("max gRPC message size must be greater than 0")
 	}
 
-	logger.Info("creating relay client", "urls", config.Sockets)
+	logger.Info("creating relay client")
 
-	initOnce := sync.Map{}
-	for key := range config.Sockets {
-		initOnce.Store(key, &sync.Once{})
-	}
 	return &relayClient{
-		config: config,
-
-		initOnce: &initOnce,
-		logger:   logger.With("component", "RelayClient"),
+		config:           config,
+		logger:           logger.With("component", "RelayClient"),
+		relayUrlProvider: relayUrlProvider,
 	}, nil
 }
 
 func (c *relayClient) GetBlob(ctx context.Context, relayKey corev2.RelayKey, blobKey corev2.BlobKey) ([]byte, error) {
-	client, err := c.getClient(relayKey)
+	client, err := c.getClient(ctx, relayKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get grpc client for key %d: %w", relayKey, err)
 	}
 
 	res, err := client.GetBlob(ctx, &relaygrpc.GetBlobRequest{
@@ -140,9 +144,10 @@ func (c *relayClient) GetChunksByRange(
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")
 	}
-	client, err := c.getClient(relayKey)
+
+	client, err := c.getClient(ctx, relayKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get grpc relay client for key %d: %w", relayKey, err)
 	}
 
 	grpcRequests := make([]*relaygrpc.ChunkRequest, len(requests))
@@ -184,9 +189,9 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, fmt.Errorf("no requests")
 	}
 
-	client, err := c.getClient(relayKey)
+	client, err := c.getClient(ctx, relayKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get grpc relay client for key %d: %w", relayKey, err)
 	}
 
 	grpcRequests := make([]*relaygrpc.ChunkRequest, len(requests))
@@ -219,11 +224,12 @@ func (c *relayClient) GetChunksByIndex(
 	return res.GetData(), nil
 }
 
-func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, error) {
-	if err := c.initOnceGrpcConnection(key); err != nil {
-		return nil, err
+// getClient gets the grpc relay client, which has a connection to a given relay
+func (c *relayClient) getClient(ctx context.Context, key corev2.RelayKey) (relaygrpc.RelayClient, error) {
+	if err := c.initOnceGrpcConnection(ctx, key); err != nil {
+		return nil, fmt.Errorf("init grpc connection for key %d: %w", key, err)
 	}
-	maybeClient, ok := c.grpcClients.Load(key)
+	maybeClient, ok := c.grpcRelayClients.Load(key)
 	if !ok {
 		return nil, fmt.Errorf("no grpc client for relay key: %v", key)
 	}
@@ -234,53 +240,62 @@ func (c *relayClient) getClient(key corev2.RelayKey) (relaygrpc.RelayClient, err
 	return client, nil
 }
 
-func (c *relayClient) initOnceGrpcConnection(key corev2.RelayKey) error {
-	var initErr error
-	once, ok := c.initOnce.Load(key)
+// initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only do perform
+// the initialization once per relay.
+func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.RelayKey) error {
+	// we must use a mutex here instead of a sync.Map, because this method could be called concurrently, and if
+	// two concurrent calls tried to `LoadOrStore` from a sync.Map at the same time, it's possible they would
+	// each create a unique sync.Once object, and perform duplicate initialization
+	c.initOnceMutex.Lock()
+	once, ok := c.initOnce[key]
 	if !ok {
-		return fmt.Errorf("unknown relay key: %v", key)
+		once = &sync.Once{}
+		c.initOnce[key] = once
 	}
-	once.(*sync.Once).Do(func() {
-		socket, ok := c.config.Sockets[key]
-		if !ok {
-			initErr = fmt.Errorf("unknown relay key: %v", key)
-			return
-		}
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
-		conn, err := grpc.NewClient(socket, dialOptions...)
-		if err != nil {
-			initErr = err
-			return
-		}
-		c.conns.Store(key, conn)
-		c.grpcClients.Store(key, relaygrpc.NewRelayClient(conn))
-	})
-	return initErr
-}
+	c.initOnceMutex.Unlock()
 
-func (c *relayClient) GetSockets() map[corev2.RelayKey]string {
-	return c.config.Sockets
+	var initErr error
+	once.Do(
+		func() {
+			relayUrl, err := c.relayUrlProvider.GetRelayUrl(ctx, key)
+			if err != nil {
+				initErr = fmt.Errorf("get relay url for key %d: %w", key, err)
+				return
+			}
+
+			dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
+			conn, err := grpc.NewClient(relayUrl, dialOptions...)
+			if err != nil {
+				initErr = fmt.Errorf("create grpc client for key %d: %w", key, err)
+				return
+			}
+			c.clientConnections.Store(key, conn)
+			c.grpcRelayClients.Store(key, relaygrpc.NewRelayClient(conn))
+		})
+
+	return initErr
 }
 
 func (c *relayClient) Close() error {
 	var errList *multierror.Error
-	c.conns.Range(func(k, v interface{}) bool {
-		conn, ok := v.(*grpc.ClientConn)
-		if !ok {
-			errList = multierror.Append(errList, fmt.Errorf("invalid connection for relay key: %v", k))
-			return true
-		}
-
-		if conn != nil {
-			err := conn.Close()
-			c.conns.Delete(k)
-			c.grpcClients.Delete(k)
-			if err != nil {
-				c.logger.Error("failed to close connection", "err", err)
-				errList = multierror.Append(errList, err)
+	c.clientConnections.Range(
+		func(k, v interface{}) bool {
+			conn, ok := v.(*grpc.ClientConn)
+			if !ok {
+				errList = multierror.Append(errList, fmt.Errorf("invalid connection for relay key: %v", k))
+				return true
 			}
-		}
-		return true
-	})
+
+			if conn != nil {
+				err := conn.Close()
+				c.clientConnections.Delete(k)
+				c.grpcRelayClients.Delete(k)
+				if err != nil {
+					c.logger.Error("failed to close connection", "err", err)
+					errList = multierror.Append(errList, err)
+				}
+			}
+			return true
+		})
 	return errList.ErrorOrNil()
 }
