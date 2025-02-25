@@ -124,7 +124,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 
 // ValidateQuorums ensures that the quorums listed in the blobHeader are present within allowedQuorums
 // Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
-// will still charge against all of the allowed quorums. A on-demand requrests require and only allow
+// will still charge against all of the allowed quorums. A on-demand requests require and only allow
 // the ETH and EIGEN quorums.
 func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	if len(headerQuorums) == 0 {
@@ -146,7 +146,7 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 	now := time.Now().Unix()
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
-	// Valid reservation periodes are either the current bin or the previous bin
+	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
@@ -242,16 +242,16 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// nextPmtnumSymbols is the numSymbols of corresponding to nextPmt if exists
+// nextPmtNumSymbols is the numSymbols of corresponding to nextPmt if exists
 // prevPmt + PaymentMetadata.numSymbols * m.FixedFeePerByte
 // <= PaymentMetadata.CumulativePayment
-// <= nextPmt - nextPmtnumSymbols * m.FixedFeePerByte > nextPmt
+// <= nextPmt - nextPmtNumSymbols * m.FixedFeePerByte > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint32) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	prevPmt, nextPmt, nextPmtnumSymbols, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
+	prevPmt, nextPmt, nextPmtNumSymbols, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
@@ -260,7 +260,7 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint(nextPmtnumSymbols))).Cmp(nextPmt) > 0 {
+	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint(nextPmtNumSymbols))).Cmp(nextPmt) > 0 {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments

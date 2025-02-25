@@ -52,7 +52,7 @@ type DisperserClient interface {
 	Close() error
 	DisperseBlob(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	// DisperseBlobAuthenticated disperses a blob with an authenticated request.
-	// The BlobStatus returned will always be PROCESSSING if error is nil.
+	// The BlobStatus returned will always be PROCESSING if error is nil.
 	DisperseBlobAuthenticated(ctx context.Context, data []byte, customQuorums []uint8) (*disperser.BlobStatus, []byte, error)
 	GetBlobStatus(ctx context.Context, key []byte) (*disperser_rpc.BlobStatusReply, error)
 	RetrieveBlob(ctx context.Context, batchHeaderHash []byte, blobIndex uint32) ([]byte, error)

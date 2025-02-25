@@ -24,7 +24,7 @@ const (
 // BlobStatus represents the status of a blob.
 // The status of a blob is updated as the blob is processed by the disperser.
 // The status of a blob can be queried by the client using the GetBlobStatus API.
-// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 // - PROCESSING
 // - DISPERSING
 // - CONFIRMED
@@ -43,7 +43,7 @@ const (
 	BlobStatus_CONFIRMED BlobStatus = 2
 	// FAILED means that the blob has failed permanently (for reasons other than insufficient
 	// signatures, which is a separate state). This status is somewhat of a catch-all category,
-	// containg (but not necessarily exclusively as errors can be added in the future):
+	// containing (but not necessarily exclusively as errors can be added in the future):
 	//   - blob has expired
 	//   - internal logic error while requesting encoding
 	//   - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
