@@ -134,14 +134,6 @@ func (r *retrievalClient) GetBlob(
 			assignmentIndices[i] = uint(index)
 		}
 
-		if len(assignmentIndices) != len(reply.Chunks) {
-			r.logger.Warn("invalid number of chunks from operator",
-				"operator", reply.OperatorID.Hex(),
-				"expected", len(assignmentIndices),
-				"actual", len(reply.Chunks))
-			continue
-		}
-
 		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
