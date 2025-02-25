@@ -738,8 +738,8 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint16)
 	}
 	return &core.BlobVersionParameters{
 		CodingRate:      uint32(params.CodingRate),
-		NumChunks:       uint32(params.NumChunks),
-		MaxNumOperators: uint32(params.MaxNumOperators),
+		NumChunks:       params.NumChunks,
+		MaxNumOperators: params.MaxNumOperators,
 	}, nil
 }
 
