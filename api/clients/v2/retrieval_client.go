@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
