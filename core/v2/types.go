@@ -107,7 +107,11 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	}
 	slices.Sort(quorumNumbers)
 
-	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	paymentMetadata, err := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payment metadata: %v", err)
+	}
+
 	if paymentMetadata == nil {
 		return nil, errors.New("payment metadata is nil")
 	}

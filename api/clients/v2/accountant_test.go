@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +34,7 @@ func TestNewAccountant(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	assert.NotNil(t, accountant)
@@ -63,7 +64,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -114,7 +115,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -142,7 +143,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -170,7 +171,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -223,7 +224,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -264,7 +265,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -307,7 +308,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -354,7 +355,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := hex.EncodeToString(privateKey1.D.Bytes())
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()

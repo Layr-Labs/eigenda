@@ -259,7 +259,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))

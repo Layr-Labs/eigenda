@@ -7,6 +7,7 @@ import (
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -49,7 +50,7 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 		return nil, fmt.Errorf("failed to get account ID: %v", err)
 	}
 
-	hash := sha256.Sum256([]byte(accountId))
+	hash := sha256.Sum256(accountId.Bytes())
 	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
@@ -59,9 +60,8 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
-
-	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey).Hex()
+func (s *LocalBlobRequestSigner) GetAccountID() (gethcommon.Address, error) {
+	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey)
 	return accountId, nil
 }
 
@@ -81,6 +81,6 @@ func (s *LocalNoopSigner) SignPaymentStateRequest() ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign payment state request")
 }
 
-func (s *LocalNoopSigner) GetAccountID() (string, error) {
-	return "", fmt.Errorf("noop signer cannot get accountID")
+func (s *LocalNoopSigner) GetAccountID() (gethcommon.Address, error) {
+	return gethcommon.Address{}, fmt.Errorf("noop signer cannot get accountID")
 }

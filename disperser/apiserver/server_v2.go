@@ -273,10 +273,14 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.metrics.reportGetPaymentStateLatency(time.Since(start))
 	}()
 
+	if !gethcommon.IsHexAddress(req.AccountId) {
+		return nil, api.NewErrorInvalidArg("invalid account ID")
+	}
+
 	accountID := gethcommon.HexToAddress(req.AccountId)
 
 	// validate the signature
-	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), req.GetAccountId()); err != nil {
+	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), accountID); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
@@ -289,12 +293,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, req.AccountId, currentReservationPeriod)
+	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, req.AccountId)
+	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 

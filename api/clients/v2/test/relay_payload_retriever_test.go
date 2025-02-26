@@ -25,6 +25,7 @@ import (
 	prover2 "github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -114,8 +115,10 @@ func buildBlobAndCert(
 	blobHeader := &commonv2.BlobHeader{
 		Version:       1,
 		QuorumNumbers: make([]uint32, 0),
-		PaymentHeader: &commonv2.PaymentHeader{},
-		Commitment:    commitmentsProto,
+		PaymentHeader: &commonv2.PaymentHeader{
+			AccountId: gethcommon.Address{1}.Hex(),
+		},
+		Commitment: commitmentsProto,
 	}
 
 	blobCertificate := &commonv2.BlobCertificate{
