@@ -48,15 +48,15 @@ var (
 	compactionLatency    *prometheus.HistogramVec
 	compactionThroughput *prometheus.GaugeVec
 	totalCompactionTime  *prometheus.GaugeVec
+	compactionCount      *prometheus.GaugeVec
 
 	// Resource utilization metrics
-	readThroughput  *prometheus.GaugeVec
-	writeThroughput *prometheus.GaugeVec
-	openTableCount  *prometheus.GaugeVec
-	blockCacheSize  *prometheus.GaugeVec
+	openTableCount *prometheus.GaugeVec
+	blockCacheSize *prometheus.GaugeVec
 
 	// Performance metrics
-	compactionCount *prometheus.GaugeVec
+	readThroughput  *prometheus.GaugeVec
+	writeThroughput *prometheus.GaugeVec
 	writePaused     *prometheus.GaugeVec
 
 	// Level-specific metrics
@@ -367,13 +367,7 @@ func (mc *MetricsCollector) collectMetrics() {
 	}
 
 	// Process compaction metrics
-	mc.processCompactionMetrics(&stats, timeDelta)
-
-	// Process IO metrics
-	mc.processIOMetrics(&stats, timeDelta)
-
-	// Process level-specific metrics
-	mc.processLevelMetrics(&stats)
+	mc.processMetrics(&stats, timeDelta)
 
 	// Check for performance degradation
 	mc.checkDegradation(&stats)
@@ -383,7 +377,7 @@ func (mc *MetricsCollector) collectMetrics() {
 	mc.lastCollection = time.Now()
 }
 
-func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, timeDelta float64) {
+func (mc *MetricsCollector) processMetrics(stats *leveldb.DBStats, timeDelta float64) {
 	// Calculate compaction latencies
 	if !mc.lastCollection.IsZero() && len(mc.lastStats.LevelDurations) > 0 {
 		for level, duration := range stats.LevelDurations {
@@ -397,13 +391,12 @@ func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, tim
 		}
 	}
 
-	// Calculate total compaction time
+	// Calculate total compaction time (cumulative)
 	var totalDuration time.Duration
 	for _, duration := range stats.LevelDurations {
 		totalDuration += duration
 	}
 
-	// Report the total in seconds
 	totalCompactionTime.WithLabelValues(mc.config.Name).Set(totalDuration.Seconds())
 
 	// Calculate throughput metrics
@@ -421,16 +414,11 @@ func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, tim
 	compactionCount.WithLabelValues("nonlevel0", mc.config.Name).Set(float64(stats.NonLevel0Comp))
 	compactionCount.WithLabelValues("seek", mc.config.Name).Set(float64(stats.SeekComp))
 
-	// Track write pauses
-	if stats.WritePaused {
-		writePaused.WithLabelValues(mc.config.Name).Set(1)
-	} else {
-		writePaused.WithLabelValues(mc.config.Name).Set(0)
-	}
-}
+	// Process resource metrics
+	openTableCount.WithLabelValues(mc.config.Name).Set(float64(stats.OpenedTablesCount))
+	blockCacheSize.WithLabelValues(mc.config.Name).Set(float64(stats.BlockCacheSize))
 
-func (mc *MetricsCollector) processIOMetrics(stats *leveldb.DBStats, timeDelta float64) {
-	// Calculate IO rates
+	// Process performance metrics
 	if !mc.lastCollection.IsZero() {
 		readDelta := float64(stats.IORead - mc.lastStats.IORead)
 		writeDelta := float64(stats.IOWrite - mc.lastStats.IOWrite)
@@ -439,12 +427,14 @@ func (mc *MetricsCollector) processIOMetrics(stats *leveldb.DBStats, timeDelta f
 		writeThroughput.WithLabelValues(mc.config.Name).Set(writeDelta / timeDelta)
 	}
 
-	// Update current resource usage
-	openTableCount.WithLabelValues(mc.config.Name).Set(float64(stats.OpenedTablesCount))
-	blockCacheSize.WithLabelValues(mc.config.Name).Set(float64(stats.BlockCacheSize))
-}
+	// Track write pauses
+	if stats.WritePaused {
+		writePaused.WithLabelValues(mc.config.Name).Set(1)
+	} else {
+		writePaused.WithLabelValues(mc.config.Name).Set(0)
+	}
 
-func (mc *MetricsCollector) processLevelMetrics(stats *leveldb.DBStats) {
+	// Process level-specific metrics
 	for level := range stats.LevelTablesCounts {
 		levelName := getLevelName(level)
 		levelTableCount.WithLabelValues(levelName, mc.config.Name).Set(float64(stats.LevelTablesCounts[level]))
