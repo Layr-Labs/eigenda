@@ -47,6 +47,7 @@ var (
 	// Compaction metrics
 	compactionLatency    *prometheus.HistogramVec
 	compactionThroughput *prometheus.GaugeVec
+	totalCompactionTime  *prometheus.GaugeVec
 
 	// Resource utilization metrics
 	readThroughput  *prometheus.GaugeVec
@@ -104,6 +105,23 @@ func newLevelDBMetrics(reg *prometheus.Registry) error {
 		}
 	} else {
 		compactionThroughput = compactionThroughputMetric
+	}
+
+	totalCompactionTimeMetric := prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "total_compaction_time_seconds",
+		Namespace: "eigenda",
+		Subsystem: "leveldb",
+		Help:      "Total time spent in compaction across all levels",
+	}, []string{"name"})
+
+	if err := reg.Register(totalCompactionTimeMetric); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			totalCompactionTime = are.ExistingCollector.(*prometheus.GaugeVec)
+		} else {
+			return fmt.Errorf("failed to register total compaction time metric: %w", err)
+		}
+	} else {
+		totalCompactionTime = totalCompactionTimeMetric
 	}
 
 	// Resource utilization metrics
@@ -378,6 +396,15 @@ func (mc *MetricsCollector) processCompactionMetrics(stats *leveldb.DBStats, tim
 			}
 		}
 	}
+
+	// Calculate total compaction time
+	var totalDuration time.Duration
+	for _, duration := range stats.LevelDurations {
+		totalDuration += duration
+	}
+
+	// Report the total in seconds
+	totalCompactionTime.WithLabelValues(mc.config.Name).Set(totalDuration.Seconds())
 
 	// Calculate throughput metrics
 	if prevStats := mc.lastStats; prevStats.LevelRead != nil {
