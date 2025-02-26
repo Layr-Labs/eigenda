@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -22,18 +22,22 @@ import (
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
-	logger          logging.Logger
-	config          PayloadDisperserConfig
-	codec           codecs.BlobCodec
-	disperserClient DisperserClient
-	certVerifier    verification.ICertVerifier
+	logger               logging.Logger
+	config               PayloadDisperserConfig
+	disperserClient      DisperserClient
+	certVerifier         verification.ICertVerifier
+	requiredQuorumsStore *RequiredQuorumsStore
 }
 
 // BuildPayloadDisperser builds a PayloadDisperser from config structs.
-func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserConfig,
+func BuildPayloadDisperser(
+	log logging.Logger,
+	payloadDispCfg PayloadDisperserConfig,
 	dispClientCfg *DisperserClientConfig,
 	ethCfg *geth.EthClientConfig,
-	kzgConfig *kzg.KzgConfig, encoderCfg *encoding.Config) (*PayloadDisperser, error) {
+	kzgConfig *kzg.KzgConfig,
+	encoderCfg *encoding.Config,
+) (*PayloadDisperser, error) {
 
 	// 1 - verify key semantics and create signer
 	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
@@ -42,7 +46,6 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	}
 
 	// 2 - create prover (if applicable)
-
 	var kzgProver encoding.Prover
 	if kzgConfig != nil {
 		if encoderCfg == nil {
@@ -86,20 +89,13 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
-	// 5 - create codec
-	codec, err := codecs.CreateCodec(payloadDispCfg.PayloadPolynomialForm, payloadDispCfg.PayloadEncodingVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewPayloadDisperser(log, payloadDispCfg, codec, disperserClient, certVerifier)
+	return NewPayloadDisperser(log, payloadDispCfg, disperserClient, certVerifier)
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	codec codecs.BlobCodec,
 	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
 	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
 	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
@@ -116,12 +112,17 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
+	requiredQuorumsStore, err := NewRequiredQuorumsStore(certVerifier)
+	if err != nil {
+		return nil, fmt.Errorf("new required quorums store: %w", err)
+	}
+
 	return &PayloadDisperser{
-		logger:          logger,
-		config:          payloadDisperserConfig,
-		codec:           codec,
-		disperserClient: disperserClient,
-		certVerifier:    certVerifier,
+		logger:               logger,
+		config:               payloadDisperserConfig,
+		disperserClient:      disperserClient,
+		certVerifier:         certVerifier,
+		requiredQuorumsStore: requiredQuorumsStore,
 	}, nil
 }
 
@@ -137,27 +138,30 @@ func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	certVerifierAddress string,
 	// payload is the raw data to be stored on eigenDA
-	payload []byte,
+	payload *coretypes.Payload,
 ) (*verification.EigenDACert, error) {
-
-	blobBytes, err := pd.codec.EncodeBlob(payload)
+	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
-		return nil, fmt.Errorf("encode payload to blob: %w", err)
+		return nil, fmt.Errorf("convert payload to blob: %w", err)
 	}
-	pd.logger.Debug("Payload encoded to blob")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
+	requiredQuorums, err := pd.requiredQuorumsStore.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
+
+	// TODO (litt3): eventually, we should consider making DisperseBlob accept an actual blob object, instead of the
+	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
+	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
+	//  many areas of code, though.
 	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
 		timeoutCtx,
-		blobBytes,
+		blob.Serialize(),
 		pd.config.BlobVersion,
 		requiredQuorums,
 	)

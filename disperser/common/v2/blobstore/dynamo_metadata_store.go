@@ -291,29 +291,33 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
-// queryBucketBlobMetadata returns blobs (as metadata) within range [startKey, endKey] from a single bucket.
+// queryBucketBlobMetadata appends blobs (as metadata) within range (startKey, endKey) from a single bucket to the provided result slice.
 // Results are ordered by <RequestedAt, Bobkey> in ascending order.
 //
 // The function handles DynamoDB's 1MB response size limitation by performing multiple queries if necessary.
+// It filters out blobs at the exact startKey and endKey as they are exclusive bounds.
 func (s *BlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
+	ascending bool,
+	after BlobFeedCursor,
+	before BlobFeedCursor,
 	startKey string,
 	endKey string,
+	limit int,
+	result []*v2.BlobMetadata,
+	lastProcessedCursor **BlobFeedCursor,
 ) ([]*v2.BlobMetadata, error) {
-	metadata := make([]*v2.BlobMetadata, 0)
 	var lastEvaledKey map[string]types.AttributeValue
-
 	for {
 		start := startKey
 		if lastEvaledKey != nil {
 			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
+				return result, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
 			}
 			start = requestedAtBlobkey
 		}
-
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -326,18 +330,43 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 			},
 			0, // no limit within a bucket
 			lastEvaledKey,
+			ascending,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+			return result, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
 		}
 
 		// Collect results
 		for _, item := range res.Items {
 			bm, err := UnmarshalBlobMetadata(item)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+				return result, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
 			}
-			metadata = append(metadata, bm)
+
+			// Get blob key for filtering
+			blobKey, err := bm.BlobHeader.BlobKey()
+			if err != nil {
+				return result, fmt.Errorf("failed to get blob key: %w", err)
+			}
+
+			// Skip blobs at the endpoints (exclusive bounds)
+			if after.Equal(bm.RequestedAt, &blobKey) || before.Equal(bm.RequestedAt, &blobKey) {
+				continue
+			}
+
+			// Add to result
+			result = append(result, bm)
+
+			// Update last processed cursor
+			*lastProcessedCursor = &BlobFeedCursor{
+				RequestedAt: bm.RequestedAt,
+				BlobKey:     &blobKey,
+			}
+
+			// Check limit
+			if limit > 0 && len(result) >= limit {
+				return result, nil
+			}
 		}
 
 		// Exhausted all items already
@@ -348,65 +377,86 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 		lastEvaledKey = res.LastEvaluatedKey
 	}
 
-	return metadata, nil
+	return result, nil
 }
 
-// GetBlobMetadataByRequestedAt returns blobs (as BlobMetadata) that are in cursor position
-// range (start, end]. Blobs returned are in cursor order.
+// GetBlobMetadataByRequestedAtForward returns blobs (as BlobMetadata) in cursor range
+// (after, before) (both exclusive). Blobs are retrieved and ordered by <RequestedAt, BlobKey>
+// in ascending order.
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
 // Also returns the cursor of the last processed blob, or nil if no blobs were processed.
-func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
+func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	ctx context.Context,
-	start BlobFeedCursor,
-	end BlobFeedCursor,
+	after BlobFeedCursor,
+	before BlobFeedCursor,
 	limit int,
 ) ([]*v2.BlobMetadata, *BlobFeedCursor, error) {
-	if !start.LessThan(&end) {
-		return nil, nil, errors.New("start cursor is expected to be less than end cursor")
+	if !after.LessThan(&before) {
+		return nil, nil, errors.New("after cursor must be less than before cursor")
 	}
 
-	startBucket, endBucket := GetRequestedAtBucketIDRange(start.RequestedAt, end.RequestedAt)
-	startKey := start.ToCursorKey()
-	endKey := end.ToCursorKey()
-
+	startBucket, endBucket := GetRequestedAtBucketIDRange(after.RequestedAt, before.RequestedAt)
+	startKey := after.ToCursorKey()
+	endKey := before.ToCursorKey()
 	result := make([]*v2.BlobMetadata, 0)
 	var lastProcessedCursor *BlobFeedCursor
 
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-
-		bucketMetadata, err := s.queryBucketBlobMetadata(ctx, bucket, startKey, endKey)
+		// Pass the result slice to be modified in-place along with cursors for filtering
+		var err error
+		result, err = s.queryBucketBlobMetadata(
+			ctx, bucket, true, after, before, startKey, endKey, limit, result, &lastProcessedCursor,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Process bucket results
-		for _, bm := range bucketMetadata {
-			blobKey, err := bm.BlobHeader.BlobKey()
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
-			}
-
-			// Skip the start cursor's blob
-			if start.Equal(bm.RequestedAt, &blobKey) {
-				continue
-			}
-
-			result = append(result, bm)
-			lastProcessedCursor = &BlobFeedCursor{
-				RequestedAt: bm.RequestedAt,
-				BlobKey:     &blobKey,
-			}
-
-			if limit > 0 && len(result) >= limit {
-				break
-			}
+		if limit > 0 && len(result) >= limit {
+			break
 		}
 	}
 
+	return result, lastProcessedCursor, nil
+}
+
+// GetBlobMetadataByRequestedAtBackward returns blobs (as BlobMetadata) in cursor range
+// (after, before) (both exclusive). Blobs are retrieved and ordered by <RequestedAt, BlobKey>
+// in descending order.
+//
+// If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
+// Also returns the cursor of the last processed blob, or nil if no blobs were processed.
+func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
+	ctx context.Context,
+	before BlobFeedCursor,
+	after BlobFeedCursor,
+	limit int,
+) ([]*v2.BlobMetadata, *BlobFeedCursor, error) {
+	if !after.LessThan(&before) {
+		return nil, nil, errors.New("after cursor must be less than before cursor")
+	}
+
+	startBucket, endBucket := GetRequestedAtBucketIDRange(after.RequestedAt, before.RequestedAt)
+	startKey := after.ToCursorKey()
+	endKey := before.ToCursorKey()
+	result := make([]*v2.BlobMetadata, 0)
+	var lastProcessedCursor *BlobFeedCursor
+
+	// Traverse buckets in reverse order
+	for bucket := endBucket; bucket >= startBucket; bucket-- {
+		// Pass the result slice to be modified in-place along with cursors for filtering
+		var err error
+		result, err = s.queryBucketBlobMetadata(
+			ctx, bucket, false, after, before, startKey, endKey, limit, result, &lastProcessedCursor,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
 	return result, lastProcessedCursor, nil
 }
 
@@ -415,7 +465,12 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAt(
 //
 // The function handles DynamoDB's 1MB response size limitation by performing multiple queries  if necessary.
 // If there are more than numToReturn attestations in the bucket, returns numToReturn attestations; otherwise returns all attestations in bucket.
-func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, start, end uint64, numToReturn int) ([]*corev2.Attestation, error) {
+func (s *BlobMetadataStore) queryBucketAttestation(
+	ctx context.Context,
+	bucket, start, end uint64,
+	numToReturn int,
+	ascending bool,
+) ([]*corev2.Attestation, error) {
 	attestations := make([]*corev2.Attestation, 0)
 	var lastEvaledKey map[string]types.AttributeValue
 
@@ -444,6 +499,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, 
 			},
 			0, // no limit within a bucket
 			lastEvaledKey,
+			ascending,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
@@ -474,41 +530,85 @@ func (s *BlobMetadataStore) queryBucketAttestation(ctx context.Context, bucket, 
 	return attestations, nil
 }
 
-// GetAttestationByAttestedAt returns attestations within a specified time range (start, end],
-// ordered by their AttestedAt timestamp in ascending order.
+// GetAttestationByAttestedAtForward returns attestations within time range (after, before)
+// (both exclusive), retrieved and ordered by AttestedAt timestamp in ascending order.
 //
-// The function splits the time range into buckets and queries each bucket sequentially.
+// The function splits the time range into buckets and queries each bucket sequentially from earliest to latest.
 // Results from all buckets are combined while maintaining the ordering.
 //
 // If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
 // in the time range.
-func (s *BlobMetadataStore) GetAttestationByAttestedAt(
+func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 	ctx context.Context,
-	start uint64,
-	end uint64,
+	after uint64,
+	before uint64,
 	limit int,
 ) ([]*corev2.Attestation, error) {
-	if start >= end {
-		return nil, errors.New("start must be less than end")
+	if after+1 > before-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", after, before)
 	}
-
-	startBucket, endBucket := GetAttestedAtBucketIDRange(start, end)
-
+	startBucket, endBucket := GetAttestedAtBucketIDRange(after, before)
 	result := make([]*corev2.Attestation, 0)
+
+	// Traverse buckets in forward order
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
 		if limit > 0 && len(result) >= limit {
 			break
 		}
-
 		remaining := math.MaxInt
 		if limit > 0 {
 			remaining = limit - len(result)
 		}
-		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, start+1, end, remaining)
+		// Query bucket in ascending order
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, after+1, before-1, remaining, true)
 		if err != nil {
 			return nil, err
 		}
+		for _, ba := range bucketAttestation {
+			result = append(result, ba)
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+	}
+	return result, nil
+}
 
+// GetAttestationByAttestedAtBackward returns attestations within time range (after, before)
+// (both exclusive), retrieved and ordered by AttestedAt timestamp in descending order.
+//
+// The function splits the time range into buckets and queries each bucket sequentially from latest to earliest.
+// Results from all buckets are combined while maintaining the ordering.
+//
+// If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
+// in the time range.
+func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
+	ctx context.Context,
+	before uint64,
+	after uint64,
+	limit int,
+) ([]*corev2.Attestation, error) {
+	if after+1 > before-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", after, before)
+	}
+	// Note: we traverse buckets in reverse order for backward query
+	startBucket, endBucket := GetAttestedAtBucketIDRange(after, before)
+	result := make([]*corev2.Attestation, 0)
+
+	// Traverse buckets in reverse order
+	for bucket := endBucket; bucket >= startBucket; bucket-- {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
+		}
+		// Query bucket in descending order
+		bucketAttestation, err := s.queryBucketAttestation(ctx, bucket, after+1, before-1, remaining, false)
+		if err != nil {
+			return nil, err
+		}
 		for _, ba := range bucketAttestation {
 			result = append(result, ba)
 			if limit > 0 && len(result) >= limit {
@@ -571,7 +671,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
-	}, limit, cursor)
+	}, limit, cursor, true)
 	if err != nil {
 		return nil, nil, err
 	}

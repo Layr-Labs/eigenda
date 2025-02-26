@@ -1,7 +1,6 @@
 package load
 
 import (
-	"github.com/Layr-Labs/eigenda/core"
 	"time"
 )
 
@@ -24,6 +23,8 @@ type LoadGeneratorConfig struct {
 	MaxParallelism uint64
 	// The timeout for each blob dispersal.
 	DispersalTimeout time.Duration
-	// The quorums to use for the load test.
-	Quorums []core.QuorumID
+	// EnablePprof enables the pprof HTTP server for profiling
+	EnablePprof bool
+	// PprofHttpPort is the port that the pprof HTTP server listens on
+	PprofHttpPort int
 }

@@ -5,9 +5,5 @@
   "RelayReadAmplification": 0,
   "ValidatorReadAmplification": 0,
   "MaxParallelism": 100,
-  "DispersalTimeout": 300,
-  "Quorums": [
-    0,
-    1
-  ]
+  "DispersalTimeout": 300
 }

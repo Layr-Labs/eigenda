@@ -1,9 +1,10 @@
-package codecs
+package coretypes
 
 import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
@@ -27,6 +28,15 @@ type Blob struct {
 
 // DeserializeBlob initializes a Blob from bytes
 func DeserializeBlob(bytes []byte, blobLengthSymbols uint32) (*Blob, error) {
+	// we check that length of bytes is <= blob length, rather than checking for equality, because it's possible
+	// that the bytes being deserialized have had trailing 0s truncated.
+	if uint32(len(bytes)) > blobLengthSymbols*encoding.BYTES_PER_SYMBOL {
+		return nil, fmt.Errorf(
+			"length (%d bytes) is greater than claimed blob length (%d bytes)",
+			len(bytes),
+			blobLengthSymbols*encoding.BYTES_PER_SYMBOL)
+	}
+
 	coeffPolynomial, err := rs.ToFrArray(bytes)
 	if err != nil {
 		return nil, fmt.Errorf("bytes to field elements: %w", err)
@@ -66,17 +76,18 @@ func (b *Blob) ToPayload(payloadForm codecs.PolynomialForm) (*Payload, error) {
 	return payload, nil
 }
 
+// BlobLengthSymbols returns the length of the blob, in symbols
+func (b *Blob) BlobLengthSymbols() uint32 {
+	return b.blobLengthSymbols
+}
+
 // toEncodedPayload creates an encodedPayload from the blob
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
 // conversion, if any, must be performed when creating an encoded payload from the blob.
 func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayload, error) {
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
-	if err != nil {
-		return nil, fmt.Errorf("get max permissible payload length: %w", err)
-	}
-
 	var payloadElements []fr.Element
+	var err error
 	switch payloadForm {
 	case codecs.PolynomialFormCoeff:
 		// the payload is interpreted as coefficients of the polynomial, so no conversion needs to be done, given that
@@ -91,6 +102,11 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 		}
 	default:
 		return nil, fmt.Errorf("invalid polynomial form")
+	}
+
+	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("get max permissible payload length: %w", err)
 	}
 
 	encodedPayload, err := encodedPayloadFromElements(payloadElements, maxPermissiblePayloadLength)
