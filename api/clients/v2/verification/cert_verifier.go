@@ -318,9 +318,14 @@ func (cv *CertVerifier) getVerifierCaller(
 	certVerifierAddress string,
 ) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
 
-	existingCaller, valueExists := cv.verifierCallers.Load(certVerifierAddress)
+	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		return existingCaller.(*verifierBindings.ContractEigenDACertVerifierCaller), nil
+		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierCaller)
+		if !ok {
+			return nil, fmt.Errorf(
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
+		}
+		return existingCaller, nil
 	}
 
 	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
