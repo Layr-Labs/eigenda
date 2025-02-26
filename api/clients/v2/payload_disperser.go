@@ -30,10 +30,14 @@ type PayloadDisperser struct {
 }
 
 // BuildPayloadDisperser builds a PayloadDisperser from config structs.
-func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserConfig,
+func BuildPayloadDisperser(
+	log logging.Logger,
+	payloadDispCfg PayloadDisperserConfig,
 	dispClientCfg *DisperserClientConfig,
 	ethCfg *geth.EthClientConfig,
-	kzgConfig *kzg.KzgConfig, encoderCfg *encoding.Config) (*PayloadDisperser, error) {
+	kzgConfig *kzg.KzgConfig,
+	encoderCfg *encoding.Config,
+) (*PayloadDisperser, error) {
 
 	// 1 - verify key semantics and create signer
 	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
@@ -42,7 +46,6 @@ func BuildPayloadDisperser(log logging.Logger, payloadDispCfg PayloadDisperserCo
 	}
 
 	// 2 - create prover (if applicable)
-
 	var kzgProver encoding.Prover
 	if kzgConfig != nil {
 		if encoderCfg == nil {
