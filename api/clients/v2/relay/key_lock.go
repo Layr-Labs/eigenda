@@ -26,6 +26,9 @@ func NewKeyLock[T comparable]() *KeyLock[T] {
 }
 
 // AcquireKeyLock acquires an exclusive lock on a conceptual key, and returns a function to release the lock
+//
+// The caller MUST eventually invoke the returned unlock function, or all future calls with the same key will block
+// indefinitely
 func (kl *KeyLock[T]) AcquireKeyLock(key T) func() {
 	// we must globally synchronize access to the mutex map, so that only a single mutex will be created for a given key
 	kl.globalMutex.Lock()
