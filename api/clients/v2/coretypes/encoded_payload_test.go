@@ -34,7 +34,9 @@ func TestDecodeLongBytes(t *testing.T) {
 	encodedPayload, err := newEncodedPayload(NewPayload(originalData))
 	require.NoError(t, err)
 
-	encodedPayload.bytes = append(encodedPayload.bytes, make([]byte, 32)...)
+	// appending 33 bytes to the encoded payload guarantees that, after removing padding, the unpadded bytes will be
+	// at least 32 bytes longer than the expected length, which is the error case we're trying to trigger here
+	encodedPayload.bytes = append(encodedPayload.bytes, make([]byte, 33)...)
 	payload2, err := encodedPayload.decode()
 	require.Error(t, err)
 	require.Nil(t, payload2)
