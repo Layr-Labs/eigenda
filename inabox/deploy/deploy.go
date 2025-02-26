@@ -265,7 +265,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint32]string {
+func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
@@ -306,9 +306,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 	if err != nil {
 		log.Panicf("Error: %s", err)
 	}
-	relays := map[uint32]string{}
+
 	ethAddr := ethClient.GetAccountAddress()
-	for i, relayVars := range env.Relays {
+	for _, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
 			RelayAddress: ethAddr,
@@ -321,10 +321,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 		if err != nil {
 			log.Panicf("Error: %s", err)
 		}
-		relays[uint32(i)] = url
 	}
-
-	return relays
 }
 
 // TODO: Supply the test path to the runner utility
