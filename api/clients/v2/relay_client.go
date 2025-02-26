@@ -93,10 +93,10 @@ func NewRelayClient(
 	logger.Info("creating relay client")
 
 	return &relayClient{
-		config:           config,
-		logger:           logger.With("component", "RelayClient"),
+		config:            config,
+		logger:            logger.With("component", "RelayClient"),
 		relayLockProvider: relay.NewKeyLock[corev2.RelayKey](),
-		relayUrlProvider: relayUrlProvider,
+		relayUrlProvider:  relayUrlProvider,
 	}, nil
 }
 
@@ -253,8 +253,8 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 
 	// In cases were the value hasn't already been initialized, we must acquire a conceptual lock on the relay in
 	// question. This allows us to guarantee that a connection with a given relay is only initialized a single time
-	releaseMemberLock := c.relayLockProvider.AcquireKeyLock(key)
-	defer releaseMemberLock()
+	releaseKeyLock := c.relayLockProvider.AcquireKeyLock(key)
+	defer releaseKeyLock()
 
 	_, alreadyInitialized = c.relayInitializationStatus.Load(key)
 	if alreadyInitialized {
