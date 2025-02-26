@@ -403,10 +403,6 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	var lastProcessedCursor *BlobFeedCursor
 
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-
 		// Pass the result slice to be modified in-place along with cursors for filtering
 		var err error
 		result, err = s.queryBucketBlobMetadata(
@@ -448,10 +444,6 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 
 	// Traverse buckets in reverse order
 	for bucket := endBucket; bucket >= startBucket; bucket-- {
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-
 		// Pass the result slice to be modified in-place along with cursors for filtering
 		var err error
 		result, err = s.queryBucketBlobMetadata(
