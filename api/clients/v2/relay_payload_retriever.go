@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -24,7 +23,6 @@ type RelayPayloadRetriever struct {
 	// must be evaluated for thread safety.
 	random      *rand.Rand
 	config      RelayPayloadRetrieverConfig
-	codec       codecs.BlobCodec
 	relayClient RelayClient
 	g1Srs       []bn254.G1Affine
 }
@@ -48,19 +46,11 @@ func BuildRelayPayloadRetriever(
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
 
-	codec, err := codecs.CreateCodec(
-		relayPayloadRetrieverConfig.PayloadPolynomialForm,
-		relayPayloadRetrieverConfig.PayloadEncodingVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	return NewRelayPayloadRetriever(
 		log,
 		rand.New(rand.NewSource(rand.Int63())),
 		relayPayloadRetrieverConfig,
 		relayClient,
-		codec,
 		g1Srs)
 }
 
@@ -71,7 +61,6 @@ func NewRelayPayloadRetriever(
 	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
 	relayClient RelayClient,
-	codec codecs.BlobCodec,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
@@ -83,7 +72,6 @@ func NewRelayPayloadRetriever(
 		log:         log,
 		random:      random,
 		config:      relayPayloadRetrieverConfig,
-		codec:       codec,
 		relayClient: relayClient,
 		g1Srs:       g1Srs,
 	}, nil
@@ -100,7 +88,7 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *verification.EigenDACert) ([]byte, error) {
+	eigenDACert *verification.EigenDACert) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
@@ -130,7 +118,9 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	for _, val := range indices {
 		relayKey := relayKeys[val]
 
-		blob, err := pr.getBlobWithTimeout(ctx, relayKey, blobKey)
+		blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
+		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
 		// if GetBlob returned an error, try calling a different relay
 		if err != nil {
 			pr.log.Warn(
@@ -141,17 +131,14 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 
-		if uint(len(blob)) > blobCommitments.Length*encoding.BYTES_PER_SYMBOL {
-			pr.log.Warn(
-				"received length is greater than claimed blob length",
-				"blobKey", blobKey.Hex(),
-				"relayKey", relayKey,
-				"receivedLengthBytes", len(blob),
-				"claimedLengthBytes", blobCommitments.Length*encoding.BYTES_PER_SYMBOL)
-			continue
-		}
-
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob, blobCommitments.Commitment)
+		// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
+		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
+		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
+		//  change now, to limit the size of the refactor PR.
+		valid, err := verification.GenerateAndCompareBlobCommitment(
+			pr.g1Srs,
+			blob.Serialize(),
+			blobCommitments.Commitment)
 		if err != nil {
 			pr.log.Warn(
 				"generate and compare blob commitment",
@@ -165,14 +152,13 @@ func (pr *RelayPayloadRetriever) GetPayload(
 			continue
 		}
 
-		payload, err := pr.codec.DecodeBlob(blob)
+		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.log.Error(
-				`Cert verification was successful, but decode blob failed!
-					This is likely a problem with the local blob codec configuration,
-					but could potentially indicate a maliciously generated blob certificate.
-					It should not be possible for an honestly generated certificate to verify
-					for an invalid blob!`,
+				`Commitment verification was successful, but conversion from blob to payload failed!
+					This is likely a problem with the local configuration, but could potentially indicate
+					malicious dispersed data. It should not be possible for a commitment to verify for an
+					invalid blob!`,
 				"blobKey", blobKey.Hex(), "relayKey", relayKey, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
@@ -183,16 +169,30 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve blob %v from any relay. relay count: %d", blobKey.Hex(), relayKeyCount)
 }
 
-// getBlobWithTimeout attempts to get a blob from a given relay, and times out based on config.FetchTimeout
-func (pr *RelayPayloadRetriever) getBlobWithTimeout(
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given relay, and times out based on config.FetchTimeout
+func (pr *RelayPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	relayKey core.RelayKey,
-	blobKey *core.BlobKey) ([]byte, error) {
+	blobKey *core.BlobKey,
+	// blobLengthSymbols should be taken from the eigenDACert for the blob being retrieved
+	blobLengthSymbols uint32,
+) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RelayTimeout)
 	defer cancel()
 
-	return pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
+	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
+	blobBytes, err := pr.relayClient.GetBlob(timeoutCtx, relayKey, *blobKey)
+	if err != nil {
+		return nil, fmt.Errorf("get blob from relay: %w", err)
+	}
+
+	blob, err := coretypes.DeserializeBlob(blobBytes, blobLengthSymbols)
+	if err != nil {
+		return nil, fmt.Errorf("deserialize blob: %w", err)
+	}
+
+	return blob, nil
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
