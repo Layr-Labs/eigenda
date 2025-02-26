@@ -10,7 +10,7 @@ import {
   } from "matchstick-as"
 import { Address, BigInt, Bytes, ethereum, log } from "@graphprotocol/graph-ts"
 import { handleBatchConfirmed, BATCH_PREFIX_BYTES, BATCH_GAS_FEES_PREFIX_BYTES, handleConfirmBatchCall, BATCH_HEADER_PREFIX_BYTES, NON_SIGNING_PREFIX_BYTES, OPERATOR_PREFIX_BYTES, hash2BigInts, bytesToBigIntArray } from "../src/edasm"
-import { createNewBatchConfirmedEvent, createNewConfimBatchCall } from "./edasm-utils"
+import { createNewBatchConfirmedEvent, createNewConfirmBatchCall } from "./edasm-utils"
 
 let blobHeadersRoot: Bytes = Bytes.fromHexString("0x1111000011110000111100001111000011110000111100001111000011110000")
 let quorumNumbers: Bytes = Bytes.fromHexString("0x000112")
@@ -39,7 +39,7 @@ describe("EigenDASM", () => {
   // https://thegraph.com/docs/en/developer/matchstick/#write-a-unit-test
 
   test("has batchheader, nonsigners, and operators created", () => {
-    let confirmBatchCall = createNewConfimBatchCall(
+    let confirmBatchCall = createNewConfirmBatchCall(
       blobHeadersRoot,
       quorumNumbers,
       quorumThresholdPercentages,
