@@ -219,7 +219,11 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	chainReader, err := eth.NewReader(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	chainReader, err = eth.NewReader(
+		logger,
+		ethClient,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
