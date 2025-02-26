@@ -73,7 +73,7 @@ func (m *Meterer) Start(ctx context.Context) {
 
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
-func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8) (uint32, error) {
+func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint, quorumNumbers []uint8, receivedAt time.Time) (uint32, error) {
 	accountID := gethcommon.HexToAddress(header.AccountID)
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
@@ -83,7 +83,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, reservation, symbolsCharged, quorumNumbers); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, reservation, symbolsCharged, quorumNumbers, receivedAt); err != nil {
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
@@ -91,7 +91,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		if err != nil {
 			return 0, fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
-		if err := m.ServeOnDemandRequest(ctx, header, onDemandPayment, symbolsCharged, quorumNumbers); err != nil {
+		if err := m.ServeOnDemandRequest(ctx, header, onDemandPayment, symbolsCharged, quorumNumbers, receivedAt); err != nil {
 			return 0, fmt.Errorf("invalid on-demand request: %w", err)
 		}
 	}
@@ -100,7 +100,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 }
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint32, quorumNumbers []uint8) error {
+func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint32, quorumNumbers []uint8, receivedAt time.Time) error {
 	m.logger.Info("Recording and validating reservation usage", "header", header, "reservation", reservation)
 	if !reservation.IsActiveByNanosecond(header.Timestamp) {
 		return fmt.Errorf("reservation not active")
@@ -110,7 +110,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	}
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	requestReservationPeriod := GetReservationPeriodByNanosecond(header.Timestamp, reservationWindow)
-	if !m.ValidateReservationPeriod(reservation, requestReservationPeriod) {
+	if !m.ValidateReservationPeriod(reservation, requestReservationPeriod, receivedAt) {
 		return fmt.Errorf("invalid reservation period for reservation")
 	}
 
@@ -142,10 +142,9 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
-func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint32) bool {
-	now := time.Now().Unix()
+func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint32, receivedAt time.Time) bool {
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	currentReservationPeriod := GetReservationPeriod(now, reservationWindow)
+	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periodes are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
@@ -203,7 +202,7 @@ func GetReservationPeriod(timestamp int64, binInterval uint32) uint32 {
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
-func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint32, headerQuorums []uint8) error {
+func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint32, headerQuorums []uint8, receivedAt time.Time) error {
 	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
@@ -227,7 +226,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	// Update bin usage atomically and check against bin capacity
-	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged)); err != nil {
+	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged), receivedAt); err != nil {
 		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
 		dbErr := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
 		if dbErr != nil {
@@ -286,8 +285,8 @@ func (m *Meterer) SymbolsCharged(numSymbols uint) uint32 {
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64) error {
-	globalPeriod := GetReservationPeriod(time.Now().Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
+func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
+	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
