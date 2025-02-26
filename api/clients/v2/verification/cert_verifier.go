@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -55,6 +56,8 @@ type CertVerifier struct {
 	latestBlockNumber atomic.Uint64
 	// atomic bool, so that only a single goroutine is polling the internal client with BlockNumber() calls at any given time
 	pollingActive atomic.Bool
+	// maps contract address to a ContractEigenDACertVerifierCaller object
+	verifierCallers sync.Map
 }
 
 var _ ICertVerifier = &CertVerifier{}
@@ -121,11 +124,9 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("wait for block number: %w", err)
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress),
-		cv.ethClient)
+	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
 	if err != nil {
-		return fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+		return fmt.Errorf("get verifier caller: %w", err)
 	}
 
 	err = certVerifierCaller.VerifyDACertV2FromSignedBatch(
@@ -159,13 +160,9 @@ func (cv *CertVerifier) VerifyCertV2(
 		return fmt.Errorf("wait for block number: %w", err)
 	}
 
-	// don't try to bind to the address until AFTER waiting for the block number. if you try to bind too early, the
-	// contract might not exist yet
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress),
-		cv.ethClient)
+	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
 	if err != nil {
-		return fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+		return fmt.Errorf("get verifier caller: %w", err)
 	}
 
 	err = certVerifierCaller.VerifyDACertV2(
@@ -206,11 +203,9 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress),
-		cv.ethClient)
+	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
 	if err != nil {
-		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+		return nil, fmt.Errorf("get verifier caller: %w", err)
 	}
 
 	nonSignerStakesAndSignature, err := certVerifierCaller.GetNonSignerStakesAndSignature(
@@ -227,11 +222,9 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 // GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 // be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
 func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, certVerifierAddress string) ([]uint8, error) {
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress),
-		cv.ethClient)
+	certVerifierCaller, err := cv.getVerifierCaller(certVerifierAddress)
 	if err != nil {
-		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+		return nil, fmt.Errorf("get verifier caller: %w", err)
 	}
 
 	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequiredV2(&bind.CallOpts{Context: ctx})
@@ -315,4 +308,32 @@ func (cv *CertVerifier) MaybeWaitForBlockNumber(ctx context.Context, targetBlock
 				"actualBlockNumber", cv.latestBlockNumber.Load())
 		}
 	}
+}
+
+// getVerifierCaller returns a ContractEigenDACertVerifierCaller that corresponds to the input certVerifierAddress
+//
+// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
+// and parsing json, and is therefore not trivially inexpensive.
+func (cv *CertVerifier) getVerifierCaller(
+	certVerifierAddress string,
+) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
+
+	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
+	if valueExists {
+		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierCaller)
+		if !ok {
+			return nil, fmt.Errorf(
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
+		}
+		return existingCaller, nil
+	}
+
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
+		gethcommon.HexToAddress(certVerifierAddress), cv.ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
+	}
+
+	cv.verifierCallers.Store(certVerifierAddress, certVerifierCaller)
+	return certVerifierCaller, nil
 }
