@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -496,7 +497,7 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
-	AccountID string `json:"account_id"`
+	AccountID gethcommon.Address `json:"account_id"`
 
 	// Timestamp represents the nanosecond of the dispersal request creation
 	Timestamp int64 `json:"timestamp"`
@@ -533,7 +534,17 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		},
 	}
 
-	bytes, err := arguments.Pack(pm)
+	s := struct {
+		AccountID         string
+		Timestamp         int64
+		CumulativePayment *big.Int
+	}{
+		AccountID:         pm.AccountID.Hex(),
+		Timestamp:         pm.Timestamp,
+		CumulativePayment: pm.CumulativePayment,
+	}
+
+	bytes, err := arguments.Pack(s)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -553,7 +564,7 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
-			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID.Hex()},
 			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
@@ -571,7 +582,7 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
 	}
-	pm.AccountID = accountID.Value
+	pm.AccountID = gethcommon.HexToAddress(accountID.Value)
 	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
@@ -594,23 +605,27 @@ func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 		return nil
 	}
 	return &commonpbv2.PaymentHeader{
-		AccountId:         pm.AccountID,
+		AccountId:         pm.AccountID.Hex(),
 		Timestamp:         pm.Timestamp,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
 	}
 }
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, error) {
 	if ph == nil {
-		return nil
+		return nil, nil
+	}
+
+	if !gethcommon.IsHexAddress(ph.AccountId) {
+		return nil, fmt.Errorf("invalid account ID: %s", ph.AccountId)
 	}
 
 	return &PaymentMetadata{
-		AccountID:         ph.AccountId,
+		AccountID:         gethcommon.HexToAddress(ph.AccountId),
 		Timestamp:         ph.Timestamp,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
-	}
+	}, nil
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment

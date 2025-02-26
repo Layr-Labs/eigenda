@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
+			AccountID:         gethcommon.HexToAddress("0x123"),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
@@ -32,7 +33,7 @@ func TestConvertBatchToFromProtobuf(t *testing.T) {
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x456",
+			AccountID:         gethcommon.HexToAddress("0x456"),
 			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
@@ -76,7 +77,7 @@ func TestConvertBlobHeaderToFromProtobuf(t *testing.T) {
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
+			AccountID:         gethcommon.HexToAddress("0x123"),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
@@ -101,7 +102,7 @@ func TestConvertBlobCertToFromProtobuf(t *testing.T) {
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
+			AccountID:         gethcommon.HexToAddress("0x123"),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},

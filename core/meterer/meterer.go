@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -80,7 +79,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -88,7 +87,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
