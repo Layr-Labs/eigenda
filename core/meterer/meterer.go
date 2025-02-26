@@ -150,7 +150,7 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
-	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod <= endPeriod
+	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
 	if !isCurrentOrPreviousPeriod || !isWithinReservationWindow {
 		return false
 	}
@@ -214,15 +214,16 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
-	if err != nil {
-		return fmt.Errorf("failed to update cumulative payment: %w", err)
-	}
 	// Validate payments attached
 	err = m.ValidatePayment(ctx, header, onDemandPayment, symbolsCharged)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
+	}
+
+	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
+	if err != nil {
+		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 
 	// Update bin usage atomically and check against bin capacity
@@ -255,11 +256,11 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if prevPmt.Add(prevPmt, m.PaymentCharged(uint(symbolsCharged))).Cmp(header.CumulativePayment) > 0 {
+	if new(big.Int).Add(prevPmt, m.PaymentCharged(uint(symbolsCharged))).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt.Cmp(big.NewInt(0)) != 0 && header.CumulativePayment.Add(header.CumulativePayment, m.PaymentCharged(uint(nextPmtnumSymbols))).Cmp(nextPmt) > 0 {
+	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint(nextPmtnumSymbols))).Cmp(nextPmt) > 0 {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
