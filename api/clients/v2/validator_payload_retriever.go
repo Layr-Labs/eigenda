@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -36,7 +35,6 @@ func BuildValidatorPayloadRetriever(
 	logger logging.Logger,
 	validatorPayloadRetrieverConfig ValidatorPayloadRetrieverConfig,
 	ethConfig geth.EthClientConfig,
-	thegraphConfig thegraph.Config,
 	kzgConfig kzg.KzgConfig,
 ) (*ValidatorPayloadRetriever, error) {
 	err := validatorPayloadRetrieverConfig.checkAndSetDefaults()
@@ -58,8 +56,10 @@ func BuildValidatorPayloadRetriever(
 		return nil, fmt.Errorf("new reader: %w", err)
 	}
 
-	chainState := eth.NewChainState(reader, ethClient)
-	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
+	chainState, err := eth.NewChainState(reader, ethClient, logger)
+	if err != nil {
+		return nil, fmt.Errorf("new chain state: %w", err)
+	}
 
 	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
 	if err != nil {
@@ -69,7 +69,7 @@ func BuildValidatorPayloadRetriever(
 	retrievalClient := NewRetrievalClient(
 		logger,
 		reader,
-		indexedChainState,
+		chainState,
 		kzgVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 
