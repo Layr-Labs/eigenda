@@ -606,7 +606,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 		for i := 0; i < numBlobs; i++ {
 			metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 1)
 			require.NoError(t, err)
-			assert.Equal(t, 1, len(metadata))
+			require.Equal(t, 1, len(metadata))
 			checkBlobKeyEqual(t, keys[i], metadata[0].BlobHeader)
 			require.NotNil(t, lastProcessedCursor)
 			assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
