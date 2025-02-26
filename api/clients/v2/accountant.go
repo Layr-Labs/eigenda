@@ -19,9 +19,9 @@ type Accountant struct {
 	accountID         string
 	reservation       *core.ReservedPayment
 	onDemand          *core.OnDemandPayment
-	reservationWindow uint32
-	pricePerSymbol    uint32
-	minNumSymbols     uint32
+	reservationWindow uint64
+	pricePerSymbol    uint64
+	minNumSymbols     uint64
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
@@ -38,7 +38,7 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint32, pricePerSymbol uint32, minNumSymbols uint32, numBins uint32) *Accountant {
+func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
 	periodRecords := make([]PeriodRecord, numBins)
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
@@ -67,9 +67,9 @@ func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand
 // indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
+func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint64, quorumNumbers []uint8, timestamp int64) (*big.Int, error) {
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
-	symbolUsage := uint64(a.SymbolsCharged(numSymbols))
+	symbolUsage := a.SymbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
@@ -111,7 +111,7 @@ func (a *Accountant) BlobPaymentInfo(ctx context.Context, numSymbols uint32, quo
 }
 
 // AccountBlob accountant provides and records payment information
-func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbols uint32, quorums []uint8) (*core.PaymentMetadata, error) {
+func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbols uint64, quorums []uint8) (*core.PaymentMetadata, error) {
 	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, err
@@ -128,22 +128,22 @@ func (a *Accountant) AccountBlob(ctx context.Context, timestamp int64, numSymbol
 
 // TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
 // PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(numSymbols uint32) uint64 {
-	return uint64(a.SymbolsCharged(numSymbols)) * uint64(a.pricePerSymbol)
+func (a *Accountant) PaymentCharged(numSymbols uint64) uint64 {
+	return a.SymbolsCharged(numSymbols) * a.pricePerSymbol
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(numSymbols uint32) uint32 {
+func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 	if numSymbols <= a.minNumSymbols {
 		return a.minNumSymbols
 	}
 	// Round up to the nearest multiple of MinNumSymbols
-	return uint32(core.RoundUpDivide(uint(numSymbols), uint(a.minNumSymbols))) * a.minNumSymbols
+	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativePeriodRecord(index uint32) *PeriodRecord {
-	relativeIndex := index % a.numBins
+func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
+	relativeIndex := uint32(index % uint64(a.numBins))
 	if a.periodRecords[relativeIndex].Index != uint32(index) {
 		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
@@ -167,9 +167,9 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		return fmt.Errorf("payment global params cannot be nil")
 	}
 
-	a.minNumSymbols = uint32(paymentState.GetPaymentGlobalParams().GetMinNumSymbols())
-	a.pricePerSymbol = uint32(paymentState.GetPaymentGlobalParams().GetPricePerSymbol())
-	a.reservationWindow = uint32(paymentState.GetPaymentGlobalParams().GetReservationWindow())
+	a.minNumSymbols = paymentState.GetPaymentGlobalParams().GetMinNumSymbols()
+	a.pricePerSymbol = paymentState.GetPaymentGlobalParams().GetPricePerSymbol()
+	a.reservationWindow = paymentState.GetPaymentGlobalParams().GetReservationWindow()
 
 	if paymentState.GetOnchainCumulativePayment() == nil {
 		a.onDemand = &core.OnDemandPayment{

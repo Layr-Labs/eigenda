@@ -930,9 +930,9 @@ Global constant parameters defined by the payment vault.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | global_symbols_per_second | [uint64](#uint64) |  | Global ratelimit for on-demand dispersals |
-| min_num_symbols | [uint32](#uint32) |  | Minimum number of symbols accounted for all dispersals |
-| price_per_symbol | [uint32](#uint32) |  | Price charged per symbol for on-demand dispersals |
-| reservation_window | [uint32](#uint32) |  | Reservation window for all reservations |
+| min_num_symbols | [uint64](#uint64) |  | Minimum number of symbols accounted for all dispersals |
+| price_per_symbol | [uint64](#uint64) |  | Price charged per symbol for on-demand dispersals |
+| reservation_window | [uint64](#uint64) |  | Reservation window for all reservations |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make on-demand dispersals |
 
 
