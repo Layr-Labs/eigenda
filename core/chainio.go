@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -139,6 +140,9 @@ type Reader interface {
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
+
+	// GetSocketUpdates returns all socket updates in a given block range.
+	GetSocketUpdates(ctx context.Context, startBlock, endBlock uint64) ([]*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate, error)
 }
 
 type Writer interface {

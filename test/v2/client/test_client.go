@@ -20,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -45,7 +44,7 @@ type TestClient struct {
 	payloadDisperser          *clients.PayloadDisperser
 	relayClient               clients.RelayClient
 	relayPayloadRetriever     *clients.RelayPayloadRetriever
-	indexedChainState         core.IndexedChainState
+	chainState                core.ChainState
 	retrievalClient           clients.RetrievalClient
 	validatorPayloadRetriever *clients.ValidatorPayloadRetriever
 	certVerifier              *verification.CertVerifier
@@ -237,12 +236,10 @@ func NewTestClient(
 	// Construct the retrieval client
 
 	chainState := eth.NewChainState(ethReader, ethClient)
-	icsConfig := thegraph.Config{
-		Endpoint:     config.SubgraphURL,
-		PullInterval: 100 * time.Millisecond,
-		MaxRetries:   5,
+	socketStateCache, err := eth.NewSocketStateCache(context.Background(), ethReader, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create socket state cache: %w", err)
 	}
-	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
 	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig:           *payloadClientConfig,
@@ -255,7 +252,8 @@ func NewTestClient(
 	retrievalClient := clients.NewRetrievalClient(
 		logger,
 		ethReader,
-		indexedChainState,
+		chainState,
+		socketStateCache,
 		blobVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 
@@ -276,7 +274,7 @@ func NewTestClient(
 		payloadDisperser:          payloadDisperser,
 		relayClient:               relayClient,
 		relayPayloadRetriever:     relayPayloadRetriever,
-		indexedChainState:         indexedChainState,
+		chainState:                chainState,
 		retrievalClient:           retrievalClient,
 		validatorPayloadRetriever: validatorPayloadRetriever,
 		certVerifier:              certVerifier,
@@ -366,9 +364,9 @@ func (c *TestClient) GetRelayPayloadRetriever() *clients.RelayPayloadRetriever {
 	return c.relayPayloadRetriever
 }
 
-// GetIndexedChainState returns the test client's indexed chain state.
-func (c *TestClient) GetIndexedChainState() core.IndexedChainState {
-	return c.indexedChainState
+// GetChainState returns the test client's chain state.
+func (c *TestClient) GetChainState() core.ChainState {
+	return c.chainState
 }
 
 // GetRetrievalClient returns the test client's retrieval client.
@@ -544,7 +542,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	quorums []core.QuorumID,
 	expectedPayloadBytes []byte) error {
 
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
+	currentBlockNumber, err := c.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}

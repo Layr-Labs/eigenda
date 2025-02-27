@@ -10,8 +10,6 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	"github.com/Layr-Labs/eigenda/core"
-	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -22,10 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const numOperators = 10
-
 var (
-	indexedChainState      core.IndexedChainState
 	retrievalClient        *clientsmock.MockRetrievalClient
 	chainClient            *mock.MockChainClient
 	batchHeaderHash        [32]byte
@@ -57,20 +52,11 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 	return p, v, nil
 }
 
-func newTestServer(t *testing.T) *retriever.Server {
+func newTestServer(_ *testing.T) *retriever.Server {
 	var err error
 	config := &retriever.Config{}
 
 	logger := testutils.GetLogger()
-
-	indexedChainState, err = coremock.MakeChainDataMock(map[uint8]int{
-		0: numOperators,
-		1: numOperators,
-		2: numOperators,
-	})
-	if err != nil {
-		log.Fatalf("failed to create new mocked chain data: %s", err)
-	}
 
 	_, _, err = makeTestComponents()
 	if err != nil {
@@ -79,7 +65,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 	retrievalClient = &clientsmock.MockRetrievalClient{}
 	chainClient = mock.NewMockChainClient()
-	return retriever.NewServer(config, logger, retrievalClient, indexedChainState, chainClient)
+	return retriever.NewServer(config, logger, retrievalClient, chainClient)
 }
 
 func TestRetrieveBlob(t *testing.T) {
