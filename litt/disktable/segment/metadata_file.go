@@ -23,8 +23,12 @@ const (
 	MetadataSwapExtension = ".metadata.swap"
 
 	// The size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
-	// 4 bytes for version, 8 bytes for timestamp, 1 byte for sealed
-	metadataSize = 13
+	// - 4 bytes for version
+	// - 4 bytes for the sharding factor
+	// - 4 bytes for salt
+	// - 8 bytes for timestamp
+	// - and 1 byte for sealed.
+	metadataSize = 21
 )
 
 // metadataFile contains metadata about a segment.
@@ -33,18 +37,25 @@ type metadataFile struct {
 	index uint32
 
 	// The serialization version for this segment, used to permit smooth data migrations.
-	// This value is encoded in file.
+	// This value is encoded in the file.
 	serializationVersion uint32
 
-	// If true, the segment is sealed and no more data can be written to it. If false, then data can still be written to
-	// this segment. This value is encoded in file.
-	sealed bool
+	// The sharding factor for this segment. This value is encoded in the file.
+	shardingFactor uint32
+
+	// A random number, used to make the sharding hash function hard for an attacker to predict.
+	// This value is encoded in the file.
+	salt uint32
 
 	// The time when the last value was written into the segment, in nanoseconds since the epoch. A segment can
 	// only be deleted when all values within it are expired, and so we only need to keep track of the timestamp of
 	// the last value (which always expires last). This value is irrelevant if the segment is not yet sealed.
-	// This value is encoded in file.
+	// This value is encoded in the file.
 	timestamp uint64
+
+	// If true, the segment is sealed and no more data can be written to it. If false, then data can still be written to
+	// this segment. This value is encoded in the file.
+	sealed bool
 
 	// The parent directory containing this file. This value is not encoded in file, and is stored here
 	// for bookkeeping purposes.
@@ -53,7 +64,15 @@ type metadataFile struct {
 
 // newMetadataFile creates a new metadata file. When this method returns, the metadata file will
 // be durably written to disk.
-func newMetadataFile(index uint32, parentDirectory string) (*metadataFile, error) {
+//
+// Note that shardingFactor and salt parameters are ignored if this is not a new metadata file. Metadata files
+// loaded from disk always use their original sharding factor and salt values.
+func newMetadataFile(
+	index uint32,
+	shardingFactor uint32,
+	salt uint32,
+	parentDirectory string) (*metadataFile, error) {
+
 	file := &metadataFile{
 		index:           index,
 		parentDirectory: parentDirectory,
@@ -78,6 +97,8 @@ func newMetadataFile(index uint32, parentDirectory string) (*metadataFile, error
 	} else {
 		// File does not exist. Create it.
 		file.serializationVersion = currentSerializationVersion
+		file.shardingFactor = shardingFactor
+		file.salt = salt
 		err = file.write()
 		if err != nil {
 			return nil, fmt.Errorf("failed to write metadata file: %v", err)
@@ -127,14 +148,20 @@ func (m *metadataFile) serialize() []byte {
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
 
+	// Write the sharding factor
+	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
+
+	// Write the salt
+	binary.BigEndian.PutUint32(data[8:12], m.salt)
+
 	// Write the timestamp
-	binary.BigEndian.PutUint64(data[4:12], m.timestamp)
+	binary.BigEndian.PutUint64(data[12:20], m.timestamp)
 
 	// Write the sealed flag
 	if m.sealed {
-		data[12] = 1
+		data[20] = 1
 	} else {
-		data[12] = 0
+		data[20] = 0
 	}
 
 	return data
@@ -150,8 +177,11 @@ func (m *metadataFile) deserialize(data []byte) error {
 	if m.serializationVersion != currentSerializationVersion {
 		return fmt.Errorf("unsupported serialization version: %d", m.serializationVersion)
 	}
-	m.timestamp = binary.BigEndian.Uint64(data[4:12])
-	m.sealed = data[12] == 1
+
+	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
+	m.salt = binary.BigEndian.Uint32(data[8:12])
+	m.timestamp = binary.BigEndian.Uint64(data[12:20])
+	m.sealed = data[20] == 1
 
 	return nil
 }

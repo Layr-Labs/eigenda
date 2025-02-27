@@ -253,6 +253,8 @@ func GatherSegmentFiles(
 	logger logging.Logger,
 	rootDirectory string,
 	now time.Time,
+	shardingFactor uint32,
+	salt uint32,
 	createMutableSegment bool,
 ) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
@@ -312,7 +314,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := NewSegment(logger, i, rootDirectory, now, true)
+			segment, err := NewSegment(logger, i, rootDirectory, now, shardingFactor, salt, true)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)
@@ -324,7 +326,8 @@ func GatherSegmentFiles(
 	if createMutableSegment {
 		// Create a new mutable segment at the end.
 		if isEmpty {
-			segment, err := NewSegment(logger, lowestSegmentIndex, rootDirectory, now, false)
+			segment, err :=
+				NewSegment(logger, lowestSegmentIndex, rootDirectory, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", lowestSegmentIndex, err)
@@ -332,7 +335,8 @@ func GatherSegmentFiles(
 
 			segments[0] = segment
 		} else {
-			segment, err := NewSegment(logger, highestSegmentIndex+1, rootDirectory, now, false)
+			segment, err :=
+				NewSegment(logger, highestSegmentIndex+1, rootDirectory, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", highestSegmentIndex+1, err)

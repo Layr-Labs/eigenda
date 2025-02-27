@@ -47,6 +47,9 @@ type DiskTable struct {
 	// The table's metadata.
 	metadata *tableMetadata
 
+	// Random data to make the sharding hash function hard for an attacker to predict.
+	salt uint32
+
 	// A map of keys to their addresses.
 	keyMap keymap.KeyMap
 
@@ -109,6 +112,8 @@ func NewDiskTable(
 	root string,
 	targetFileSize uint32,
 	controlChannelSize int,
+	shardingFactor uint32,
+	salt uint32,
 	gcPeriod time.Duration) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
@@ -163,6 +168,7 @@ func NewDiskTable(
 		segmentDirectory:        segDir,
 		name:                    name,
 		metadata:                metadata,
+		salt:                    salt,
 		keyMap:                  keyMap,
 		keysPendingFlush:        make([]*types.KAPair, 0, keysPendingFlushInitialCapacity),
 		targetFileSize:          targetFileSize,
@@ -175,7 +181,13 @@ func NewDiskTable(
 	table.stopChannel <- struct{}{}
 
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
-		segment.GatherSegmentFiles(logger, table.segmentDirectory, timeSource(), true)
+		segment.GatherSegmentFiles(
+			logger,
+			table.segmentDirectory,
+			timeSource(),
+			shardingFactor,
+			salt,
+			true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
@@ -437,7 +449,7 @@ func (d *DiskTable) expandSegments() error {
 
 	// Create a new segment.
 	newSegment, err :=
-		segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.segmentDirectory, now, false)
+		segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.segmentDirectory, now, d.metadata.GetShardingFactor(), d.salt, false)
 	if err != nil {
 		d.segmentLock.Unlock()
 		return fmt.Errorf("failed to create new segment: %v", err)

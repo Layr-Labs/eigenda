@@ -1,10 +1,11 @@
 package segment
 
 import (
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnsealedSerialization(t *testing.T) {
@@ -12,18 +13,22 @@ func TestUnsealedSerialization(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
+	shardingFactor := rand.Uint32()
+	salt := rand.Uint32()
 	timestamp := rand.Uint64()
 	m := &metadataFile{
 		index:                index,
 		serializationVersion: currentSerializationVersion,
-		sealed:               false,
+		shardingFactor:       shardingFactor,
+		salt:                 salt,
 		timestamp:            timestamp,
+		sealed:               false,
 		parentDirectory:      directory,
 	}
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := newMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, 1234, 5678, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -44,18 +49,22 @@ func TestSealedSerialization(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
+	shardingFactor := rand.Uint32()
+	salt := rand.Uint32()
 	timestamp := rand.Uint64()
 	m := &metadataFile{
 		index:                index,
 		serializationVersion: currentSerializationVersion,
-		sealed:               true,
+		shardingFactor:       shardingFactor,
+		salt:                 salt,
 		timestamp:            timestamp,
+		sealed:               true,
 		parentDirectory:      directory,
 	}
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := newMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, 1234, 5678, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -76,7 +85,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	m, err := newMetadataFile(index, directory)
+	m, err := newMetadataFile(index, 1234, 5678, directory)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
@@ -85,7 +94,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	require.Zero(t, m.timestamp)
 	require.Equal(t, directory, m.parentDirectory)
 
-	deserialized, err := newMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, 42, 42, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -106,7 +115,7 @@ func TestSealing(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	m, err := newMetadataFile(index, directory)
+	m, err := newMetadataFile(index, 1234, 5678, directory)
 	require.NoError(t, err)
 
 	// seal the file
@@ -121,7 +130,7 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
-	deserialized, err := newMetadataFile(index, m.parentDirectory)
+	deserialized, err := newMetadataFile(index, 42, 42, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
