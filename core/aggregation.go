@@ -71,11 +71,22 @@ type SignatureAggregation struct {
 
 // SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
 type SignatureAggregator interface {
+
 	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the attestation result by quorum.
-	ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error)
+	ReceiveSignatures(
+		ctx context.Context,
+		state *IndexedOperatorState,
+		batchHeaderHash [32]byte,
+		messageChan chan SigningMessage) (*QuorumAttestation, error)
+
 	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
-	AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error)
+	AggregateSignatures(
+		ctx context.Context,
+		ics IndexedChainState,
+		referenceBlockNumber uint,
+		quorumAttestation *QuorumAttestation,
+		quorumIDs []QuorumID) (*SignatureAggregation, error)
 }
 
 type StdSignatureAggregator struct {
@@ -100,117 +111,42 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
-func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error) {
-	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
-	for quorumID := range state.Operators {
-		quorumIDs = append(quorumIDs, quorumID)
-	}
-	slices.Sort(quorumIDs)
+// ReceiveSignatures gets signatures from messageChan, blocking until either all operators have responded or the
+// time for collecting signatures has ended.
+func (a *StdSignatureAggregator) ReceiveSignatures(
+	ctx context.Context,
+	state *IndexedOperatorState,
+	batchHeaderHash [32]byte,
+	messageChan chan SigningMessage) (*QuorumAttestation, error) {
 
-	if len(quorumIDs) == 0 {
-		return nil, errors.New("the number of quorums must be greater than zero")
-	}
-
-	// Ensure all quorums are found in state
-	for _, id := range quorumIDs {
-		_, found := state.Operators[id]
-		if !found {
-			return nil, errors.New("quorum not found")
-		}
+	quorumIDs, err := getQuorumIDs(state)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quorum IDs: %w", err)
 	}
 
+	// TODO consider making a struct to hold aggregation info
+
+	// The amount of stake that has provided a valid signature for each quorum.
 	stakeSigned := make(map[QuorumID]*big.Int, len(quorumIDs))
 	for _, quorumID := range quorumIDs {
 		stakeSigned[quorumID] = big.NewInt(0)
 	}
+	// Valid signatures for each quorum.
 	aggSigs := make(map[QuorumID]*Signature, len(quorumIDs))
+	// The public of each operator that has provided a valid signature for each quorum.
 	aggPubKeys := make(map[QuorumID]*G2Point, len(quorumIDs))
+	// Map of operator IDs that have signed this batch.
 	signerMap := make(map[OperatorID]bool)
 
-	// Aggregate Signatures
+	// Handle each reply from the operators, discarding invalid signatures.
 	numOperators := len(state.IndexedOperators)
-
 	for numReply := 0; numReply < numOperators; numReply++ {
-		var err error
-		r := <-messageChan
-		operatorIDHex := r.Operator.Hex()
-		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
-		if !ok && a.Transactor != nil {
-			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
-			if err != nil {
-				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
-				operatorAddr = gethcommon.Address{}
-			} else {
-				a.OperatorAddresses.Add(r.Operator, operatorAddr)
-			}
-		} else if !ok {
-			operatorAddr = gethcommon.Address{}
-		}
-
-		socket := ""
-		if op, ok := state.IndexedOperators[r.Operator]; ok {
-			socket = op.Socket
-		}
-		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
-		if r.Err != nil {
-			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs, "err", r.Err)
-			continue
-		}
-
-		op, found := state.IndexedOperators[r.Operator]
-		if !found {
-			a.Logger.Error("Operator not found in state", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket)
-			continue
-		}
-
-		// Verify Signature
-		sig := r.Signature
-		ok = sig.Verify(op.PubkeyG2, message)
-		if !ok {
-			a.Logger.Error("signature is not valid", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
-			continue
-		}
-
-		operatorQuorums := make([]uint8, 0, len(quorumIDs))
-		for _, quorumID := range quorumIDs {
-			// Get stake amounts for operator
-			ops := state.Operators[quorumID]
-			opInfo, ok := ops[r.Operator]
-			// If operator is not in quorum, skip
-			if !ok {
-				continue
-			}
-			operatorQuorums = append(operatorQuorums, quorumID)
-
-			signerMap[r.Operator] = true
-
-			// Add to stake signed
-			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
-
-			// Add to agg signature
-			if aggSigs[quorumID] == nil {
-				aggSigs[quorumID] = &Signature{sig.Clone()}
-				aggPubKeys[quorumID] = op.PubkeyG2.Clone()
-			} else {
-				aggSigs[quorumID].Add(sig.G1Point)
-				aggPubKeys[quorumID].Add(op.PubkeyG2)
-			}
-		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs)
+		signingMessage := <-messageChan
+		a.handleSigningMessage(
+			ctx, state, &signingMessage, batchHeaderHash, quorumIDs, signerMap, stakeSigned, aggSigs, aggPubKeys)
 	}
 
-	// Aggregate Non signer Pubkey Id
-	nonSignerKeys := make([]*G1Point, 0)
-	nonSignerOperatorIds := make([]OperatorID, 0)
-
-	for id, op := range state.IndexedOperators {
-		_, found := signerMap[id]
-		if !found {
-			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
-			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
-		}
-	}
-
+	nonSignerKeys, nonSignerOperatorIds := aggregateNonSignerIDs(state, signerMap)
 	quorumAggPubKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
 
 	// Validate the amount signed and aggregate signatures for each quorum
@@ -229,7 +165,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 			continue
 		}
 
-		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
+		// Verify that the aggregated public key for the quorum matches the on-chain
+		// quorum aggregate public key sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[quorumID] = quorumAggKey
 
@@ -254,7 +191,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		}
 
 		// Verify the aggregated signature for the quorum
-		ok = aggSigs[quorumID].Verify(aggPubKeys[quorumID], message)
+		ok = aggSigs[quorumID].Verify(aggPubKeys[quorumID], batchHeaderHash)
 		if !ok {
 			return nil, ErrAggSigNotValid
 		}
@@ -267,6 +204,145 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		QuorumResults:    quorumResults,
 		SignerMap:        signerMap,
 	}, nil
+}
+
+// aggregateNonSignerIDs returns the operator IDs and public keys of the operators that did not sign the batch.
+func aggregateNonSignerIDs(state *IndexedOperatorState, signerMap map[OperatorID]bool) ([]*G1Point, []OperatorID) {
+	nonSignerKeys := make([]*G1Point, 0)
+	nonSignerOperatorIds := make([]OperatorID, 0)
+
+	for id, op := range state.IndexedOperators {
+		_, found := signerMap[id]
+		if !found {
+			nonSignerKeys = append(nonSignerKeys, op.PubkeyG1)
+			nonSignerOperatorIds = append(nonSignerOperatorIds, id)
+		}
+	}
+
+	return nonSignerKeys, nonSignerOperatorIds
+}
+
+// getSortedQuorumIDs returns a sorted list of quorum IDs from the state.
+func getQuorumIDs(state *IndexedOperatorState) ([]QuorumID, error) {
+	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
+	for quorumID := range state.Operators {
+		quorumIDs = append(quorumIDs, quorumID)
+	}
+	slices.Sort(quorumIDs)
+	if len(quorumIDs) == 0 {
+		return nil, errors.New("the number of quorums must be greater than zero")
+	}
+
+	// Ensure all quorums are found in state
+	for _, id := range quorumIDs {
+		_, found := state.Operators[id]
+		if !found {
+			return nil, errors.New("quorum not found")
+		}
+	}
+
+	return quorumIDs, nil
+}
+
+// handleSigningMessage processes the signing message and updates the state of the aggregation.
+func (a *StdSignatureAggregator) handleSigningMessage(
+	ctx context.Context,
+	state *IndexedOperatorState,
+	signingMessage *SigningMessage,
+	batchHeaderHash [32]byte,
+	quorumIDs []QuorumID,
+	signerMap map[OperatorID]bool,
+	stakeSigned map[QuorumID]*big.Int,
+	aggSigs map[QuorumID]*Signature,
+	aggPubKeys map[QuorumID]*G2Point) {
+
+	// TODO break up this method
+
+	var err error
+
+	operatorIDHex := signingMessage.Operator.Hex()
+	operatorAddr, ok := a.OperatorAddresses.Get(signingMessage.Operator)
+	if !ok && a.Transactor != nil {
+		operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, signingMessage.Operator)
+		if err != nil {
+			a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
+			operatorAddr = gethcommon.Address{}
+		} else {
+			a.OperatorAddresses.Add(signingMessage.Operator, operatorAddr)
+		}
+	} else if !ok {
+		operatorAddr = gethcommon.Address{}
+	}
+
+	socket := ""
+	if op, ok := state.IndexedOperators[signingMessage.Operator]; ok {
+		socket = op.Socket
+	}
+	batchHeaderHashHex := hex.EncodeToString(signingMessage.BatchHeaderHash[:])
+	if signingMessage.Err != nil {
+		a.Logger.Warn("error returned from messageChan",
+			"operatorID", operatorIDHex,
+			"operatorAddress", operatorAddr,
+			"socket", socket,
+			"batchHeaderHash", batchHeaderHashHex,
+			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"err", signingMessage.Err)
+		return
+	}
+
+	op, found := state.IndexedOperators[signingMessage.Operator]
+	if !found {
+		a.Logger.Error("Operator not found in state",
+			"operatorID", operatorIDHex,
+			"operatorAddress", operatorAddr,
+			"socket", socket)
+		return
+	}
+
+	// Verify Signature
+	sig := signingMessage.Signature
+	ok = sig.Verify(op.PubkeyG2, batchHeaderHash)
+	if !ok {
+		a.Logger.Error("signature is not valid",
+			"operatorID", operatorIDHex,
+			"operatorAddress", operatorAddr,
+			"socket", socket,
+			"pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
+		return
+	}
+
+	operatorQuorums := make([]uint8, 0, len(quorumIDs))
+	for _, quorumID := range quorumIDs {
+		// Get stake amounts for operator
+		ops := state.Operators[quorumID]
+		opInfo, ok := ops[signingMessage.Operator]
+		// If operator is not in quorum, skip
+		if !ok {
+			continue
+		}
+		operatorQuorums = append(operatorQuorums, quorumID)
+
+		signerMap[signingMessage.Operator] = true
+
+		// Add to stake signed
+		stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
+
+		// Add to agg signature
+		if aggSigs[quorumID] == nil {
+			aggSigs[quorumID] = &Signature{sig.Clone()}
+			aggPubKeys[quorumID] = op.PubkeyG2.Clone()
+		} else {
+			aggSigs[quorumID].Add(sig.G1Point)
+			aggPubKeys[quorumID].Add(op.PubkeyG2)
+		}
+	}
+	a.Logger.Info("received signature from operator",
+		"operatorID", operatorIDHex,
+		"operatorAddress", operatorAddr,
+		"socket", socket,
+		"quorumIDs", fmt.Sprint(operatorQuorums),
+		"batchHeaderHash", batchHeaderHashHex,
+		"attestationLatencyMs", signingMessage.AttestationLatencyMs)
 }
 
 func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error) {
