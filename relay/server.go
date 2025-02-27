@@ -211,6 +211,30 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	return reply, nil
 }
 
+func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
+	if request == nil {
+		return api.NewErrorInvalidArg("request is nil")
+	}
+	if len(request.OperatorId) == 0 {
+		return api.NewErrorInvalidArg("operator ID is empty")
+	}
+	if len(request.ChunkRequests) == 0 {
+		return api.NewErrorInvalidArg("no chunk requests provided")
+	}
+	if len(request.ChunkRequests) > s.config.MaxKeysPerGetChunksRequest {
+		return api.NewErrorInvalidArg(fmt.Sprintf(
+			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest))
+	}
+
+	for _, chunkRequest := range request.ChunkRequests {
+		if chunkRequest.GetByIndex() == nil && chunkRequest.GetByRange() == nil {
+			return api.NewErrorInvalidArg("chunk request must be either by index or by range")
+		}
+	}
+
+	return nil
+}
+
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 	start := time.Now()
@@ -220,14 +244,11 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
 		defer cancel()
 	}
+	err := s.validateGetChunksRequest(request)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(request.ChunkRequests) <= 0 {
-		return nil, api.NewErrorInvalidArg("no chunk requests provided")
-	}
-	if len(request.ChunkRequests) > s.config.MaxKeysPerGetChunksRequest {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
-			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest))
-	}
 	s.metrics.ReportChunkKeyCount(len(request.ChunkRequests))
 
 	if s.authenticator != nil {
@@ -252,7 +273,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 
 	clientID := string(request.OperatorId)
-	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}
