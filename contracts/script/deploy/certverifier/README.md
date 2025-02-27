@@ -1,6 +1,6 @@
 ## EigenDA Cert Verfier Deployer
 
-This script can be used to deploy an EigenDACertVerifier contract with specified security thresholds and quorum numbers required
+This script can be used to deploy an EigenDACertVerifier contract with custom security thresholds and quorum numbers. The deployment should only be performed on Ethereum L1 testnet or mainnet environment and is not supported on L2s.
 
 ### Config
 
@@ -27,10 +27,10 @@ Two sample configs are provided in the `config/` folder for preprod and testnet 
 
 ### Deployment
 
-To deploy the contract, run the following command passing in the path to the config file and appropriate keys
+To deploy the contract, run the following command passing in the path to the config file, the output path, and appropriate keys
 
 ```bash
-forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string)" <config.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
+forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 ```
 
 The deployment will output the address of the deployed contract to a json file in the `output/` folder named `certverifier_deployment_data.json`

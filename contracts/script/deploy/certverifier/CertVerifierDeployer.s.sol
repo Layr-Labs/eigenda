@@ -18,7 +18,7 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import "src/interfaces/IEigenDAStructs.sol";
 
-//forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string)" <config.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
+//forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployer is Script, Test {
 
     address eigenDACertVerifier;
@@ -32,9 +32,9 @@ contract CertVerifierDeployer is Script, Test {
     SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
-    function run(string memory json) external {
+    function run(string memory json, string memory outputPath) external {
 
-         string memory path = string.concat("./script/deploy/certverifier/config/", json);
+        string memory path = string.concat("./script/deploy/certverifier/config/", json);
         string memory data = vm.readFile(path);
 
         bytes memory raw = stdJson.parseRaw(data, ".eigenDAServiceManager");
@@ -76,7 +76,7 @@ contract CertVerifierDeployer is Script, Test {
 
         console.log("Deployed new EigenDACertVerifier at address: ", eigenDACertVerifier);
 
-        string memory outputPath = "script/deploy/certverifier/output/certverifier_deployment_data.json";
+        string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputPath);
         string memory parent_object = "parent object";
         string memory finalJson = vm.serializeAddress(parent_object, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.writeJson(finalJson, outputPath);
