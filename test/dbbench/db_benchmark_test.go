@@ -32,8 +32,10 @@ func runWriteBenchmark(
 	start := time.Now()
 	dataWritten := uint64(0)
 
-	reportInterval := units.MiB * 10
+	reportInterval := units.MiB * 100
 	interval := 0
+	previousIntervalDataWritten := uint64(0)
+	previousIntervalTimestamp := time.Now()
 
 	for dataWritten < totalDataToWrite {
 		key := rand.Bytes(32)
@@ -44,9 +46,27 @@ func runWriteBenchmark(
 
 		dataWritten += dataSize
 
+		// Do some console logging
 		newInterval := int(dataWritten / uint64(reportInterval))
 		if newInterval > interval {
-			fmt.Printf("wrote %d MiB\r", dataWritten/units.MiB)
+
+			timeSinceLastInterval := time.Since(previousIntervalTimestamp)
+			dataSinceLastInterval := dataWritten - previousIntervalDataWritten
+			previousIntervalDataWritten = dataWritten
+
+			mbPerSecondOverLastInterval := float64(dataSinceLastInterval) / (units.MiB) /
+				(float64(timeSinceLastInterval.Nanoseconds()) / float64(time.Second))
+
+			timeSinceStart := time.Since(start)
+			mbPerSecondTotal := float64(dataWritten) / (units.MiB) /
+				(float64(timeSinceStart.Nanoseconds()) / float64(time.Second))
+
+			mbWritten := float64(dataWritten) / units.MiB
+
+			completionPercentage := int(float64(dataWritten) / float64(totalDataToWrite) * 100)
+
+			fmt.Printf("%d%%: wrote %d MiB. %d mb/s during recent period, %d mb/s overall.\r",
+				completionPercentage, int(mbWritten), int(mbPerSecondOverLastInterval), int(mbPerSecondTotal))
 			interval = newInterval
 		}
 	}
