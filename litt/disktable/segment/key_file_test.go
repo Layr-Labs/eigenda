@@ -12,8 +12,7 @@ import (
 )
 
 func TestReadWriteKeys(t *testing.T) {
-	t.Parallel()
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
@@ -28,7 +27,7 @@ func TestReadWriteKeys(t *testing.T) {
 		keys[i] = &types.KAPair{Key: key, Address: address}
 	}
 
-	file, err := createKeyFile(logger, index, directory)
+	file, err := newKeyFile(logger, index, directory, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -43,28 +42,10 @@ func TestReadWriteKeys(t *testing.T) {
 	err = file.seal()
 	require.NoError(t, err)
 
-	// Verify that file size is correctly reported.
-	reportedSize := file.Size()
-	stat, err := os.Stat(file.path())
-	require.NoError(t, err)
-	actualSize := uint64(stat.Size())
-	require.Equal(t, actualSize, reportedSize)
-
 	// Reading the file after sealing it is allowed.
 	readKeys, err := file.readKeys()
 	require.NoError(t, err)
 
-	for i, key := range keys {
-		assert.Equal(t, key, readKeys[i])
-	}
-
-	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadKeyFile(logger, index, []string{directory})
-	require.NoError(t, err)
-	require.Equal(t, file.Size(), file2.Size())
-
-	readKeys, err = file2.readKeys()
-	require.NoError(t, err)
 	for i, key := range keys {
 		assert.Equal(t, key, readKeys[i])
 	}
@@ -82,8 +63,7 @@ func TestReadWriteKeys(t *testing.T) {
 }
 
 func TestReadingTruncatedKeyFile(t *testing.T) {
-	t.Parallel()
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
@@ -98,7 +78,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 		keys[i] = &types.KAPair{Key: key, Address: address}
 	}
 
-	file, err := createKeyFile(logger, index, directory)
+	file, err := newKeyFile(logger, index, directory, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {

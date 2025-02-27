@@ -4,15 +4,15 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
-
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"io"
 	"math/big"
 	"math/rand"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 // charset is the set of characters that can be used to generate random strings
@@ -106,11 +106,6 @@ func (r *TestRandom) Time() time.Time {
 	return time.Date(1970+years, time.Month(months+1), days+1, hours, minutes, seconds, nanos, time.UTC)
 }
 
-// TimeInRange generates a random time between min (inclusive) and max (exclusive).
-func (r *TestRandom) TimeInRange(min time.Time, max time.Time) time.Time {
-	return min.Add(time.Duration(r.Int63n(int64(max.Sub(min)))))
-}
-
 // String generates a random string out of printable ASCII characters.
 func (r *TestRandom) String(length int) string {
 	b := make([]byte, length)
@@ -200,6 +195,46 @@ func (r *TestRandom) BLS() (*core.KeyPair, error) {
 
 	sk := new(core.PrivateKey).SetBigInt(n)
 	return core.MakeKeyPair(sk), nil
+}
+
+// Bool generates a random boolean.
+func (r *TestRandom) Bool() bool {
+	return r.BoolWithProbability(0.5)
+}
+
+// BoolWithProbability generates a random boolean with a given probability of being true.
+func (r *TestRandom) BoolWithProbability(probability float64) bool {
+	return r.Float64() < probability
+}
+
+// Uint32Range generates a random uint32 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Uint32Range(min uint32, max uint32) uint32 {
+	return r.Uint32()%(max-min) + min
+}
+
+// Uint64Range generates a random uint64 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Uint64Range(min uint64, max uint64) uint64 {
+	return r.Uint64()%(max-min) + min
+}
+
+// Int32Range generates a random int32 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Int32Range(min, max int32) int32 {
+	return r.Int31n(max-min) + min
+}
+
+// Int64Range generates a random int64 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Int64Range(min, max int64) int64 {
+	return r.Int63n(max-min) + min
+}
+
+// Float32Range generates a random float32 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Float32Range(min, max float32) float32 {
+	return r.Float32()*(max-min) + min
+}
+
+// Float64Range generates a random float64 between min (inclusive) and max (exclusive).
+func (r *TestRandom) Float64Range(min, max float64) float64 {
+	return r.Float64()*(max-min) + min
 }
 
 // Bool generates a random boolean.

@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/types"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ Keymap = &memKeymap{}
+var _ KeyMap = &memKeymap{}
 
 // An in-memory keymap implementation. When a table using a memKeymap is restarted, it loads all keys from
-// the segment files.  Methods on this struct are goroutine safe.
+// the segment files.
 //
 // - potentially high memory usage for large keymaps
 // - potentially slow startup time for large keymaps
@@ -20,21 +20,15 @@ var _ Keymap = &memKeymap{}
 type memKeymap struct {
 	logger logging.Logger
 	data   map[string]types.Address
-	// if true, then return an error if an update would overwrite an existing key
-	doubleWriteProtection bool
-	lock                  sync.RWMutex
+	lock   sync.RWMutex
 }
 
-// NewMemKeymap creates a new in-memory keymap.
-func NewMemKeymap(logger logging.Logger,
-	keymapPath string,
-	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
-
+// NewMemKeyMap creates a new in-memory keymap.
+func NewMemKeyMap(logger logging.Logger) KeyMap {
 	return &memKeymap{
-		logger:                logger,
-		data:                  make(map[string]types.Address),
-		doubleWriteProtection: doubleWriteProtection,
-	}, true, nil
+		logger: logger,
+		data:   make(map[string]types.Address),
+	}
 }
 
 func (m *memKeymap) Put(pairs []*types.KAPair) error {
@@ -42,16 +36,7 @@ func (m *memKeymap) Put(pairs []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, pair := range pairs {
-		stringKey := util.UnsafeBytesToString(pair.Key)
-
-		if m.doubleWriteProtection {
-			_, ok := m.data[stringKey]
-			if ok {
-				return fmt.Errorf("key %s already exists", pair.Key)
-			}
-		}
-
-		m.data[stringKey] = pair.Address
+		m.data[string(pair.Key)] = pair.Address
 	}
 	return nil
 }
@@ -60,7 +45,7 @@ func (m *memKeymap) Get(key []byte) (types.Address, bool, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	address, ok := m.data[util.UnsafeBytesToString(key)]
+	address, ok := m.data[string(key)]
 	return address, ok, nil
 }
 
@@ -69,9 +54,8 @@ func (m *memKeymap) Delete(keys []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, key := range keys {
-		delete(m.data, util.UnsafeBytesToString(key.Key))
+		delete(m.data, string(key.Key))
 	}
-
 	return nil
 }
 
@@ -81,8 +65,51 @@ func (m *memKeymap) Stop() error {
 }
 
 func (m *memKeymap) Destroy() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	m.data = nil
+	// nothing to do here
+	return nil
+}
+
+func (m *memKeymap) LoadFromSegments(
+	segments map[uint32]*segment.Segment,
+	lowestSegmentIndex uint32,
+	highestSegmentIndex uint32) error {
+
+	// It's possible that some of the data written near the end of the previous session was corrupted.
+	// Read data from the end until the first valid key/value pair is found.
+	isValid := false
+
+	for segmentIndex := highestSegmentIndex; segmentIndex >= lowestSegmentIndex && segmentIndex+1 != 0; segmentIndex-- {
+		if !segments[segmentIndex].IsSealed() {
+			// ignore unsealed segment, this will have been created in the current session and will not
+			// yet contain any data.
+			continue
+		}
+
+		keys, err := segments[segmentIndex].GetKeys()
+		if err != nil {
+			return fmt.Errorf("failed to get keys from segment: %v", err)
+		}
+		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
+			key := keys[keyIndex]
+
+			if !isValid {
+				_, err = segments[segmentIndex].Read(key.Address)
+				if err == nil {
+					// we found a valid key/value pair. All subsequent keys are valid.
+					isValid = true
+				} else {
+					// This is not cause for alarm (probably).
+					// This can happen when the database is not cleanly shut down,
+					// and just means that some data near the end was not fully committed.
+					m.logger.Infof("truncated value for key %s with address %s", key.Key, key.Address)
+				}
+			}
+
+			if isValid {
+				m.data[string(key.Key)] = key.Address
+			}
+		}
+	}
+
 	return nil
 }

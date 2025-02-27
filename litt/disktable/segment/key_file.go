@@ -6,21 +6,16 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strconv"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// KeyFileExtension is the file extension for the keys file. This file contains the keys for the data segment,
-// and is used for performing garbage collection on the keymap. It can also be used to rebuild the keymap.
-const KeyFileExtension = ".keys"
+// KeysFileExtension is the file extension for the keys file. This file contains the keys for the data segment,
+// and is used for performing garbage collection on the key index.
+const KeysFileExtension = ".keys"
 
-// keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
-//
-// This struct is NOT goroutine safe. It is unsafe to concurrently call write, flush, or seal on the same key file.
-// It is not safe to read a key file until it is sealed. Once sealed, read only operations are goroutine safe.
+// keyFile tracks the keys in a segment. It is used to do garbage collection on the key-to-address map.
 type keyFile struct {
 	// The logger for the key file.
 	logger logging.Logger
@@ -33,16 +28,14 @@ type keyFile struct {
 
 	// The writer for the file. If the file is sealed, this value is nil.
 	writer *bufio.Writer
-
-	// The size of the key file in bytes.
-	size uint64
 }
 
 // newKeyFile creates a new key file.
-func createKeyFile(
+func newKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string) (*keyFile, error) {
+	parentDirectory string,
+	sealed bool) (*keyFile, error) {
 
 	keys := &keyFile{
 		logger:          logger,
@@ -52,73 +45,36 @@ func createKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := util.VerifyFileProperties(filePath)
+	exists, _, err := verifyFilePermissions(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("can not write to file: %v", err)
+		return nil, fmt.Errorf("file is not writeable: %v", err)
 	}
 
-	if exists {
-		return nil, fmt.Errorf("key file %s already exists", filePath)
-	}
+	if sealed {
+		if !exists {
+			return nil, fmt.Errorf("key file %s does not exist", filePath)
+		}
+	} else {
+		if exists {
+			return nil, fmt.Errorf("key file %s already exists", filePath)
+		}
 
-	flags := os.O_RDWR | os.O_CREATE
-	file, err := os.OpenFile(filePath, flags, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open key file: %v", err)
-	}
+		flags := os.O_RDWR | os.O_CREATE
+		file, err := os.OpenFile(filePath, flags, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open key file: %v", err)
+		}
 
-	writer := bufio.NewWriter(file)
-	keys.writer = writer
-
-	return keys, nil
-}
-
-// loadKeyFile loads the key file from disk, looking in the given parent directories until it finds the file.
-// If the file is not found, it returns an error.
-func loadKeyFile(logger logging.Logger, index uint32, parentDirectories []string) (*keyFile, error) {
-
-	keyFileName := fmt.Sprintf("%d%s", index, KeyFileExtension)
-	keysPath, err := lookForFile(parentDirectories, keyFileName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find key file: %w", err)
-	}
-	if keysPath == "" {
-		return nil, fmt.Errorf("failed to find key file %s", keyFileName)
-	}
-	parentDirectory := path.Dir(keysPath)
-
-	keys := &keyFile{
-		logger:          logger,
-		index:           index,
-		parentDirectory: parentDirectory,
-	}
-
-	filePath := keys.path()
-
-	exists, size, err := util.VerifyFileProperties(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("can not write to file: %v", err)
-	}
-
-	if exists {
-		keys.size = uint64(size)
-	}
-
-	if !exists {
-		return nil, fmt.Errorf("key file %s does not exist", filePath)
+		writer := bufio.NewWriter(file)
+		keys.writer = writer
 	}
 
 	return keys, nil
-}
-
-// Size returns the size of the key file in bytes.
-func (k *keyFile) Size() uint64 {
-	return k.size
 }
 
 // name returns the name of the key file.
 func (k *keyFile) name() string {
-	return fmt.Sprintf("%d%s", k.index, KeyFileExtension)
+	return fmt.Sprintf("%d%s", k.index, KeysFileExtension)
 }
 
 // path returns the full path to the key file.
@@ -150,22 +106,7 @@ func (k *keyFile) write(key []byte, address types.Address) error {
 		return fmt.Errorf("failed to write address to key file: %v", err)
 	}
 
-	k.size += uint64(4 + len(key) + 8)
-
 	return nil
-}
-
-// getKeyFileIndex returns the index of the key file from the file name. Key file names have the form "X.keys",
-// where X is the segment index.
-func getKeyFileIndex(fileName string) (uint32, error) {
-	baseName := path.Base(fileName)
-	indexString := baseName[:len(baseName)-len(KeyFileExtension)]
-	index, err := strconv.Atoi(indexString)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
-	}
-
-	return uint32(index), nil
 }
 
 // flush flushes the key file to disk.
@@ -193,9 +134,6 @@ func (k *keyFile) seal() error {
 }
 
 // readKeys reads all keys from the key file. This method returns an error if the key file is not sealed.
-// If there are keys that were only partially written (i.e. keys being written when the process crashed), then
-// those keys may not be returned. If a key is returned, it is guaranteed to be "whole" (i.e. a partial key will
-// never be returned).
 func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 	if k.writer != nil {
 		return nil, fmt.Errorf("key file is not sealed")
@@ -221,22 +159,18 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 
 	index := 0
 	for {
-		// We need at least 4 bytes to read the length of the key.
-		if index+4 > len(keyBytes) {
-			// There are fewer than 4 bytes left in the file.
+		if index+4 >= len(keyBytes) {
 			break
 		}
-		keyLength := int(binary.BigEndian.Uint32(keyBytes[index : index+4]))
+		keyLength := binary.BigEndian.Uint32(keyBytes[index : index+4])
 		index += 4
 
-		// We need to read the key, as well as the 8 byte address.
-		if index+keyLength+8 > len(keyBytes) {
-			// There are insufficient bytes left in the file to read the key and address.
+		if index+int(keyLength)+8 > len(keyBytes) {
 			break
 		}
 
-		key := keyBytes[index : index+keyLength]
-		index += keyLength
+		key := keyBytes[index : index+int(keyLength)]
+		index += int(keyLength)
 
 		address := types.Address(binary.BigEndian.Uint64(keyBytes[index : index+8]))
 		index += 8
@@ -251,7 +185,7 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 	if index != len(keyBytes) {
 		// This can happen if there is a crash while we are writing to the key file.
 		// Recoverable, but best to note the event in the logs.
-		k.logger.Warnf("key file %s has %d partial bytes", k.path(), len(keyBytes)-index)
+		k.logger.Warnf("key file %s has %d corrupted bytes", k.path(), len(keyBytes)-index)
 	}
 
 	return keys, nil

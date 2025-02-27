@@ -41,8 +41,8 @@ func (t *threadSafeCache[K, V]) Weight() uint64 {
 	return t.cache.Weight()
 }
 
-func (t *threadSafeCache[K, V]) SetMaxWeight(capacity uint64) {
+func (t *threadSafeCache[K, V]) SetCapacity(capacity uint64) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.cache.SetMaxWeight(capacity)
+	t.cache.SetCapacity(capacity)
 }

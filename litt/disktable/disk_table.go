@@ -1,12 +1,9 @@
 package disktable
 
 import (
-	"errors"
+	"context"
 	"fmt"
-	"math"
-	"math/rand"
 	"os"
-	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,716 +11,543 @@ import (
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
-	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var _ litt.ManagedTable = (*DiskTable)(nil)
 
-// segmentDirectory is the directory where segment files are stored, relative to the root directory.
-const segmentDirectory = "segments"
-
-// keymapReloadBatchSize is the size of the batch used for reloading keys from segments into the keymap.
-const keymapReloadBatchSize = 1024
-
-const tableFlushChannelCapacity = 8
+// keysPendingFlushInitialCapacity is the initial capacity of the keysPendingFlush slice.
+const keysPendingFlushInitialCapacity = 64
 
 // DiskTable manages a table's Segments.
 type DiskTable struct {
+	// The context for the disk table.
+	ctx context.Context
+
+	// cancel is the cancel function for the disk table's context.
+	cancel context.CancelFunc
+
 	// The logger for the disk table.
 	logger logging.Logger
 
-	// fatalErrorHandler is a struct that permits the DB to "panic". There are many goroutines that function under the
-	// hood, and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations,
-	// the desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
-	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
-	fatalErrorHandler *util.FatalErrorHandler
-
-	// The root directories for the disk table.
-	roots []string
-
-	// The directories where segment files are stored.
-	segmentDirectories []string
+	// The root directory for the disk table.
+	root string
 
 	// The table's name.
 	name string
 
-	// The table's metadata.
-	metadata *tableMetadata
-
 	// A map of keys to their addresses.
-	keymap keymap.Keymap
-
-	// The path to the keymap directory.
-	keymapPath string
-
-	// The type file for the keymap.
-	keymapTypeFile *keymap.KeymapTypeFile
+	keyMap keymap.KeyMap
 
 	// unflushedDataCache is a map of keys to their values that may not have been flushed to disk yet. This is used as a
 	// lookup table when data is requested from the table before it has been flushed to disk.
 	unflushedDataCache sync.Map
 
-	// clock is the time source used by the disk table.
-	clock func() time.Time
+	// keysPendingFlush is a list keys that have not yet been flushed out to the key map. A key is only eligible
+	// to be flushed to the key map after its value has been written to disk. This is important! If write a key
+	// first then crash before writing the value, then the key will be dangling in the key map.
+	keysPendingFlush []*types.KAPair
 
-	// The number of bytes contained within all segments, including the mutable segment. This tracks the number of
-	// bytes that are on disk, not bytes in memory.
-	size atomic.Uint64
+	// The index of the lowest numbered segment. After initial creation, only the garbage collection
+	// thread is permitted to read/write this value  for the sake of thread safety.
+	lowestSegmentIndex uint32
 
-	// The number of keys in the table.
-	keyCount atomic.Int64
+	// The index of the highest numbered segment. All writes are applied to this segment.
+	highestSegmentIndex uint32
 
-	// The control loop is a goroutine responsible for scheduling operations that mutate the table.
-	controlLoop *controlLoop
+	// All segments currently in use.
+	segments map[uint32]*segment.Segment
 
-	// The flush loop is a goroutine responsible for blocking on flush operations.
-	flushLoop *flushLoop
+	// The target size for value files.
+	targetFileSize uint32
 
-	// Encapsulates metrics for the database.
-	metrics *metrics.LittDBMetrics
+	// segmentLock protects access to the segments map and highestSegmentIndex.
+	// Does not protect the segments themselves.
+	segmentLock sync.RWMutex
+
+	// alive is an atomic boolean that is true if the disk table is alive, or false if it has been shut down.
+	alive atomic.Bool
+
+	// This channel can be used to block until the disk table has been stopped. The channel has a capacity of 1, and
+	// there is an element in the channel up until the disk table has been stopped.
+	stopChannel chan struct{}
+
+	// controllerChan is the channel for messages sent to controller goroutine. No data managed by the DiskTable
+	// may be mutated by anything other than the controller, with the exception of the
+	// segmentLock and reference counting.
+	controllerChan chan any
+
+	// garbageCollectionPeriod is the period at which garbage collection is run.
+	garbageCollectionPeriod time.Duration
+
+	// timeSource is the time source used by the disk table.
+	timeSource func() time.Time
+
+	// the currently configured TTL
+	ttl atomic.Pointer[time.Duration]
+
+	// Set to true when there is a fatal error on a goroutine that doesn't have a way to return the error.
+	// This is used during testing.
+	fatalError atomic.Bool
 }
 
 // NewDiskTable creates a new DiskTable.
 func NewDiskTable(
-	config *litt.Config,
+	ctx context.Context,
+	logger logging.Logger,
+	timeSource func() time.Time,
 	name string,
-	keymap keymap.Keymap,
-	keymapPath string,
-	keymapTypeFile *keymap.KeymapTypeFile,
-	roots []string,
-	reloadKeymap bool,
-	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
+	keyMap keymap.KeyMap,
+	root string,
+	targetFileSize uint32,
+	controlChannelSize int,
+	gcPeriod time.Duration) (litt.ManagedTable, error) {
 
-	if config.GCPeriod <= 0 {
-		return nil, errors.New("garbage collection period must be greater than 0")
+	_, err := os.Stat(root)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(root, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root directory: %v", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to stat root directory: %v", err)
 	}
 
-	// If the root directories don't exist, create them.
-	for _, root := range roots {
-		exists, err := util.Exists(root)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if root directory exists: %w", err)
-		}
-		if !exists {
-			err = os.MkdirAll(root, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %w", err)
-			}
-		}
+	if gcPeriod <= 0 {
+		return nil, fmt.Errorf("garbage collection period must be greater than 0")
 	}
 
-	// For each root directory, create a segment directory if it doesn't exist.
-	segDirs := make([]string, 0, len(roots))
-	for _, root := range roots {
-		segDir := path.Join(root, segmentDirectory)
-		segDirs = append(segDirs, segDir)
-
-		exists, err := util.Exists(segDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment directory exists: %w", err)
-		}
-
-		if !exists {
-			err := os.MkdirAll(segDir, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create segment directory: %w", err)
-			}
-		}
-	}
-
-	var metadataFilePath string
-	var metadata *tableMetadata
-
-	// Find the table metadata file or create a new one.
-	for _, root := range roots {
-		possibleMetadataPath := metadataPath(root)
-		exists, err := util.Exists(possibleMetadataPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if metadata file exists: %w", err)
-		}
-		if exists {
-			if metadataFilePath != "" {
-				return nil, fmt.Errorf("multiple metadata files found: %s and %s",
-					metadataFilePath, possibleMetadataPath)
-			}
-
-			// We've found an existing metadata file. Use it.
-			metadataFilePath = possibleMetadataPath
-		}
-	}
-	if metadataFilePath == "" {
-		// No metadata file exists yet. Create a new one in the first root.
-		var err error
-		metadataDir := roots[0]
-		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create table metadata: %w", err)
-		}
-	} else {
-		// Metadata file exists, so we need to load it.
-		var err error
-		metadataDir := path.Dir(metadataFilePath)
-		metadata, err = loadTableMetadata(config.Logger, metadataDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load table metadata: %w", err)
-		}
-	}
-
-	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger, config.FatalErrorCallback)
+	ctx, cancel := context.WithCancel(ctx)
 
 	table := &DiskTable{
-		logger:             config.Logger,
-		fatalErrorHandler:  fatalErrorHandler,
-		clock:              config.Clock,
-		roots:              roots,
-		segmentDirectories: segDirs,
-		name:               name,
-		metadata:           metadata,
-		keymap:             keymap,
-		keymapPath:         keymapPath,
-		keymapTypeFile:     keymapTypeFile,
-		metrics:            metrics,
-	}
-
-	lowestSegmentIndex, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(
-			config.Logger,
-			fatalErrorHandler,
-			table.segmentDirectories,
-			config.Clock())
-	if err != nil {
-		return nil, fmt.Errorf("failed to gather segment files: %w", err)
-	}
-
-	immutableSegmentSize := uint64(0)
-	for _, seg := range segments {
-		immutableSegmentSize += seg.Size()
-	}
-
-	// Create the mutable segment
-	creatingFirstSegment := len(segments) == 0
-
-	var nextSegmentIndex uint32
-	if creatingFirstSegment {
-		nextSegmentIndex = 0
-	} else {
-		nextSegmentIndex = highestSegmentIndex + 1
-	}
-	mutableSegment, err := segment.CreateSegment(
-		config.Logger,
-		fatalErrorHandler,
-		nextSegmentIndex,
-		segDirs,
-		config.Clock(),
-		metadata.GetShardingFactor(),
-		config.SaltShaker.Uint32(),
-		config.Fsync)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
-	}
-	if !creatingFirstSegment {
-		segments[highestSegmentIndex].SetNextSegment(mutableSegment)
-		highestSegmentIndex++
-	}
-	segments[nextSegmentIndex] = mutableSegment
-
-	if reloadKeymap {
-		config.Logger.Infof("reloading keymap from segments")
-		err = table.reloadKeymap(segments, lowestSegmentIndex, highestSegmentIndex)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load keymap from segments: %w", err)
-		}
-	}
-
-	tableSaltShaker := rand.New(rand.NewSource(config.SaltShaker.Int63()))
-
-	// Start the flush loop.
-	fLoop := &flushLoop{
-		logger:            config.Logger,
-		diskTable:         table,
-		fatalErrorHandler: fatalErrorHandler,
-		flushChannel:      make(chan any, tableFlushChannelCapacity),
-		metrics:           metrics,
-		clock:             config.Clock,
-		name:              name,
-	}
-	table.flushLoop = fLoop
-	go fLoop.run()
-
-	// Start the control loop.
-	cLoop := &controlLoop{
-		logger:                  config.Logger,
-		diskTable:               table,
-		fatalErrorHandler:       fatalErrorHandler,
-		controllerChannel:       make(chan any, config.ControlChannelSize),
-		lowestSegmentIndex:      lowestSegmentIndex,
-		highestSegmentIndex:     highestSegmentIndex,
-		segments:                segments,
-		size:                    &table.size,
-		keyCount:                &table.keyCount,
-		targetFileSize:          config.TargetSegmentFileSize,
-		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
-		maxKeyCount:             config.MaxSegmentKeyCount,
-		clock:                   config.Clock,
-		segmentDirectories:      segDirs,
-		saltShaker:              tableSaltShaker,
-		metadata:                metadata,
-		fsync:                   config.Fsync,
-		metrics:                 metrics,
+		ctx:                     ctx,
+		cancel:                  cancel,
+		logger:                  logger,
+		timeSource:              timeSource,
+		root:                    root,
 		name:                    name,
-		gcBatchSize:             config.GCBatchSize,
-		keymap:                  keymap,
-		flushLoop:               fLoop,
-		garbageCollectionPeriod: config.GCPeriod,
+		keyMap:                  keyMap,
+		keysPendingFlush:        make([]*types.KAPair, 0, keysPendingFlushInitialCapacity),
+		targetFileSize:          targetFileSize,
+		segments:                make(map[uint32]*segment.Segment),
+		controllerChan:          make(chan any, controlChannelSize),
+		stopChannel:             make(chan struct{}, 1),
+		garbageCollectionPeriod: gcPeriod,
 	}
-	cLoop.threadsafeHighestSegmentIndex.Store(highestSegmentIndex)
-	table.controlLoop = cLoop
-	cLoop.updateCurrentSize()
-	go cLoop.run()
+	table.alive.Store(true)
+	table.stopChannel <- struct{}{}
+
+	// By default, no TTL is enforced.
+	defaultTTL := time.Duration(0)
+	table.ttl.Store(&defaultTTL)
+
+	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
+		segment.GatherSegmentFiles(logger, root, timeSource(), true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather segment files: %v", err)
+	}
+
+	err = table.keyMap.LoadFromSegments(table.segments, table.lowestSegmentIndex, table.highestSegmentIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load key map from segments: %v", err)
+	}
 
 	return table, nil
-}
-
-func (d *DiskTable) KeyCount() uint64 {
-	return uint64(d.keyCount.Load())
-}
-
-func (d *DiskTable) Size() uint64 {
-	return d.size.Load()
-}
-
-// reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't
-// save its data on disk, or we are migrating from one keymap type to another.
-func (d *DiskTable) reloadKeymap(
-	segments map[uint32]*segment.Segment,
-	lowestSegmentIndex uint32,
-	highestSegmentIndex uint32) error {
-
-	start := d.clock()
-	defer func() {
-		d.logger.Infof("spent %v reloading keymap", d.clock().Sub(start))
-	}()
-
-	// It's possible that some of the data written near the end of the previous session was corrupted.
-	// Read data from the end until the first valid key/value pair is found.
-	isValid := false
-
-	batch := make([]*types.KAPair, 0, keymapReloadBatchSize)
-
-	for i := highestSegmentIndex; i >= lowestSegmentIndex && i+1 != 0; i-- {
-		if !segments[i].IsSealed() {
-			// ignore unsealed segment, this will have been created in the current session and will not
-			// yet contain any data.
-			continue
-		}
-
-		keys, err := segments[i].GetKeys()
-		if err != nil {
-			return fmt.Errorf("failed to get keys from segment %d: %w", i, err)
-		}
-		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
-			key := keys[keyIndex]
-
-			if !isValid {
-				_, err = segments[i].Read(key.Key, key.Address)
-				if err == nil {
-					// we found a valid key/value pair. All subsequent keys are valid.
-					isValid = true
-				} else {
-					// This is not cause for alarm (probably).
-					// This can happen when the database is not cleanly shut down,
-					// and just means that some data near the end was not fully committed.
-					d.logger.Infof("truncated value for key %s with address %s for segment %d",
-						key.Key, key.Address, i)
-				}
-			}
-
-			if isValid {
-				batch = append(batch, key)
-				if len(batch) == keymapReloadBatchSize {
-					err = d.keymap.Put(batch)
-					if err != nil {
-						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
-					}
-					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
-				}
-			}
-		}
-
-	}
-
-	if len(batch) > 0 {
-		err := d.keymap.Put(batch)
-		if err != nil {
-			return fmt.Errorf("failed to put keys: %w", err)
-		}
-	}
-
-	// Now that the keymap is loaded, write the marker file that indicates that the keymap is fully loaded.
-	// If we crash prior to writing this file, the keymap will reload from the segments again.
-	keymapInitializedFile := path.Join(d.keymapPath, keymap.KeymapInitializedFileName)
-	err := os.MkdirAll(d.keymapPath, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create keymap directory: %w", err)
-	}
-
-	f, err := os.Create(keymapInitializedFile)
-	if err != nil {
-		return fmt.Errorf("failed to create keymap initialized file after reload: %w", err)
-	}
-	err = f.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close keymap initialized file after reload: %w", err)
-	}
-
-	return nil
 }
 
 func (d *DiskTable) Name() string {
 	return d.name
 }
 
-// Close stops the disk table. Flushes all data out to disk.
-func (d *DiskTable) Close() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
+// Start starts the disk table.
+func (d *DiskTable) Start() error {
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
+	}
+	go d.controlLoop()
+	return nil
+}
+
+// Stop stops the disk table. Flushes all data out to disk.
+func (d *DiskTable) Stop() error {
+	alive := d.alive.Swap(false)
+	if alive {
+		flushReq := &flushRequest{
+			responseChan: make(chan error, 1),
+		}
+		d.controllerChan <- flushReq
+		err := <-flushReq.responseChan
+
+		d.cancel()
+		if err != nil {
+			return fmt.Errorf("failed to flush: %v", err)
+		}
 	}
 
-	d.fatalErrorHandler.Shutdown()
-
-	shutdownCompleteChan := make(chan struct{}, 1)
-	request := &controlLoopShutdownRequest{
-		shutdownCompleteChan: shutdownCompleteChan,
-	}
-
-	err := d.controlLoop.enqueue(request)
-	if err != nil {
-		return fmt.Errorf("failed to send shutdown request: %w", err)
-	}
-
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, shutdownCompleteChan)
-	if err != nil {
-		return fmt.Errorf("failed to shutdown: %w", err)
-	}
+	// Wait for the control loop to stop.
+	d.stopChannel <- struct{}{}
+	<-d.stopChannel
 
 	return nil
 }
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
-	}
-
-	err := d.Close()
+	err := d.Stop()
 	if err != nil {
-		return fmt.Errorf("failed to stop: %w", err)
+		return fmt.Errorf("failed to stop: %v", err)
 	}
 
-	d.logger.Infof("deleting disk table at path(s): %v", d.roots)
+	d.logger.Infof("deleting disk table at path: %s", d.root)
 
-	// release all segments
-	segments, err := d.controlLoop.getSegments()
-	if err != nil {
-		return fmt.Errorf("failed to get segments: %w", err)
-	}
-	for _, seg := range segments {
+	for _, seg := range d.segments {
 		seg.Release()
 	}
-	// wait for segments to delete themselves
-	for _, seg := range segments {
-		err = seg.BlockUntilFullyDeleted()
-		if err != nil {
-			return fmt.Errorf("failed to delete segment: %w", err)
-		}
+	for _, seg := range d.segments {
+		seg.BlockUntilFullyDeleted()
+	}
+	err = os.Remove(d.root)
+	if err != nil {
+		return fmt.Errorf("failed to remove root directory: %v", err)
 	}
 
-	// delete all segment directories
-	for _, segDir := range d.segmentDirectories {
-		err = os.Remove(segDir)
-		if err != nil {
-			return fmt.Errorf("failed to remove segment directory: %w", err)
-		}
-	}
-
-	// destroy the keymap
-	err = d.keymap.Destroy()
+	err = d.keyMap.Destroy()
 	if err != nil {
-		return fmt.Errorf("failed to destroy keymap: %w", err)
-	}
-	err = d.keymapTypeFile.Delete()
-	if err != nil {
-		return fmt.Errorf("failed to delete keymap type file: %w", err)
-	}
-	exists, err := util.Exists(d.keymapPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if keymap directory exists: %w", err)
-	}
-	if exists {
-		err = os.RemoveAll(d.keymapPath)
-		if err != nil {
-			return fmt.Errorf("failed to remove keymap directory: %w", err)
-		}
-	}
-
-	// delete the metadata file
-	err = d.metadata.delete()
-	if err != nil {
-		return fmt.Errorf("failed to delete metadata: %w", err)
-	}
-
-	// delete the root directories for the table
-	for _, root := range d.roots {
-		err = os.Remove(root)
-		if err != nil {
-			return fmt.Errorf("failed to remove root directory: %w", err)
-		}
+		return fmt.Errorf("failed to destroy key map: %v", err)
 	}
 
 	return nil
 }
 
-// SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting affects both new
+// SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting effects both new
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
 	}
 
-	err := d.metadata.SetTTL(ttl)
-	if err != nil {
-		return fmt.Errorf("failed to set TTL: %w", err)
-	}
+	d.ttl.Store(&ttl)
 	return nil
 }
 
-func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf(
-			"Cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
+// getSegment returns the segment with the given index. Segment is reserved, and it is the caller's responsibility to
+// release the reservation when done.
+func (d *DiskTable) getReservedSegment(index uint32) (*segment.Segment, bool) {
+	d.segmentLock.RLock()
+	defer d.segmentLock.RUnlock()
+
+	seg, ok := d.segments[index]
+	if !ok {
+		return nil, false
 	}
 
-	if shardingFactor == 0 {
-		return fmt.Errorf("sharding factor must be greater than 0")
+	ok = seg.Reserve()
+	if !ok {
+		// segmented was deleted out from under us
+		return nil, false
 	}
 
-	request := &controlLoopSetShardingFactorRequest{
-		shardingFactor: shardingFactor,
-	}
-	err := d.controlLoop.enqueue(request)
-	if err != nil {
-		return fmt.Errorf("failed to send sharding factor request: %w", err)
-	}
-
-	return nil
+	return seg, true
 }
 
 func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return nil, false, fmt.Errorf(
-			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
-	}
-
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
+	if !d.alive.Load() {
+		return nil, false, fmt.Errorf("DB is shut down")
 	}
 
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
-	if value, ok := d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); ok {
-		bytes := value.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(bytes))
-		return bytes, true, nil
+	if value, ok := d.unflushedDataCache.Load(string(key)); ok {
+		return value.([]byte), true, nil
 	}
 
 	// Look up the address of the data.
-	address, ok, err := d.keymap.Get(key)
+	address, ok, err := d.keyMap.Get(key)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get address: %w", err)
+		return nil, false, fmt.Errorf("failed to get address: %v", err)
 	}
 	if !ok {
 		return nil, false, nil
 	}
 
 	// Reserve the segment that contains the data.
-	seg, ok := d.controlLoop.getReservedSegment(address.Index())
+	seg, ok := d.getReservedSegment(address.Index())
 	if !ok {
 		return nil, false, nil
 	}
 	defer seg.Release()
 
 	// Read the data from disk.
-	data, err := seg.Read(key, address)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to read data: %w", err)
-	}
+	data, err := seg.Read(address)
 
-	dataSize = uint64(len(data))
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to read data: %v", err)
+	}
 
 	return data, true, nil
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
-	return d.PutBatch([]*types.KVPair{{Key: key, Value: value}})
-}
-
-func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
 	}
 
-	if d.metrics != nil {
-		start := d.clock()
-		totalSize := uint64(0)
-		for _, kv := range batch {
-			totalSize += uint64(len(kv.Value))
-		}
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportWriteOperation(d.name, delta, uint64(len(batch)), totalSize)
-		}()
+	d.unflushedDataCache.Store(string(key), value)
+
+	writeReq := &writeRequest{
+		values: make([]*types.KVPair, 1),
+	}
+	writeReq.values[0] = &types.KVPair{
+		Key:   key,
+		Value: value,
 	}
 
-	for _, kv := range batch {
-		if len(kv.Key) > math.MaxUint32 {
-			return fmt.Errorf("key is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Key))
-		}
-		if len(kv.Value) > math.MaxUint32 {
-			return fmt.Errorf("value is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Value))
-		}
-
-		d.unflushedDataCache.Store(util.UnsafeBytesToString(kv.Key), kv.Value)
-	}
-
-	request := &controlLoopWriteRequest{
-		values: batch,
-	}
-	err := d.controlLoop.enqueue(request)
-	if err != nil {
-		return fmt.Errorf("failed to send write request: %w", err)
-	}
-
-	d.keyCount.Add(int64(len(batch)))
+	d.controllerChan <- writeReq
 
 	return nil
 }
 
-func (d *DiskTable) Exists(key []byte) (bool, error) {
-	_, ok := d.unflushedDataCache.Load(util.UnsafeBytesToString(key))
-	if ok {
-		return true, nil
+func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
 	}
 
-	_, ok, err := d.keymap.Get(key)
+	for _, kv := range batch {
+		d.unflushedDataCache.Store(string(kv.Key), kv.Value)
+	}
+
+	request := &writeRequest{
+		values: batch,
+	}
+	d.controllerChan <- request
+	return nil
+}
+
+// writeRequest is a request to write a key-value pair.
+type writeRequest struct {
+	values []*types.KVPair
+}
+
+// handleWriteRequest handles a writeRequest control message.
+func (d *DiskTable) handleWriteRequest(req *writeRequest) {
+	for _, kv := range req.values {
+		// Do the write.
+		seg := d.segments[d.highestSegmentIndex]
+		address, err := seg.Write(kv.Key, kv.Value)
+		if err != nil {
+			d.panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
+		}
+
+		d.keysPendingFlush = append(d.keysPendingFlush, &types.KAPair{Key: kv.Key, Address: address})
+
+		// Check to see if the write caused the mutable segment to become full.
+		if d.segments[d.highestSegmentIndex].CurrentSize() >= uint64(d.targetFileSize) {
+			// Mutable segment is full. Before continuing, we need to expand the segments.
+			err = d.expandSegments()
+			if err != nil {
+				d.panic(fmt.Errorf("failed to expand segments: %v", err))
+			}
+		}
+	}
+}
+
+// panic! Something just went very wrong. (╯°□°)╯︵ ┻━┻
+func (d *DiskTable) panic(err error) {
+	d.fatalError.Store(true)
+	d.logger.Fatalf("unrecoverable DB error, database is shutting down: %v", err)
+	err = d.Stop()
 	if err != nil {
-		return false, fmt.Errorf("failed to get address: %w", err)
+		d.logger.Fatalf("failed to stop DB: %v", err)
+	}
+}
+
+// expandSegments checks if the highest segment is full, and if so, creates a new segment.
+func (d *DiskTable) expandSegments() error {
+	// Seal the previous segment.
+	now := d.timeSource()
+	err := d.segments[d.highestSegmentIndex].Seal(now)
+	if err != nil {
+		return fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err)
 	}
 
-	return ok, nil
+	// All keys are now eligible to be flushed.
+	err = d.flushKeys()
+	if err != nil {
+		return fmt.Errorf("failed to flush keys: %v", err)
+	}
+
+	// Create a new segment.
+	newSegment, err := segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.root, now, false)
+	if err != nil {
+		d.segmentLock.Unlock()
+		return fmt.Errorf("failed to create new segment: %v", err)
+	}
+	d.segments[d.highestSegmentIndex].SetNextSegment(newSegment)
+	d.highestSegmentIndex++
+
+	d.segmentLock.Lock()
+	d.segments[d.highestSegmentIndex] = newSegment
+	d.segmentLock.Unlock()
+
+	return nil
 }
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Flush() request, DB is in panicked state due to error: %w", err)
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
 	}
 
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportFlushOperation(d.name, delta)
-		}()
+	flushReq := &flushRequest{
+		responseChan: make(chan error, 1),
 	}
-
-	flushReq := &controlLoopFlushRequest{
-		responseChan: make(chan struct{}, 1),
-	}
-	err := d.controlLoop.enqueue(flushReq)
+	d.controllerChan <- flushReq
+	err := <-flushReq.responseChan
 	if err != nil {
-		return fmt.Errorf("failed to send flush request: %w", err)
-	}
-
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, flushReq.responseChan)
-	if err != nil {
-		return fmt.Errorf("failed to flush: %w", err)
+		return fmt.Errorf("failed to flush: %v", err)
 	}
 
 	return nil
 }
 
-func (d *DiskTable) SetCacheSize(_ uint64) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
-	}
-
-	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
-	return nil
+// flushRequest is a request to flush the writer.
+type flushRequest struct {
+	responseChan chan error
 }
 
-func (d *DiskTable) RunGC() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf(
-			"Cannot process RunGC() request, DB is in panicked state due to error: %w", err)
-	}
-
-	request := &controlLoopGCRequest{
-		completionChan: make(chan struct{}, 1),
-	}
-
-	err := d.controlLoop.enqueue(request)
+// handleFlushRequest handles a flushRequest control message.
+func (d *DiskTable) handleFlushRequest(req *flushRequest) {
+	err := d.segments[d.highestSegmentIndex].Flush()
 	if err != nil {
-		return fmt.Errorf("failed to send GC request: %w", err)
+		err = fmt.Errorf("failed to flush mutable segment: %v", err)
+		req.responseChan <- err
+		return
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, request.completionChan)
+	err = d.flushKeys()
 	if err != nil {
-		return fmt.Errorf("failed to await GC completion: %w", err)
+		err = fmt.Errorf("failed to flush keys: %v", err)
+		d.panic(err)
+		req.responseChan <- err
+		return
 	}
 
-	return nil
+	req.responseChan <- nil
 }
 
-// writeKeysToKeymap flushes all keys to the keymap. Once they are flushed, it also removes the keys from the
-// unflushedDataCache.
-func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
-	if len(keys) == 0 {
-		// Nothing to flush.
+// flushKeys flushes all keys to the key map. As they are flushed, it also removes them from the unflushedDataCache.
+func (d *DiskTable) flushKeys() error {
+	if len(d.keysPendingFlush) == 0 {
 		return nil
 	}
 
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportKeymapFlushLatency(d.name, delta)
-		}()
-	}
-
-	err := d.keymap.Put(keys)
+	err := d.keyMap.Put(d.keysPendingFlush)
 	if err != nil {
-		return fmt.Errorf("failed to flush keys: %w", err)
+		return fmt.Errorf("failed to flush keys: %v", err)
 	}
 
-	// Keys are now durably written to both the segment and the keymap. It is therefore safe to remove them from the
-	// unflushed data cache.
-	for _, ka := range keys {
-		d.unflushedDataCache.Delete(util.UnsafeBytesToString(ka.Key))
+	// This method will only be called when all values have been written to disk. Since we just flushed the keys,
+	// it is now the case that a caller to Get() can fetch data using the key map and the files on disk. So
+	// it's safe to remove the keys from the unflushedDataCache.
+	for _, ka := range d.keysPendingFlush {
+		d.unflushedDataCache.Delete(string(ka.Key))
 	}
 
+	d.keysPendingFlush = make([]*types.KAPair, 0, keysPendingFlushInitialCapacity)
 	return nil
+}
+
+// controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
+// disk table (this vastly simplifies locking and thread safety).
+func (d *DiskTable) controlLoop() {
+	defer d.shutdownTasks()
+
+	ticker := time.NewTicker(d.garbageCollectionPeriod)
+
+	for d.ctx.Err() == nil {
+		select {
+		case message := <-d.controllerChan:
+			if writeReq, ok := message.(*writeRequest); ok {
+				d.handleWriteRequest(writeReq)
+			} else if flushReq, ok := message.(*flushRequest); ok {
+				d.handleFlushRequest(flushReq)
+			} else {
+				d.logger.Errorf("Unknown control message type %T", message)
+			}
+		case <-ticker.C:
+			d.doGarbageCollection()
+		case <-d.ctx.Done():
+			return
+		}
+	}
+}
+
+// shutdownTasks performs tasks necessary to cleanly shut down the disk table.
+func (d *DiskTable) shutdownTasks() {
+	// Seal the mutable segment
+	err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
+	if err != nil {
+		d.logger.Errorf("failed to seal mutable segment: %v", err)
+	}
+
+	// Stop the key map
+	err = d.keyMap.Stop()
+	if err != nil {
+		d.logger.Errorf("failed to stop key map: %v", err)
+	}
+
+	// unblock the Stop() method
+	<-d.stopChannel
+}
+
+// doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
+func (d *DiskTable) doGarbageCollection() {
+	now := d.timeSource()
+	ttl := *d.ttl.Load()
+	if ttl.Nanoseconds() == 0 {
+		// No TTL set, so nothing to do.
+		return
+	}
+
+	for index := d.lowestSegmentIndex; index <= d.highestSegmentIndex; index++ {
+		seg := d.segments[index]
+		if !seg.IsSealed() {
+			// We can't delete an unsealed segment.
+			return
+		}
+
+		sealTime := seg.GetSealTime()
+		segmentAge := now.Sub(sealTime)
+		if segmentAge < ttl {
+			// Segment is not old enough to be deleted.
+			return
+		}
+
+		// Segment is old enough to be deleted.
+
+		keys, err := seg.GetKeys()
+		if err != nil {
+			d.logger.Errorf("Failed to get keys: %v", err)
+			return
+		}
+
+		err = d.keyMap.Delete(keys)
+		if err != nil {
+			d.logger.Errorf("Failed to delete keys: %v", err)
+			return
+		}
+
+		// Deletion of segment files will happen when the segment is released by all reservation holders.
+		seg.Release()
+		d.segmentLock.Lock()
+		delete(d.segments, index)
+		d.segmentLock.Unlock()
+
+		d.lowestSegmentIndex++
+	}
+}
+
+func (d *DiskTable) SetCacheSize(size uint64) {
+	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
 }

@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
-	"github.com/Layr-Labs/eigenda/core"
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -64,9 +63,8 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	var err error
-	server.frameCache, err = cache.NewCacheAccessor[blobKeyWithMetadata, *core.ChunksData](
-		cachecommon.NewFIFOCache[blobKeyWithMetadata, *core.ChunksData](cacheSize, server.computeFramesCacheWeight),
+	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
+		cache2.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, server.computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)

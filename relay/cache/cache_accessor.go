@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -48,7 +48,7 @@ type cacheAccessor[K comparable, V any] struct {
 	lookupsInProgress map[K]*accessResult[V]
 
 	// cache is the underlying cache that this wrapper manages.
-	cache cachecommon.Cache[K, V]
+	cache cache2.Cache[K, V]
 
 	// concurrencyLimiter is a channel used to limit the number of concurrent lookups that can be in progress.
 	concurrencyLimiter chan struct{}
@@ -72,7 +72,7 @@ type cacheAccessor[K comparable, V any] struct {
 // If metrics is not nil, it will be used to record metrics about the cache accessor's performance.
 // If nil, no metrics will be recorded.
 func NewCacheAccessor[K comparable, V any](
-	cache cachecommon.Cache[K, V],
+	cache cache2.Cache[K, V],
 	concurrencyLimit int,
 	accessor Accessor[K, V],
 	metrics *CacheAccessorMetrics) (CacheAccessor[K, V], error) {

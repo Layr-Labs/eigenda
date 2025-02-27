@@ -6,30 +6,26 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestWriteThenReadValues(t *testing.T) {
-	t.Parallel()
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	shard := rand.Uint32()
 	valueCount := rand.Int32Range(100, 200)
 	values := make([][]byte, valueCount)
-	expectedFileSize := uint64(0)
 	for i := 0; i < int(valueCount); i++ {
 		values[i] = rand.VariableBytes(1, 100)
-		expectedFileSize += uint64(len(values[i])) + 4 /* length uint32 */
 	}
 
-	// A map from the first byte index of the value to the value itself.
-	addressMap := make(map[uint32][]byte)
+	addressMap := make(map[types.Address][]byte)
 
-	file, err := createValueFile(logger, index, shard, directory, false)
+	file, err := newValueFile(logger, index, directory, false)
 	require.NoError(t, err)
 
 	for _, value := range values {
@@ -64,22 +60,6 @@ func TestWriteThenReadValues(t *testing.T) {
 		require.Equal(t, val, readValue)
 	}
 
-	reportedFileSize := file.size
-	stat, err := os.Stat(file.path())
-	require.NoError(t, err)
-	actualFileSize := uint64(stat.Size())
-	require.Equal(t, actualFileSize, reportedFileSize)
-
-	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadValueFile(logger, index, shard, []string{directory})
-	require.NoError(t, err)
-	require.Equal(t, file.size, file2.size)
-	for key, val := range addressMap {
-		readValue, err := file2.read(key)
-		require.NoError(t, err)
-		require.Equal(t, val, readValue)
-	}
-
 	// delete the file
 	filePath := file.path()
 	_, err = os.Stat(filePath)
@@ -93,27 +73,24 @@ func TestWriteThenReadValues(t *testing.T) {
 }
 
 func TestReadingTruncatedValueFile(t *testing.T) {
-	t.Parallel()
-	rand := random.NewTestRandom()
+	rand := random.NewTestRandom(t)
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	shard := rand.Uint32()
 	valueCount := rand.Int32Range(100, 200)
 	values := make([][]byte, valueCount)
 	for i := 0; i < int(valueCount); i++ {
 		values[i] = rand.VariableBytes(1, 100)
 	}
 
-	// A map from the first byte index of the value to the value itself.
-	addressMap := make(map[uint32][]byte)
+	addressMap := make(map[types.Address][]byte)
 
-	file, err := createValueFile(logger, index, shard, directory, false)
+	file, err := newValueFile(logger, index, directory, false)
 	require.NoError(t, err)
 
-	var lastAddress uint32
+	var lastAddress types.Address
 	for _, value := range values {
 		address, err := file.write(value)
 		require.NoError(t, err)
@@ -138,7 +115,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = loadValueFile(logger, index, shard, []string{directory})
+	file, err = newValueFile(logger, index, directory, true)
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.
@@ -160,7 +137,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = loadValueFile(logger, index, shard, []string{directory})
+	file, err = newValueFile(logger, index, directory, true)
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.

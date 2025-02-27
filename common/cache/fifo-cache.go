@@ -83,7 +83,7 @@ func (f *FIFOCache[K, V]) Weight() uint64 {
 	return f.currentWeight
 }
 
-func (f *FIFOCache[K, V]) SetMaxWeight(capacity uint64) {
+func (f *FIFOCache[K, V]) SetCapacity(capacity uint64) {
 	f.maxWeight = capacity
 	f.evict()
 }
