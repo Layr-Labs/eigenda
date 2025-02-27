@@ -400,7 +400,7 @@ func (d *DiskTable) handleWriteRequest(req *writeRequest) {
 		d.keysPendingFlush = append(d.keysPendingFlush, &types.KAPair{Key: kv.Key, Address: address})
 
 		// Check to see if the write caused the mutable segment to become full.
-		if d.segments[d.highestSegmentIndex].CurrentSize() >= uint64(d.targetFileSize) {
+		if d.segments[d.highestSegmentIndex].CurrentSize() > uint64(d.targetFileSize) {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
@@ -474,6 +474,8 @@ func (d *DiskTable) Flush() error {
 type flushRequest struct {
 	responseChan chan error
 }
+
+// TODO parallel flush, why not
 
 // handleFlushRequest handles a flushRequest control message.
 func (d *DiskTable) handleFlushRequest(req *flushRequest) {

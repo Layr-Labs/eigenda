@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path"
@@ -120,7 +121,7 @@ func (v *valueFile) read(address types.Address) ([]byte, error) {
 
 	// Read the value itself.
 	value := make([]byte, length)
-	bytesRead, err := reader.Read(value)
+	bytesRead, err := io.ReadFull(reader, value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read value from value file: %v", err)
 	}
@@ -138,8 +139,8 @@ func (v *valueFile) write(value []byte) (types.Address, error) {
 		return 0, fmt.Errorf("value file is sealed")
 	}
 
-	if v.currentSize+uint64(len(value)) >= math.MaxUint32 {
-		// No matter what, we can't start a new value if its first byte would be at position 2^32 or beyond.
+	if v.currentSize > math.MaxUint32 {
+		// No matter what, we can't start a new value if its first byte would be beyond position 2^32.
 		// This is because we only have 32 bits in an address to store the position of a value's first byte.
 		return 0, fmt.Errorf("value file already contains %d bytes, cannot add a new value", v.currentSize)
 	}

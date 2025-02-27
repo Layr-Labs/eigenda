@@ -61,7 +61,7 @@ func NewSegment(
 	}
 
 	if sealIfUnsealed && !metadata.sealed {
-		logger.Infof("Sealing segment %d", index)
+		logger.Debugf("Sealing segment %d", index) // TODO maybe delete this
 		err = metadata.seal(now)
 		if err != nil {
 			return nil, fmt.Errorf("failed to seal segment: %v", err)
