@@ -61,6 +61,7 @@ func newDB(
 		ttl:          ttl,
 		gcPeriod:     gcPeriod,
 		tableBuilder: tableBuilder,
+		tables:       make(map[string]litt.ManagedTable),
 	}
 }
 

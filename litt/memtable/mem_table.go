@@ -161,3 +161,8 @@ func (m *memTable) Stop() error {
 func (m *memTable) SetCacheSize(size uint64) {
 	// The memory table doesn't have a cache... it's already one giant cache.
 }
+
+func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
+	// the memory table has no concept of sharding
+	return nil
+}
