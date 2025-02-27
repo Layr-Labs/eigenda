@@ -556,7 +556,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 	})
 
-	t.Run("various query ranges and limits", func(t *testing.T) {
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// Returns keys[43] through keys[102] (60 blobs)
 		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
@@ -603,7 +603,54 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkCursor(t, response.Cursor, requestedAt[100], keys[100])
 	})
 
-	t.Run("pagination", func(t *testing.T) {
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// Returns keys[102] through keys[43] (60 blobs in descending order of time)
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?direction=backward&limit=0")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[43], keys[43])
+
+		// Test 2: 2-hour window captures all test blobs
+		// Verifies correct ordering of timestamp-colliding blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=-1", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, numBlobs, len(response.Blobs))
+		// The last 3 blobs ordered by key due to same timestamp
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[numBlobs-3].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[numBlobs-2].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[numBlobs-1].BlobMetadata.BlobHeader)
+		for i := 3; i < numBlobs; i++ {
+			checkBlobKeyEqual(t, keys[i], response.Blobs[numBlobs-i-1].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[numBlobs-i-1].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[0], firstBlobKeys[0])
+
+		// Test 3: Custom end time with 1-hour window
+		// Retrieves keys[100] through keys[41]
+		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&before=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[100-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[100-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[41], keys[41])
+	})
+
+	t.Run("forward pagination", func(t *testing.T) {
 		// Test pagination behavior:
 		// 1. First page: blobs in past 1h limited to 20, returns keys[43] through keys[62]
 		// 2. Second page: the next 20 blobs, returns keys[63] through keys[82]
@@ -634,6 +681,39 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		assert.True(t, len(response.Cursor) > 0)
 		checkCursor(t, response.Cursor, requestedAt[82], keys[82])
+	})
+
+	t.Run("backward pagination", func(t *testing.T) {
+		// Test backward pagination behavior:
+		// 1. First page: the most recent 20 blobs, keys[102] through keys[83]
+		// 2. Second page: requesting the next 20 blobs, but only 3 blobs due to "after" time bound
+		// Verifies:
+		// - Correct sequencing across pages
+		// - Proper token handling (cursor is exclusive)
+		tm := time.Unix(0, int64(requestedAt[80])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[83], keys[83])
+
+		// Request next page using pagination cursor
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20&cursor=%s", endTime, response.Cursor)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 3, len(response.Blobs))
+		for i := 0; i < 3; i++ {
+			checkBlobKeyEqual(t, keys[82-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[82-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[80], keys[80])
 	})
 
 	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
@@ -1059,14 +1139,14 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[66] (60 batches)
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `end` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
-		require.Equal(t, 60, len(response.Batches))
-		for i := 0; i < 60; i++ {
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)

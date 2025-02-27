@@ -281,8 +281,8 @@ func TestMetererReservations(t *testing.T) {
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
 	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint32(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(3), nil)
 	now := time.Now().Unix()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -313,13 +313,13 @@ func TestMetererOnDemand(t *testing.T) {
 	header = createPaymentHeader(now, big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	// No rollback after meter request
+	// Not record for invalid payment
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, 0, len(result))
 
 	// test duplicated cumulative payments
 	symbolLength := uint(100)
@@ -334,7 +334,8 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
-	for i := 1; i < 9; i++ {
+	numValidPayments := 9
+	for i := 1; i < numValidPayments; i++ {
 		header = createPaymentHeader(now, new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 		assert.NoError(t, err)
@@ -360,13 +361,12 @@ func TestMetererOnDemand(t *testing.T) {
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
-	numPrevRecords := 12
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numPrevRecords, len(result))
+	assert.Equal(t, numValidPayments, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now, big.NewInt(0).Add(previousCumulativePayment, mt.PaymentCharged(1010)), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers)
@@ -377,7 +377,7 @@ func TestMetererOnDemand(t *testing.T) {
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numPrevRecords, len(result))
+	assert.Equal(t, numValidPayments, len(result))
 }
 
 func TestMeterer_paymentCharged(t *testing.T) {
@@ -427,8 +427,8 @@ func TestMeterer_paymentCharged(t *testing.T) {
 
 	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
-		paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint32(tt.pricePerSymbol), nil)
-		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
+		paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(tt.pricePerSymbol), nil)
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
