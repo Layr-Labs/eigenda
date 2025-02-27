@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
@@ -222,6 +223,43 @@ func TestBadgerDBWrite(t *testing.T) {
 				return err
 			}
 			batch = db.NewWriteBatch()
+			objectsInBatch = 0
+		}
+
+		return nil
+	}
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Close()
+	require.NoError(t, err)
+}
+
+func TestPebbleDBWrite(t *testing.T) {
+	directory := "./test-data"
+
+	options := &pebble.Options{}
+
+	db, err := pebble.Open(directory, options)
+	require.NoError(t, err)
+
+	batch := db.NewBatch()
+	objectsInBatch := 0
+
+	writeFunction := func(key []byte, value []byte) error {
+
+		err = batch.Set(key, value, nil)
+		if err != nil {
+			return err
+		}
+		objectsInBatch++
+
+		if objectsInBatch >= batchSize {
+			err = batch.Commit(nil)
+			if err != nil {
+				return err
+			}
+			batch = db.NewBatch()
 			objectsInBatch = 0
 		}
 
