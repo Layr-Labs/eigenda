@@ -19,7 +19,6 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/google/uuid"
-	"github.com/shurcooL/graphql"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -29,7 +28,6 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -220,8 +218,6 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 	}
 
 	cs := eth.NewChainState(tx, ethClient)
-	querier := graphql.NewClient(retrievalClientConfig.ChurnerGraphUrl, nil)
-	indexedChainStateClient := thegraph.NewIndexedChainState(cs, querier, logger)
 	agn := &core.StdAssignmentCoordinator{}
 
 	// TODO: What should be the value here?
@@ -247,12 +243,12 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, indexedChainStateClient, agn, nodeClient, v, 10)
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, 10)
 	if err != nil {
 		return err
 	}
 
-	return indexedChainStateClient.Start(context.Background())
+	return nil
 }
 
 // TODO: This file contains some code that can be refactored and shared across some other tests ex:Integration Test.
