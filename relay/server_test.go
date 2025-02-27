@@ -3,9 +3,10 @@ package relay
 import (
 	"context"
 	"encoding/binary"
-	"github.com/docker/go-units"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/relay/auth"
@@ -93,7 +94,8 @@ func getChunks(
 	operatorIDBytes := make([]byte, 32)
 	binary.BigEndian.PutUint32(operatorIDBytes[24:], operatorID)
 	request.OperatorId = operatorIDBytes
-	signature := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	signature, err := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	require.NoError(t, err)
 	request.OperatorSignature = signature
 
 	var opts []grpc.DialOption

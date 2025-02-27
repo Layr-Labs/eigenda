@@ -131,7 +131,10 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 		G1Point: g1Point,
 	}
 
-	hash := hashing.HashGetChunksRequest(request)
+	hash, err := hashing.HashGetChunksRequest(request)
+	if err != nil {
+		return fmt.Errorf("failed to hash request: %w", err)
+	}
 	isValid := signature.Verify(key, ([32]byte)(hash))
 
 	if !isValid {
