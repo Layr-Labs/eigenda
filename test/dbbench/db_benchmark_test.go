@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/dgraph-io/badger/v4"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
@@ -194,5 +195,41 @@ func TestMemKeymapLittDBWrite(t *testing.T) {
 	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
 
 	err = db.Stop()
+	require.NoError(t, err)
+}
+
+func TestBadgerDBWrite(t *testing.T) {
+	directory := "./test-data"
+	opts := badger.DefaultOptions(directory)
+
+	opts.Logger = nil
+	db, err := badger.Open(opts)
+	require.NoError(t, err)
+
+	batch := db.NewWriteBatch()
+	objectsInBatch := 0
+
+	writeFunction := func(key []byte, value []byte) error {
+		err = batch.Set(key, value)
+		if err != nil {
+			return err
+		}
+		objectsInBatch++
+
+		if objectsInBatch >= batchSize {
+			err = batch.Flush()
+			if err != nil {
+				return err
+			}
+			batch = db.NewWriteBatch()
+			objectsInBatch = 0
+		}
+
+		return nil
+	}
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Close()
 	require.NoError(t, err)
 }
