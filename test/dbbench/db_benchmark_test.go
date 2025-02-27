@@ -49,8 +49,10 @@ func runWriteBenchmark(
 		// Do some console logging
 		newInterval := int(dataWritten / uint64(reportInterval))
 		if newInterval > interval {
+			interval = newInterval
 
 			timeSinceLastInterval := time.Since(previousIntervalTimestamp)
+			previousIntervalTimestamp = time.Now()
 			dataSinceLastInterval := dataWritten - previousIntervalDataWritten
 			previousIntervalDataWritten = dataWritten
 
@@ -67,7 +69,6 @@ func runWriteBenchmark(
 
 			fmt.Printf("%d%%: wrote %d MiB. %d mb/s during recent period, %d mb/s overall.\r",
 				completionPercentage, int(mbWritten), int(mbPerSecondOverLastInterval), int(mbPerSecondTotal))
-			interval = newInterval
 		}
 	}
 
