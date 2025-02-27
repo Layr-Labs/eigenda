@@ -30,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
@@ -210,7 +211,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         tu.RandomString(10),
+			AccountId:         gethcommon.BytesToAddress(tu.RandomBytes(20)).Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},

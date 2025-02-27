@@ -157,7 +157,11 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		return nil, fmt.Errorf("convert blob commitment: %s", err)
 	}
 
-	paymentHeaderHash, err := core.ConvertToPaymentMetadata(inputHeader.GetPaymentHeader()).Hash()
+	paymentHeader, err := core.ConvertToPaymentMetadata(inputHeader.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("convert payment header: %s", err)
+	}
+	paymentHeaderHash, err := paymentHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("hash payment header: %s", err)
 	}

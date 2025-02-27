@@ -2,11 +2,12 @@ package encoder_test
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"math/big"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/encoding/rs"
 
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
@@ -19,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -204,7 +206,7 @@ func createTestBlobHeader(t *testing.T) *corev2.BlobHeader {
 		QuorumNumbers:   []core.QuorumID{0},
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x1234",
+			AccountID:         gethcommon.Address{1},
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},

@@ -20,6 +20,7 @@ import (
 	retriever "github.com/Layr-Labs/eigenda/retriever/v2"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -127,7 +128,7 @@ func TestRetrieveBlob(t *testing.T) {
 			QuorumNumbers: []uint32{0},
 			Commitment:    c,
 			PaymentHeader: &commonpbv2.PaymentHeader{
-				AccountId: "account_id",
+				AccountId: gethcommon.Address{1}.Hex(),
 			},
 		},
 		ReferenceBlockNumber: 100,
