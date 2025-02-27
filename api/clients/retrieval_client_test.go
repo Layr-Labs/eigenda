@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -19,7 +18,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/wealdtech/go-merkletree/v2"
@@ -191,30 +189,6 @@ func setup(t *testing.T) {
 		encodedBlob.EncodedBundlesByOperator[id] = eb
 	}
 
-}
-
-func mustMakeOpertatorPubKeysPair(t *testing.T) *coreindexer.OperatorPubKeys {
-	operators := make(map[core.OperatorID]coreindexer.OperatorPubKeysPair, len(operatorState.Operators))
-	for operatorId := range operatorState.Operators[0] {
-		keyPair, err := core.GenRandomBlsKeys()
-		if err != nil {
-			t.Fatalf("Generating random BLS keys Error: %s", err.Error())
-		}
-		operators[operatorId] = coreindexer.OperatorPubKeysPair{
-			PubKeyG1: keyPair.PubKey.G1Affine,
-			PubKeyG2: keyPair.GetPubKeyG2().G2Affine,
-		}
-	}
-	keyPair, err := core.GenRandomBlsKeys()
-	if err != nil {
-		t.Fatalf("Generating random BLS keys Error: %s", err.Error())
-	}
-	return &coreindexer.OperatorPubKeys{
-		Operators: operators,
-		QuorumTotals: map[core.QuorumID]*bn254.G1Affine{
-			0: keyPair.PubKey.G1Affine,
-		},
-	}
 }
 
 func musMakeOperatorSocket(_ *testing.T) core.OperatorSockets {
