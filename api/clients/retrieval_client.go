@@ -65,6 +65,7 @@ type retrievalClient struct {
 func NewRetrievalClient(
 	logger logging.Logger,
 	chainState core.ChainState,
+	socketStateCache core.SocketStateCache,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	verifier encoding.Verifier,
@@ -73,6 +74,7 @@ func NewRetrievalClient(
 	return &retrievalClient{
 		logger:                logger.With("component", "RetrievalClient"),
 		chainState:            chainState,
+		socketStateCache:      socketStateCache,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		verifier:              verifier,

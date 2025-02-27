@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -33,11 +34,12 @@ type RetrievalClient interface {
 }
 
 type retrievalClient struct {
-	logger            logging.Logger
-	ethClient         core.Reader
-	indexedChainState core.IndexedChainState
-	verifier          encoding.Verifier
-	numConnections    int
+	logger           logging.Logger
+	ethClient        core.Reader
+	chainState       core.ChainState
+	socketStateCache core.SocketStateCache
+	verifier         encoding.Verifier
+	numConnections   int
 }
 
 var _ RetrievalClient = &retrievalClient{}
@@ -46,16 +48,18 @@ var _ RetrievalClient = &retrievalClient{}
 func NewRetrievalClient(
 	logger logging.Logger,
 	ethClient core.Reader,
-	chainState core.IndexedChainState,
+	chainState core.ChainState,
+	socketStateCache core.SocketStateCache,
 	verifier encoding.Verifier,
 	numConnections int,
 ) RetrievalClient {
 	return &retrievalClient{
-		logger:            logger.With("component", "RetrievalClient"),
-		ethClient:         ethClient,
-		indexedChainState: chainState,
-		verifier:          verifier,
-		numConnections:    numConnections,
+		logger:           logger.With("component", "RetrievalClient"),
+		ethClient:        ethClient,
+		chainState:       chainState,
+		socketStateCache: socketStateCache,
+		verifier:         verifier,
+		numConnections:   numConnections,
 	}
 }
 
@@ -74,13 +78,22 @@ func (r *retrievalClient) GetBlob(
 		return nil, err
 	}
 
-	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
+	operatorState, err := r.chainState.GetOperatorState(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
 	}
-	operators, ok := indexedOperatorState.Operators[quorumID]
+	operators, ok := operatorState.Operators[quorumID]
 	if !ok {
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
+	}
+	// grab all operators IDs
+	operatorIDs := make([]core.OperatorID, 0, len(operators))
+	for operatorID := range operators {
+		operatorIDs = append(operatorIDs, operatorID)
+	}
+	operatorSockets, err := r.socketStateCache.GetOperatorSockets(ctx, operatorIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	blobVersions, err := r.ethClient.GetAllVersionedBlobParams(ctx)
@@ -98,7 +111,7 @@ func (r *retrievalClient) GetBlob(
 		return nil, err
 	}
 
-	assignments, err := corev2.GetAssignments(indexedOperatorState.OperatorState, blobParam, quorumID)
+	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorumID)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -107,10 +120,13 @@ func (r *retrievalClient) GetBlob(
 	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
-		opID := opID
-		opInfo := indexedOperatorState.IndexedOperators[opID]
+		socket := operatorSockets[opID]
+		if socket == nil {
+			r.logger.Warn("no socket for operator", "operator", opID)
+			continue
+		}
 		pool.Submit(func() {
-			r.getChunksFromOperator(ctx, opID, opInfo, blobKey, quorumID, chunksChan)
+			r.getChunksFromOperator(ctx, opID, socket, blobKey, quorumID, chunksChan)
 		})
 	}
 
@@ -160,7 +176,7 @@ func (r *retrievalClient) GetBlob(
 func (r *retrievalClient) getChunksFromOperator(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.IndexedOperatorInfo,
+	socket *core.OperatorSocket,
 	blobKey corev2.BlobKey,
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
@@ -176,7 +192,7 @@ func (r *retrievalClient) getChunksFromOperator(
 	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
 
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
+		socket.GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)

@@ -59,7 +59,10 @@ func BuildValidatorPayloadRetriever(
 	}
 
 	chainState := eth.NewChainState(reader, ethClient)
-	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
+	socketStateCache, err := eth.NewSocketStateCache(context.Background(), reader, logger)
+	if err != nil {
+		return nil, fmt.Errorf("new socket state cache: %w", err)
+	}
 
 	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
 	if err != nil {
@@ -69,7 +72,8 @@ func BuildValidatorPayloadRetriever(
 	retrievalClient := NewRetrievalClient(
 		logger,
 		reader,
-		indexedChainState,
+		chainState,
+		socketStateCache,
 		kzgVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 

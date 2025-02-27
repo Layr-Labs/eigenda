@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/retriever"
 	retrivereth "github.com/Layr-Labs/eigenda/retriever/eth"
@@ -99,19 +98,20 @@ func RetrieverMain(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalln("could not start tcp listener", err)
 	}
-
-	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-	ics := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	socketStateCache, err := eth.NewSocketStateCache(context.Background(), tx, logger)
+	if err != nil {
+		log.Fatalln("could not start tcp listener", err)
+	}
 
 	if config.EigenDAVersion == 1 {
 		agn := &core.StdAssignmentCoordinator{}
-		retrievalClient, err := clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, config.NumConnections)
+		retrievalClient, err := clients.NewRetrievalClient(logger, cs, socketStateCache, agn, nodeClient, v, config.NumConnections)
 		if err != nil {
 			log.Fatalln("could not start tcp listener", err)
 		}
 
 		chainClient := retrivereth.NewChainClient(gethClient, logger)
-		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, ics, chainClient)
+		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, chainClient)
 		if err = retrieverServiceServer.Start(context.Background()); err != nil {
 			log.Fatalln("failed to start retriever service server", err)
 		}
@@ -131,8 +131,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, ics, v, config.NumConnections)
-		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, ics)
+		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, socketStateCache, v, config.NumConnections)
+		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		if err = retrieverServiceServer.Start(context.Background()); err != nil {
 			log.Fatalln("failed to start retriever service server", err)
 		}

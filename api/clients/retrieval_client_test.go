@@ -10,6 +10,7 @@ import (
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -17,7 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
-	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
+
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -52,14 +53,14 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 }
 
 var (
-	chainState      core.ChainState
-	indexer         *indexermock.MockIndexer
-	operatorState   *core.OperatorState
-	nodeClient      *clientsmock.MockNodeClient
-	coordinator     *core.StdAssignmentCoordinator
-	retrievalClient clients.RetrievalClient
-	blobHeader      *core.BlobHeader
-	encodedBlob     core.EncodedBlob = core.EncodedBlob{
+	chainState       core.ChainState
+	socketStateCache *coremock.SocketStateCacheMock
+	operatorState    *core.OperatorState
+	nodeClient       *clientsmock.MockNodeClient
+	coordinator      *core.StdAssignmentCoordinator
+	retrievalClient  clients.RetrievalClient
+	blobHeader       *core.BlobHeader
+	encodedBlob      core.EncodedBlob = core.EncodedBlob{
 		BlobHeader:               nil,
 		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 	}
@@ -80,6 +81,11 @@ func setup(t *testing.T) {
 		t.Fatalf("failed to create new mocked chain data: %s", err)
 	}
 
+	socketStateCache, err = coremock.NewSocketStateCacheMock(nil)
+	if err != nil {
+		t.Fatalf("failed to create new mocked socket state cache: %s", err)
+	}
+
 	nodeClient = clientsmock.NewNodeClient()
 	coordinator = &core.StdAssignmentCoordinator{}
 	p, v, err := makeTestComponents()
@@ -87,16 +93,10 @@ func setup(t *testing.T) {
 		t.Fatal(err)
 	}
 	logger := testutils.GetLogger()
-	indexer = &indexermock.MockIndexer{}
-	indexer.On("Index").Return(nil).Once()
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, chainState, coordinator, nodeClient, v, 2)
+	retrievalClient, err = clients.NewRetrievalClient(logger, chainState, socketStateCache, coordinator, nodeClient, v, 2)
 	if err != nil {
 		panic("failed to create a new retrieval client")
-	}
-	err = indexer.Index(context.Background())
-	if err != nil {
-		panic("failed to start indexing")
 	}
 
 	var (
@@ -217,10 +217,11 @@ func mustMakeOpertatorPubKeysPair(t *testing.T) *coreindexer.OperatorPubKeys {
 	}
 }
 
-func musMakeOperatorSocket(t *testing.T) coreindexer.OperatorSockets {
-	operatorSocket := make(coreindexer.OperatorSockets, len(operatorState.Operators))
-	for operatorId := range operatorState.Operators[0] {
-		operatorSocket[operatorId] = "test"
+func musMakeOperatorSocket(_ *testing.T) core.OperatorSockets {
+	operatorSocket := make(core.OperatorSockets, len(operatorState.Operators))
+	for id, _ := range operatorState.Operators[0] {
+		testSocket := core.MakeOperatorSocket("0.0.0.0", "01", "01", "01", "01")
+		operatorSocket[id] = &testSocket
 	}
 	return operatorSocket
 }
@@ -234,12 +235,8 @@ func TestInvalidBlobHeader(t *testing.T) {
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)
-
-	operatorPubKeys := mustMakeOpertatorPubKeysPair(t)
-	operatorSocket := musMakeOperatorSocket(t)
-
-	indexer.On("GetObject", mock.Anything, 0).Return(operatorPubKeys, nil).Once()
-	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
+	operatorSockets := musMakeOperatorSocket(t)
+	socketStateCache.On("GetOperatorSockets", mock.Anything, mock.Anything).Return(operatorSockets, nil)
 
 	_, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.ErrorContains(t, err, "failed to get blob header from all operators")
@@ -255,12 +252,8 @@ func TestValidBlobHeader(t *testing.T) {
 	nodeClient.
 		On("GetChunks", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(encodedBlob)
-
-	operatorPubKeys := mustMakeOpertatorPubKeysPair(t)
-	operatorSocket := musMakeOperatorSocket(t)
-
-	indexer.On("GetObject", mock.Anything, 0).Return(operatorPubKeys, nil).Once()
-	indexer.On("GetObject", mock.Anything, 1).Return(operatorSocket, nil).Once()
+	operatorSockets := musMakeOperatorSocket(t)
+	socketStateCache.On("GetOperatorSockets", mock.Anything, mock.Anything).Return(operatorSockets, nil)
 
 	data, err := retrievalClient.RetrieveBlob(context.Background(), batchHeaderHash, 0, 0, batchRoot, 0)
 	assert.NoError(t, err)
