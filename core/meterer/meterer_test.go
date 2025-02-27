@@ -281,8 +281,8 @@ func TestMetererReservations(t *testing.T) {
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
 	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
 	now := time.Now().Unix()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -427,8 +427,8 @@ func TestMeterer_paymentCharged(t *testing.T) {
 
 	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
-		paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(tt.pricePerSymbol), nil)
-		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(tt.minNumSymbols), nil)
+		paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(tt.pricePerSymbol), nil)
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
