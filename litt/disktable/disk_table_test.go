@@ -40,14 +40,14 @@ func buildMemKeyDiskTable(
 
 	keys := keymap.NewMemKeyMap(logger)
 
-	segmentsPath := path + "/segments"
+	root := path + "/table"
 	table, err := NewDiskTable(
 		context.Background(),
 		logger,
 		timeSource,
 		name,
 		keys,
-		segmentsPath,
+		root,
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1*time.Millisecond)
@@ -75,14 +75,14 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to create key map: %w", err)
 	}
 
-	segmentsPath := path + "/segments"
+	root := path + "/table"
 	table, err := NewDiskTable(
 		context.Background(),
 		logger,
 		timeSource,
 		name,
 		keys,
-		segmentsPath,
+		root,
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1*time.Millisecond)
@@ -266,7 +266,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Delete a file in the middle of the sequence of segments.
 	lowestSegmentIndex, highestSegmentIndex, _, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
@@ -275,13 +275,13 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	filePath := ""
 	if choice < 1.0/3.0 {
 		// Delete the key file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
 	} else if choice < 2.0/3.0 {
 		// Delete the value file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.ValuesFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.ValuesFileExtension)
 	} else {
 		// Delete the segment file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
 	}
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// files in segments directory should not be changed as a result of the deletion
-	files, err := os.ReadDir(directory + "/segments")
+	files, err := os.ReadDir(directory + "/table/segments")
 	require.NoError(t, err)
 
 	// Restart the table. This should fail.
@@ -299,7 +299,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.Nil(t, table)
 
 	// Ensure that no files were added or removed from the segments directory.
-	filesAfterRestart, err := os.ReadDir(directory + "/segments")
+	filesAfterRestart, err := os.ReadDir(directory + "/table/segments")
 	require.NoError(t, err)
 	require.Equal(t, len(files), len(filesAfterRestart))
 	filesSet := make(map[string]struct{})
@@ -371,7 +371,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	lowestSegmentIndex, _, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -387,13 +387,16 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	filePath := ""
 	if choice < 1.0/3.0 {
 		// Delete the key file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, lowestSegmentIndex, segment.KeysFileExtension)
 	} else if choice < 2.0/3.0 {
 		// Delete the value file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.ValuesFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, lowestSegmentIndex, segment.ValuesFileExtension)
 	} else {
 		// Delete the segment file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
@@ -550,7 +553,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -566,13 +569,16 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	filePath := ""
 	if choice < 1.0/3.0 {
 		// Delete the key file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, highestSegmentIndex, segment.KeysFileExtension)
 	} else if choice < 2.0/3.0 {
 		// Delete the value file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.ValuesFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, highestSegmentIndex, segment.ValuesFileExtension)
 	} else {
 		// Delete the segment file
-		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, highestSegmentIndex, segment.MetadataFileExtension)
 	}
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
@@ -750,14 +756,15 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	// Truncate the last key file.
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
 
-	keyFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.KeysFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -783,7 +790,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -961,14 +969,15 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	// Truncate the last value file.
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
 
-	valueFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.ValuesFileExtension)
+	valueFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.ValuesFileExtension)
 	valueFileBytes, err := os.ReadFile(valueFileName)
 	require.NoError(t, err)
 
@@ -993,7 +1002,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -1174,7 +1184,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the key map to simulate keys that have not
@@ -1188,7 +1198,8 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
-	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.MetadataFileExtension)
 	metadataBytes, err := os.ReadFile(metadataFileName)
 	require.NoError(t, err)
 	// The last byte of the metadata file is the sealed flag.
@@ -1305,5 +1316,115 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 func TestUnflushedKeys(t *testing.T) {
 	for _, tb := range tableBuilders {
 		unflushedKeysTest(t, tb)
+	}
+}
+
+func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom()
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+	require.Equal(t, tableName, table.Name())
+
+	ttl := time.Duration(rand.Int63n(1000)) * time.Millisecond
+	err = table.SetTTL(ttl)
+	require.NoError(t, err)
+	shardingFactor := rand.Uint32Range(1, 100)
+	err = table.SetShardingFactor(shardingFactor)
+	require.NoError(t, err)
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Check the table metadata.
+	actualTTL := (table.(*DiskTable)).metadata.GetTTL()
+	require.Equal(t, ttl, actualTTL)
+
+	actualShardingFactor := (table.(*DiskTable)).metadata.GetShardingFactor()
+	require.Equal(t, shardingFactor, actualShardingFactor)
+
+	err = table.Destroy()
+	require.NoError(t, err)
+}
+
+func TestMetadataPreservedOnRestart(t *testing.T) {
+	for _, tb := range tableBuilders {
+		metadataPreservedOnRestartTest(t, tb)
+	}
+}
+
+func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom()
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+	require.Equal(t, tableName, table.Name())
+
+	ttl := time.Duration(rand.Int63n(1000)) * time.Millisecond
+	err = table.SetTTL(ttl)
+	require.NoError(t, err)
+	shardingFactor := rand.Uint32Range(1, 100)
+	err = table.SetShardingFactor(shardingFactor)
+	require.NoError(t, err)
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// Simulate an orphaned metadata file.
+	orphanedMetadataFileName := fmt.Sprintf("%s/table/%s", directory, tableMetadataSwapFileName)
+	orphanedFileBytes := rand.PrintableVariableBytes(1, 1024)
+	err = os.WriteFile(orphanedMetadataFileName, orphanedFileBytes, 0644)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Check the table metadata.
+	actualTTL := (table.(*DiskTable)).metadata.GetTTL()
+	require.Equal(t, ttl, actualTTL)
+
+	actualShardingFactor := (table.(*DiskTable)).metadata.GetShardingFactor()
+	require.Equal(t, shardingFactor, actualShardingFactor)
+
+	err = table.Destroy()
+	require.NoError(t, err)
+}
+
+func TestOrphanedMetadata(t *testing.T) {
+	for _, tb := range tableBuilders {
+		orphanedMetadataTest(t, tb)
 	}
 }

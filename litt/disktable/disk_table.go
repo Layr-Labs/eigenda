@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,6 +21,9 @@ var _ litt.ManagedTable = (*DiskTable)(nil)
 // keysPendingFlushInitialCapacity is the initial capacity of the keysPendingFlush slice.
 const keysPendingFlushInitialCapacity = 64
 
+// segmentDirectory is the directory where segment files are stored, relative to the root directory.
+const segmentDirectory = "segments"
+
 // DiskTable manages a table's Segments.
 type DiskTable struct {
 	// The context for the disk table.
@@ -34,8 +38,14 @@ type DiskTable struct {
 	// The root directory for the disk table.
 	root string
 
+	// The directory where segment files are stored.
+	segmentDirectory string
+
 	// The table's name.
 	name string
+
+	// The table's metadata.
+	metadata *tableMetadata
 
 	// A map of keys to their addresses.
 	keyMap keymap.KeyMap
@@ -84,9 +94,6 @@ type DiskTable struct {
 	// timeSource is the time source used by the disk table.
 	timeSource func() time.Time
 
-	// the currently configured TTL
-	ttl atomic.Pointer[time.Duration]
-
 	// Set to true when there is a fatal error on a goroutine that doesn't have a way to return the error.
 	// This is used during testing.
 	fatalError atomic.Bool
@@ -104,6 +111,10 @@ func NewDiskTable(
 	controlChannelSize int,
 	gcPeriod time.Duration) (litt.ManagedTable, error) {
 
+	if gcPeriod <= 0 {
+		return nil, fmt.Errorf("garbage collection period must be greater than 0")
+	}
+
 	_, err := os.Stat(root)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(root, 0755)
@@ -114,8 +125,31 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to stat root directory: %v", err)
 	}
 
-	if gcPeriod <= 0 {
-		return nil, fmt.Errorf("garbage collection period must be greater than 0")
+	segDir := path.Join(root, segmentDirectory)
+	_, err = os.Stat(segDir)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(segDir, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create root directory: %v", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to stat root directory: %v", err)
+	}
+
+	var metadata *tableMetadata
+	metadataFilePath := metadataPath(root)
+	if _, err := os.Stat(metadataFilePath); os.IsNotExist(err) {
+		// No metadata file exists, so we need to create one.
+		metadata, err = newTableMetadata(logger, root, 0, 1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create table metadata: %v", err)
+		}
+	} else {
+		// Metadata file exists, so we need to load it.
+		metadata, err = loadTableMetadata(logger, root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load table metadata: %v", err)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -126,7 +160,9 @@ func NewDiskTable(
 		logger:                  logger,
 		timeSource:              timeSource,
 		root:                    root,
+		segmentDirectory:        segDir,
 		name:                    name,
+		metadata:                metadata,
 		keyMap:                  keyMap,
 		keysPendingFlush:        make([]*types.KAPair, 0, keysPendingFlushInitialCapacity),
 		targetFileSize:          targetFileSize,
@@ -138,12 +174,8 @@ func NewDiskTable(
 	table.alive.Store(true)
 	table.stopChannel <- struct{}{}
 
-	// By default, no TTL is enforced.
-	defaultTTL := time.Duration(0)
-	table.ttl.Store(&defaultTTL)
-
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
-		segment.GatherSegmentFiles(logger, root, timeSource(), true)
+		segment.GatherSegmentFiles(logger, table.segmentDirectory, timeSource(), true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
@@ -207,14 +239,24 @@ func (d *DiskTable) Destroy() error {
 	for _, seg := range d.segments {
 		seg.BlockUntilFullyDeleted()
 	}
-	err = os.Remove(d.root)
+	err = os.Remove(d.segmentDirectory)
 	if err != nil {
-		return fmt.Errorf("failed to remove root directory: %v", err)
+		return fmt.Errorf("failed to remove segment directory: %v", err)
 	}
 
 	err = d.keyMap.Destroy()
 	if err != nil {
 		return fmt.Errorf("failed to destroy key map: %v", err)
+	}
+
+	err = d.metadata.delete()
+	if err != nil {
+		return fmt.Errorf("failed to delete metadata: %v", err)
+	}
+
+	err = os.Remove(d.root)
+	if err != nil {
+		return fmt.Errorf("failed to remove root directory: %v", err)
 	}
 
 	return nil
@@ -227,7 +269,23 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 		return fmt.Errorf("DB is shut down")
 	}
 
-	d.ttl.Store(&ttl)
+	err := d.metadata.SetTTL(ttl)
+	if err != nil {
+		return fmt.Errorf("failed to set TTL: %v", err)
+	}
+	return nil
+}
+
+func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
+	if !d.alive.Load() {
+		return fmt.Errorf("DB is shut down")
+	}
+
+	err := d.metadata.SetShardingFactor(shardingFactor)
+	if err != nil {
+		return fmt.Errorf("failed to set sharding factor: %v", err)
+	}
+
 	return nil
 }
 
@@ -378,7 +436,8 @@ func (d *DiskTable) expandSegments() error {
 	}
 
 	// Create a new segment.
-	newSegment, err := segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.root, now, false)
+	newSegment, err :=
+		segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.segmentDirectory, now, false)
 	if err != nil {
 		d.segmentLock.Unlock()
 		return fmt.Errorf("failed to create new segment: %v", err)
@@ -504,7 +563,7 @@ func (d *DiskTable) shutdownTasks() {
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (d *DiskTable) doGarbageCollection() {
 	now := d.timeSource()
-	ttl := *d.ttl.Load()
+	ttl := d.metadata.GetTTL()
 	if ttl.Nanoseconds() == 0 {
 		// No TTL set, so nothing to do.
 		return
