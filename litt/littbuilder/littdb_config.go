@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"math/rand"
 	"path"
 	"time"
 
@@ -69,6 +70,14 @@ type LittDBConfig struct {
 	// The period between garbage collection runs. The default is 5 minutes.
 	GCPeriod time.Duration
 
+	// The sharding factor for the database. The default is 8. Must be at least 1.
+	ShardingFactor uint32
+
+	// The salt used for sharding. Chosen randomly at boot time by default.
+	// This doesn't need to be cryptographically secure, but it should be kept private.
+	// In theory, an attacker who knows the salt could craft keys that all hash to the same shard.
+	Salt uint32
+
 	// The size of the cache for tables that have not had their cache size set. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
 	// individually on each table by calling Table.SetCacheSize().
@@ -86,6 +95,8 @@ func DefaultConfig(path string) *LittDBConfig {
 		loggerConfig:          common.DefaultLoggerConfig(),
 		TimeSource:            time.Now,
 		GCPeriod:              5 * time.Minute,
+		ShardingFactor:        8,
+		Salt:                  rand.Uint32(),
 		DBType:                DiskDB,
 		KeyMapType:            LevelDBKeyMap,
 		ControlChannelSize:    64,
@@ -130,6 +141,10 @@ func (c *LittDBConfig) buildTable(
 
 	var table litt.ManagedTable
 
+	if c.ShardingFactor < 1 {
+		return nil, fmt.Errorf("sharding factor must be at least 1")
+	}
+
 	switch c.DBType {
 	case DiskDB:
 		keyMap, err := c.buildKeyMap(name, logger)
@@ -147,6 +162,8 @@ func (c *LittDBConfig) buildTable(
 			tableRoot,
 			c.TargetSegmentFileSize,
 			c.ControlChannelSize,
+			c.ShardingFactor,
+			c.Salt,
 			c.GCPeriod)
 
 		if err != nil {

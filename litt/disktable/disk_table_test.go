@@ -50,6 +50,8 @@ func buildMemKeyDiskTable(
 		root,
 		uint32(100), // intentionally use a very small segment size
 		10,
+		1,
+		1234,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -85,6 +87,8 @@ func buildLevelDBKeyDiskTable(
 		root,
 		uint32(100), // intentionally use a very small segment size
 		10,
+		1,
+		1234,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -265,8 +269,8 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
 	// Delete a file in the middle of the sequence of segments.
-	lowestSegmentIndex, highestSegmentIndex, _, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
@@ -370,8 +374,8 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
-	lowestSegmentIndex, _, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -552,8 +556,8 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
-	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -755,8 +759,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
-	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	// Truncate the last key file.
@@ -968,8 +972,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
-	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	// Truncate the last value file.
@@ -1183,8 +1187,8 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 	require.False(t, table.(*DiskTable).fatalError.Load())
 
-	_, highestSegmentIndex, segments, err :=
-		segment.GatherSegmentFiles(logger, directory+"/table/segments", time.Now(), false)
+	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
+		logger, directory+"/table/segments", time.Now(), 0, 0, false)
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the key map to simulate keys that have not

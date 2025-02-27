@@ -48,20 +48,24 @@ type Segment struct {
 }
 
 // NewSegment creates a new data segment.
+//
+// Note that shardingFactor and salt parameters are ignored if this is not a new segment. Segments loaded from
+// disk always use their original sharding factor and salt values
 func NewSegment(
 	logger logging.Logger,
 	index uint32,
 	parentDirectory string,
 	now time.Time,
+	shardingFactor uint32,
+	salt uint32,
 	sealIfUnsealed bool) (*Segment, error) {
 
-	metadata, err := newMetadataFile(index, parentDirectory)
+	metadata, err := newMetadataFile(index, shardingFactor, salt, parentDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
 	}
 
 	if sealIfUnsealed && !metadata.sealed {
-		logger.Debugf("Sealing segment %d", index) // TODO maybe delete this
 		err = metadata.seal(now)
 		if err != nil {
 			return nil, fmt.Errorf("failed to seal segment: %v", err)
