@@ -240,7 +240,6 @@ func TestMetererReservations(t *testing.T) {
 	symbolLength := uint(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
-		now = time.Now()
 		reservationPeriod = meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mt.ChainPaymentState.GetReservationWindow())
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
@@ -282,8 +281,8 @@ func TestMetererReservations(t *testing.T) {
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
 	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint32(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(3), nil)
 	now := time.Now()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -428,8 +427,8 @@ func TestMeterer_paymentCharged(t *testing.T) {
 
 	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
-		paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint32(tt.pricePerSymbol), nil)
-		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
+		paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(tt.pricePerSymbol), nil)
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,

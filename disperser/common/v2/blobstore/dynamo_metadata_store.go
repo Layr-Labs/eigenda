@@ -291,30 +291,33 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 	return metadata, nil
 }
 
-// queryBucketBlobMetadata returns blobs (as metadata) within range [startKey, endKey] from a single bucket.
+// queryBucketBlobMetadata appends blobs (as metadata) within range (startKey, endKey) from a single bucket to the provided result slice.
 // Results are ordered by <RequestedAt, Bobkey> in ascending order.
 //
 // The function handles DynamoDB's 1MB response size limitation by performing multiple queries if necessary.
+// It filters out blobs at the exact startKey and endKey as they are exclusive bounds.
 func (s *BlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
+	ascending bool,
+	after BlobFeedCursor,
+	before BlobFeedCursor,
 	startKey string,
 	endKey string,
-	ascending bool,
+	limit int,
+	result []*v2.BlobMetadata,
+	lastProcessedCursor **BlobFeedCursor,
 ) ([]*v2.BlobMetadata, error) {
-	metadata := make([]*v2.BlobMetadata, 0)
 	var lastEvaledKey map[string]types.AttributeValue
-
 	for {
 		start := startKey
 		if lastEvaledKey != nil {
 			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
+				return result, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
 			}
 			start = requestedAtBlobkey
 		}
-
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -330,16 +333,40 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 			ascending,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
+			return result, fmt.Errorf("query failed for bucket %d: %w", bucket, err)
 		}
 
 		// Collect results
 		for _, item := range res.Items {
 			bm, err := UnmarshalBlobMetadata(item)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+				return result, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
 			}
-			metadata = append(metadata, bm)
+
+			// Get blob key for filtering
+			blobKey, err := bm.BlobHeader.BlobKey()
+			if err != nil {
+				return result, fmt.Errorf("failed to get blob key: %w", err)
+			}
+
+			// Skip blobs at the endpoints (exclusive bounds)
+			if after.Equal(bm.RequestedAt, &blobKey) || before.Equal(bm.RequestedAt, &blobKey) {
+				continue
+			}
+
+			// Add to result
+			result = append(result, bm)
+
+			// Update last processed cursor
+			*lastProcessedCursor = &BlobFeedCursor{
+				RequestedAt: bm.RequestedAt,
+				BlobKey:     &blobKey,
+			}
+
+			// Check limit
+			if limit > 0 && len(result) >= limit {
+				return result, nil
+			}
 		}
 
 		// Exhausted all items already
@@ -350,7 +377,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 		lastEvaledKey = res.LastEvaluatedKey
 	}
 
-	return metadata, nil
+	return result, nil
 }
 
 // GetBlobMetadataByRequestedAtForward returns blobs (as BlobMetadata) in cursor range
@@ -368,6 +395,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	if !after.LessThan(&before) {
 		return nil, nil, errors.New("after cursor must be less than before cursor")
 	}
+
 	startBucket, endBucket := GetRequestedAtBucketIDRange(after.RequestedAt, before.RequestedAt)
 	startKey := after.ToCursorKey()
 	endKey := before.ToCursorKey()
@@ -375,33 +403,20 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	var lastProcessedCursor *BlobFeedCursor
 
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-		bucketMetadata, err := s.queryBucketBlobMetadata(ctx, bucket, startKey, endKey, true)
+		// Pass the result slice to be modified in-place along with cursors for filtering
+		var err error
+		result, err = s.queryBucketBlobMetadata(
+			ctx, bucket, true, after, before, startKey, endKey, limit, result, &lastProcessedCursor,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
-		// Process bucket results
-		for _, bm := range bucketMetadata {
-			blobKey, err := bm.BlobHeader.BlobKey()
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
-			}
-			// Skip blobs at the endpoints
-			if after.Equal(bm.RequestedAt, &blobKey) || before.Equal(bm.RequestedAt, &blobKey) {
-				continue
-			}
-			result = append(result, bm)
-			lastProcessedCursor = &BlobFeedCursor{
-				RequestedAt: bm.RequestedAt,
-				BlobKey:     &blobKey,
-			}
-			if limit > 0 && len(result) >= limit {
-				break
-			}
+
+		if limit > 0 && len(result) >= limit {
+			break
 		}
 	}
+
 	return result, lastProcessedCursor, nil
 }
 
@@ -420,6 +435,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 	if !after.LessThan(&before) {
 		return nil, nil, errors.New("after cursor must be less than before cursor")
 	}
+
 	startBucket, endBucket := GetRequestedAtBucketIDRange(after.RequestedAt, before.RequestedAt)
 	startKey := after.ToCursorKey()
 	endKey := before.ToCursorKey()
@@ -428,31 +444,17 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 
 	// Traverse buckets in reverse order
 	for bucket := endBucket; bucket >= startBucket; bucket-- {
-		if limit > 0 && len(result) >= limit {
-			break
-		}
-		bucketMetadata, err := s.queryBucketBlobMetadata(ctx, bucket, startKey, endKey, false)
+		// Pass the result slice to be modified in-place along with cursors for filtering
+		var err error
+		result, err = s.queryBucketBlobMetadata(
+			ctx, bucket, false, after, before, startKey, endKey, limit, result, &lastProcessedCursor,
+		)
 		if err != nil {
 			return nil, nil, err
 		}
-		// Process bucket results
-		for _, bm := range bucketMetadata {
-			blobKey, err := bm.BlobHeader.BlobKey()
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get blob key: %w", err)
-			}
-			// Skip blobs at the endpoints
-			if before.Equal(bm.RequestedAt, &blobKey) || after.Equal(bm.RequestedAt, &blobKey) {
-				continue
-			}
-			result = append(result, bm)
-			lastProcessedCursor = &BlobFeedCursor{
-				RequestedAt: bm.RequestedAt,
-				BlobKey:     &blobKey,
-			}
-			if limit > 0 && len(result) >= limit {
-				break
-			}
+
+		if limit > 0 && len(result) >= limit {
+			break
 		}
 	}
 	return result, lastProcessedCursor, nil
