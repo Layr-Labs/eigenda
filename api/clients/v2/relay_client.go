@@ -242,8 +242,8 @@ func (c *relayClient) getClient(ctx context.Context, key corev2.RelayKey) (relay
 	return client, nil
 }
 
-// initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only perform
-// the initialization once per relay.
+// initOnceGrpcConnection initializes the GRPC connection for a given relay, and is guaranteed to only be completed
+// once per relay. If initialization fails, it will be retried by the next caller.
 func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.RelayKey) error {
 	_, alreadyInitialized := c.relayInitializationStatus.Load(key)
 	if alreadyInitialized {
@@ -263,11 +263,6 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 		return nil
 	}
 
-	// TODO (litt3): immediately storing `true` for key mirrors the previous implementation, where a failed init
-	//  is NOT retried, and the connection to that relay will just be broken forever. Consider implementing
-	//  logic to retry initialization after a period of time in case of failure
-	c.relayInitializationStatus.Store(key, true)
-
 	relayUrl, err := c.relayUrlProvider.GetRelayUrl(ctx, key)
 	if err != nil {
 		return fmt.Errorf("get relay url for key %d: %w", key, err)
@@ -281,6 +276,9 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 	}
 	c.clientConnections.Store(key, conn)
 	c.grpcRelayClients.Store(key, relaygrpc.NewRelayClient(conn))
+
+	// only set the initialization status to true if everything was successful.
+	c.relayInitializationStatus.Store(key, true)
 
 	return nil
 }
