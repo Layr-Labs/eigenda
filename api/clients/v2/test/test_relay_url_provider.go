@@ -1,8 +1,9 @@
-package relay
+package test
 
 import (
 	"context"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
@@ -13,7 +14,7 @@ type TestRelayUrlProvider struct {
 	urlMap map[v2.RelayKey]string
 }
 
-var _ RelayUrlProvider = &TestRelayUrlProvider{}
+var _ relay.RelayUrlProvider = &TestRelayUrlProvider{}
 
 func NewTestRelayUrlProvider() *TestRelayUrlProvider {
 	return &TestRelayUrlProvider{

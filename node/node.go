@@ -244,7 +244,7 @@ func NewNode(
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
 		}
 
-		relayUrlProvider, err := relay.NewDefaultRelayUrlProvider(client, tx.GetRelayRegistryAddress())
+		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
 		if err != nil {
 			return nil, fmt.Errorf("create relay url provider: %w", err)
 		}

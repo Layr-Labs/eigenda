@@ -205,7 +205,7 @@ func NewTestClient(
 		MessageSigner:      fakeSigner,
 	}
 
-	relayUrlProvider, err := relayv2.NewDefaultRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
+	relayUrlProvider, err := relayv2.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
 	if err != nil {
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}

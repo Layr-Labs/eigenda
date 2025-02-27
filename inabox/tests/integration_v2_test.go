@@ -213,7 +213,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 			MaxGRPCMessageSize: units.GiB,
 		}
 
-		relayUrlProvider, err := relay.NewDefaultRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+		relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
 		Expect(err).To(BeNil())
 
 		// Test retrieval from relay

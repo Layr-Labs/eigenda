@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/test"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -252,7 +252,7 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	c.node.Config.EnableV2 = true
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
 
-	relayUrlProvider := relay.NewTestRelayUrlProvider()
+	relayUrlProvider := test.NewTestRelayUrlProvider()
 	relayUrlProvider.StoreRelayUrl(0, "http://localhost:8080")
 
 	messageSigner := func(ctx context.Context, data [32]byte) (*core.Signature, error) {
