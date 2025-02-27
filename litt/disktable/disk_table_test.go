@@ -1,0 +1,1309 @@
+package disktable
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
+	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
+	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/stretchr/testify/require"
+)
+
+// This file contains tests that are specific to the disk table implementation. Other more general test scenarios
+// are defined in litt/test/table_test.go.
+
+type tableBuilder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
+
+// This test executes against different table implementations. This is useful for distinguishing between bugs that
+// are present in an implementation, and bugs that are present in the test scenario itself.
+var tableBuilders = []tableBuilder{
+	buildMemKeyDiskTable,
+	buildLevelDBKeyDiskTable,
+}
+
+func buildMemKeyDiskTable(
+	timeSource func() time.Time,
+	name string,
+	path string) (litt.ManagedTable, error) {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	keys := keymap.NewMemKeyMap(logger)
+
+	segmentsPath := path + "/segments"
+	table, err := NewDiskTable(
+		context.Background(),
+		logger,
+		timeSource,
+		name,
+		keys,
+		segmentsPath,
+		uint32(100), // intentionally use a very small segment size
+		10,
+		1*time.Millisecond)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create disk table: %w", err)
+	}
+
+	return table, nil
+}
+
+func buildLevelDBKeyDiskTable(
+	timeSource func() time.Time,
+	name string,
+	path string) (litt.ManagedTable, error) {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	keysPath := path + "/keys"
+	keys, err := keymap.NewLevelDBKeyMap(logger, keysPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create key map: %w", err)
+	}
+
+	segmentsPath := path + "/segments"
+	table, err := NewDiskTable(
+		context.Background(),
+		logger,
+		timeSource,
+		name,
+		keys,
+		segmentsPath,
+		uint32(100), // intentionally use a very small segment size
+		10,
+		1*time.Millisecond)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create disk table: %w", err)
+	}
+
+	return table, nil
+}
+
+func restartTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	iterations := 1000
+	restartIteration := iterations/2 + int(rand.Int64Range(-10, 10))
+
+	for i := 0; i < iterations; i++ {
+
+		// Somewhere in the middle of the test, restart the table.
+		if i == restartIteration {
+			err = table.Stop()
+			require.NoError(t, err)
+			require.False(t, table.(*DiskTable).fatalError.Load())
+			table, err = tableBuilder(time.Now, tableName, directory)
+			require.NoError(t, err)
+			err = table.Start()
+			require.NoError(t, err)
+
+			// Do a full scan of the table to verify that all expected values are still present.
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestRestart(t *testing.T) {
+	for _, tb := range tableBuilders {
+		restartTest(t, tb)
+	}
+}
+
+// This test deletes a random file from a middle segment. This is considered unrecoverable corruption, and should
+// cause the table to fail to restart.
+func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// Delete a file in the middle of the sequence of segments.
+	lowestSegmentIndex, highestSegmentIndex, _, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
+
+	choice := rand.Float64()
+	filePath := ""
+	if choice < 1.0/3.0 {
+		// Delete the key file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
+	} else if choice < 2.0/3.0 {
+		// Delete the value file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.ValuesFileExtension)
+	} else {
+		// Delete the segment file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
+	}
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	err = os.Remove(filePath)
+	require.NoError(t, err)
+
+	// files in segments directory should not be changed as a result of the deletion
+	files, err := os.ReadDir(directory + "/segments")
+	require.NoError(t, err)
+
+	// Restart the table. This should fail.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.Error(t, err)
+	require.Nil(t, table)
+
+	// Ensure that no files were added or removed from the segments directory.
+	filesAfterRestart, err := os.ReadDir(directory + "/segments")
+	require.NoError(t, err)
+	require.Equal(t, len(files), len(filesAfterRestart))
+	filesSet := make(map[string]struct{})
+	for _, file := range files {
+		filesSet[file.Name()] = struct{}{}
+	}
+	for _, file := range filesAfterRestart {
+		require.Contains(t, filesSet, file.Name())
+	}
+}
+
+func TestMiddleFileMissing(t *testing.T) {
+	for _, tb := range tableBuilders {
+		middleFileMissingTest(t, tb)
+	}
+}
+
+// This test deletes a random file from the first segment. This is considered recoverable, since it can happen
+// if the table crashes during garbage collection.
+func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	lowestSegmentIndex, _, segments, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	// All keys in the initial segment are expected to be missing after the restart.
+	missingKeys := make(map[string]struct{})
+	segmentKeys, err := segments[lowestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+	for _, key := range segmentKeys {
+		missingKeys[string(key.Key)] = struct{}{}
+	}
+
+	// Delete a file in the initial segment.
+	choice := rand.Float64()
+	filePath := ""
+	if choice < 1.0/3.0 {
+		// Delete the key file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.KeysFileExtension)
+	} else if choice < 2.0/3.0 {
+		// Delete the value file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.ValuesFileExtension)
+	} else {
+		// Delete the segment file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, lowestSegmentIndex, segment.MetadataFileExtension)
+	}
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	err = os.Remove(filePath)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Check the data in the table.
+	for expectedKey, expectedValue := range expectedValues {
+		if _, expectedToBeMissing := missingKeys[expectedKey]; expectedToBeMissing {
+			_, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.False(t, ok)
+		} else {
+			value, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, expectedValue, value)
+		}
+	}
+
+	// Remove the missing values from the expected values map. Simplifies following checks.
+	for key := range missingKeys {
+		delete(expectedValues, key)
+	}
+
+	// Make additional modifications to the table to ensure that it is still working.
+	for i := 0; i < iterations; i++ {
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestInitialFileMissing(t *testing.T) {
+	for _, tb := range tableBuilders {
+		initialFileMissingTest(t, tb)
+	}
+}
+
+// This test deletes a random file from the last segment. This can happen if the table crashes prior to the
+// last segment being flushed.
+func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	_, highestSegmentIndex, segments, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	// All keys in the final segment are expected to be missing after the restart.
+	missingKeys := make(map[string]struct{})
+	segmentKeys, err := segments[highestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+	for _, key := range segmentKeys {
+		missingKeys[string(key.Key)] = struct{}{}
+	}
+
+	// Delete a file in the final segment.
+	choice := rand.Float64()
+	filePath := ""
+	if choice < 1.0/3.0 {
+		// Delete the key file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+	} else if choice < 2.0/3.0 {
+		// Delete the value file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.ValuesFileExtension)
+	} else {
+		// Delete the segment file
+		filePath = fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	}
+	_, err = os.Stat(filePath)
+	require.NoError(t, err)
+
+	err = os.Remove(filePath)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// yet been durably flushed to disk.
+	for key := range missingKeys {
+		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		require.NoError(t, err)
+	}
+
+	// Check the data in the table.
+	for expectedKey, expectedValue := range expectedValues {
+		if _, expectedToBeMissing := missingKeys[expectedKey]; expectedToBeMissing {
+			_, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.False(t, ok)
+		} else {
+			value, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, expectedValue, value)
+		}
+	}
+
+	// Remove the missing values from the expected values map. Simplifies following checks.
+	for key := range missingKeys {
+		delete(expectedValues, key)
+	}
+
+	// Make additional modifications to the table to ensure that it is still working.
+	for i := 0; i < iterations; i++ {
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestLastFileMissing(t *testing.T) {
+	for _, tb := range tableBuilders {
+		lastFileMissingTest(t, tb)
+	}
+}
+
+// This test simulates the scenario where a key file is truncated.
+func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// if the last segment is empty.
+	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
+	// if there is no data to be truncated.
+	err = table.Flush()
+	require.NoError(t, err)
+	diskTable := table.(*DiskTable)
+	if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	_, highestSegmentIndex, segments, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	// Truncate the last key file.
+	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+
+	keyFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+	keyFileBytes, err := os.ReadFile(keyFileName)
+	require.NoError(t, err)
+
+	bytesRemaining := int32(0)
+	if len(keyFileBytes) > 0 {
+		bytesRemaining = rand.Int32Range(1, int32(len(keyFileBytes)))
+	}
+
+	keyFileBytes = keyFileBytes[:bytesRemaining]
+	err = os.WriteFile(keyFileName, keyFileBytes, 0644)
+	require.NoError(t, err)
+
+	keysInLastFileAfterTruncate, err := segments[highestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+
+	missingKeyCount := len(keysInLastFile) - len(keysInLastFileAfterTruncate)
+	require.True(t, missingKeyCount > 0)
+	remainingKeyCount := len(keysInLastFileAfterTruncate)
+
+	missingKeys := make(map[string]struct{})
+	for i := 0; i < missingKeyCount; i++ {
+		missingKeys[string(keysInLastFile[remainingKeyCount+i].Key)] = struct{}{}
+	}
+
+	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
+	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataBytes, err := os.ReadFile(metadataFileName)
+	require.NoError(t, err)
+	// The last byte of the metadata file is the sealed flag.
+	metadataBytes[len(metadataBytes)-1] = 0
+	err = os.WriteFile(metadataFileName, metadataBytes, 0644)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// yet been durably flushed to disk.
+	for key := range missingKeys {
+		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		require.NoError(t, err)
+	}
+
+	// Check the data in the table.
+	for expectedKey, expectedValue := range expectedValues {
+		if _, expectedToBeMissing := missingKeys[expectedKey]; expectedToBeMissing {
+			_, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.False(t, ok)
+		} else {
+			value, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, expectedValue, value)
+		}
+	}
+
+	// Remove the missing values from the expected values map. Simplifies following checks.
+	for key := range missingKeys {
+		delete(expectedValues, key)
+	}
+
+	// Make additional modifications to the table to ensure that it is still working.
+	for i := 0; i < iterations; i++ {
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestTruncatedKeyFile(t *testing.T) {
+	for _, tb := range tableBuilders {
+		truncatedKeyFileTest(t, tb)
+	}
+}
+
+// This test simulates the scenario where a value file is truncated.
+func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// if the last segment is empty.
+	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
+	// if there is no data to be truncated.
+	err = table.Flush()
+	require.NoError(t, err)
+	diskTable := table.(*DiskTable)
+	if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	_, highestSegmentIndex, segments, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	// Truncate the last value file.
+	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+
+	valueFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.ValuesFileExtension)
+	valueFileBytes, err := os.ReadFile(valueFileName)
+	require.NoError(t, err)
+
+	bytesRemaining := int32(0)
+	if len(valueFileBytes) > 0 {
+		bytesRemaining = rand.Int32Range(1, int32(len(valueFileBytes)))
+	}
+
+	valueFileBytes = valueFileBytes[:bytesRemaining]
+	err = os.WriteFile(valueFileName, valueFileBytes, 0644)
+	require.NoError(t, err)
+
+	missingKeys := make(map[string]struct{})
+	for _, key := range keysInLastFile {
+		offset := key.Address.Offset()
+		valueSize := len(expectedValues[string(key.Key)])
+		// If there are not at least this many bytes remaining in the value file, the value is missing.
+		requiredLength := offset + uint32(valueSize) + 4
+		if requiredLength > uint32(len(valueFileBytes)) {
+			missingKeys[string(key.Key)] = struct{}{}
+		}
+	}
+
+	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
+	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataBytes, err := os.ReadFile(metadataFileName)
+	require.NoError(t, err)
+	// The last byte of the metadata file is the sealed flag.
+	metadataBytes[len(metadataBytes)-1] = 0
+	err = os.WriteFile(metadataFileName, metadataBytes, 0644)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// yet been durably flushed to disk.
+	for key := range missingKeys {
+		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		require.NoError(t, err)
+	}
+
+	// Check the data in the table.
+	for expectedKey, expectedValue := range expectedValues {
+		if _, expectedToBeMissing := missingKeys[expectedKey]; expectedToBeMissing {
+			_, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.False(t, ok)
+		} else {
+			value, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, expectedValue, value)
+		}
+	}
+
+	// Remove the missing values from the expected values map. Simplifies following checks.
+	for key := range missingKeys {
+		delete(expectedValues, key)
+	}
+
+	// Make additional modifications to the table to ensure that it is still working.
+	for i := 0; i < iterations; i++ {
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestTruncatedValueFile(t *testing.T) {
+	for _, tb := range tableBuilders {
+		truncatedValueFileTest(t, tb)
+	}
+}
+
+// This test simulates the scenario where keys have not been flushed to the key store. The important thing
+// is to ensure that garbage collection doesn't explode when it encounters keys that are not in the key store.
+func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom(t)
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	directory := t.TempDir()
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, directory)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	err = table.Start()
+	if err != nil {
+		t.Fatalf("failed to start table: %v", err)
+	}
+
+	expectedValues := make(map[string][]byte)
+
+	// Fill the table with random data.
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+		batchSize := rand.Int32Range(1, 10)
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+	}
+
+	// if the last segment is empty.
+	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
+	// if there is no data to be truncated.
+	err = table.Flush()
+	require.NoError(t, err)
+	diskTable := table.(*DiskTable)
+	if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
+
+	// Stop the table
+	err = table.Stop()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	_, highestSegmentIndex, segments, err :=
+		segment.GatherSegmentFiles(logger, directory+"/segments", time.Now(), false)
+	require.NoError(t, err)
+
+	// Identify keys in the last file. These will be removed from the key map to simulate keys that have not
+	// been flushed to the key store.
+	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
+	require.NoError(t, err)
+
+	missingKeys := make(map[string]struct{})
+	for _, key := range keysInLastFile {
+		missingKeys[string(key.Key)] = struct{}{}
+	}
+
+	// Mark the last segment as non-sealed. This will be the case if the file is truncated.
+	metadataFileName := fmt.Sprintf("%s/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
+	metadataBytes, err := os.ReadFile(metadataFileName)
+	require.NoError(t, err)
+	// The last byte of the metadata file is the sealed flag.
+	metadataBytes[len(metadataBytes)-1] = 0
+	err = os.WriteFile(metadataFileName, metadataBytes, 0644)
+	require.NoError(t, err)
+
+	// Restart the table.
+	table, err = tableBuilder(time.Now, tableName, directory)
+	require.NoError(t, err)
+	err = table.Start()
+	require.NoError(t, err)
+
+	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// yet been durably flushed to disk.
+	for key := range missingKeys {
+		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		require.NoError(t, err)
+	}
+
+	// Check the data in the table.
+	for expectedKey, expectedValue := range expectedValues {
+		if _, expectedToBeMissing := missingKeys[expectedKey]; expectedToBeMissing {
+			_, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.False(t, ok)
+		} else {
+			value, ok, err := table.Get([]byte(expectedKey))
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, expectedValue, value)
+		}
+	}
+
+	// Remove the missing values from the expected values map. Simplifies following checks.
+	for key := range missingKeys {
+		delete(expectedValues, key)
+	}
+
+	// Make additional modifications to the table to ensure that it is still working.
+	for i := 0; i < iterations; i++ {
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	// Enable a TTL for the table. The goal is to force the keys that were not flush to become eligible for
+	// garbage collection.
+	err = table.SetTTL(1 * time.Millisecond)
+	require.NoError(t, err)
+
+	// Sleep for a short time to allow the TTL to expire, and to give the garbage collector a chance to
+	// do bad things if it is going to.
+	time.Sleep(50 * time.Millisecond)
+
+	err = table.Destroy()
+	require.NoError(t, err)
+	require.False(t, table.(*DiskTable).fatalError.Load())
+
+	// ensure that the test directory is empty
+	entries, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}
+
+func TestUnflushedKeys(t *testing.T) {
+	for _, tb := range tableBuilders {
+		unflushedKeysTest(t, tb)
+	}
+}

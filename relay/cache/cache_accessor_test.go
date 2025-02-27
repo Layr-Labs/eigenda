@@ -3,13 +3,15 @@ package cache
 import (
 	"context"
 	"errors"
-	tu "github.com/Layr-Labs/eigenda/common/testutils"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
+	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRandomOperationsSingleThread(t *testing.T) {
@@ -33,7 +35,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -81,7 +83,7 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -145,7 +147,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -215,7 +217,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -289,7 +291,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 
 	cacheSize := 100
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, maxConcurrency, accessor, nil)
 	require.NoError(t, err)
 
@@ -344,7 +346,7 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -433,7 +435,7 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 

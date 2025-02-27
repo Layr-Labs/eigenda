@@ -1,10 +1,11 @@
 package cache
 
 import (
+	"testing"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
-	"testing"
 )
 
 func TestExpirationOrder(t *testing.T) {
@@ -134,3 +135,6 @@ func TestWeightedValues(t *testing.T) {
 		require.Equal(t, v, value)
 	}
 }
+
+// TODO add unit test for changing cache capacity
+// TODO test thread safe wrapper
