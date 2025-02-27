@@ -159,6 +159,9 @@ type IndexedOperatorInfo struct {
 	Socket string
 }
 
+// OperatorSockets contains information about the current socket addresses of operators
+type OperatorSockets map[OperatorID]*OperatorSocket
+
 // IndexedOperatorState contains information about the current state of operators which is contained in events from the EigenDA smart contracts,
 // in addition to the information contained in OperatorState
 type IndexedOperatorState struct {
@@ -175,6 +178,12 @@ type ChainState interface {
 	GetOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
 	GetOperatorSocket(ctx context.Context, blockNumber uint, operator OperatorID) (string, error)
+}
+
+// SocketStateCache is an interface for getting information about the current operator socket state.
+type SocketStateCache interface {
+	GetOperatorSocket(ctx context.Context, operator OperatorID) (string, error)
+	GetOperatorSockets(ctx context.Context, operators []OperatorID) (OperatorSockets, error)
 }
 
 // ChainState is an interface for getting information about the current chain state.

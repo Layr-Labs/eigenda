@@ -46,13 +46,13 @@ func (c *MockNodeClient) GetBlobHeader(ctx context.Context, socket string, batch
 func (c *MockNodeClient) GetChunks(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.IndexedOperatorInfo,
+	opSocket *core.OperatorSocket,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
 ) {
-	args := c.Called(opID, opInfo, batchHeaderHash, blobIndex)
+	args := c.Called(opID, opSocket, batchHeaderHash, blobIndex)
 	encodedBlob := (args.Get(0)).(core.EncodedBlob)
 	chunks, err := encodedBlob.EncodedBundlesByOperator[opID][quorumID].ToFrames()
 	if err != nil {

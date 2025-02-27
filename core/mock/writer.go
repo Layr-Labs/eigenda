@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
+	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
 	"github.com/Layr-Labs/eigenda/core"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -313,4 +314,10 @@ func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32
 	}
 
 	return result.(gethcommon.Address), args.Error(1)
+}
+
+func (t *MockWriter) GetSocketUpdates(ctx context.Context, startBlock, endBlock uint64) ([]*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate, error) {
+	args := t.Called()
+	result := args.Get(0)
+	return result.([]*regcoordinator.ContractRegistryCoordinatorOperatorSocketUpdate), args.Error(1)
 }
