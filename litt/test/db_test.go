@@ -180,7 +180,6 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 
 	iterations := 1000
 	restartIteration := iterations/2 + int(rand.Int64Range(-10, 10))
-	fmt.Printf("restartIteration: %d\n", restartIteration) // TODO
 
 	for i := 0; i < iterations; i++ {
 		// Somewhere in the middle of the test, restart the db.
