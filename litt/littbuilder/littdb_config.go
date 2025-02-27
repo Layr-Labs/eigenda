@@ -63,6 +63,9 @@ type LittDBConfig struct {
 	// The size of the control channel for the segment manager. The default is 64.
 	ControlChannelSize int
 
+	// The target size for segments. The default is math.MaxUint32.
+	TargetSegmentFileSize uint32
+
 	// The period between garbage collection runs. The default is 5 minutes.
 	GCPeriod time.Duration
 
@@ -77,12 +80,16 @@ type LittDBConfig struct {
 }
 
 // DefaultConfig returns a Config with default values.
-func DefaultConfig() *LittDBConfig {
+func DefaultConfig(path string) *LittDBConfig {
 	return &LittDBConfig{
-		TimeSource: time.Now,
-		GCPeriod:   5 * time.Minute,
-		DBType:     DiskDB,
-		KeyMapType: LevelDBKeyMap,
+		Path:                  path,
+		loggerConfig:          common.DefaultLoggerConfig(),
+		TimeSource:            time.Now,
+		GCPeriod:              5 * time.Minute,
+		DBType:                DiskDB,
+		KeyMapType:            LevelDBKeyMap,
+		ControlChannelSize:    64,
+		TargetSegmentFileSize: math.MaxUint32,
 	}
 }
 
@@ -130,15 +137,15 @@ func (c *LittDBConfig) buildTable(
 			return nil, fmt.Errorf("error creating key map: %w", err)
 		}
 
-		segmentsPath := path.Join(c.Path, name, "segments")
+		tableRoot := path.Join(c.Path, name)
 		table, err = disktable.NewDiskTable(
 			ctx,
 			logger,
 			time.Now,
 			name,
 			keyMap,
-			segmentsPath,
-			math.MaxUint32,
+			tableRoot,
+			c.TargetSegmentFileSize,
 			c.ControlChannelSize,
 			c.GCPeriod)
 

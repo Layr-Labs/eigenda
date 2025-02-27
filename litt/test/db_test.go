@@ -9,95 +9,58 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
-	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
-	"github.com/Layr-Labs/eigenda/litt/memtable"
-	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
 
-type dbBuilder struct {
-	name    string
-	builder func(t *testing.T, tableDirectory string) (litt.DB, error)
+type dbBuilder func(t *testing.T, tableDirectory string) (litt.DB, error)
+
+var builders = []dbBuilder{
+	buildMemDB,
+	buildMemKeyDiskDB,
+	buildLevelDBDiskDB,
 }
 
-var builders = []*dbBuilder{
-	{
-		name:    "mem",
-		builder: buildMemDB,
-	},
-	{
-		name:    "mem keymap disk table",
-		builder: buildMemKeyDiskDB,
-	},
-	{
-		name:    "levelDB keymap disk table",
-		builder: buildLevelDBDiskDB,
-	},
-}
-
-var restartableBuilders = []*dbBuilder{
-	{
-		name:    "mem keymap disk table",
-		builder: buildMemKeyDiskDB,
-	},
-	{
-		name:    "levelDB keymap disk table",
-		builder: buildLevelDBDiskDB,
-	},
+var restartableBuilders = []dbBuilder{
+	buildMemKeyDiskDB,
+	buildLevelDBDiskDB,
 }
 
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := litt.DefaultConfig(path)
-	require.NoError(t, err)
+	config := littbuilder.DefaultConfig(path)
+	config.DBType = littbuilder.MemDB
+	config.CacheSize = 1000
 
-	config.GCPeriod = 50 * time.Millisecond
-
-	tb := func(
-		ctx context.Context,
-		logger logging.Logger,
-		name string,
-		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
-		return memtable.NewMemTable(config, name), nil
-	}
-
-	return littbuilder.NewDBUnsafe(config, tb)
+	return config.Build(context.Background())
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := litt.DefaultConfig(path)
-	require.NoError(t, err)
-	config.KeymapType = keymap.MemKeymapType
+	config := littbuilder.DefaultConfig(path)
+	config.DBType = littbuilder.DiskDB
+	config.KeyMapType = littbuilder.MemKeyMap
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
-	config.ShardingFactor = 4
-	config.Fsync = false // fsync is too slow for unit test workloads
-	config.DoubleWriteProtection = true
 
-	return littbuilder.NewDB(config)
+	return config.Build(context.Background())
 }
 
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := litt.DefaultConfig(path)
-	require.NoError(t, err)
-	config.KeymapType = keymap.UnsafeLevelDBKeymapType
+	config := littbuilder.DefaultConfig(path)
+	config.DBType = littbuilder.DiskDB
+	config.KeyMapType = littbuilder.LevelDBKeyMap
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
-	config.ShardingFactor = 4
-	config.Fsync = false // fsync is too slow for unit test workloads
-	config.DoubleWriteProtection = true
 
-	return littbuilder.NewDB(config)
+	return config.Build(context.Background())
 }
 
-func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
+func randomDBOperationsTest(t *testing.T, builder dbBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
-	db, err := builder.builder(t, directory)
+	db, err := builder(t, directory)
 	require.NoError(t, err)
 
 	tableCount := rand.Int32Range(8, 16)
@@ -105,6 +68,9 @@ func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
 	for i := int32(0); i < tableCount; i++ {
 		tableNames = append(tableNames, fmt.Sprintf("table-%d-%s", i, rand.PrintableBytes(8)))
 	}
+
+	err = db.Start()
+	require.NoError(t, err)
 
 	// first key is table name, second key is the key in the kv-pair
 	expectedValues := make(map[string]map[string][]byte)
@@ -184,20 +150,17 @@ func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
 }
 
 func TestRandomDBOperations(t *testing.T) {
-	t.Parallel()
 	for _, builder := range builders {
-		t.Run(builder.name, func(t *testing.T) {
-			randomDBOperationsTest(t, builder)
-		})
+		randomDBOperationsTest(t, builder)
 	}
 }
 
-func dbRestartTest(t *testing.T, builder *dbBuilder) {
+func dbRestartTest(t *testing.T, builder dbBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
-	db, err := builder.builder(t, directory)
+	db, err := builder(t, directory)
 	require.NoError(t, err)
 
 	tableCount := rand.Int32Range(8, 16)
@@ -205,6 +168,9 @@ func dbRestartTest(t *testing.T, builder *dbBuilder) {
 	for i := int32(0); i < tableCount; i++ {
 		tableNames = append(tableNames, fmt.Sprintf("table-%d-%s", i, rand.PrintableBytes(8)))
 	}
+
+	err = db.Start()
+	require.NoError(t, err)
 
 	// first key is table name, second key is the key in the kv-pair
 	expectedValues := make(map[string]map[string][]byte)
@@ -214,14 +180,17 @@ func dbRestartTest(t *testing.T, builder *dbBuilder) {
 
 	iterations := 1000
 	restartIteration := iterations/2 + int(rand.Int64Range(-10, 10))
+	fmt.Printf("restartIteration: %d\n", restartIteration) // TODO
 
 	for i := 0; i < iterations; i++ {
 		// Somewhere in the middle of the test, restart the db.
 		if i == restartIteration {
-			err = db.Close()
+			err = db.Stop()
 			require.NoError(t, err)
 
-			db, err = builder.builder(t, directory)
+			db, err = builder(t, directory)
+			require.NoError(t, err)
+			err = db.Start()
 			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.
@@ -307,10 +276,7 @@ func dbRestartTest(t *testing.T, builder *dbBuilder) {
 }
 
 func TestDBRestart(t *testing.T) {
-	t.Parallel()
 	for _, builder := range restartableBuilders {
-		t.Run(builder.name, func(t *testing.T) {
-			dbRestartTest(t, builder)
-		})
+		dbRestartTest(t, builder)
 	}
 }
