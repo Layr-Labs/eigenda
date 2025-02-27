@@ -282,28 +282,6 @@ func (t *MockWriter) GetNumRelays(ctx context.Context) (uint32, error) {
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockWriter) GetRelayURL(ctx context.Context, key uint32) (string, error) {
-	args := t.Called()
-	if args.Get(0) == nil {
-		return "", args.Error(1)
-	}
-	result := args.Get(0)
-	return result.(string), args.Error(1)
-}
-
-func (t *MockWriter) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
-	args := t.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, args.Error(1)
-	}
-
-	return result.(map[uint32]string), args.Error(1)
-}
-
 func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
 	args := t.Called(disperserID)
 	result := args.Get(0)
@@ -313,4 +291,10 @@ func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32
 	}
 
 	return result.(gethcommon.Address), args.Error(1)
+}
+
+func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(gethcommon.Address)
 }

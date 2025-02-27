@@ -37,6 +37,7 @@ import (
 type ContractBindings struct {
 	RegCoordinatorAddr    gethcommon.Address
 	ServiceManagerAddr    gethcommon.Address
+	RelayRegistryAddress  gethcommon.Address
 	DelegationManager     *delegationmgr.ContractDelegationManager
 	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
 	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
@@ -192,16 +193,10 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
-	var contractRelayRegistry *relayreg.ContractEigenDARelayRegistry
-	relayRegistryAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
+	relayRegistryAddress, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
 		// TODO(ian-shim): return err when the contract is deployed
-	} else {
-		contractRelayRegistry, err = relayreg.NewContractEigenDARelayRegistry(relayRegistryAddr, t.ethClient)
-		if err != nil {
-			t.logger.Error("Failed to fetch IEigenDARelayRegistry contract", "err", err)
-		}
 	}
 
 	var contractThresholdRegistry *thresholdreg.ContractEigenDAThresholdRegistry
@@ -248,6 +243,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	t.bindings = &ContractBindings{
 		ServiceManagerAddr:    eigenDAServiceManagerAddr,
 		RegCoordinatorAddr:    registryCoordinatorAddr,
+		RelayRegistryAddress:  relayRegistryAddress,
 		AVSDirectory:          contractAVSDirectory,
 		SocketRegistry:        contractSocketRegistry,
 		OpStateRetriever:      contractBLSOpStateRetr,
@@ -258,7 +254,6 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		StakeRegistry:         contractStakeRegistry,
 		EigenDAServiceManager: contractEigenDAServiceManager,
 		DelegationManager:     contractDelegationManager,
-		RelayRegistry:         contractRelayRegistry,
 		PaymentVault:          contractPaymentVault,
 		ThresholdRegistry:     contractThresholdRegistry,
 		DisperserRegistry:     contractEigenDADisperserRegistry,
@@ -939,58 +934,6 @@ func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.Operator
 	return socket, nil
 }
 
-func (t *Reader) GetNumRelays(ctx context.Context) (uint32, error) {
-	if t.bindings.RelayRegistry == nil {
-		return 0, errors.New("relay registry not deployed")
-	}
-
-	return t.bindings.RelayRegistry.NextRelayKey(&bind.CallOpts{
-		Context: ctx,
-	})
-}
-
-func (t *Reader) GetRelayURL(ctx context.Context, key uint32) (string, error) {
-	if t.bindings.RelayRegistry == nil {
-		return "", errors.New("relay registry not deployed")
-	}
-
-	return t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
-		Context: ctx,
-	}, uint32(key))
-}
-
-func (t *Reader) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
-	if t.bindings.RelayRegistry == nil {
-		return nil, errors.New("relay registry not deployed")
-	}
-
-	numRelays, err := t.GetNumRelays(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	res := make(map[uint32]string)
-	for relayKey := uint32(0); relayKey < numRelays; relayKey++ {
-		url, err := t.bindings.RelayRegistry.RelayKeyToUrl(&bind.CallOpts{
-			Context: ctx,
-		}, relayKey)
-
-		if err != nil && strings.Contains(err.Error(), "execution reverted") {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		res[relayKey] = url
-	}
-
-	if len(res) == 0 {
-		return nil, errors.New("no relay URLs found")
-	}
-
-	return res, nil
-}
-
 func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
 	registry := t.bindings.DisperserRegistry
 	if registry == nil {
@@ -1012,4 +955,8 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 	}
 
 	return address, nil
+}
+
+func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
+	return t.bindings.RelayRegistryAddress
 }
