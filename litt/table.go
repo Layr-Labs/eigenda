@@ -42,6 +42,10 @@ type Table interface {
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
 	SetTTL(ttl time.Duration) error
 
+	// SetShardingFactor sets the number of write shards used. Increasing this value increases the number of parallel
+	// writes that can be performed.
+	SetShardingFactor(shardingFactor uint32) error
+
 	// SetCacheSize sets the cache size, in bytes, for the table. For tables without a cache, this method does nothing.
 	// If the cache size is set to 0 (default), the cache is disabled. The size of each cache entry is equal to the sum
 	// the key length and the value length. Note that the actual in-memory footprint if the cache will be slightly

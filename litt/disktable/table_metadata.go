@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -18,8 +17,6 @@ const tableMetadataFileExtension = ".metadata"
 const tableMetadataFileName = "table" + tableMetadataFileExtension
 const tableMetadataSwapFileExtension = ".mswap"
 const tableMetadataSwapFileName = "table" + tableMetadataSwapFileExtension
-
-const tableMetadataSize = 16
 
 // tableMetadata contains table data that is preserved across restarts.
 type tableMetadata struct {
@@ -64,12 +61,7 @@ func newTableMetadata(
 // loadTableMetadata loads the table metadata from disk.
 func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMetadata, error) {
 	mPath := metadataPath(tableDirectory)
-
-	exists, err := util.Exists(mPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if table metadata file exists: %v", err)
-	}
-	if !exists {
+	if _, err := os.Stat(mPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("table metadata file does not exist: %s", mPath)
 	}
 
@@ -91,11 +83,6 @@ func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMeta
 	}
 
 	return metadata, nil
-}
-
-// Size returns the size of the table metadata file in bytes.
-func (t *tableMetadata) Size() uint64 {
-	return tableMetadataSize
 }
 
 // GetTTL returns the time-to-live for the table.
@@ -161,7 +148,7 @@ func (t *tableMetadata) serialize() []byte {
 	// 4 bytes for version
 	// 8 bytes for TTL
 	// 4 bytes for sharding factor
-	data := make([]byte, tableMetadataSize)
+	data := make([]byte, 16)
 
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], tableMetadataSerializationVersion)
@@ -181,7 +168,7 @@ func deserialize(data []byte) (*tableMetadata, error) {
 	// 4 bytes for version
 	// 8 bytes for TTL
 	// 4 bytes for sharding factor
-	if len(data) != tableMetadataSize {
+	if len(data) != 16 {
 		return nil, fmt.Errorf("metadata file is not the correct size, expected 16 bytes, got %d", len(data))
 	}
 
@@ -224,13 +211,7 @@ func (t *tableMetadata) swapPath() string {
 // This can happen if the process crashes while writing the metadata file (recoverable).
 func (t *tableMetadata) deleteOrphanedSwapFile() error {
 	swapPath := t.swapPath()
-
-	exists, err := util.Exists(swapPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if swap file exists: %v", err)
-	}
-
-	if exists {
+	if _, err := os.Stat(swapPath); err == nil {
 		t.logger.Warnf("Found orphaned table metadata swap file %s, deleting", swapPath)
 
 		// delete orphaned swap file
