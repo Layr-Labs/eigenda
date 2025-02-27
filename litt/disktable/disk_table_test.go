@@ -95,7 +95,7 @@ func buildLevelDBKeyDiskTable(
 }
 
 func restartTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
@@ -214,7 +214,7 @@ func TestRestart(t *testing.T) {
 // This test deletes a random file from a middle segment. This is considered unrecoverable corruption, and should
 // cause the table to fail to restart.
 func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -320,7 +320,7 @@ func TestMiddleFileMissing(t *testing.T) {
 // This test deletes a random file from the first segment. This is considered recoverable, since it can happen
 // if the table crashes during garbage collection.
 func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -499,7 +499,7 @@ func TestInitialFileMissing(t *testing.T) {
 // This test deletes a random file from the last segment. This can happen if the table crashes prior to the
 // last segment being flushed.
 func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -685,7 +685,7 @@ func TestLastFileMissing(t *testing.T) {
 
 // This test simulates the scenario where a key file is truncated.
 func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -896,7 +896,7 @@ func TestTruncatedKeyFile(t *testing.T) {
 
 // This test simulates the scenario where a value file is truncated.
 func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -1109,7 +1109,7 @@ func TestTruncatedValueFile(t *testing.T) {
 // This test simulates the scenario where keys have not been flushed to the key store. The important thing
 // is to ensure that garbage collection doesn't explode when it encounters keys that are not in the key store.
 func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)

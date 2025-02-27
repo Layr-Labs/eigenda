@@ -55,11 +55,10 @@ message StoreChunksRequest {
   //   e. digest certificate.BlobHeader.Commitment.LengthProof
   //   f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
   //   g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  //   h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
+  //   h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
   //   i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  //   j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  //   k. digest certificate.BlobHeader.Signature
-  //   l. for each relay in certificate.Relays:
+  //   j. digest certificate.BlobHeader.Signature
+  //   k. for each relay in certificate.Relays:
   //     i. digest relay (4 bytes, unsigned big endian)
   // 4. digest disperserID (4 bytes, unsigned big endian)
   //
@@ -69,7 +68,7 @@ message StoreChunksRequest {
 
 // StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 message StoreChunksReply {
-  // a custody signature of the received chunks
+  // The validator's BSL signature signed on the batch header hash.
   bytes signature = 1;
 }
 
@@ -85,10 +84,42 @@ message GetChunksRequest {
   uint32 quorum_id = 2;
 }
 
+// This describes how the chunks returned in GetChunksReply are encoded.
+// Used to facilitate the decoding of chunks.
+enum ChunkEncodingFormat {
+  // A valid response should never use this value.
+  // If encountered, the client should treat it as an error.
+  UNKNOWN = 0;
+
+  // A chunk encoded in GNARK has the following format:
+  //
+  // [KZG proof: 32 bytes]
+  // [Coeff 1:   32 bytes]
+  // [Coeff 2:   32 bytes]
+  // ...
+  // [Coeff n:   32 bytes]
+  //
+  // The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes().
+  // The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+  //
+  // References:
+  // - bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254
+  // - fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+  //
+  // Golang serialization and deserialization can be found in:
+  // - Frame.SerializeGnark()
+  // - Frame.DeserializeGnark()
+  // Package: github.com/Layr-Labs/eigenda/encoding
+  GNARK = 1;
+}
+
 // The response to the GetChunks() RPC.
 message GetChunksReply {
-  // All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
+  // All chunks the Node is storing for the requested blob per GetChunksRequest.
   repeated bytes chunks = 1;
+
+  // The format how the above chunks are encoded.
+  ChunkEncodingFormat chunk_encoding_format = 2;
 }
 
 // The parameter for the GetNodeInfo() RPC.

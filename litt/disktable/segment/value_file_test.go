@@ -11,7 +11,7 @@ import (
 )
 
 func TestWriteThenReadValues(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
@@ -73,7 +73,7 @@ func TestWriteThenReadValues(t *testing.T) {
 }
 
 func TestReadingTruncatedValueFile(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()

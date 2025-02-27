@@ -18,3 +18,10 @@ func hashUint64(hasher hash.Hash, value uint64) {
 	binary.BigEndian.PutUint64(bytes, value)
 	hasher.Write(bytes)
 }
+
+// hashInt64 hashes the given int64 value.
+func hashInt64(hasher hash.Hash, value int64) {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, uint64(value))
+	hasher.Write(bytes)
+}

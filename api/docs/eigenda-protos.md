@@ -121,6 +121,8 @@
     - [StoreChunksReply](#validator-StoreChunksReply)
     - [StoreChunksRequest](#validator-StoreChunksRequest)
   
+    - [ChunkEncodingFormat](#validator-ChunkEncodingFormat)
+  
     - [Dispersal](#validator-Dispersal)
     - [Retrieval](#validator-Retrieval)
   
@@ -361,7 +363,6 @@ On-demand dispersal is currently limited to using a subset of the following quor
 Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation. Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10 |
 | commitment | [common.BlobCommitment](#common-BlobCommitment) |  | commitment is the KZG commitment to the blob |
 | payment_header | [PaymentHeader](#common-v2-PaymentHeader) |  | payment_header contains payment information for the blob |
-| salt | [uint32](#uint32) |  | salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand payments already have unique cumulative_payment values for intentionally unique dispersal requests. |
 
 
 
@@ -385,9 +386,9 @@ multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d5625
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
-| reservation_period | [uint32](#uint32) |  | The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches either the current or the previous period.
+| timestamp | [int64](#int64) |  | The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request, and will be used to determine the reservation period, and compared against the reservation active start and end timestamps On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision. If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected. The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches either the current or the previous period.
 
-Example Usage Flow: 1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp, endTimestamp, and reservationPeriodInterval. 2. When sending a dispersal request at time t, the client computes reservation_period = floor(t / reservationPeriodInterval). 3. The request includes this reservation_period index. The disperser checks: - If the reservation is active (t &gt;= startTimestamp and t &lt; endTimestamp). - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval). 4. Server always go ahead with recording the received request, and then categorize the scenarios - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds. - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin. - If the bandwidth has already been exhausted, the request is rejected. 5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records. Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand. |
+Example Usage Flow: 1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp, endTimestamp, and reservationPeriodInterval. 2. When sending a dispersal request at time t, the client fill in the timestamp field with t. 3. The disperser take timestamp t and checks the reservation period and the user&#39;s bandwidth capacity: - If the reservation is active (t &gt;= startTimestamp and t &lt; endTimestamp). - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval). - The request is ratelimited against the current reservation period, and calculated as reservation_period = t / reservationPeriodInterval. the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period. 4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds. - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin. - If the bandwidth has already been exhausted, the request is rejected. 5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records. Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand. |
 | cumulative_payment | [bytes](#bytes) |  | Cumulative payment is the total amount of tokens paid by the requesting account, including the current request. This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total, requests can arrive out of order and still unambiguously declare how much of the on-chain deposit can be deducted.
 
 Example Decision Flow: 1. In the set up phase, the user must deposit tokens into the EigenDA PaymentVault contract. The payment vault contract specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage. The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, the server will only refresh every few minutes for the top-up to take effect. 2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt). 3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on protocol defined pricing. 4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field. 5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment and smallest later payment if exists). 6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected. |
@@ -1015,11 +1016,9 @@ Terminal states are states that will not be updated to a different state:
 This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an unanticipated bug. |
 | QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
 | ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
-| GATHERING_SIGNATURES | 3 | GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators, and in doing so requesting that the validators sign to acknowledge receipt of the blob. Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser, after which the BlobStatus becomes COMPLETE.
-
-Note: this status is not currently implemented, and is a placeholder for future functionality. |
+| GATHERING_SIGNATURES | 3 | GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators, and in doing so requesting that the validators sign to acknowledge receipt of the blob. Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser, after which the BlobStatus becomes COMPLETE. |
 | COMPLETE | 4 | COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed. This status does not guarantee any signer percentage, so a client should check that the signature has met its required threshold, and resubmit a new blob dispersal request if not. |
-| FAILED | 5 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again with different salt (blob key is required to be unique). |
+| FAILED | 5 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again (blob key is required to be unique). |
 
 
  
@@ -1716,7 +1715,8 @@ The response to the GetChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per RetrieveChunksRequest. |
+| chunks | [bytes](#bytes) | repeated | All chunks the Node is storing for the requested blob per GetChunksRequest. |
+| chunk_encoding_format | [ChunkEncodingFormat](#validator-ChunkEncodingFormat) |  | The format how the above chunks are encoded. |
 
 
 
@@ -1776,7 +1776,7 @@ StoreChunksReply is the message type used to respond to a StoreChunks() RPC.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| signature | [bytes](#bytes) |  | a custody signature of the received chunks |
+| signature | [bytes](#bytes) |  | The validator&#39;s BSL signature signed on the batch header hash. |
 
 
 
@@ -1797,7 +1797,7 @@ Request that the Node store a batch of chunks.
 
 Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned). A reference implementation (golang) can be found at https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
 
-1. digest batch.BatchHeader.BatchRoot 2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian) 3. for each certificate in batch.BlobCertificates: a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian) b. for each quorum_number in certificate.BlobHeader.QuorumNumbers: i. digest quorum_number (4 bytes, unsigned big endian) c. digest certificate.BlobHeader.Commitment.Commitment d. digest certificate.BlobHeader.Commitment.LengthCommitment e. digest certificate.BlobHeader.Commitment.LengthProof f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian) g. digest certificate.BlobHeader.PaymentHeader.AccountId h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian) i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian) k. digest certificate.BlobHeader.Signature l. for each relay in certificate.Relays: i. digest relay (4 bytes, unsigned big endian) 4. digest disperserID (4 bytes, unsigned big endian)
+1. digest batch.BatchHeader.BatchRoot 2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian) 3. for each certificate in batch.BlobCertificates: a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian) b. for each quorum_number in certificate.BlobHeader.QuorumNumbers: i. digest quorum_number (4 bytes, unsigned big endian) c. digest certificate.BlobHeader.Commitment.Commitment d. digest certificate.BlobHeader.Commitment.LengthCommitment e. digest certificate.BlobHeader.Commitment.LengthProof f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian) g. digest certificate.BlobHeader.PaymentHeader.AccountId h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian) i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment j. digest certificate.BlobHeader.Signature k. for each relay in certificate.Relays: i. digest relay (4 bytes, unsigned big endian) 4. digest disperserID (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. |
 
@@ -1806,6 +1806,27 @@ Note that this signature is not included in the hash for obvious reasons. |
 
 
  
+
+
+<a name="validator-ChunkEncodingFormat"></a>
+
+### ChunkEncodingFormat
+This describes how the chunks returned in GetChunksReply are encoded.
+Used to facilitate the decoding of chunks.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. |
+| GNARK | 1 | A chunk encoded in GNARK has the following format:
+
+[KZG proof: 32 bytes] [Coeff 1: 32 bytes] [Coeff 2: 32 bytes] ... [Coeff n: 32 bytes]
+
+The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes(). The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+
+References: - bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254 - fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+
+Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding |
+
 
  
 

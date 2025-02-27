@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -25,7 +25,6 @@ import (
 type ValidatorPayloadRetriever struct {
 	logger          logging.Logger
 	config          ValidatorPayloadRetrieverConfig
-	codec           codecs.BlobCodec
 	retrievalClient RetrievalClient
 	g1Srs           []bn254.G1Affine
 }
@@ -74,17 +73,9 @@ func BuildValidatorPayloadRetriever(
 		kzgVerifier,
 		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
 
-	codec, err := codecs.CreateCodec(
-		validatorPayloadRetrieverConfig.PayloadPolynomialForm,
-		validatorPayloadRetrieverConfig.BlobEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("create codec: %w", err)
-	}
-
 	return &ValidatorPayloadRetriever{
 		logger:          logger,
 		config:          validatorPayloadRetrieverConfig,
-		codec:           codec,
 		retrievalClient: retrievalClient,
 		g1Srs:           kzgVerifier.Srs.G1,
 	}, nil
@@ -94,7 +85,6 @@ func BuildValidatorPayloadRetriever(
 func NewValidatorPayloadRetriever(
 	logger logging.Logger,
 	config ValidatorPayloadRetrieverConfig,
-	codec codecs.BlobCodec,
 	retrievalClient RetrievalClient,
 	g1Srs []bn254.G1Affine,
 ) (*ValidatorPayloadRetriever, error) {
@@ -106,7 +96,6 @@ func NewValidatorPayloadRetriever(
 	return &ValidatorPayloadRetriever{
 		logger:          logger,
 		config:          config,
-		codec:           codec,
 		retrievalClient: retrievalClient,
 		g1Srs:           g1Srs,
 	}, nil
@@ -120,7 +109,7 @@ func NewValidatorPayloadRetriever(
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
 	eigenDACert *verification.EigenDACert,
-) ([]byte, error) {
+) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
@@ -135,7 +124,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
-		blobBytes, err := pr.getBlobWithTimeout(
+		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			*blobKey,
 			blobHeader.Version,
@@ -152,13 +141,11 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			continue
 		}
 
-		err = verification.CheckBlobLength(blobBytes, commitment.Length)
-		if err != nil {
-			pr.logger.Warn("check blob length", "blobKey", blobKey.Hex(), "quorumID", quorumID, "error", err)
-			continue
-		}
-
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blobBytes, commitment.Commitment)
+		// TODO (litt3): eventually, we should make GenerateAndCompareBlobCommitment accept a blob, instead of the
+		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
+		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
+		//  change now, to limit the size of the refactor PR.
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), commitment.Commitment)
 		if err != nil {
 			pr.logger.Warn(
 				"generate and compare blob commitment",
@@ -172,14 +159,13 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			continue
 		}
 
-		payload, err := pr.codec.DecodeBlob(blobBytes)
+		payload, err := blob.ToPayload(pr.config.PayloadPolynomialForm)
 		if err != nil {
 			pr.logger.Error(
-				`Cert verification was successful, but decode blob failed!
-					This is likely a problem with the local blob codec configuration,
-					but could potentially indicate a maliciously generated blob certificate.
-					It should not be possible for an honestly generated certificate to verify
-					for an invalid blob!`,
+				`Commitment verification was successful, but conversion from blob to payload failed!
+					This is likely a problem with the local configuration, but could potentially indicate
+					malicious dispersed data. It should not be possible for a commitment to verify for an
+					invalid blob!`,
 				"blobKey", blobKey.Hex(), "quorumID", quorumID, "eigenDACert", eigenDACert, "error", err)
 			return nil, fmt.Errorf("decode blob: %w", err)
 		}
@@ -190,23 +176,35 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", blobHeader.QuorumNumbers)
 }
 
-// getBlobWithTimeout attempts to get a blob from a given quorum, and times out based on config.RetrievalTimeout
-func (pr *ValidatorPayloadRetriever) getBlobWithTimeout(
+// retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
+func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	referenceBlockNumber uint32,
-	quorumID core.QuorumID) ([]byte, error) {
+	quorumID core.QuorumID) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
 
-	return pr.retrievalClient.GetBlob(
+	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
+	blobBytes, err := pr.retrievalClient.GetBlob(
 		timeoutCtx,
 		blobKey,
 		blobVersion,
 		blobCommitments,
 		uint64(referenceBlockNumber),
 		quorumID)
+
+	if err != nil {
+		return nil, fmt.Errorf("get blob: %w", err)
+	}
+
+	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(blobCommitments.Length))
+	if err != nil {
+		return nil, fmt.Errorf("deserialize blob: %w", err)
+	}
+
+	return blob, nil
 }

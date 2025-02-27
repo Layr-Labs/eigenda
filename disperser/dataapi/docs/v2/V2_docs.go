@@ -126,29 +126,35 @@ const docTemplateV2 = `{
                 "tags": [
                     "Blobs"
                 ],
-                "summary": "Fetch blob feed",
+                "summary": "Fetch blob feed in specified direction",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
-                        "name": "end",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]",
-                        "name": "interval",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]",
-                        "name": "pagination_token",
+                        "description": "Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than ` + "`" + `before` + "`" + ` [default: before-1h]",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor (opaque string from previous response); for 'forward' direction, overrides ` + "`" + `after` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `before` + "`" + `; for 'backward' direction, overrides ` + "`" + `before` + "`" + ` and fetches blobs from ` + "`" + `cursor` + "`" + ` to ` + "`" + `after` + "`" + ` (all bounds exclusive) [default: empty]",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "The maximum number of blobs to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "description": "Maximum number of blobs to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
                         "name": "limit",
                         "in": "query"
                     }
@@ -693,8 +699,8 @@ const docTemplateV2 = `{
                         }
                     ]
                 },
-                "reservation_period": {
-                    "description": "ReservationPeriod represents the range of time at which the dispersal is made",
+                "timestamp": {
+                    "description": "Timestamp represents the nanosecond of the dispersal request creation",
                     "type": "integer"
                 }
             }
@@ -879,10 +885,6 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "salt": {
-                    "description": "Salt is used to make blob intentionally unique when everything else is the same",
-                    "type": "integer"
                 }
             }
         },
@@ -979,6 +981,32 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.AttestationInfo": {
+            "type": "object",
+            "properties": {
+                "attestation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                },
+                "nonsigners": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/v2.OperatorIdentity"
+                        }
+                    }
+                },
+                "signers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/v2.OperatorIdentity"
+                        }
+                    }
+                }
+            }
+        },
         "v2.BatchFeedResponse": {
             "type": "object",
             "properties": {
@@ -1039,8 +1067,8 @@ const docTemplateV2 = `{
         "v2.BlobAttestationInfoResponse": {
             "type": "object",
             "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                "attestation_info": {
+                    "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header_hash": {
                     "type": "string"
@@ -1070,7 +1098,7 @@ const docTemplateV2 = `{
                         "$ref": "#/definitions/v2.BlobInfo"
                     }
                 },
-                "pagination_token": {
+                "cursor": {
                     "type": "string"
                 }
             }
@@ -1231,6 +1259,17 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.OperatorIdentity": {
+            "type": "object",
+            "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
+                "operator_id": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.OperatorLivenessResponse": {
             "type": "object",
             "properties": {
@@ -1289,6 +1328,9 @@ const docTemplateV2 = `{
         "v2.OperatorStake": {
             "type": "object",
             "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },

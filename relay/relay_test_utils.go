@@ -211,7 +211,7 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
 			AccountId:         tu.RandomString(10),
-			ReservationPeriod: 5,
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -231,14 +231,12 @@ func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) 
 	return header, data, frames
 }
 
-func disassembleFrames(frames []*encoding.Frame) ([]*rs.Frame, []*encoding.Proof) {
-	rsFrames := make([]*rs.Frame, len(frames))
+func disassembleFrames(frames []*encoding.Frame) ([]rs.FrameCoeffs, []*encoding.Proof) {
+	rsFrames := make([]rs.FrameCoeffs, len(frames))
 	proofs := make([]*encoding.Proof, len(frames))
 
 	for i, frame := range frames {
-		rsFrames[i] = &rs.Frame{
-			Coeffs: frame.Coeffs,
-		}
+		rsFrames[i] = frame.Coeffs
 		proofs[i] = &frame.Proof
 	}
 

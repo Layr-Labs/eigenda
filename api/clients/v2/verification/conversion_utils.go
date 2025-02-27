@@ -147,16 +147,9 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 			math.MaxUint16)
 	}
 
-	var quorumNumbers []byte
-	for _, quorumNumber := range inputHeader.GetQuorumNumbers() {
-		if quorumNumber > math.MaxUint8 {
-			return nil, fmt.Errorf(
-				"quorum number overflow: value was %d, but max allowable value is %d",
-				quorumNumber,
-				uint8(math.MaxUint8))
-		}
-
-		quorumNumbers = append(quorumNumbers, byte(quorumNumber))
+	quorumNumbers, err := QuorumNumbersUint32ToUint8(inputHeader.GetQuorumNumbers())
+	if err != nil {
+		return nil, fmt.Errorf("convert quorum numbers to uint8: %s", err)
 	}
 
 	convertedBlobCommitment, err := blobCommitmentProtoToBinding(inputHeader.GetCommitment())
@@ -174,7 +167,6 @@ func blobHeaderProtoToBinding(inputHeader *commonv2.BlobHeader) (*contractEigenD
 		QuorumNumbers:     quorumNumbers,
 		Commitment:        *convertedBlobCommitment,
 		PaymentHeaderHash: paymentHeaderHash,
-		Salt:              inputHeader.GetSalt(),
 	}, nil
 }
 
@@ -307,4 +299,24 @@ func BlobCommitmentsBindingToInternal(
 	}
 
 	return blobCommitment, nil
+}
+
+// QuorumNumbersUint32ToUint8 accepts an array of uint32 quorum numbers, and converts it into an array of uint8 quorum
+// numbers.
+//
+// Returns an error if any quorum number is too large to fit into a uint8
+func QuorumNumbersUint32ToUint8(inputQuorums []uint32) ([]uint8, error) {
+	var outputQuorums []byte
+	for _, quorumNumber := range inputQuorums {
+		if quorumNumber > math.MaxUint8 {
+			return nil, fmt.Errorf(
+				"quorum number overflow: value was %d, but max allowable value is %d",
+				quorumNumber,
+				uint8(math.MaxUint8))
+		}
+
+		outputQuorums = append(outputQuorums, byte(quorumNumber))
+	}
+
+	return outputQuorums, nil
 }

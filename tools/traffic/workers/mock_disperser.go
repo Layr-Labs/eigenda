@@ -22,9 +22,9 @@ func (m *MockDisperserClient) DisperseBlob(
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-	salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error) {
+) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 
-	args := m.mock.Called(ctx, data, blobVersion, quorums, salt)
+	args := m.mock.Called(ctx, data, blobVersion, quorums)
 	return args.Get(0).(*dispv2.BlobStatus), args.Get(1).(corev2.BlobKey), args.Error(2)
 }
 

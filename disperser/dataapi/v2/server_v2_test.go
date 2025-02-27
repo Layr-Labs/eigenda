@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"sort"
 	"testing"
@@ -259,9 +260,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(42))
-	require.NoError(t, err)
-	salt, err := rand.Int(rand.Reader, big.NewInt(1000))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
 	require.NoError(t, err)
@@ -274,10 +273,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 		BlobCommitments: makeCommitment(t),
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp.Int64(),
 			CumulativePayment: cumulativePayment,
 		},
-		Salt: uint32(salt.Int64()),
 	}
 }
 
@@ -320,7 +318,7 @@ func checkOperatorSigningInfoEqual(t *testing.T, actual, expected *serverv2.Oper
 	assert.Equal(t, expected.TotalBatches, actual.TotalBatches)
 }
 
-func checkPaginationToken(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
+func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.BlobKey) {
 	cursor, err := new(blobstorev2.BlobFeedCursor).FromCursorKey(token)
 	require.NoError(t, err)
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
@@ -359,7 +357,7 @@ func TestFetchBlob(t *testing.T) {
 	assert.Equal(t, "Queued", response.Status)
 	assert.Equal(t, uint16(0), response.BlobHeader.BlobVersion)
 	assert.Equal(t, blobHeader.PaymentMetadata.AccountID, response.BlobHeader.PaymentMetadata.AccountID)
-	assert.Equal(t, blobHeader.PaymentMetadata.ReservationPeriod, response.BlobHeader.PaymentMetadata.ReservationPeriod)
+	assert.Equal(t, blobHeader.PaymentMetadata.Timestamp, response.BlobHeader.PaymentMetadata.Timestamp)
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
@@ -411,6 +409,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobKey, err := blobHeader.BlobKey()
@@ -435,27 +434,109 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
 	}
 	sort.Slice(firstBlobKeys, func(i, j int) bool {
 		return bytes.Compare(firstBlobKeys[i][:], firstBlobKeys[j][:]) < 0
 	})
 
+	defer deleteItems(t, dynamoKeys)
+
 	r.GET("/v2/blobs/feed", testDataApiServerV2.FetchBlobFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
-		reqUrls := []string{
-			"/v2/blobs/feed?pagination_token=abc",
-			"/v2/blobs/feed?limit=abc",
-			"/v2/blobs/feed?interval=abc",
-			"/v2/blobs/feed?interval=-1",
-			"/v2/blobs/feed?end=2006-01-02T15:04:05",
-			"/v2/blobs/feed?end=2006-01-02T15:04:05Z",
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "direction must be either 'forward' or 'backward', found: abc",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse before param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse after param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "'after' must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+				},
+				wantError: "after time must be before before time",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "before time cannot be more than 14 days in the past",
+			},
+
+			// Invalid cursor
+			{
+				name:        "invalid cursor format",
+				queryParams: map[string]string{"cursor": "not-a-valid-cursor"},
+				wantError:   "failed to parse the cursor",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse limit param",
+			},
 		}
-		for _, url := range reqUrls {
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+			url := fmt.Sprintf("/v2/blobs/feed?%s", params.Encode())
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
+
 			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
 		}
 	})
 
@@ -471,11 +552,11 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 	})
 
-	t.Run("various query ranges and limits", func(t *testing.T) {
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// Returns keys[43] through keys[102] (60 blobs)
 		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?limit=0")
@@ -485,12 +566,14 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		w = executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?interval=7200&limit=-1")
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, numBlobs, len(response.Blobs))
 		// First 3 blobs ordered by key due to same timestamp
@@ -501,14 +584,14 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[102], keys[102])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[102], keys[102])
 
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=-1", endTime)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 60, len(response.Blobs))
@@ -516,11 +599,58 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[41+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[41+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[100], keys[100])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[100], keys[100])
 	})
 
-	t.Run("pagination", func(t *testing.T) {
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// Returns keys[102] through keys[43] (60 blobs in descending order of time)
+		w := executeRequest(t, r, http.MethodGet, "/v2/blobs/feed?direction=backward&limit=0")
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[43], keys[43])
+
+		// Test 2: 2-hour window captures all test blobs
+		// Verifies correct ordering of timestamp-colliding blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=-1", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, numBlobs, len(response.Blobs))
+		// The last 3 blobs ordered by key due to same timestamp
+		checkBlobKeyEqual(t, firstBlobKeys[2], response.Blobs[numBlobs-3].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[numBlobs-2].BlobMetadata.BlobHeader)
+		checkBlobKeyEqual(t, firstBlobKeys[0], response.Blobs[numBlobs-1].BlobMetadata.BlobHeader)
+		for i := 3; i < numBlobs; i++ {
+			checkBlobKeyEqual(t, keys[i], response.Blobs[numBlobs-i-1].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[i], response.Blobs[numBlobs-i-1].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[0], firstBlobKeys[0])
+
+		// Test 3: Custom end time with 1-hour window
+		// Retrieves keys[100] through keys[41]
+		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&before=%s&limit=-1", endTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			checkBlobKeyEqual(t, keys[100-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[100-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[41], keys[41])
+	})
+
+	t.Run("forward pagination", func(t *testing.T) {
 		// Test pagination behavior:
 		// 1. First page: blobs in past 1h limited to 20, returns keys[43] through keys[62]
 		// 2. Second page: the next 20 blobs, returns keys[63] through keys[82]
@@ -529,7 +659,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - Proper token handling
 		tm := time.Unix(0, time.Now().UnixNano()).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -537,11 +667,11 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[43+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[43+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[62], keys[62])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[62], keys[62])
 
-		// Request next page using pagination token
-		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=20&pagination_token=%s", endTime, response.PaginationToken)
+		// Request next page using pagination cursor
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 20, len(response.Blobs))
@@ -549,8 +679,41 @@ func TestFetchBlobFeed(t *testing.T) {
 			checkBlobKeyEqual(t, keys[63+i], response.Blobs[i].BlobMetadata.BlobHeader)
 			assert.Equal(t, requestedAt[63+i], response.Blobs[i].BlobMetadata.RequestedAt)
 		}
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[82], keys[82])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[82], keys[82])
+	})
+
+	t.Run("backward pagination", func(t *testing.T) {
+		// Test backward pagination behavior:
+		// 1. First page: the most recent 20 blobs, keys[102] through keys[83]
+		// 2. Second page: requesting the next 20 blobs, but only 3 blobs due to "after" time bound
+		// Verifies:
+		// - Correct sequencing across pages
+		// - Proper token handling (cursor is exclusive)
+		tm := time.Unix(0, int64(requestedAt[80])).UTC()
+		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20", endTime)
+		w := executeRequest(t, r, http.MethodGet, reqUrl)
+		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			checkBlobKeyEqual(t, keys[102-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[102-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[83], keys[83])
+
+		// Request next page using pagination cursor
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20&cursor=%s", endTime, response.Cursor)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
+		require.Equal(t, 3, len(response.Blobs))
+		for i := 0; i < 3; i++ {
+			checkBlobKeyEqual(t, keys[82-i], response.Blobs[i].BlobMetadata.BlobHeader)
+			assert.Equal(t, requestedAt[82-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[80], keys[80])
 	})
 
 	t.Run("pagination over same-timestamp blobs", func(t *testing.T) {
@@ -562,7 +725,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
-		reqUrl := fmt.Sprintf("/v2/blobs/feed?end=%s&limit=2", endTime)
+		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		require.Equal(t, 2, len(response.Blobs))
@@ -570,11 +733,11 @@ func TestFetchBlobFeed(t *testing.T) {
 		checkBlobKeyEqual(t, firstBlobKeys[1], response.Blobs[1].BlobMetadata.BlobHeader)
 		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
 		assert.Equal(t, firstBlobTime, response.Blobs[1].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[1], firstBlobKeys[1])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[1], firstBlobKeys[1])
 
 		// Second page: fetch remaining blobs (limit=0 means no limit, hence reach the last blob)
-		reqUrl = fmt.Sprintf("/v2/blobs/feed?end=%s&limit=0&pagination_token=%s", endTime, response.PaginationToken)
+		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=0&cursor=%s", endTime, response.Cursor)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
 		// Verify second page contains:
@@ -587,8 +750,8 @@ func TestFetchBlobFeed(t *testing.T) {
 		assert.Equal(t, firstBlobTime, response.Blobs[0].BlobMetadata.RequestedAt)
 		assert.Equal(t, requestedAt[3], response.Blobs[1].BlobMetadata.RequestedAt)
 		assert.Equal(t, requestedAt[4], response.Blobs[2].BlobMetadata.RequestedAt)
-		assert.True(t, len(response.PaginationToken) > 0)
-		checkPaginationToken(t, response.PaginationToken, requestedAt[4], keys[4])
+		assert.True(t, len(response.Cursor) > 0)
+		checkCursor(t, response.Cursor, requestedAt[4], keys[4])
 	})
 }
 
@@ -597,12 +760,22 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	r := setUpRouter()
 
 	// Set up blob inclusion info
+	now := time.Now()
 	blobHeader := makeBlobHeaderV2(t)
+	metadata := &commonv2.BlobMetadata{
+		BlobHeader: blobHeader,
+		BlobStatus: commonv2.Queued,
+		Expiry:     uint64(now.Add(time.Hour).Unix()),
+		NumRetries: 0,
+		UpdatedAt:  uint64(now.UnixNano()),
+	}
+	err := blobMetadataStore.PutBlobMetadata(context.Background(), metadata)
+	require.NoError(t, err)
 	blobKey, err := blobHeader.BlobKey()
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{1, 2, 3},
-		ReferenceBlockNumber: 100,
+		ReferenceBlockNumber: 10,
 	}
 	bhh, err := batchHeader.Hash()
 	assert.NoError(t, err)
@@ -627,18 +800,43 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
 	})
 
+	operatorPubKeys := []*core.G1Point{
+		core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
+		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
 	// Set up attestation
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
 	apk := keyPair.GetPubKeyG2()
+	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		AttestedAt:  uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
-			core.NewG1Point(big.NewInt(3), big.NewInt(4)),
-		},
-		APKG2: apk,
+		BatchHeader:      batchHeader,
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nonsignerPubKeys,
+		APKG2:            apk,
 		QuorumAPKs: map[uint8]*core.G1Point{
 			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
 			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
@@ -655,6 +853,51 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(ctx, attestation)
 	assert.NoError(t, err)
 
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		10: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[1].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(3),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[3].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
+	}
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
+
 	t.Run("found attestation info", func(t *testing.T) {
 		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
 		w := executeRequest(t, r, http.MethodGet, reqStr)
@@ -663,9 +906,58 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, blobKey.Hex(), response.BlobKey)
 		assert.Equal(t, hex.EncodeToString(bhh[:]), response.BatchHeaderHash)
 		assert.Equal(t, inclusionInfo, response.InclusionInfo)
-		assert.Equal(t, attestation, response.Attestation)
+		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
+
+		signers := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
+			},
+			1: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[2].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[3].Hex(),
+				},
+			},
+		}
+		nonsigners := map[uint8][]serverv2.OperatorIdentity{
+			0: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
+				{
+					OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[1].Hex(),
+				},
+			},
+			1: []serverv2.OperatorIdentity{
+				{
+					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+					OperatorAddress: operatorAddresses[0].Hex(),
+				},
+			},
+		}
+		for key, expectedSigners := range signers {
+			actualSigners, exists := response.AttestationInfo.Signers[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedSigners, actualSigners)
+		}
+		for key, expectedNonsigners := range nonsigners {
+			actualNonsigners, exists := response.AttestationInfo.Nonsigners[key]
+			require.True(t, exists)
+			assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+		}
 	})
 
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
 	deleteItems(t, []commondynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
@@ -678,6 +970,10 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		},
 	})
 }
@@ -843,14 +1139,14 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[66] (60 batches)
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `end` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
 		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
-		require.Equal(t, 60, len(response.Batches))
-		for i := 0; i < 60; i++ {
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
 			assert.Equal(t, attestedAt[7+i], response.Batches[i].AttestedAt)
 			assert.Equal(t, batchHeaders[7+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
@@ -1383,6 +1679,8 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		})
 	})
 
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
 }
 
 func TestCheckOperatorsLiveness(t *testing.T) {
@@ -1509,26 +1807,57 @@ func TestFetchOperatorsStake(t *testing.T) {
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
+	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
+	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				if id == opId0 {
+					result[i] = addr0
+				} else if id == opId1 {
+					result[i] = addr1
+				} else {
+					result[i] = gethcommon.Address{}
+				}
+			}
+			return result
+		},
+		nil,
+	)
+
 	r.GET("/v2/operators/stake", testDataApiServerV2.FetchOperatorsStake)
 
 	w := executeRequest(t, r, http.MethodGet, "/v2/operators/stake")
 	response := decodeResponseBody[dataapi.OperatorsStakeResponse](t, w)
 
 	// The quorums and the operators in the quorum are defined in "mockChainState"
-	// There are 3 quorums (0, 1) and a "total" entry for TotalQuorumStake
+	// There are 2 quorums (0, 1)
 	require.Equal(t, 2, len(response.StakeRankedOperators))
+	checkAddress := func(op *dataapi.OperatorStake) {
+		if op.OperatorId == opId0.Hex() {
+			assert.Equal(t, addr0.Hex(), op.OperatorAddress)
+		}
+		if op.OperatorId == opId1.Hex() {
+			assert.Equal(t, addr1.Hex(), op.OperatorAddress)
+		}
+	}
 	// Quorum 0
 	ops, ok := response.StakeRankedOperators["0"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId0.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId1.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 	// Quorum 1
 	ops, ok = response.StakeRankedOperators["1"]
 	require.True(t, ok)
 	require.Equal(t, 2, len(ops))
 	assert.Equal(t, opId1.Hex(), ops[0].OperatorId)
 	assert.Equal(t, opId0.Hex(), ops[1].OperatorId)
+	checkAddress(ops[0])
+	checkAddress(ops[1])
 }
 
 func TestFetchMetricsSummary(t *testing.T) {

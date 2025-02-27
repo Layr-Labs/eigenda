@@ -17,8 +17,13 @@ on:
       - 'core/**'
       - 'common/**'
       - 'api/**'
+      - 'subgraphs/**'
+      - 'indexer/**'
+      - 'encoding/**'
+      - 'crypto/**'
+      - 'relay/**'
       - '.github/codeql/**'
-      - '.github/workflows/codeql-analysis.yml'
+      - '.github/workflows/codeql-scanning.yaml'
   schedule:
     - cron: '0 9 * * *'
 
@@ -40,22 +45,34 @@ jobs:
 
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1
+      with:
+          version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
 
     - name: Install golang
       uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
       with:
         go-version: '1.21.13'
 
-    - name: Custom build using make
+    - name: Build contract dependencies
       run: |
-        go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-        make compile-el
+        cd contracts && yarn
+
+    - name: Compile contracts
+      run: |
+        cd contracts && forge build
+
+    # Ref: https://github.com/Layr-Labs/eigenda/blob/master/.github/workflows/integration-tests.yml#L71C7-L71C67
+    # - name: Custom build using make
+    #   run: |
+    #     go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+    #     make compile-contracts
         
     # Initializes the CodeQL tools for scanning.
-    - name: Initialize CodeQL
+    - name: Initialize CodeQL including Trail of Bits Go Queries
       uses: github/codeql-action/init@dd746615b3b9d728a6a37ca2045b68ca76d4841a #3.28.8
       with:
         languages: go
+        packs: trailofbits/go-queries
         
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@dd746615b3b9d728a6a37ca2045b68ca76d4841a #3.28.8

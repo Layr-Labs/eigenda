@@ -1,66 +1,97 @@
 package v2
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/gin-gonic/gin"
 )
 
 // FetchBlobFeed godoc
 //
-//	@Summary	Fetch blob feed
+//	@Summary	Fetch blob feed in specified direction
 //	@Tags		Blobs
 //	@Produce	json
-//	@Param		end					query		string	false	"Fetch blobs up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval			query		int		false	"Fetch blobs starting from an interval (in seconds) before the end time [default: 3600]"
-//	@Param		pagination_token	query		string	false	"Fetch blobs starting from the pagination token (exclusively). Overrides the interval param if specified [default: empty]"
-//	@Param		limit				query		int		false	"The maximum number of blobs to fetch. System max (1000) if limit <= 0 [default: 20; max: 1000]"
-//	@Success	200					{object}	BlobFeedResponse
-//	@Failure	400					{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404					{object}	ErrorResponse	"error: Not found"
-//	@Failure	500					{object}	ErrorResponse	"error: Server error"
+//	@Param		direction	query		string	false	"Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
+//	@Param		before		query		string	false	"Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		after		query		string	false	"Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: before-1h]"
+//	@Param		cursor		query		string	false	"Pagination cursor (opaque string from previous response); for 'forward' direction, overrides `after` and fetches blobs from `cursor` to `before`; for 'backward' direction, overrides `before` and fetches blobs from `cursor` to `after` (all bounds exclusive) [default: empty]"
+//	@Param		limit		query		int		false	"Maximum number of blobs to return; if limit <= 0 or >1000, it's treated as 1000 [default: 20; max: 1000]"
+//	@Success	200			{object}	BlobFeedResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/feed [get]
 func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
 
+	// Validate direction
+	direction := "forward"
+	if dirStr := c.Query("direction"); dirStr != "" {
+		if dirStr != "forward" && dirStr != "backward" {
+			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+			invalidParamsErrorResponse(c, fmt.Errorf("direction must be either 'forward' or 'backward', found: %s", dirStr))
+			return
+		}
+		direction = dirStr
+	}
+
 	now := handlerStart
 	oldestTime := now.Add(-maxBlobAge)
 
-	endTime := now
-	if c.Query("end") != "" {
-		endTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("end"))
+	// Handle before parameter
+	beforeTime := now
+	if c.Query("before") != "" {
+		beforeTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("before"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse end param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse before param: %w", err))
 			return
 		}
-		if endTime.Before(oldestTime) {
+		if beforeTime.Before(oldestTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("end time cannot be more than 14 days in the past, found: %s", c.Query("end")))
+			invalidParamsErrorResponse(c, fmt.Errorf("before time cannot be more than 14 days in the past, found: %s", c.Query("before")))
 			return
+		}
+		if now.Before(beforeTime) {
+			beforeTime = now
 		}
 	}
 
-	interval := 3600
-	if c.Query("interval") != "" {
-		interval, err = strconv.Atoi(c.Query("interval"))
+	// Handle after parameter
+	afterTime := beforeTime.Add(-time.Hour)
+	if c.Query("after") != "" {
+		afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse interval param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse after param: %w", err))
 			return
 		}
-		if interval <= 0 {
+		if now.Before(afterTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("interval must be greater than 0, found: %d", interval))
+			invalidParamsErrorResponse(c, fmt.Errorf("'after' must be before current time, found: %s", c.Query("after")))
 			return
 		}
+		if afterTime.Before(oldestTime) {
+			afterTime = oldestTime
+		}
+	}
+
+	// Validate time range
+	if !afterTime.Before(beforeTime) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
+		invalidParamsErrorResponse(c, fmt.Errorf("after time must be before before time"))
+		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -73,63 +104,64 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		limit = maxNumBlobsPerBlobFeedResponse
 	}
 
-	paginationCursor := blobstore.BlobFeedCursor{
+	// Convert times to cursors
+	afterCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(afterTime.UnixNano()),
+	}
+	beforeCursor := blobstore.BlobFeedCursor{
+		RequestedAt: uint64(beforeTime.UnixNano()),
+	}
+
+	current := blobstore.BlobFeedCursor{
 		RequestedAt: 0,
 	}
-	if c.Query("pagination_token") != "" {
-		cursor, err := paginationCursor.FromCursorKey(c.Query("pagination_token"))
+	// Handle cursor if provided
+	if cursorStr := c.Query("cursor"); cursorStr != "" {
+		cursor, err := new(blobstore.BlobFeedCursor).FromCursorKey(cursorStr)
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the pagination token: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the cursor: %w", err))
 			return
 		}
-		paginationCursor = *cursor
+		current = *cursor
 	}
 
-	startTime := endTime.Add(-time.Duration(interval) * time.Second)
-	if startTime.Before(oldestTime) {
-		startTime = oldestTime
-	}
-	startCursor := blobstore.BlobFeedCursor{
-		RequestedAt: uint64(startTime.UnixNano()),
-	}
-	if startCursor.LessThan(&paginationCursor) {
-		startCursor = paginationCursor
-	}
-	endCursor := blobstore.BlobFeedCursor{
-		RequestedAt: uint64(endTime.UnixNano()),
+	var blobs []*v2.BlobMetadata
+	var nextCursor *blobstore.BlobFeedCursor
+
+	if direction == "forward" {
+		startCursor := afterCursor
+		// The presence of `cursor` param will override the `after` param
+		if current.RequestedAt > 0 {
+			startCursor = current
+		}
+		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAtForward(
+			c.Request.Context(),
+			startCursor,
+			beforeCursor,
+			limit,
+		)
+	} else {
+		endCursor := beforeCursor
+		// The presence of `cursor` param will override the `before` param
+		if current.RequestedAt > 0 {
+			endCursor = current
+		}
+		blobs, nextCursor, err = s.blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
+			c.Request.Context(),
+			endCursor,
+			afterCursor,
+			limit,
+		)
 	}
 
-	blobs, paginationToken, err := s.blobMetadataStore.GetBlobMetadataByRequestedAt(c.Request.Context(), startCursor, endCursor, limit)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))
 		return
 	}
 
-	token := ""
-	if paginationToken != nil {
-		token = paginationToken.ToCursorKey()
-	}
-	blobInfo := make([]BlobInfo, len(blobs))
-	for i := 0; i < len(blobs); i++ {
-		bk, err := blobs[i].BlobHeader.BlobKey()
-		if err != nil {
-			s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
-			errorResponse(c, fmt.Errorf("failed to serialize blob key: %w", err))
-			return
-		}
-		blobInfo[i].BlobKey = bk.Hex()
-		blobInfo[i].BlobMetadata = blobs[i]
-	}
-	response := &BlobFeedResponse{
-		Blobs:           blobInfo,
-		PaginationToken: token,
-	}
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeed")
-	s.metrics.ObserveLatency("FetchBlobFeed", time.Since(handlerStart))
-	c.JSON(http.StatusOK, response)
+	s.sendBlobFeedResponse(c, blobs, nextCursor, handlerStart)
 }
 
 // FetchBlob godoc
@@ -225,6 +257,8 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 //	@Router		/blobs/{blob_key}/attestation-info [get]
 func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	handlerStart := time.Now()
+
+	ctx := c.Request.Context()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobAttestationInfo")
@@ -246,15 +280,139 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
+	// Get quorums that this blob was dispersed to
+	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch blob metadata: %w", err))
+		return
+	}
+	blobQuorums := make(map[uint8]struct{}, 0)
+	for _, q := range metadata.BlobHeader.QuorumNumbers {
+		blobQuorums[q] = struct{}{}
+	}
+
+	// Get all operators for the attestation
+	operatorList, operatorsByQuorum, err := s.getAllOperatorsForAttestation(ctx, attestationInfo.Attestation)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
+		return
+	}
+
+	// Get all nonsigners (of the batch that this blob is part of)
+	nonsigners := make(map[core.OperatorID]struct{}, 0)
+	for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
+		opId := attestationInfo.Attestation.NonSignerPubKeys[i].GetOperatorID()
+		nonsigners[opId] = struct{}{}
+	}
+
+	// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
+	blobSigners := make(map[uint8][]OperatorIdentity, 0)
+	blobNonsigners := make(map[uint8][]OperatorIdentity, 0)
+	for q, innerMap := range operatorsByQuorum {
+		// Make sure the blob was dispersed to the quorum
+		if _, exist := blobQuorums[q]; !exist {
+			continue
+		}
+		for _, op := range innerMap {
+			id := op.OperatorID.Hex()
+			addr, exist := operatorList.GetAddress(id)
+			// This should never happen becuase OperatorList ensures the 1:1 mapping
+			if !exist {
+				addr = "Unexpected internal error"
+				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
+			}
+			if _, exist := nonsigners[op.OperatorID]; exist {
+				blobNonsigners[q] = append(blobNonsigners[q], OperatorIdentity{
+					OperatorId:      id,
+					OperatorAddress: addr,
+				})
+			} else {
+				blobSigners[q] = append(blobSigners[q], OperatorIdentity{
+					OperatorId:      id,
+					OperatorAddress: addr,
+				})
+			}
+		}
+	}
+
 	response := &BlobAttestationInfoResponse{
 		BlobKey:         blobKey.Hex(),
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 		InclusionInfo:   attestationInfo.InclusionInfo,
-		Attestation:     attestationInfo.Attestation,
+		AttestationInfo: &AttestationInfo{
+			Attestation: attestationInfo.Attestation,
+			Signers:     blobSigners,
+			Nonsigners:  blobNonsigners,
+		},
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
 	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, response)
+}
+
+func (s *ServerV2) getAllOperatorsForAttestation(ctx context.Context, attestation *corev2.Attestation) (*dataapi.OperatorList, core.OperatorStakes, error) {
+	rbn := attestation.ReferenceBlockNumber
+	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, attestation.QuorumNumbers, uint32(rbn))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	operatorsSeen := make(map[core.OperatorID]struct{}, 0)
+	for _, ops := range operatorsByQuorum {
+		for _, op := range ops {
+			operatorsSeen[op.OperatorID] = struct{}{}
+		}
+	}
+	operatorIDs := make([]core.OperatorID, 0)
+	for id := range operatorsSeen {
+		operatorIDs = append(operatorIDs, id)
+	}
+
+	// Get the address for the operators.
+	// operatorAddresses[i] is the address for operatorIDs[i].
+	operatorList := dataapi.NewOperatorList()
+	operatorAddresses, err := s.chainReader.BatchOperatorIDToAddress(ctx, operatorIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	for i := range operatorIDs {
+		operatorList.Add(operatorIDs[i], operatorAddresses[i].Hex())
+	}
+
+	return operatorList, operatorsByQuorum, nil
+}
+
+func (s *ServerV2) sendBlobFeedResponse(
+	c *gin.Context,
+	blobs []*v2.BlobMetadata,
+	nextCursor *blobstore.BlobFeedCursor,
+	handlerStart time.Time,
+) {
+	cursorStr := ""
+	if nextCursor != nil {
+		cursorStr = nextCursor.ToCursorKey()
+	}
+	blobInfo := make([]BlobInfo, len(blobs))
+	for i := 0; i < len(blobs); i++ {
+		bk, err := blobs[i].BlobHeader.BlobKey()
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobFeed")
+			errorResponse(c, fmt.Errorf("failed to serialize blob key: %w", err))
+			return
+		}
+		blobInfo[i].BlobKey = bk.Hex()
+		blobInfo[i].BlobMetadata = blobs[i]
+	}
+	response := &BlobFeedResponse{
+		Blobs:  blobInfo,
+		Cursor: cursorStr,
+	}
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeed")
+	s.metrics.ObserveLatency("FetchBlobFeed", time.Since(handlerStart))
 	c.JSON(http.StatusOK, response)
 }

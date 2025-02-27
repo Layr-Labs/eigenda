@@ -125,6 +125,7 @@ type (
 	OperatorStake struct {
 		QuorumId        string  `json:"quorum_id"`
 		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
 	}

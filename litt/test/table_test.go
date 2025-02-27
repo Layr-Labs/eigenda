@@ -169,7 +169,7 @@ func buildCachedLevelDBKeyDiskTable(
 }
 
 func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
@@ -258,7 +258,7 @@ func TestRandomOperations(t *testing.T) {
 }
 
 func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 

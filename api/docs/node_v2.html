@@ -203,6 +203,10 @@
                 </li>
               
               
+                <li>
+                  <a href="#validator.ChunkEncodingFormat"><span class="badge">E</span>ChunkEncodingFormat</a>
+                </li>
+              
               
               
                 <li>
@@ -242,7 +246,14 @@
                   <td>chunks</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td>repeated</td>
-                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                  <td><p>All chunks the Node is storing for the requested blob per GetChunksRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_encoding_format</td>
+                  <td><a href="#validator.ChunkEncodingFormat">ChunkEncodingFormat</a></td>
+                  <td></td>
+                  <td><p>The format how the above chunks are encoded. </p></td>
                 </tr>
               
             </tbody>
@@ -360,7 +371,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>a custody signature of the received chunks </p></td>
+                  <td><p>The validator&#39;s BSL signature signed on the batch header hash. </p></td>
                 </tr>
               
             </tbody>
@@ -416,11 +427,10 @@ https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.
   e. digest certificate.BlobHeader.Commitment.LengthProof
   f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
   g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
+  h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
   i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  k. digest certificate.BlobHeader.Signature
-  l. for each relay in certificate.Relays:
+  j. digest certificate.BlobHeader.Signature
+  k. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
 4. digest disperserID (4 bytes, unsigned big endian)
 
@@ -435,6 +445,48 @@ Note that this signature is not included in the hash for obvious reasons. </p></
         
       
 
+      
+        <h3 id="validator.ChunkEncodingFormat">ChunkEncodingFormat</h3>
+        <p>This describes how the chunks returned in GetChunksReply are encoded.</p><p>Used to facilitate the decoding of chunks.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p>A valid response should never use this value.
+If encountered, the client should treat it as an error.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GNARK</td>
+                <td>1</td>
+                <td><p>A chunk encoded in GNARK has the following format:
+
+[KZG proof: 32 bytes]
+[Coeff 1:   32 bytes]
+[Coeff 2:   32 bytes]
+...
+[Coeff n:   32 bytes]
+
+The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes().
+The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+
+References:
+- bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254
+- fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+
+Golang serialization and deserialization can be found in:
+- Frame.SerializeGnark()
+- Frame.DeserializeGnark()
+Package: github.com/Layr-Labs/eigenda/encoding</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       

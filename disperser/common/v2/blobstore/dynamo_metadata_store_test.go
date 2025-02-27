@@ -40,6 +40,16 @@ func checkAttestationsOrdered(t *testing.T, at []*corev2.Attestation) {
 	}
 }
 
+func checkAttestationsOrderedDesc(t *testing.T, attestations []*corev2.Attestation) {
+	for i := 1; i < len(attestations); i++ {
+		assert.Greater(t,
+			attestations[i-1].AttestedAt, // previous should be greater
+			attestations[i].AttestedAt,   // than current
+			"attestations should be in descending order",
+		)
+	}
+}
+
 func TestBlobFeedCursor_Equal(t *testing.T) {
 	bk1 := corev2.BlobKey([32]byte{1, 2, 3})
 	bk2 := corev2.BlobKey([32]byte{2, 3, 4})
@@ -253,7 +263,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *testing.T) {
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimestamp(t *testing.T) {
 	ctx := context.Background()
 	now := uint64(time.Now().UnixNano())
 	firstBlobTime := now - uint64(time.Hour.Nanoseconds())
@@ -299,7 +309,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 		BlobKey:     nil,
 	}
 
-	metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 	require.NoError(t, err)
 	assert.Equal(t, len(metadata), 5)
 	require.NotNil(t, lastProcessedCursor)
@@ -330,7 +340,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 		BlobKey:     &keys[1],
 	}
 	endCursor = blobstore.BlobFeedCursor{
-		RequestedAt: requestedAts[3],
+		RequestedAt: requestedAts[4],
 		BlobKey:     nil,
 	}
 
@@ -341,13 +351,13 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 		expectLast int
 	}{
 		{nil, 1, 2},
-		{&keys[3], 2, 3},
-		{&keys[4], 3, 4},
+		{&keys[3], 1, 2}, // keys[2] will be retrieved
+		{&keys[4], 2, 3}, // keys[2], keys[3] will be retrieved
 	}
 
 	for _, tc := range testCases {
 		endCursor.BlobKey = tc.endBlobKey
-		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, tc.expectLen, len(metadata))
 		require.NotNil(t, lastProcessedCursor)
@@ -363,7 +373,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithIdenticalTimestamp(t *
 	}
 }
 
-func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithDynamoPagination(t *testing.T) {
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithDynamoPagination(t *testing.T) {
 	ctx := context.Background()
 
 	// Make all blobs happen in 120s
@@ -418,7 +428,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithDynamoPagination(t *te
 		RequestedAt: now + 1,
 		BlobKey:     nil,
 	}
-	blobs, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+	blobs, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 	require.NoError(t, err)
 	require.Equal(t, numBlobs, len(blobs))
 	require.NotNil(t, lastProcessedCursor)
@@ -426,7 +436,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtWithDynamoPagination(t *te
 	assert.Equal(t, keys[numBlobs-1], *lastProcessedCursor.BlobKey)
 }
 
-func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 	ctx := context.Background()
 	numBlobs := 103
 	now := uint64(time.Now().UnixNano())
@@ -471,12 +481,12 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		}
 
 		// Test equal cursors error
-		_, _, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, startCursor, 10)
+		_, _, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, startCursor, 10)
 		assert.Error(t, err)
-		assert.Equal(t, "start cursor is expected to be less than end cursor", err.Error())
+		assert.Equal(t, "after cursor must be less than before cursor", err.Error())
 
 		// Test empty range
-		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 10)
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 10)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(metadata))
 		assert.Nil(t, lastProcessedCursor)
@@ -494,7 +504,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		}
 
 		// Test without limit
-		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, numBlobs, len(metadata))
 		require.NotNil(t, lastProcessedCursor)
@@ -502,7 +512,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		assert.Equal(t, keys[102], *lastProcessedCursor.BlobKey)
 
 		// Test with limit
-		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 32)
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 32)
 		require.NoError(t, err)
 		assert.Equal(t, 32, len(metadata))
 		require.NotNil(t, lastProcessedCursor)
@@ -522,16 +532,22 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		}
 
 		// Test exclusive start
-		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(metadata))
 		assert.Nil(t, lastProcessedCursor)
 
-		// Test inclusive end
+		// Test exclusive end
 		endCursor.BlobKey = &keys[1]
-		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
-		assert.Equal(t, 1, len(metadata))
+		require.Equal(t, 0, len(metadata))
+		assert.Nil(t, lastProcessedCursor)
+
+		endCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob + 1 // pass the time of second blob
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(metadata))
 		assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt)
 		checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
 		require.NotNil(t, lastProcessedCursor)
@@ -539,7 +555,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 
 		// Test nil start blob key, so it should return the first blob
 		startCursor.BlobKey = nil
-		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, len(metadata))
 		assert.Equal(t, firstBlobTime, metadata[0].RequestedAt)
@@ -561,7 +577,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 			BlobKey:     nil,
 		}
 
-		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, numBlobs, len(metadata))
 		require.NotNil(t, lastProcessedCursor)
@@ -570,7 +586,7 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 
 		// Test future start time
 		startCursor.RequestedAt = uint64(time.Now().UnixNano()) + 3600*1e9
-		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 0)
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(metadata))
 		assert.Nil(t, lastProcessedCursor)
@@ -588,9 +604,9 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 		}
 
 		for i := 0; i < numBlobs; i++ {
-			metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAt(ctx, startCursor, endCursor, 1)
+			metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtForward(ctx, startCursor, endCursor, 1)
 			require.NoError(t, err)
-			assert.Equal(t, 1, len(metadata))
+			require.Equal(t, 1, len(metadata))
 			checkBlobKeyEqual(t, keys[i], metadata[0].BlobHeader)
 			require.NotNil(t, lastProcessedCursor)
 			assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
@@ -599,7 +615,195 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAt(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
+func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
+	ctx := context.Background()
+	numBlobs := 103
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(24*time.Hour.Nanoseconds())
+	nanoSecsPerBlob := uint64(60 * 1e9) // 1 blob per minute
+
+	// Create blobs for testing
+	keys := make([]corev2.BlobKey, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: firstBlobTime + nanoSecsPerBlob*uint64(i),
+		}
+
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		beforeCursor := blobstore.BlobFeedCursor{
+			RequestedAt: now + 10*1e9,
+			BlobKey:     nil,
+		}
+		afterCursor := blobstore.BlobFeedCursor{
+			RequestedAt: now,
+			BlobKey:     nil,
+		}
+
+		// Test equal cursors error
+		_, _, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, beforeCursor, 10)
+		assert.Error(t, err)
+		assert.Equal(t, "after cursor must be less than before cursor", err.Error())
+
+		// Test empty range
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 10)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(metadata))
+		assert.Nil(t, lastProcessedCursor)
+	})
+
+	// Test full range query
+	t.Run("full range", func(t *testing.T) {
+		beforeCursor := blobstore.BlobFeedCursor{
+			RequestedAt: now,
+			BlobKey:     nil,
+		}
+		afterCursor := blobstore.BlobFeedCursor{
+			RequestedAt: firstBlobTime,
+			BlobKey:     nil,
+		}
+
+		// Test without limit
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 0)
+		require.NoError(t, err)
+		assert.Equal(t, numBlobs, len(metadata))
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, firstBlobTime, lastProcessedCursor.RequestedAt)
+		assert.Equal(t, keys[0], *lastProcessedCursor.BlobKey)
+
+		// Test with limit
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 32)
+		require.NoError(t, err)
+		assert.Equal(t, 32, len(metadata))
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, firstBlobTime+nanoSecsPerBlob*71, lastProcessedCursor.RequestedAt) // numBlobs-32
+		assert.Equal(t, keys[71], *lastProcessedCursor.BlobKey)
+	})
+
+	t.Run("cursor boundaries", func(t *testing.T) {
+		beforeCursor := blobstore.BlobFeedCursor{
+			RequestedAt: firstBlobTime + nanoSecsPerBlob, // time of blob[1]
+			BlobKey:     &keys[1],                        // exclusive
+		}
+		afterCursor := blobstore.BlobFeedCursor{
+			RequestedAt: firstBlobTime, // time of blob[0]
+			BlobKey:     &keys[0],      // exclusive
+		}
+
+		// Test exclusive before, exclusive after
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
+			ctx,
+			beforeCursor, // blob[1] excluded
+			afterCursor,  // blob[0] excluded
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, 0, len(metadata))
+		assert.Nil(t, lastProcessedCursor)
+
+		// Test the effects of blob key in before cursor
+		beforeCursor.RequestedAt = firstBlobTime + nanoSecsPerBlob*2 // time of blob[2]
+		beforeCursor.BlobKey = &keys[2]                              // exclusive of blob[2]
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
+			ctx,
+			beforeCursor, // excludes blob[2]
+			afterCursor,  // excludes blob[0]
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(metadata))
+		assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt) // blob[1]
+		checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, keys[1], *lastProcessedCursor.BlobKey)
+
+		// Test when removing blob key from after cursor
+		afterCursor.BlobKey = nil // makes after cursor point to before blob[0]
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtBackward(
+			ctx,
+			beforeCursor, // excludes blob[2]
+			afterCursor,  // now points to before blob[0], so blob[0] will be included
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(metadata))
+		assert.Equal(t, firstBlobTime+nanoSecsPerBlob, metadata[0].RequestedAt) // blob[1]
+		assert.Equal(t, firstBlobTime, metadata[1].RequestedAt)                 // blob[0]
+		checkBlobKeyEqual(t, keys[1], metadata[0].BlobHeader)
+		checkBlobKeyEqual(t, keys[0], metadata[1].BlobHeader)
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, keys[0], *lastProcessedCursor.BlobKey)
+	})
+
+	// Test min/max timestamp range
+	t.Run("min/max timestamp range", func(t *testing.T) {
+		beforeCursor := blobstore.BlobFeedCursor{
+			RequestedAt: math.MaxUint64,
+			BlobKey:     nil,
+		}
+		afterCursor := blobstore.BlobFeedCursor{
+			RequestedAt: 0,
+			BlobKey:     nil,
+		}
+
+		metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 0)
+		require.NoError(t, err)
+		assert.Equal(t, numBlobs, len(metadata))
+		require.NotNil(t, lastProcessedCursor)
+		assert.Equal(t, firstBlobTime, lastProcessedCursor.RequestedAt)
+		assert.Equal(t, keys[0], *lastProcessedCursor.BlobKey)
+
+		// Test past `after` time
+		afterCursor.RequestedAt = uint64(time.Now().UnixNano()) + 3600*1e9
+		metadata, lastProcessedCursor, err = blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 0)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(metadata))
+		assert.Nil(t, lastProcessedCursor)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		beforeCursor := blobstore.BlobFeedCursor{
+			RequestedAt: math.MaxUint64,
+			BlobKey:     nil,
+		}
+		afterCursor := blobstore.BlobFeedCursor{
+			RequestedAt: 0,
+			BlobKey:     nil,
+		}
+
+		for i := numBlobs - 1; i >= 0; i-- {
+			metadata, lastProcessedCursor, err := blobMetadataStore.GetBlobMetadataByRequestedAtBackward(ctx, beforeCursor, afterCursor, 1)
+			require.NoError(t, err)
+			assert.Equal(t, 1, len(metadata))
+			checkBlobKeyEqual(t, keys[i], metadata[0].BlobHeader)
+			require.NotNil(t, lastProcessedCursor)
+			assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
+			beforeCursor = *lastProcessedCursor
+		}
+	})
+}
+
+func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 	ctx := context.Background()
 	numBatches := 72
 	now := uint64(time.Now().UnixNano())
@@ -654,12 +858,16 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	// Test empty range
 	t.Run("empty range", func(t *testing.T) {
 		// Test invalid time range
-		_, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, 1, 1, 0)
+		_, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 1, 1, 0)
 		require.Error(t, err)
-		assert.Equal(t, "start must be less than end", err.Error())
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 1, 2, 0)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
 
 		// Test empty range
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, now, now+uint64(240*time.Hour.Nanoseconds()), 0)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, now, now+uint64(240*time.Hour.Nanoseconds()), 0)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(attestations))
 	})
@@ -667,23 +875,23 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	// Test full range query
 	t.Run("full range", func(t *testing.T) {
 		// Test without limit
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
 		checkAttestationsOrdered(t, attestations)
 
 		// Test with limit
-		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 10)
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now, 10)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(attestations))
 		checkAttestationsOrdered(t, attestations)
 
 		// Test min/max timestamp range
-		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, 0, now, 0)
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 0, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
 		checkAttestationsOrdered(t, attestations)
-		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, math.MaxInt64, 0)
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, math.MaxInt64, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
 		checkAttestationsOrdered(t, attestations)
@@ -692,7 +900,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	// Test range boundaries
 	t.Run("range boundaries", func(t *testing.T) {
 		// Test exclusive start
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs, now, 0)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now+1, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches-1, len(attestations))
 		checkAttestationsOrdered(t, attestations)
@@ -701,21 +909,21 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
 		assert.Equal(t, batchHeaders[numBatches-1].BatchRoot, attestations[numBatches-2].BatchRoot)
 
-		// Test inclusive end
-		attestations, err = blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, attestedAt[4], 0)
+		// Test exclusive end
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, attestedAt[4], 0)
 		require.NoError(t, err)
-		require.Equal(t, 5, len(attestations))
+		require.Equal(t, 4, len(attestations))
 		checkAttestationsOrdered(t, attestations)
 		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
-		assert.Equal(t, attestedAt[4], attestations[4].AttestedAt)
-		assert.Equal(t, batchHeaders[4].BatchRoot, attestations[4].BatchRoot)
+		assert.Equal(t, attestedAt[3], attestations[3].AttestedAt)
+		assert.Equal(t, batchHeaders[3].BatchRoot, attestations[3].BatchRoot)
 	})
 
 	// Test pagination
 	t.Run("pagination", func(t *testing.T) {
 		for i := 1; i < numBatches; i++ {
-			attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, attestedAt[i-1], attestedAt[i], 1)
+			attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, attestedAt[i-1], attestedAt[i]+1, 1)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(attestations))
 			assert.Equal(t, attestedAt[i], attestations[0].AttestedAt)
@@ -724,7 +932,149 @@ func TestBlobMetadataStoreGetAttestationByAttestedAt(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreGetAttestationByAttestedAtWithDynamoPagination(t *testing.T) {
+func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
+	ctx := context.Background()
+	numBatches := 72
+	now := uint64(time.Now().UnixNano())
+	firstBatchTs := now - uint64((72+2)*time.Hour.Nanoseconds())
+	nanoSecsPerBatch := uint64(time.Hour.Nanoseconds()) // 1 batch per hour
+
+	// Create attestations for testing
+	attestedAt := make([]uint64, numBatches)
+	batchHeaders := make([]*corev2.BatchHeader, numBatches)
+	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	for i := 0; i < numBatches; i++ {
+		batchHeaders[i] = &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 2, byte(i)},
+			ReferenceBlockNumber: uint64(i + 1),
+		}
+		bhh, err := batchHeaders[i].Hash()
+		assert.NoError(t, err)
+		keyPair, err := core.GenRandomBlsKeys()
+		assert.NoError(t, err)
+		apk := keyPair.GetPubKeyG2()
+		attestedAt[i] = firstBatchTs + uint64(i)*nanoSecsPerBatch
+		attestation := &corev2.Attestation{
+			BatchHeader: batchHeaders[i],
+			AttestedAt:  attestedAt[i],
+			NonSignerPubKeys: []*core.G1Point{
+				core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+				core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+			},
+			APKG2: apk,
+			QuorumAPKs: map[uint8]*core.G1Point{
+				0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+				1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+			},
+			Sigma: &core.Signature{
+				G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+			},
+			QuorumNumbers: []core.QuorumID{0, 1},
+			QuorumResults: map[uint8]uint8{
+				0: 100,
+				1: 80,
+			},
+		}
+		err = blobMetadataStore.PutAttestation(ctx, attestation)
+		assert.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetAttestationByAttestedAtBackward(ctx, 1, 1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetAttestationByAttestedAtBackward(ctx, 2, 1, 0)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
+
+		// Test empty range
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx,
+			now-uint64(240*time.Hour.Nanoseconds()), // before
+			now-uint64(241*time.Hour.Nanoseconds()), // after
+			0,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(attestations))
+	})
+
+	t.Run("full range", func(t *testing.T) {
+		// Test without limit - traverse from now back to firstBatchTs
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx,
+			now+1,          // before (exclusive)
+			firstBatchTs-1, // after (inclusive)
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, numBatches, len(attestations))
+		checkAttestationsOrderedDesc(t, attestations)
+
+		// Test with limit
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx,
+			now+1,          // before
+			firstBatchTs-1, // after
+			10,
+		)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(attestations))
+		checkAttestationsOrderedDesc(t, attestations)
+	})
+
+	t.Run("range boundaries", func(t *testing.T) {
+		// Test exclusive before - should skip the newest item
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx,
+			attestedAt[numBatches-1], // before (exclusive)
+			firstBatchTs,             // after (exclusive)
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, numBatches-2, len(attestations))
+		// The first one returned is not "before" (as "before" is exclusive)
+		assert.Equal(t, attestedAt[numBatches-2], attestations[0].AttestedAt)
+		// The last one returned is the second batch (as "after" is exclusive)
+		assert.Equal(t, attestedAt[1], attestations[numBatches-3].AttestedAt)
+		checkAttestationsOrderedDesc(t, attestations)
+
+		// Test exclusive after - should not include the oldest item
+		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx,
+			attestedAt[4]+1, // before: just after 4th item (so this batch should be included)
+			attestedAt[0],   // after: oldest item (should not be included)
+			0,
+		)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(attestations))
+		assert.Equal(t, attestedAt[4], attestations[0].AttestedAt)
+		assert.Equal(t, attestedAt[1], attestations[3].AttestedAt)
+		checkAttestationsOrderedDesc(t, attestations)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		for i := numBatches - 1; i > 0; i-- {
+			attestations, err := blobMetadataStore.GetAttestationByAttestedAtBackward(
+				ctx,
+				attestedAt[i]+1, // before: just after current item
+				attestedAt[i-1], // after: previous item (included)
+				1,
+			)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(attestations))
+			assert.Equal(t, attestedAt[i], attestations[0].AttestedAt)
+		}
+	})
+}
+
+func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(t *testing.T) {
 	ctx := context.Background()
 
 	now := uint64(time.Now().UnixNano())
@@ -797,7 +1147,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtWithDynamoPagination(t *test
 
 	// Test the query can fetch all attestations in a bucket
 	t.Run("full range", func(t *testing.T) {
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 0)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
 		checkAttestationsOrdered(t, attestations)
@@ -805,7 +1155,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtWithDynamoPagination(t *test
 
 	// Test the query returns after getting desired num of attestations in a bucket
 	t.Run("return after getting desired num of items", func(t *testing.T) {
-		attestations, err := blobMetadataStore.GetAttestationByAttestedAt(ctx, firstBatchTs-1, now, 125)
+		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 125)
 		require.NoError(t, err)
 		require.Equal(t, 125, len(attestations))
 		checkAttestationsOrdered(t, attestations)
@@ -876,16 +1226,20 @@ func TestBlobMetadataStoreGetBlobMetadataByStatusPaginated(t *testing.T) {
 			require.Equal(t, cursor.UpdatedAt, expectedCursors[i].UpdatedAt)
 		} else {
 			require.Len(t, metadata, numBlobs%pageSize)
-			require.Equal(t, cursor.BlobKey, &keys[numBlobs-1])
-			require.Equal(t, cursor.UpdatedAt, metadataList[numBlobs-1].UpdatedAt)
+			require.Nil(t, cursor)
 		}
 		i++
 	}
-	lastCursor := cursor
+
+	for i := 0; i < numBlobs; i++ {
+		err = blobMetadataStore.UpdateBlobStatus(ctx, keys[i], v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
 	metadata, cursor, err = blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, cursor, int32(pageSize))
 	require.NoError(t, err)
 	require.Len(t, metadata, 0)
-	require.Equal(t, cursor, lastCursor)
+	require.Nil(t, cursor)
 
 	deleteItems(t, dynamoKeys)
 }
@@ -929,7 +1283,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
 					AccountID:         "0x123",
-					ReservationPeriod: uint32(i),
+					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
 			},
@@ -947,14 +1301,14 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, certs, numCerts)
 	assert.Len(t, fragmentInfos, numCerts)
-	reservationPeriodes := make(map[uint32]struct{})
+	timestamps := make(map[int64]struct{})
 	for i := 0; i < numCerts; i++ {
 		assert.Equal(t, fragmentInfos[i], fragmentInfo)
-		reservationPeriodes[certs[i].BlobHeader.PaymentMetadata.ReservationPeriod] = struct{}{}
+		timestamps[certs[i].BlobHeader.PaymentMetadata.Timestamp] = struct{}{}
 	}
-	assert.Len(t, reservationPeriodes, numCerts)
+	assert.Len(t, timestamps, numCerts)
 	for i := 0; i < numCerts; i++ {
-		assert.Contains(t, reservationPeriodes, uint32(i))
+		assert.Contains(t, timestamps, int64(i))
 	}
 
 	deleteItems(t, []commondynamodb.Key{
@@ -1310,15 +1664,44 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, attestation, fetchedAttestation)
 
-	// attempt to put attestation with the same key should fail
-	err = blobMetadataStore.PutAttestation(ctx, attestation)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
-
 	// attempt to retrieve batch header and attestation at the same time
 	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
 	assert.NoError(t, err)
 	assert.Equal(t, h, fetchedHeader)
 	assert.Equal(t, attestation, fetchedAttestation)
+
+	// overwrite existing attestation
+	updatedAttestation := &corev2.Attestation{
+		BatchHeader: h,
+		AttestedAt:  uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: []*core.G1Point{
+			core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		},
+		APKG2: apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
+		},
+		Sigma: &core.Signature{
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 90,
+		},
+	}
+
+	err = blobMetadataStore.PutAttestation(ctx, updatedAttestation)
+	assert.NoError(t, err)
+	fetchedAttestation, err = blobMetadataStore.GetAttestation(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
+
+	fetchedHeader, fetchedAttestation, err = blobMetadataStore.GetSignedBatch(ctx, bhh)
+	assert.NoError(t, err)
+	assert.Equal(t, h, fetchedHeader)
+	assert.Equal(t, updatedAttestation, fetchedAttestation)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
@@ -1343,8 +1726,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := hex.EncodeToString(accountBytes)
-	reservationPeriod, err := rand.Int(rand.Reader, big.NewInt(256))
-	require.NoError(t, err)
+	timestamp := time.Now().UnixNano()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
@@ -1356,7 +1738,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 		BlobCommitments: mockCommitment,
 		PaymentMetadata: core.PaymentMetadata{
 			AccountID:         accountID,
-			ReservationPeriod: uint32(reservationPeriod.Int64()),
+			Timestamp:         timestamp,
 			CumulativePayment: cumulativePayment,
 		},
 	}

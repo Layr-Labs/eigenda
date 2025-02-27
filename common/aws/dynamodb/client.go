@@ -56,12 +56,12 @@ type Client interface {
 	UpdateItemWithCondition(ctx context.Context, tableName string, key Key, item Item, condition expression.ConditionBuilder) (Item, error)
 	IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error)
 	GetItem(ctx context.Context, tableName string, key Key) (Item, error)
-	GetItems(ctx context.Context, tableName string, keys []Key) ([]Item, error)
+	GetItems(ctx context.Context, tableName string, keys []Key, consistentRead bool) ([]Item, error)
 	QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error)
 	QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) (int32, error)
-	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error)
+	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error)
 	DeleteItem(ctx context.Context, tableName string, key Key) error
 	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
 	TableExists(ctx context.Context, name string) error
@@ -276,8 +276,8 @@ func (c *client) GetItem(ctx context.Context, tableName string, key Key) (Item, 
 
 // GetItems returns the items for the given keys
 // Note: ordering of items is not guaranteed
-func (c *client) GetItems(ctx context.Context, tableName string, keys []Key) ([]Item, error) {
-	items, err := c.readItems(ctx, tableName, keys)
+func (c *client) GetItems(ctx context.Context, tableName string, keys []Key, consistentRead bool) ([]Item, error) {
+	items, err := c.readItems(ctx, tableName, keys, consistentRead)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (c *client) QueryIndexCount(ctx context.Context, tableName string, indexNam
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
 // When limit is 0, all items are returned
-func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
+func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error) {
 	var queryInput *dynamodb.QueryInput
 
 	// Fetch all items if limit is 0
@@ -353,6 +353,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
 			Limit:                     &limit,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	} else {
 		queryInput = &dynamodb.QueryInput{
@@ -360,6 +361,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			IndexName:                 aws.String(indexName),
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	}
 
@@ -444,7 +446,12 @@ func (c *client) writeItems(ctx context.Context, tableName string, requestItems 
 	return failedItems, nil
 }
 
-func (c *client) readItems(ctx context.Context, tableName string, keys []Key) ([]Item, error) {
+func (c *client) readItems(
+	ctx context.Context,
+	tableName string,
+	keys []Key,
+	consistentRead bool,
+) ([]Item, error) {
 	startIndex := 0
 	items := make([]Item, 0)
 	for startIndex < len(keys) {
@@ -454,7 +461,8 @@ func (c *client) readItems(ctx context.Context, tableName string, keys []Key) ([
 		output, err := c.dynamoClient.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 			RequestItems: map[string]types.KeysAndAttributes{
 				tableName: {
-					Keys: keysBatch,
+					Keys:           keysBatch,
+					ConsistentRead: aws.Bool(consistentRead),
 				},
 			},
 		})

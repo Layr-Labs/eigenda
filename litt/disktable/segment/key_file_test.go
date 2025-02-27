@@ -12,7 +12,7 @@ import (
 )
 
 func TestReadWriteKeys(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
@@ -63,7 +63,7 @@ func TestReadWriteKeys(t *testing.T) {
 }
 
 func TestReadingTruncatedKeyFile(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()

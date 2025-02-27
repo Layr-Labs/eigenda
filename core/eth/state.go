@@ -41,8 +41,7 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
 }
 
-func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
-	ctx := context.Background()
+func (cs *ChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	header, err := cs.Client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return 0, err

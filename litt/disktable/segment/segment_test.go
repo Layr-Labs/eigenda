@@ -19,7 +19,7 @@ func countFilesInDirectory(t *testing.T, directory string) int {
 }
 
 func TestWriteAndReadSegment(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()

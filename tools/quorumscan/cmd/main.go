@@ -71,7 +71,7 @@ func RunScan(ctx *cli.Context) error {
 	if config.BlockNumber != 0 {
 		blockNumber = uint(config.BlockNumber)
 	} else {
-		blockNumber, err = ics.GetCurrentBlockNumber()
+		blockNumber, err = ics.GetCurrentBlockNumber(context.Background())
 		if err != nil {
 			return fmt.Errorf("failed to fetch current block number - %s", err)
 		}

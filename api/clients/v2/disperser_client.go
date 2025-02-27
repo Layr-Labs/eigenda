@@ -3,8 +3,10 @@ package clients
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"sync"
+	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -24,7 +26,7 @@ type DisperserClientConfig struct {
 
 type DisperserClient interface {
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID, salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
@@ -125,7 +127,6 @@ func (c *disperserClient) DisperseBlob(
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-	salt uint32,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
@@ -141,7 +142,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint32(symbolLength), quorums)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
@@ -174,6 +175,18 @@ func (c *disperserClient) DisperseBlob(
 			return nil, [32]byte{}, fmt.Errorf("error deserializing blob commitments: %w", err)
 		}
 		blobCommitments = *deserialized
+
+		// We need to check that the disperser used the correct length. Even once checking the commitment from the
+		// disperser has been implemented, there is still an edge case where the disperser could truncate trailing 0s,
+		// yielding the wrong blob length, but not causing commitment verification to fail. It is important that the
+		// commitment doesn't report a blob length smaller than expected, since this could cause payload parsing to
+		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
+		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
+		if lengthFromCommitment != uint32(symbolLength) {
+			return nil, [32]byte{}, fmt.Errorf(
+				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
+				lengthFromCommitment, symbolLength, err)
+		}
 	} else {
 		// if prover is configured, get commitments from prover
 
@@ -188,7 +201,6 @@ func (c *disperserClient) DisperseBlob(
 		BlobCommitments: blobCommitments,
 		QuorumNumbers:   quorums,
 		PaymentMetadata: *payment,
-		Salt:            salt,
 	}
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)

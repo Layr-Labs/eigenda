@@ -73,7 +73,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 	}
 
 	startTime := endTime.Add(-time.Duration(interval) * time.Second)
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAt(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), limit)
+	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAtForward(c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), limit)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchBatchFeed")
 		errorResponse(c, fmt.Errorf("failed to fetch feed from blob metadata store: %w", err))

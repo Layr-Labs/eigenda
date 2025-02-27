@@ -10,7 +10,7 @@ import (
 )
 
 func TestHashing(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	request := RandomStoreChunksRequest(rand)
 	originalRequestHash := hashing.HashStoreChunksRequest(request)
@@ -116,10 +116,10 @@ func TestHashing(t *testing.T) {
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
-	// within a blob cert, modify the PaymentHeader.ReservationPeriod
+	// within a blob cert, modify the PaymentHeader.Timestamp
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.ReservationPeriod = rand.Uint32()
+	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.Timestamp = rand.Time().UnixMicro()
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -127,13 +127,6 @@ func TestHashing(t *testing.T) {
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.CumulativePayment = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
-	require.NotEqual(t, originalRequestHash, hash)
-
-	// within a blob cert, modify the PaymentHeader.Salt
-	rand.Reset()
-	request = RandomStoreChunksRequest(rand)
-	request.Batch.BlobCertificates[0].BlobHeader.Salt = rand.Uint32()
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
 
@@ -146,9 +139,10 @@ func TestHashing(t *testing.T) {
 }
 
 func TestRequestSigning(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
-	public, private := rand.ECDSA()
+	public, private, err := rand.ECDSA()
+	require.NoError(t, err)
 	publicAddress := crypto.PubkeyToAddress(*public)
 
 	request := RandomStoreChunksRequest(rand)
@@ -161,7 +155,8 @@ func TestRequestSigning(t *testing.T) {
 	require.NoError(t, err)
 
 	// Using a different public key should make the signature invalid
-	otherPublic, _ := rand.ECDSA()
+	otherPublic, _, err := rand.ECDSA()
+	require.NoError(t, err)
 	otherPublicAddress := crypto.PubkeyToAddress(*otherPublic)
 	err = VerifyStoreChunksRequest(otherPublicAddress, request)
 	require.Error(t, err)

@@ -71,8 +71,7 @@ jobs:
       # TODO: add back DA contracts if we will need them in tests.
       # - name: Compile contracts
       #   run: |
-      #     make compile-el
-      #     make compile-dl
+      #     make compile-contracts
 
       - name: Churner
         run: go test -v ./operators/churner/tests
@@ -83,8 +82,9 @@ jobs:
       - name: Node Plugin
         run: go test -v ./node/plugin/tests
 
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
+      # TODO(ian-shim): re-enable these tests once testnet is functional
+      # - name: eigenda-client
+      #   run: go test -v ./api/clients --testnet-integration
 
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e

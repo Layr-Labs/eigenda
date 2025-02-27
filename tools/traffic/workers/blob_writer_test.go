@@ -78,7 +78,6 @@ func TestBlobWriter(t *testing.T) {
 			mock.AnythingOfType("[]uint8"),
 			mock.AnythingOfType("uint16"),
 			mock.AnythingOfType("[]uint8"),
-			mock.AnythingOfType("uint32"),
 		).Return(&status, keyToReturn, errorToReturn)
 
 		// Simulate the advancement of time (i.e. allow the writer to write the next blob).

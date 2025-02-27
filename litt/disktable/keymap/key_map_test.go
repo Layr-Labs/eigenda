@@ -28,7 +28,7 @@ func buildLevelDBKeyMap(logger logging.Logger, path string) (KeyMap, error) {
 }
 
 func testBasicBehavior(t *testing.T, keyMap KeyMap) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	expected := make(map[string]types.Address)
 
@@ -119,7 +119,7 @@ func TestBasicBehavior(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
