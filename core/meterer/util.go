@@ -96,10 +96,10 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 				AttributeName: aws.String("CumulativePayments"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
-			{
-				AttributeName: aws.String("Charge"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
+			// {
+			// 	AttributeName: aws.String("Charge"),
+			// 	AttributeType: types.ScalarAttributeTypeN,
+			// },
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
