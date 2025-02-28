@@ -507,7 +507,7 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 	result := <-storeChan
 	if result.err != nil {
 		log.Error("Store batch failed", "batchHeaderHash", batchHeaderHashHex, "err", result.err)
-		return nil, err
+		return nil, result.err
 	}
 	if result.keys != nil {
 		n.Metrics.RecordStoreChunksStage("stored", batchSize, result.latency)
