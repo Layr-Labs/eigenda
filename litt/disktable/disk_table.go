@@ -26,9 +26,6 @@ type DiskTable struct {
 	// The context for the disk table.
 	ctx context.Context
 
-	// cancel is the cancel function for the disk table's context.
-	cancel context.CancelFunc
-
 	// The logger for the disk table.
 	logger logging.Logger
 
@@ -137,7 +134,7 @@ func NewDiskTable(
 	metadataFilePath := metadataPath(root)
 	if _, err := os.Stat(metadataFilePath); os.IsNotExist(err) {
 		// No metadata file exists, so we need to create one.
-		metadata, err = newTableMetadata(logger, root, 0, 1)
+		metadata, err = newTableMetadata(logger, root, 0, shardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %v", err)
 		}
@@ -149,11 +146,8 @@ func NewDiskTable(
 		}
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	table := &DiskTable{
 		ctx:                     ctx,
-		cancel:                  cancel,
 		logger:                  logger,
 		timeSource:              timeSource,
 		root:                    root,
@@ -210,12 +204,12 @@ func (d *DiskTable) Stop() error {
 	alive := d.alive.Swap(false)
 	if alive {
 		flushReq := &flushRequest{
+			shutdown:     true,
 			responseChan: make(chan error, 1),
 		}
 		d.controllerChan <- flushReq
 		err := <-flushReq.responseChan
 
-		d.cancel()
 		if err != nil {
 			return fmt.Errorf("failed to flush: %v", err)
 		}
@@ -481,12 +475,20 @@ func (d *DiskTable) Flush() error {
 
 // flushRequest is a request to flush the writer.
 type flushRequest struct {
+	shutdown     bool
 	responseChan chan error
 }
 
 // handleFlushRequest handles a flushRequest control message.
 func (d *DiskTable) handleFlushRequest(req *flushRequest) {
-	durableKeys, err := d.segments[d.highestSegmentIndex].Flush()
+
+	var durableKeys []*types.KAPair
+	var err error
+	if req.shutdown {
+		durableKeys, err = d.segments[d.highestSegmentIndex].Seal(d.timeSource())
+	} else {
+		durableKeys, err = d.segments[d.highestSegmentIndex].Flush()
+	}
 
 	if err != nil {
 		err = fmt.Errorf("failed to flush mutable segment: %v", err)
@@ -500,6 +502,16 @@ func (d *DiskTable) handleFlushRequest(req *flushRequest) {
 		d.panic(err)
 		req.responseChan <- err
 		return
+	}
+
+	if req.shutdown {
+		err = d.keyMap.Stop()
+		if err != nil {
+			err = fmt.Errorf("failed to stop key map: %v", err)
+			d.panic(err)
+			req.responseChan <- err
+			return
+		}
 	}
 
 	req.responseChan <- nil
@@ -533,20 +545,24 @@ func (d *DiskTable) controlLoop() {
 
 	ticker := time.NewTicker(d.garbageCollectionPeriod)
 
-	for d.ctx.Err() == nil {
+	for {
 		select {
+		case <-d.ctx.Done():
+			d.logger.Infof("context done, shutting down disk table control loop")
 		case message := <-d.controllerChan:
 			if writeReq, ok := message.(*writeRequest); ok {
 				d.handleWriteRequest(writeReq)
 			} else if flushReq, ok := message.(*flushRequest); ok {
 				d.handleFlushRequest(flushReq)
+				if flushReq.shutdown {
+					<-d.stopChannel
+					return
+				}
 			} else {
 				d.logger.Errorf("Unknown control message type %T", message)
 			}
 		case <-ticker.C:
 			d.doGarbageCollection()
-		case <-d.ctx.Done():
-			return
 		}
 	}
 }
