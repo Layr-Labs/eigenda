@@ -24,11 +24,13 @@ type tableBuilder func(timeSource func() time.Time, name string, path string) (l
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
 // are present in an implementation, and bugs that are present in the test scenario itself.
 var tableBuilders = []tableBuilder{
-	buildMemKeyDiskTable,
-	buildLevelDBKeyDiskTable,
+	buildMemKeyDiskTableSingleShard,
+	buildMemKeyDiskTableMultiShard,
+	buildLevelDBKeyDiskTableSingleShard,
+	buildLevelDBKeyDiskTableMultiShard,
 }
 
-func buildMemKeyDiskTable(
+func buildMemKeyDiskTableSingleShard(
 	timeSource func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
@@ -61,7 +63,40 @@ func buildMemKeyDiskTable(
 	return table, nil
 }
 
-func buildLevelDBKeyDiskTable(
+func buildMemKeyDiskTableMultiShard(
+	timeSource func() time.Time,
+	name string,
+	path string) (litt.ManagedTable, error) {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	keys := keymap.NewMemKeyMap(logger)
+
+	root := path + "/table"
+	table, err := NewDiskTable(
+		context.Background(),
+		logger,
+		timeSource,
+		name,
+		keys,
+		root,
+		uint32(100), // intentionally use a very small segment size
+		10,
+		4,
+		1234,
+		1*time.Millisecond)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create disk table: %w", err)
+	}
+
+	return table, nil
+}
+
+func buildLevelDBKeyDiskTableSingleShard(
 	timeSource func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
@@ -88,6 +123,43 @@ func buildLevelDBKeyDiskTable(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1,
+		1234,
+		1*time.Millisecond)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create disk table: %w", err)
+	}
+
+	return table, nil
+}
+
+func buildLevelDBKeyDiskTableMultiShard(
+	timeSource func() time.Time,
+	name string,
+	path string) (litt.ManagedTable, error) {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	keysPath := path + "/keys"
+	keys, err := keymap.NewLevelDBKeyMap(logger, keysPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create key map: %w", err)
+	}
+
+	root := path + "/table"
+	table, err := NewDiskTable(
+		context.Background(),
+		logger,
+		timeSource,
+		name,
+		keys,
+		root,
+		uint32(100), // intentionally use a very small segment size
+		10,
+		4,
 		1234,
 		1*time.Millisecond)
 
@@ -217,8 +289,8 @@ func TestRestart(t *testing.T) {
 
 // This test deletes a random file from a middle segment. This is considered unrecoverable corruption, and should
 // cause the table to fail to restart.
-func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -241,7 +313,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -281,18 +353,18 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
 
-	choice := rand.Float64()
 	filePath := ""
-	if choice < 1.0/3.0 {
-		// Delete the key file
+	if typeToDelete == "key" {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
-	} else if choice < 2.0/3.0 {
-		// Delete the value file
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.ValuesFileExtension)
+	} else if typeToDelete == "value" {
+		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+		shard := rand.Uint32Range(0, shardingFactor)
+		filePath = fmt.Sprintf(
+			"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
 	} else {
-		// Delete the segment file
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
 	}
+
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
 
@@ -323,14 +395,16 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 
 func TestMiddleFileMissing(t *testing.T) {
 	for _, tb := range tableBuilders {
-		middleFileMissingTest(t, tb)
+		middleFileMissingTest(t, tb, "key")
+		middleFileMissingTest(t, tb, "value")
+		middleFileMissingTest(t, tb, "metadata")
 	}
 }
 
 // This test deletes a random file from the first segment. This is considered recoverable, since it can happen
 // if the table crashes during garbage collection.
-func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -353,7 +427,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -399,18 +473,17 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Delete a file in the initial segment.
-	choice := rand.Float64()
 	filePath := ""
-	if choice < 1.0/3.0 {
-		// Delete the key file
+	if typeToDelete == "key" {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.KeysFileExtension)
-	} else if choice < 2.0/3.0 {
-		// Delete the value file
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.ValuesFileExtension)
+	} else if typeToDelete == "value" {
+		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+		shard := rand.Uint32Range(0, shardingFactor)
+		filePath = fmt.Sprintf(
+			"%s/table/segments/%d-%d%s",
+			directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
 	} else {
-		// Delete the segment file
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
@@ -511,14 +584,16 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 
 func TestInitialFileMissing(t *testing.T) {
 	for _, tb := range tableBuilders {
-		initialFileMissingTest(t, tb)
+		initialFileMissingTest(t, tb, "key")
+		initialFileMissingTest(t, tb, "value")
+		initialFileMissingTest(t, tb, "metadata")
 	}
 }
 
 // This test deletes a random file from the last segment. This can happen if the table crashes prior to the
 // last segment being flushed.
-func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
-	rand := random.NewTestRandom(t)
+func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -541,7 +616,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -587,20 +662,16 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Delete a file in the final segment.
-	choice := rand.Float64()
 	filePath := ""
-	if choice < 1.0/3.0 {
-		// Delete the key file
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, highestSegmentIndex, segment.KeysFileExtension)
-	} else if choice < 2.0/3.0 {
-		// Delete the value file
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, highestSegmentIndex, segment.ValuesFileExtension)
+	if typeToDelete == "key" {
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+	} else if typeToDelete == "value" {
+		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+		shard := rand.Uint32Range(0, shardingFactor)
+		filePath = fmt.Sprintf(
+			"%s/table/segments/%d-%d%s", directory, highestSegmentIndex, shard, segment.ValuesFileExtension)
 	} else {
-		// Delete the segment file
-		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, highestSegmentIndex, segment.MetadataFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
 	}
 	_, err = os.Stat(filePath)
 	require.NoError(t, err)
@@ -707,7 +778,9 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder) {
 
 func TestLastFileMissing(t *testing.T) {
 	for _, tb := range tableBuilders {
-		lastFileMissingTest(t, tb)
+		lastFileMissingTest(t, tb, "key")
+		lastFileMissingTest(t, tb, "value")
+		lastFileMissingTest(t, tb, "metadata")
 	}
 }
 
@@ -736,7 +809,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -758,19 +831,32 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
+	err = table.Flush()
+	require.NoError(t, err)
+
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data to be truncated.
-	// TODO
-	//err = table.Flush()
-	//require.NoError(t, err)
-	//diskTable := table.(*DiskTable)
-	//if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
-	//	key := rand.PrintableVariableBytes(32, 64)
-	//	value := rand.PrintableVariableBytes(1, 64)
-	//	err = table.Put(key, value)
-	//	require.NoError(t, err)
-	//	expectedValues[string(key)] = value
-	//}
+	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
+		context.Background(),
+		logger,
+		directory+"/table/segments",
+		time.Now(),
+		0,
+		0,
+		false)
+	require.NoError(t, err)
+	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.KeysFileExtension)
+	keyFileBytes, err := os.ReadFile(keyFileName)
+	require.NoError(t, err)
+
+	if len(keyFileBytes) == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
 
 	// Stop the table
 	err = table.Stop()
@@ -791,9 +877,9 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
 
-	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
+	keyFileName = fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
-	keyFileBytes, err := os.ReadFile(keyFileName)
+	keyFileBytes, err = os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
 	bytesRemaining := int32(0)
@@ -955,7 +1041,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -977,19 +1063,30 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
-	// if there is no data to be truncated.
-	// TODO
-	//err = table.Flush()
-	//require.NoError(t, err)
-	//diskTable := table.(*DiskTable)
-	//if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
-	//	key := rand.PrintableVariableBytes(32, 64)
-	//	value := rand.PrintableVariableBytes(1, 64)
-	//	err = table.Put(key, value)
-	//	require.NoError(t, err)
-	//	expectedValues[string(key)] = value
-	//}
+	err = table.Flush()
+	require.NoError(t, err)
+
+	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
+		context.Background(),
+		logger,
+		directory+"/table/segments",
+		time.Now(),
+		0,
+		0,
+		false)
+	require.NoError(t, err)
+	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.KeysFileExtension)
+	keyFileBytes, err := os.ReadFile(keyFileName)
+	require.NoError(t, err)
+
+	if len(keyFileBytes) == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
 
 	// Stop the table
 	err = table.Stop()
@@ -1006,12 +1103,24 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		false)
 	require.NoError(t, err)
 
-	// Truncate the last value file.
+	// Truncate a random shard of the last value file.
+	// Find a shard that has at least one key in the last segment (truncating an empty file is boring)
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
+	diskTable := table.(*DiskTable)
+	nonEmptyShards := make(map[uint32]struct{})
+	for key := range keysInLastFile {
+		keyShard := diskTable.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
+		nonEmptyShards[keyShard] = struct{}{}
+	}
+	var shard uint32
+	for shard = range nonEmptyShards {
+		// iteration order is random, shard will be randomly selected from nonEmptyShards
+		break
+	}
 
-	valueFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.ValuesFileExtension)
+	valueFileName := fmt.Sprintf("%s/table/segments/%d-%d%s",
+		directory, highestSegmentIndex, shard, segment.ValuesFileExtension)
 	valueFileBytes, err := os.ReadFile(valueFileName)
 	require.NoError(t, err)
 
@@ -1024,8 +1133,15 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	err = os.WriteFile(valueFileName, valueFileBytes, 0644)
 	require.NoError(t, err)
 
+	// Figure out which keys are expected to be missing
 	missingKeys := make(map[string]struct{})
 	for _, key := range keysInLastFile {
+		keyShard := diskTable.segments[diskTable.highestSegmentIndex].GetShard(key.Key)
+		if keyShard != shard {
+			// key does not belong to the shard that was truncated
+			continue
+		}
+
 		offset := key.Address.Offset()
 		valueSize := len(expectedValues[string(key.Key)])
 		// If there are not at least this many bytes remaining in the value file, the value is missing.
@@ -1176,7 +1292,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
-	iterations := 1000
+	iterations := 100
 	for i := 0; i < iterations; i++ {
 		batchSize := rand.Int32Range(1, 10)
 		if batchSize == 1 {
@@ -1198,19 +1314,31 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
+	err = table.Flush()
+	require.NoError(t, err)
+
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
-	// if there is no data to be truncated.
-	// TODO
-	//err = table.Flush()
-	//require.NoError(t, err)
-	//diskTable := table.(*DiskTable)
-	//if diskTable.segments[uint32(len(diskTable.segments)-1)].CurrentSize() == 0 {
-	//	key := rand.PrintableVariableBytes(32, 64)
-	//	value := rand.PrintableVariableBytes(1, 64)
-	//	err = table.Put(key, value)
-	//	require.NoError(t, err)
-	//	expectedValues[string(key)] = value
-	//}
+	// if there is no data left unflushed.
+	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
+		context.Background(),
+		logger,
+		directory+"/table/segments",
+		time.Now(),
+		0,
+		0,
+		false)
+	require.NoError(t, err)
+	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
+		directory, highestSegmentIndex, segment.KeysFileExtension)
+	keyFileBytes, err := os.ReadFile(keyFileName)
+	require.NoError(t, err)
+	if len(keyFileBytes) == 0 {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 64)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
 
 	// Stop the table
 	err = table.Stop()

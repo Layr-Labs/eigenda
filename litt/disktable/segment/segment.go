@@ -22,8 +22,7 @@ const shardControlChannelCapacity = 32
 //
 // This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
 type Segment struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 
 	// The logger for the segment.
 	logger logging.Logger
@@ -117,11 +116,8 @@ func NewSegment(
 
 	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
 
-	ctx, cancel := context.WithCancel(ctx)
-
 	segment := &Segment{
 		ctx:             ctx,
-		cancel:          cancel,
 		logger:          logger,
 		index:           index,
 		metadata:        metadata,
@@ -158,8 +154,8 @@ func (s *Segment) SetNextSegment(nextSegment *Segment) {
 	s.nextSegment = nextSegment
 }
 
-// getShard returns the shard number for a key.
-func (s *Segment) getShard(key []byte) uint32 {
+// GetShard returns the shard number for a key.
+func (s *Segment) GetShard(key []byte) uint32 {
 	return hashKey(key, s.metadata.salt) % s.metadata.shardingFactor
 }
 
@@ -172,7 +168,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		return 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
-	shard := s.getShard(data.Key)
+	shard := s.GetShard(data.Key)
 
 	if s.shardSizes[shard] > math.MaxUint32 {
 		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
@@ -196,7 +192,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 //
 // It is only thread safe to read from a segment if the key being read has previously been flushed to disk.
 func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
-	shard := s.getShard(key)
+	shard := s.GetShard(key)
 	values := s.shards[shard]
 
 	value, err := values.read(dataAddress)
@@ -421,6 +417,11 @@ func (s *Segment) shardControlLoop(shard uint32) {
 			// Handle flush requests, and possibly also seal the shard.
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
 				shardError = s.handleShardFlushRequest(shard, flushRequest, shardError)
+
+				if flushRequest.seal {
+					// After sealing, we can exit the control loop.
+					return
+				}
 				continue
 			}
 
@@ -512,6 +513,11 @@ func (s *Segment) keyFileControlLoop() {
 			if flushRequest, ok := operation.(*keyFileFlushRequest); ok {
 				keyFileError = s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
 				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+
+				if flushRequest.seal {
+					// After sealing, we can exit the control loop.
+					return
+				}
 				continue
 			}
 

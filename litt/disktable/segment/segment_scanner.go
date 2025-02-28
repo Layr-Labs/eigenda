@@ -28,7 +28,8 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 // getKeyFileIndex returns the index of the key file from the file name. Key file names have the form "X.keys",
 // where X is the segment index.
 func getKeyFileIndex(fileName string) (uint32, error) {
-	indexString := path.Base(fileName)[:len(fileName)-len(KeysFileExtension)]
+	baseName := path.Base(fileName)
+	indexString := baseName[:len(baseName)-len(KeysFileExtension)]
 	index, err := strconv.Atoi(indexString)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
@@ -40,7 +41,8 @@ func getKeyFileIndex(fileName string) (uint32, error) {
 // getValueFileIndex returns the index of the value file from the file name. Value file names have the form
 // "X-Y.values", where X is the segment index and Y is the shard number.
 func getValueFileIndex(fileName string) (uint32, error) {
-	indexString := path.Base(fileName)[:len(fileName)-len(ValuesFileExtension)]
+	baseName := path.Base(fileName)
+	indexString := baseName[:len(baseName)-len(ValuesFileExtension)]
 
 	parts := strings.Split(indexString, "-")
 	if len(parts) != 2 {
@@ -59,7 +61,8 @@ func getValueFileIndex(fileName string) (uint32, error) {
 // getValueFileShard returns the shard number of the value file from the file name. Value file names have the form
 // "X-Y.values", where X is the segment index and Y is the shard number.
 func getValueFileShard(fileName string) (uint32, error) {
-	indexString := path.Base(fileName)[:len(fileName)-len(ValuesFileExtension)]
+	baseName := path.Base(fileName)
+	indexString := baseName[:len(baseName)-len(ValuesFileExtension)]
 
 	parts := strings.Split(indexString, "-")
 	if len(parts) != 2 {
@@ -300,13 +303,12 @@ func lookForMissingFiles(
 					}
 				}
 			}
-
-			if segmentMissingFiles {
-				// If we are missing a file in this segment, all other files in the segment are considered orphaned.
-				orphanedFiles = append(orphanedFiles, potentialOrphans...)
-			}
 		}
 
+		if segmentMissingFiles {
+			// If we are missing a file in this segment, all other files in the segment are considered orphaned.
+			orphanedFiles = append(orphanedFiles, potentialOrphans...)
+		}
 	}
 
 	return orphanedFiles, damagedSegments, nil

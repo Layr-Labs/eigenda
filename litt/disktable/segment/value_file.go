@@ -38,8 +38,6 @@ type valueFile struct {
 	currentSize uint64
 }
 
-// TODO verify behavior if value file is empty when sealed
-
 // newValueFile creates a new value file.
 func newValueFile(
 	logger logging.Logger,
