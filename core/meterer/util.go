@@ -111,6 +111,24 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 				KeyType:       types.KeyTypeRange,
 			},
 		},
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String("ChargeIndex"),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("Charge"),
+						KeyType:       types.KeyTypeHash,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(10),
+					WriteCapacityUnits: aws.Int64(10),
+				},
+			},
+		},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
