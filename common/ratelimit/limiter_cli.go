@@ -36,7 +36,7 @@ func RatelimiterCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 		},
 		cli.StringSliceFlag{
 			Name:   common.PrefixFlag(flagPrefix, BucketMultipliersFlagName),
-			Usage:  "Bucket multipiers (float)",
+			Usage:  "Bucket multipliers (float)",
 			Value:  &bucketMultipliers,
 			EnvVar: common.PrefixEnvVar(envPrefix, "BUCKET_MULTIPLIERS"),
 		},
