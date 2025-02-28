@@ -136,6 +136,12 @@ func TestHashing(t *testing.T) {
 	request.Batch.BlobCertificates[0].Signature = rand.Bytes(32)
 	hash = hashing.HashStoreChunksRequest(request)
 	require.NotEqual(t, originalRequestHash, hash)
+
+	// nil header
+	request = RandomStoreChunksRequest(rand)
+	request.Batch.Header = nil
+	hash = hashing.HashStoreChunksRequest(request)
+	require.NotEqual(t, originalRequestHash, hash)
 }
 
 func TestRequestSigning(t *testing.T) {
