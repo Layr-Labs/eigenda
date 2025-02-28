@@ -733,8 +733,8 @@ func (t *Reader) GetVersionedBlobParams(ctx context.Context, blobVersion uint16)
 	}
 	return &core.BlobVersionParameters{
 		CodingRate:      uint32(params.CodingRate),
-		NumChunks:       uint32(params.NumChunks),
-		MaxNumOperators: uint32(params.MaxNumOperators),
+		NumChunks:       params.NumChunks,
+		MaxNumOperators: params.MaxNumOperators,
 	}, nil
 }
 
@@ -863,7 +863,7 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint
 	return globalSymbolsPerSecond, nil
 }
 
-func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint32, error) {
+func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -874,10 +874,10 @@ func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber ui
 	if err != nil {
 		return 0, err
 	}
-	return uint32(globalRateBinInterval), nil
+	return globalRateBinInterval, nil
 }
 
-func (t *Reader) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint32, error) {
+func (t *Reader) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -888,10 +888,10 @@ func (t *Reader) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint
 	if err != nil {
 		return 0, err
 	}
-	return uint32(minNumSymbols), nil
+	return minNumSymbols, nil
 }
 
-func (t *Reader) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint32, error) {
+func (t *Reader) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -902,10 +902,10 @@ func (t *Reader) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uin
 	if err != nil {
 		return 0, err
 	}
-	return uint32(pricePerSymbol), nil
+	return pricePerSymbol, nil
 }
 
-func (t *Reader) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint32, error) {
+func (t *Reader) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -916,7 +916,7 @@ func (t *Reader) GetReservationWindow(ctx context.Context, blockNumber uint32) (
 	if err != nil {
 		return 0, err
 	}
-	return uint32(reservationWindow), nil
+	return reservationWindow, nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {
