@@ -23,6 +23,8 @@ const totalToWrite = 1024 * units.GiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
+const littDBShards = 32
+
 // runWriteBenchmark runs a simple benchmark. Its goal is to write a ton of data to the database as fast as possible.
 func runWriteBenchmark(
 	t *testing.T,
@@ -158,6 +160,7 @@ func TestLittDBWrite(t *testing.T) {
 	directory := "./test-data"
 
 	config := littbuilder.DefaultConfig(directory)
+	config.ShardingFactor = littDBShards
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
@@ -198,6 +201,7 @@ func TestLittDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 
 	config := littbuilder.DefaultConfig(directory)
+	config.ShardingFactor = littDBShards
 	config.GCPeriod = 2 * time.Hour
 
 	db, err := config.Build(context.Background())
