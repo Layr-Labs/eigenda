@@ -49,7 +49,7 @@ func buildMemKeyDiskTableSingleShard(
 		timeSource,
 		name,
 		keys,
-		root,
+		[]string{root},
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1,
@@ -82,7 +82,7 @@ func buildMemKeyDiskTableMultiShard(
 		timeSource,
 		name,
 		keys,
-		root,
+		[]string{root},
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
@@ -119,7 +119,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		timeSource,
 		name,
 		keys,
-		root,
+		[]string{root},
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1,
@@ -156,7 +156,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		timeSource,
 		name,
 		keys,
-		root,
+		[]string{root},
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
@@ -344,7 +344,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -457,7 +457,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -646,7 +646,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -839,7 +839,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -866,7 +866,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -1069,7 +1069,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -1096,7 +1096,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -1322,7 +1322,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,
@@ -1348,7 +1348,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
 		logger,
-		directory+"/table/segments",
+		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
 		0,

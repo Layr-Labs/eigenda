@@ -28,7 +28,8 @@ var restartableBuilders = []dbBuilder{
 }
 
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
-	config := littbuilder.DefaultConfig(path)
+	config, err := littbuilder.DefaultConfig(path)
+	require.NoError(t, err)
 	config.DBType = littbuilder.MemDB
 	config.CacheSize = 1000
 
@@ -36,7 +37,8 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config := littbuilder.DefaultConfig(path)
+	config, err := littbuilder.DefaultConfig(path)
+	require.NoError(t, err)
 	config.DBType = littbuilder.DiskDB
 	config.KeyMapType = littbuilder.MemKeyMap
 	config.CacheSize = 1000
@@ -47,7 +49,8 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 }
 
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config := littbuilder.DefaultConfig(path)
+	config, err := littbuilder.DefaultConfig(path)
+	require.NoError(t, err)
 	config.DBType = littbuilder.DiskDB
 	config.KeyMapType = littbuilder.LevelDBKeyMap
 	config.CacheSize = 1000

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
+	"path"
 	"sync/atomic"
 	"time"
 
@@ -75,13 +77,25 @@ func NewSegment(
 	ctx context.Context,
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string,
+	parentDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
 	salt uint32,
 	sealIfUnsealed bool) (*Segment, error) {
 
-	metadata, err := newMetadataFile(index, shardingFactor, salt, parentDirectory)
+	// look for the metadata file
+	metadataPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d.metadata", index))
+	var metadataDir string
+	if err != nil {
+		return nil, fmt.Errorf("failed to find metadata file: %v", err)
+	}
+	if metadataPath != "" {
+		metadataDir = path.Dir(metadataPath)
+	} else {
+		// By default, put the metadata file in the first parent directory.
+		metadataDir = parentDirectories[0]
+	}
+	metadata, err := newMetadataFile(index, shardingFactor, salt, metadataDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
 	}
@@ -93,13 +107,35 @@ func NewSegment(
 		}
 	}
 
-	keys, err := newKeyFile(logger, index, parentDirectory, metadata.sealed)
+	keysPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d.keys", index))
+	var keysDirectory string
+	if err != nil {
+		return nil, fmt.Errorf("failed to find key file: %v", err)
+	}
+	if keysPath != "" {
+		keysDirectory = path.Dir(keysPath)
+	} else {
+		// By default, put the key file in the first parent directory.
+		keysDirectory = parentDirectories[0]
+	}
+	keys, err := newKeyFile(logger, index, keysDirectory, metadata.sealed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
 
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+		valuesPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d-%d.values", index, shard))
+		var parentDirectory string
+		if err != nil {
+			return nil, fmt.Errorf("failed to find value file: %v", err)
+		}
+		if valuesPath != "" {
+			parentDirectory = path.Dir(valuesPath)
+		} else {
+			// Assign value files to parent directories in a round-robin fashion.
+			parentDirectory = parentDirectories[int(shard)%len(parentDirectories)]
+		}
 		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open value file: %v", err)
@@ -146,6 +182,30 @@ func NewSegment(
 	}
 
 	return segment, nil
+}
+
+// lookForFile looks for a file in a list of directories. It returns an error if the file appears
+// in more than one directory, and an empty string if the file is not found.
+func lookForFile(directories []string, fileName string) (string, error) {
+	locations := make([]string, 0, 1)
+	for _, directory := range directories {
+		potentialLocation := path.Join(directory, fileName)
+		_, err := os.Stat(potentialLocation)
+		if err == nil {
+			locations = append(locations, potentialLocation)
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("failed to stat file %s: %v", potentialLocation, err)
+		}
+	}
+
+	if len(locations) > 1 {
+		return "", fmt.Errorf("file %s found in multiple directories: %v", fileName, locations)
+	}
+
+	if len(locations) == 0 {
+		return "", nil
+	}
+	return locations[0], nil
 }
 
 // SetNextSegment sets the next segment in the chain.
