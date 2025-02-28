@@ -159,7 +159,8 @@ func TestLevelDBNoCompactionWrite(t *testing.T) {
 func TestLittDBWrite(t *testing.T) {
 	directory := "./test-data"
 
-	config := littbuilder.DefaultConfig(directory)
+	config, err := littbuilder.DefaultConfig(directory)
+	require.NoError(t, err)
 	config.ShardingFactor = littDBShards
 
 	db, err := config.Build(context.Background())
@@ -200,7 +201,8 @@ func TestLittDBWrite(t *testing.T) {
 func TestLittDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 
-	config := littbuilder.DefaultConfig(directory)
+	config, err := littbuilder.DefaultConfig(directory)
+	require.NoError(t, err)
 	config.ShardingFactor = littDBShards
 	config.GCPeriod = 2 * time.Hour
 
@@ -242,7 +244,8 @@ func TestLittDBWithGCWrite(t *testing.T) {
 func TestMemKeymapLittDBWrite(t *testing.T) {
 	directory := "./test-data"
 
-	config := littbuilder.DefaultConfig(directory)
+	config, err := littbuilder.DefaultConfig(directory)
+	require.NoError(t, err)
 	config.KeyMapType = littbuilder.MemKeyMap
 
 	db, err := config.Build(context.Background())

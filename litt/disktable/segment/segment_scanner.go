@@ -78,10 +78,10 @@ func getValueFileShard(fileName string) (uint32, error) {
 	return uint32(shard), nil
 }
 
-// scanDirectory scans a directory for segment files and returns a map of metadata, key, and value files.
+// scanDirectories scans directories for segment files and returns a map of metadata, key, and value files.
 // Also returns a list of garbage files that should be deleted. Does not do anything to files with unrecognized
 // extensions.
-func scanDirectory(logger logging.Logger, rootDirectory string) (
+func scanDirectories(logger logging.Logger, rootDirectories []string) (
 	metadataFiles map[uint32]string,
 	keyFiles map[uint32]string,
 	valueFiles map[uint32][]string,
@@ -101,61 +101,63 @@ func scanDirectory(logger logging.Logger, rootDirectory string) (
 
 	garbageFiles = make([]string, 0)
 
-	files, err := os.ReadDir(rootDirectory)
-	if err != nil {
-		return nil, nil, nil, nil,
-			0, 0, false,
-			fmt.Errorf("failed to read directory %s: %v", rootDirectory, err)
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue
+	for _, rootDirectory := range rootDirectories {
+		files, err := os.ReadDir(rootDirectory)
+		if err != nil {
+			return nil, nil, nil, nil,
+				0, 0, false,
+				fmt.Errorf("failed to read directory %s: %v", rootDirectory, err)
 		}
 
-		fileName := file.Name()
-		extension := path.Ext(fileName)
-		filePath := path.Join(rootDirectory, fileName)
-		var index uint32
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
 
-		switch extension {
-		case MetadataSwapExtension:
-			garbageFiles = append(garbageFiles, filePath)
-			continue
-		case MetadataFileExtension:
-			index, err = getMetadataFileIndex(fileName)
-			if err != nil {
-				return nil, nil, nil, nil,
-					0, 0, false,
-					fmt.Errorf("failed to get file index: %v", err)
-			}
-			metadataFiles[index] = filePath
-		case KeysFileExtension:
-			index, err = getKeyFileIndex(fileName)
-			if err != nil {
-				return nil, nil, nil, nil,
-					0, 0, false,
-					fmt.Errorf("failed to get file index: %v", err)
-			}
-			keyFiles[index] = filePath
-		case ValuesFileExtension:
-			index, err = getValueFileIndex(fileName)
-			if err != nil {
-				return nil, nil, nil, nil,
-					0, 0, false,
-					fmt.Errorf("failed to get file index: %v", err)
-			}
-			valueFiles[index] = append(valueFiles[index], filePath)
-		default:
-			logger.Debugf("Ignoring unknown file %s", filePath)
-			continue
-		}
+			fileName := file.Name()
+			extension := path.Ext(fileName)
+			filePath := path.Join(rootDirectory, fileName)
+			var index uint32
 
-		if index > highestSegmentIndex {
-			highestSegmentIndex = index
-		}
-		if index < lowestSegmentIndex {
-			lowestSegmentIndex = index
+			switch extension {
+			case MetadataSwapExtension:
+				garbageFiles = append(garbageFiles, filePath)
+				continue
+			case MetadataFileExtension:
+				index, err = getMetadataFileIndex(fileName)
+				if err != nil {
+					return nil, nil, nil, nil,
+						0, 0, false,
+						fmt.Errorf("failed to get file index: %v", err)
+				}
+				metadataFiles[index] = filePath
+			case KeysFileExtension:
+				index, err = getKeyFileIndex(fileName)
+				if err != nil {
+					return nil, nil, nil, nil,
+						0, 0, false,
+						fmt.Errorf("failed to get file index: %v", err)
+				}
+				keyFiles[index] = filePath
+			case ValuesFileExtension:
+				index, err = getValueFileIndex(fileName)
+				if err != nil {
+					return nil, nil, nil, nil,
+						0, 0, false,
+						fmt.Errorf("failed to get file index: %v", err)
+				}
+				valueFiles[index] = append(valueFiles[index], filePath)
+			default:
+				logger.Debugf("Ignoring unknown file %s", filePath)
+				continue
+			}
+
+			if index > highestSegmentIndex {
+				highestSegmentIndex = index
+			}
+			if index < lowestSegmentIndex {
+				lowestSegmentIndex = index
+			}
 		}
 	}
 
@@ -202,7 +204,6 @@ func diagnoseMissingFile(
 // have orphaned files.
 func lookForMissingFiles(
 	logger logging.Logger,
-	segmentDirectory string,
 	lowestSegmentIndex uint32,
 	highestSegmentIndex uint32,
 	metadataFiles map[uint32]string,
@@ -262,7 +263,10 @@ func lookForMissingFiles(
 		} else {
 
 			// We need to know the sharding factor to check for missing value files.
-			metadata, err := newMetadataFile(segment, 0, 0, segmentDirectory)
+			metadataPath := metadataFiles[segment]
+			metadataDirectory := path.Dir(metadataPath)
+
+			metadata, err := newMetadataFile(segment, 0, 0, metadataDirectory)
 			if err != nil {
 				return nil, nil,
 					fmt.Errorf("failed to load metadata file: %v", err)
@@ -352,16 +356,16 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 func GatherSegmentFiles(
 	ctx context.Context,
 	logger logging.Logger,
-	rootDirectory string,
+	rootDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
 	salt uint32,
 	createMutableSegment bool,
 ) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
-	// Scan the root directory for segment files.
+	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, isEmpty, err :=
-		scanDirectory(logger, rootDirectory)
+		scanDirectories(logger, rootDirectories)
 	if err != nil {
 		return 0, 0, nil,
 			fmt.Errorf("failed to scan directory: %v", err)
@@ -383,7 +387,6 @@ func GatherSegmentFiles(
 		// Check for missing files.
 		orphanedFiles, damagedSegments, err := lookForMissingFiles(
 			logger,
-			rootDirectory,
 			lowestSegmentIndex,
 			highestSegmentIndex,
 			metadataFiles,
@@ -411,7 +414,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := NewSegment(ctx, logger, i, rootDirectory, now, shardingFactor, salt, true)
+			segment, err := NewSegment(ctx, logger, i, rootDirectories, now, shardingFactor, salt, true)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)
@@ -424,7 +427,7 @@ func GatherSegmentFiles(
 		// Create a new mutable segment at the end.
 		if isEmpty {
 			segment, err := NewSegment(
-				ctx, logger, lowestSegmentIndex, rootDirectory, now, shardingFactor, salt, false)
+				ctx, logger, lowestSegmentIndex, rootDirectories, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", lowestSegmentIndex, err)
@@ -433,7 +436,7 @@ func GatherSegmentFiles(
 			segments[0] = segment
 		} else {
 			segment, err := NewSegment(
-				ctx, logger, highestSegmentIndex+1, rootDirectory, now, shardingFactor, salt, false)
+				ctx, logger, highestSegmentIndex+1, rootDirectories, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", highestSegmentIndex+1, err)

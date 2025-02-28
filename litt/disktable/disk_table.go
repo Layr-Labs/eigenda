@@ -29,11 +29,11 @@ type DiskTable struct {
 	// The logger for the disk table.
 	logger logging.Logger
 
-	// The root directory for the disk table.
-	root string
+	// The root directories for the disk table.
+	roots []string
 
-	// The directory where segment files are stored.
-	segmentDirectory string
+	// The directories where segment files are stored.
+	segmentDirectories []string
 
 	// The table's name.
 	name string
@@ -98,7 +98,7 @@ func NewDiskTable(
 	timeSource func() time.Time,
 	name string,
 	keyMap keymap.KeyMap,
-	root string,
+	roots []string,
 	targetFileSize uint32,
 	controlChannelSize int,
 	shardingFactor uint32,
@@ -109,38 +109,59 @@ func NewDiskTable(
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
 	}
 
-	_, err := os.Stat(root)
-	if os.IsNotExist(err) {
-		err := os.MkdirAll(root, 0755)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create root directory: %v", err)
+	for _, root := range roots {
+		_, err := os.Stat(root)
+		if os.IsNotExist(err) {
+			err := os.MkdirAll(root, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create root directory: %v", err)
+			}
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to stat root directory: %v", err)
 		}
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to stat root directory: %v", err)
 	}
 
-	segDir := path.Join(root, segmentDirectory)
-	_, err = os.Stat(segDir)
-	if os.IsNotExist(err) {
-		err := os.MkdirAll(segDir, 0755)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create root directory: %v", err)
+	segDirs := make([]string, 0, len(roots))
+	for _, root := range roots {
+		segDir := path.Join(root, segmentDirectory)
+		segDirs = append(segDirs, segDir)
+		_, err := os.Stat(segDir)
+		if os.IsNotExist(err) {
+			err := os.MkdirAll(segDir, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create root directory: %v", err)
+			}
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to stat root directory: %v", err)
 		}
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to stat root directory: %v", err)
 	}
 
+	var metadataFilePath string
 	var metadata *tableMetadata
-	metadataFilePath := metadataPath(root)
-	if _, err := os.Stat(metadataFilePath); os.IsNotExist(err) {
-		// No metadata file exists, so we need to create one.
-		metadata, err = newTableMetadata(logger, root, 0, shardingFactor)
+
+	for _, root := range roots {
+		possibleMetadataPath := metadataPath(root)
+		_, err := os.Stat(possibleMetadataPath)
+		if err == nil {
+			// We've found an existing metadata file. Use it.
+			metadataFilePath = possibleMetadataPath
+		} else if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to stat metadata file: %v", err)
+		}
+	}
+	if metadataFilePath == "" {
+		// No metadata file exists yet. Create a new one in the first root.
+		var err error
+		metadataDir := roots[0]
+		metadata, err = newTableMetadata(logger, metadataDir, 0, shardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %v", err)
 		}
 	} else {
 		// Metadata file exists, so we need to load it.
-		metadata, err = loadTableMetadata(logger, root)
+		var err error
+		metadataDir := path.Dir(metadataFilePath)
+		metadata, err = loadTableMetadata(logger, metadataDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load table metadata: %v", err)
 		}
@@ -150,8 +171,8 @@ func NewDiskTable(
 		ctx:                     ctx,
 		logger:                  logger,
 		timeSource:              timeSource,
-		root:                    root,
-		segmentDirectory:        segDir,
+		roots:                   roots,
+		segmentDirectories:      segDirs,
 		name:                    name,
 		metadata:                metadata,
 		salt:                    salt,
@@ -165,11 +186,12 @@ func NewDiskTable(
 	table.alive.Store(true)
 	table.stopChannel <- struct{}{}
 
+	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
 		segment.GatherSegmentFiles(
 			ctx,
 			logger,
-			table.segmentDirectory,
+			table.segmentDirectories,
 			timeSource(),
 			shardingFactor,
 			salt,
@@ -229,7 +251,7 @@ func (d *DiskTable) Destroy() error {
 		return fmt.Errorf("failed to stop: %v", err)
 	}
 
-	d.logger.Infof("deleting disk table at path: %s", d.root)
+	d.logger.Infof("deleting disk table at path(s): %v", d.roots)
 
 	for _, seg := range d.segments {
 		seg.Release()
@@ -237,9 +259,12 @@ func (d *DiskTable) Destroy() error {
 	for _, seg := range d.segments {
 		seg.BlockUntilFullyDeleted()
 	}
-	err = os.Remove(d.segmentDirectory)
-	if err != nil {
-		return fmt.Errorf("failed to remove segment directory: %v", err)
+
+	for _, segDir := range d.segmentDirectories {
+		err = os.Remove(segDir)
+		if err != nil {
+			return fmt.Errorf("failed to remove root directory: %v", err)
+		}
 	}
 
 	err = d.keyMap.Destroy()
@@ -252,9 +277,11 @@ func (d *DiskTable) Destroy() error {
 		return fmt.Errorf("failed to delete metadata: %v", err)
 	}
 
-	err = os.Remove(d.root)
-	if err != nil {
-		return fmt.Errorf("failed to remove root directory: %v", err)
+	for _, root := range d.roots {
+		err = os.Remove(root)
+		if err != nil {
+			return fmt.Errorf("failed to remove root directory: %v", err)
+		}
 	}
 
 	return nil
@@ -436,7 +463,7 @@ func (d *DiskTable) expandSegments() error {
 		d.ctx,
 		d.logger,
 		d.highestSegmentIndex+1,
-		d.segmentDirectory,
+		d.segmentDirectories,
 		now,
 		d.metadata.GetShardingFactor(),
 		d.salt,

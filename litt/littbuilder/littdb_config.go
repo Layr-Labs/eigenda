@@ -44,9 +44,11 @@ const LevelDBKeyMap KeyMapType = 1
 
 // LittDBConfig is configuration for a litt.DB.
 type LittDBConfig struct {
-	// The path where the database will store its files. If the path does not exist, it will be created.
-	// If the path exists, the database will attempt to open the existing database at that path.
-	Path string
+	// The paths where the database will store its files. If the path does not exist, it will be created.
+	// If more than one path is provided, then the database will do its best to spread out the data across
+	// the paths. If the database is restarted, it will attempt to load data from all paths. Note: the number
+	// of paths should not exceed the sharding factor, or else data may not be split across all paths.
+	Paths []string
 
 	// The logger configuration for the database.
 	loggerConfig common.LoggerConfig
@@ -89,9 +91,13 @@ type LittDBConfig struct {
 }
 
 // DefaultConfig returns a Config with default values.
-func DefaultConfig(path string) *LittDBConfig {
+func DefaultConfig(paths ...string) (*LittDBConfig, error) {
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("at least one path must be provided")
+	}
+
 	return &LittDBConfig{
-		Path:                  path,
+		Paths:                 paths,
 		loggerConfig:          common.DefaultLoggerConfig(),
 		TimeSource:            time.Now,
 		GCPeriod:              5 * time.Minute,
@@ -101,7 +107,7 @@ func DefaultConfig(path string) *LittDBConfig {
 		KeyMapType:            LevelDBKeyMap,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
-	}
+	}, nil
 }
 
 // cacheWeight is a function that calculates the weight of a cache entry.
@@ -118,7 +124,7 @@ func (c *LittDBConfig) buildKeyMap(name string, logger logging.Logger) (keymap.K
 	case MemKeyMap:
 		keyMap = keymap.NewMemKeyMap(logger)
 	case LevelDBKeyMap:
-		keymapPath := path.Join(c.Path, name, "keymap")
+		keymapPath := path.Join(c.Paths[0], name, "keymap")
 		keyMap, err = keymap.NewLevelDBKeyMap(logger, keymapPath)
 	default:
 		return nil, fmt.Errorf("unsupported key map type: %v", c.KeyMapType)
@@ -152,14 +158,18 @@ func (c *LittDBConfig) buildTable(
 			return nil, fmt.Errorf("error creating key map: %w", err)
 		}
 
-		tableRoot := path.Join(c.Path, name)
+		tableRoots := make([]string, len(c.Paths))
+		for i, p := range c.Paths {
+			tableRoots[i] = path.Join(p, name)
+		}
+
 		table, err = disktable.NewDiskTable(
 			ctx,
 			logger,
 			time.Now,
 			name,
 			keyMap,
-			tableRoot,
+			tableRoots,
 			c.TargetSegmentFileSize,
 			c.ControlChannelSize,
 			c.ShardingFactor,
