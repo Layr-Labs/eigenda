@@ -41,6 +41,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.KeyMapType = littbuilder.MemKeyMap
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
+	config.ShardingFactor = 4
 
 	return config.Build(context.Background())
 }
@@ -51,6 +52,7 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.KeyMapType = littbuilder.LevelDBKeyMap
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
+	config.ShardingFactor = 4
 
 	return config.Build(context.Background())
 }
