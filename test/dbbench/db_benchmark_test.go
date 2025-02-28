@@ -359,6 +359,9 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	gcDone := make(chan struct{})
 	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
+		defer func() {
+			gcDone <- struct{}{}
+		}()
 		for alive.Load() {
 			<-ticker.C
 
@@ -366,8 +369,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			if err != nil {
 				fmt.Printf("Error running GC: %v\n", err)
 			}
-
-			gcDone <- struct{}{}
 		}
 	}()
 
