@@ -159,7 +159,6 @@ func NewTestClient(
 	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
 	//  options.
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.ContractCallTimeout = 1337 * time.Hour // this suite enforces its own timeouts
 
 	payloadDisperserConfig := clients.PayloadDisperserConfig{
 		PayloadClientConfig:  *payloadClientConfig,
@@ -246,11 +245,8 @@ func NewTestClient(
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
 	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
-		PayloadClientConfig:           *payloadClientConfig,
-		MaxConnectionCount:            20,
-		BlsOperatorStateRetrieverAddr: config.BLSOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     config.EigenDAServiceManagerAddr,
-		RetrievalTimeout:              1337 * time.Hour, // this suite enforces its own timeouts
+		PayloadClientConfig: *payloadClientConfig,
+		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	retrievalClient := clients.NewRetrievalClient(
@@ -258,7 +254,7 @@ func NewTestClient(
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
+		20)
 
 	validatorPayloadRetriever, err := clients.NewValidatorPayloadRetriever(
 		logger,
