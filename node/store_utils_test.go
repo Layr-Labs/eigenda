@@ -1,9 +1,10 @@
 package node_test
 
 import (
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
-	"testing"
 
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func TestBatchMappingExpirationKeyOrdering(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	db, err := leveldb.NewStore(logger, dbPath)
+	db, err := leveldb.NewStore(logger, false, dbPath)
 	defer func() {
 		err = db.Destroy()
 		assert.NoError(t, err)
