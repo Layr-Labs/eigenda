@@ -40,24 +40,12 @@ type Store struct {
 	metrics *Metrics
 }
 
-// NewLevelDBStore creates a new Store object with a levelDB at the provided path and the given logger.
-func NewLevelDBStore(
-	path string,
-	logger logging.Logger,
-	metrics *Metrics,
-	blockStaleMeasure uint32,
-	disableSeeksCompaction bool,
-	syncWrites bool,
-	storeDurationBlocks uint32) (*Store, error) {
-
-	// Create the DB at the path.
-	var db kvstore.Store[[]byte]
-	var err error
-	if metrics != nil {
-		db, err = leveldb.NewStore(logger, path, disableSeeksCompaction, syncWrites, metrics.registry)
-	} else {
-		db, err = leveldb.NewStore(logger, path, disableSeeksCompaction, syncWrites, nil)
-	}
+// NewLevelDBStore creates a new Store object with a db at the provided path and the given logger.
+// TODO(jianoaix): parameterize this so we can switch between different database backends.
+func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
+	// Create the db at the path. This is currently hardcoded to use
+	// levelDB.
+	db, err := leveldb.NewStore(logger, false, path)
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err

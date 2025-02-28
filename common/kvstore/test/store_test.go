@@ -21,7 +21,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store[[]
 		return mapstore.NewStore(), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-		return leveldb.NewStore(logger, path, true, false, nil)
+		return leveldb.NewStore(logger, false, path)
 	},
 	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		config := tablestore.DefaultMapStoreConfig()

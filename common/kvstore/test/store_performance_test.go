@@ -112,7 +112,7 @@ func BenchmarkLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := leveldb.NewStore(logger, dbPath, true, true, nil)
+	store, err := leveldb.NewStore(logger, false, dbPath)
 	assert.NoError(b, err)
 
 	writeThenReadBenchmark(b, store)

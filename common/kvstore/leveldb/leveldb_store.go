@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -30,18 +30,12 @@ type levelDBStore struct {
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
-// If reg is nil, metrics will not be collected.
-func NewStore(
-	logger logging.Logger,
-	path string,
-	disableSeeksCompaction bool,
-	syncWrites bool,
-	reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
+func NewStore(logger logging.Logger, disableCompaction bool, path string) (kvstore.Store[[]byte], error) {
 
-	opts := &opt.Options{
-		DisableSeeksCompaction: disableSeeksCompaction,
+	options := &opt.Options{
+		DisableSeeksCompaction: disableCompaction,
 	}
-	levelDB, err := leveldb.OpenFile(path, opts)
+	levelDB, err := leveldb.OpenFile(path, options)
 
 	if err != nil {
 		return nil, err

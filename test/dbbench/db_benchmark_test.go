@@ -18,7 +18,7 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 10 * units.GiB
+const totalToWrite = 1024 * units.GiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
@@ -100,6 +100,41 @@ func TestLevelDBWrite(t *testing.T) {
 
 	writeFunction := func(key []byte, value []byte) error {
 
+		batch.Put(keyBuilder.Key(key), value)
+		if batch.Size() >= batchSize {
+			err = batch.Apply()
+			if err != nil {
+				return err
+			}
+			batch = db.NewBatch()
+		}
+
+		return nil
+	}
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Shutdown()
+	require.NoError(t, err)
+}
+
+func TestLevelDBNoCompactionWrite(t *testing.T) {
+	directory := "./test-data"
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	config := tablestore.DefaultLevelDBConfig(directory)
+	config.DisableCompaction = true
+	config.Schema = []string{"test"}
+	db, err := tablestore.Start(logger, config)
+	require.NoError(t, err)
+
+	keyBuilder, err := db.GetKeyBuilder("test")
+	require.NoError(t, err)
+
+	batch := db.NewBatch()
+
+	writeFunction := func(key []byte, value []byte) error {
 		batch.Put(keyBuilder.Key(key), value)
 		if batch.Size() >= batchSize {
 			err = batch.Apply()

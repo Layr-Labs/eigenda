@@ -50,7 +50,7 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 		return nil, errors.New("config is required")
 	}
 
-	base, err := buildBaseStore(config, logger)
+	base, err := buildBaseStore(config.Type, logger, config.DisableCompaction, config.Path)
 	if err != nil {
 		return nil, fmt.Errorf("error building base store: %w", err)
 	}
@@ -114,20 +114,17 @@ func start(
 
 // buildBaseStore creates a new base store of the given type.
 func buildBaseStore(
-	config *Config,
-	logger logging.Logger) (kvstore.Store[[]byte], error) {
+	storeType StoreType,
+	logger logging.Logger,
+	disableCompaction bool,
+	path *string) (kvstore.Store[[]byte], error) {
 
 	switch config.Type {
 	case LevelDB:
 		if config.Path == nil {
 			return nil, errors.New("path is required for LevelDB store")
 		}
-		return leveldb.NewStore(
-			logger,
-			*config.Path,
-			config.LevelDBDisableSeeksCompaction,
-			config.LevelDBSyncWrites,
-			config.MetricsRegistry)
+		return leveldb.NewStore(logger, disableCompaction, *path)
 	case MapStore:
 		return mapstore.NewStore(), nil
 	default:
