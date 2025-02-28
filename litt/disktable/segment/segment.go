@@ -189,7 +189,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 
 	s.shardChannels[shard] <- data
 
-	return maxShardSize, nil
+	return s.maxShardSize, nil
 }
 
 // Read fetches the data for a key from the data segment.
@@ -225,7 +225,7 @@ func (s *Segment) Flush() ([]*types.KAPair, error) {
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
 		shardResponseChannels[shard] = make(chan error, 1)
-		shardChannel <- shardFlushRequest{
+		shardChannel <- &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
 		}
 	}
@@ -240,7 +240,7 @@ func (s *Segment) Flush() ([]*types.KAPair, error) {
 
 	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-	s.keyFileChannel <- keyFileFlushRequest{
+	s.keyFileChannel <- &keyFileFlushRequest{
 		completionChannel: keyResponseChannel,
 	}
 
@@ -278,7 +278,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
 	for _, shardChannel := range s.shardChannels {
 		responseChannel := make(chan error, 1)
-		shardChannel <- shardFlushRequest{
+		shardChannel <- &shardFlushRequest{
 			seal:              true,
 			completionChannel: responseChannel,
 		}
@@ -294,7 +294,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 
 	// Flush+seal the key file
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-	s.keyFileChannel <- keyFileFlushRequest{
+	s.keyFileChannel <- &keyFileFlushRequest{
 		seal:              true,
 		completionChannel: keyResponseChannel,
 	}
@@ -419,8 +419,9 @@ func (s *Segment) shardControlLoop(shard uint32) {
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
 		case operation := <-s.shardChannels[shard]:
 			// Handle flush requests, and possibly also seal the shard.
-			if flushRequest, ok := operation.(shardFlushRequest); ok {
+			if flushRequest, ok := operation.(*shardFlushRequest); ok {
 				shardError = s.handleShardFlushRequest(shard, flushRequest, shardError)
+				continue
 			}
 
 			// If this shard has encountered an error, don't bother processing any other operations.
@@ -437,7 +438,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 			}
 
 			// If we reach this point, the operation type is unknown.
-			s.logger.Errorf("unknown operation type: %T", operation)
+			s.logger.Errorf("unknown operation type in shard control loop: %T", operation)
 		}
 	}
 }
@@ -453,7 +454,7 @@ type shardFlushRequest struct {
 }
 
 // handleShardFlushRequest handles a request to flush a shard to disk.
-func (s *Segment) handleShardFlushRequest(shard uint32, request shardFlushRequest, shardError error) error {
+func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushRequest, shardError error) error {
 	if shardError != nil {
 		// Report an error previously encountered
 		request.completionChannel <- shardError
@@ -508,9 +509,10 @@ func (s *Segment) keyFileControlLoop() {
 			return
 		case operation := <-s.keyFileChannel:
 			// Handle flush requests, and possibly also seal the key file.
-			if flushRequest, ok := operation.(keyFileFlushRequest); ok {
+			if flushRequest, ok := operation.(*keyFileFlushRequest); ok {
 				keyFileError = s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
 				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+				continue
 			}
 
 			// If the key file is in an error state, don't bother processing any other operations.
@@ -527,7 +529,7 @@ func (s *Segment) keyFileControlLoop() {
 			}
 
 			// If we reach this point, the operation type is unknown.
-			s.logger.Errorf("unknown operation type: %T", operation)
+			s.logger.Errorf("unknown operation type in key file control loop: %T", operation)
 		}
 	}
 }
@@ -542,7 +544,7 @@ func (s *Segment) handleKeyFileWrite(data *types.KAPair) error {
 }
 
 // handleKeyFileFlushRequest handles a request to flush the key file to disk.
-func (s *Segment) handleKeyFileFlushRequest(request keyFileFlushRequest, unflushedKeys []*types.KAPair) error {
+func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) error {
 	err := s.keys.flush()
 	if err != nil {
 		request.completionChannel <- &keyFileFlushResponse{

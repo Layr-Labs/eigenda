@@ -90,7 +90,7 @@ func perm64Bytes(b []byte) uint64 {
 
 	for i := 0; i < len(b); i += 8 {
 		var next uint64
-		if i+8 > len(b) {
+		if i+8 <= len(b) {
 			// grab the next 8 bytes
 			next = binary.BigEndian.Uint64(b[i:])
 		} else {
